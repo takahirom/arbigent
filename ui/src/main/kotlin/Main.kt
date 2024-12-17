@@ -18,53 +18,111 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import com.github.takahirom.ai_agent.*
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.*
 import java.io.File
 import java.io.FileInputStream
 
 class AppStateHolder {
-  val agents: MutableStateFlow<List<AgentStateHolder>> = MutableStateFlow<List<AgentStateHolder>>(listOf())
+  class ScenarioStateHolder(initialArbiter: Arbiter) {
+    // (var goal: String?, var arbiter: Arbiter?)
+    val goalStateFlow: MutableStateFlow<String> = MutableStateFlow("")
+    val goal get() = goalStateFlow.value
+    val arbiterStateFlow: MutableStateFlow<Arbiter> = MutableStateFlow(initialArbiter)
+    val arbiter get() = arbiterStateFlow.value
+    val isArchived = arbiterStateFlow
+      .flatMapConcat { it?.isArchivedStateFlow ?: MutableStateFlow(false) }
+      .stateIn(
+        scope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
+        started = SharingStarted.WhileSubscribed(),
+        initialValue = false
+      )
+    val isRunning = arbiterStateFlow
+      .flatMapConcat { it.isRunningStateFlow }
+      .stateIn(
+        scope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
+        started = SharingStarted.WhileSubscribed(),
+        initialValue = false
+      )
+    val contextStateFlow = arbiterStateFlow.flatMapConcat { it.contextStateFlow }
+      .stateIn(
+        scope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
+        started = SharingStarted.WhileSubscribed(),
+        initialValue = null
+      )
+    fun execute() {
+      arbiterStateFlow.value!!.execute(goal)
+    }
+
+    suspend fun waitUntilFinished() {
+      arbiterStateFlow.value!!.waitUntilFinished()
+    }
+
+    fun isGoalAchieved(): Boolean {
+      return arbiterStateFlow.value?.isArchivedStateFlow?.value ?: false
+    }
+
+    fun cancel() {
+      arbiterStateFlow.value?.cancel()
+    }
+
+    fun onGoalChanged(goal: String) {
+      goalStateFlow.value = goal
+    }
+  }
+
+  val scenarios: MutableStateFlow<List<ScenarioStateHolder>> = MutableStateFlow(listOf())
   val selectedAgentIndex: MutableStateFlow<Int> = MutableStateFlow(0)
   val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
+  fun addScenario() {
+    scenarios.value += ScenarioStateHolder(
+      createArbiter()
+    )
+  }
+
   fun runAll() {
     coroutineScope.launch {
-      agents.value.forEach {
-        it.run(
-          it.goal.value
-        )
+      scenarios.value.forEach { schenario ->
+        schenario.execute()
         delay(10)
-        it.isRunning.filter { !it }.first()
+        schenario.waitUntilFinished()
       }
     }
   }
 
   fun runAllFailed() {
     coroutineScope.launch {
-      agents.value.filter {
-//        it.contextStateFlow.value?.turns?.value?. {
-//          it.agentCommand is GoalAchievedAgentCommand
+      scenarios.value.filter { scenario ->
+//        scenario.contextStateFlow.value?.turns?.value?. {
+//          scenario.agentCommand is GoalAchievedAgentCommand
 //        } ?: true
-        !(it.contextStateFlow.value?.turns?.value?.any { it.agentCommand is GoalAchievedAgentCommand } ?: false)
-      }.forEach {
-        it.run(
-          it.goal.value
-        )
+        !scenario.isGoalAchieved()
+      }.forEach { scenario: ScenarioStateHolder ->
+        scenario.execute()
         delay(10)
-        it.isRunning.filter { !it }.first()
+        scenario.waitUntilFinished()
       }
     }
   }
 
   fun saveGoals() {
-    File("goals.text").writeText(agents.value.joinToString("\n") { it.goal.value })
+    File("goals.text").writeText(scenarios.value.map { it.goal }.joinToString("\n") { it })
   }
 
   fun loadGoals() {
-    agents.value = File("goals.text").readLines().map { AgentStateHolder(initialGoal = it) }
+    scenarios.value = File("goals.text").readLines().map {
+      ScenarioStateHolder(
+        createArbiter()
+      ).apply {
+        onGoalChanged(it)
+      }
+    }
   }
+}
+
+private fun createArbiter() = arbiter {
+  apiKey(System.getenv("API_KEY")!!)
+  maestroInstance(maestroInstance)
 }
 
 @Composable
@@ -73,7 +131,7 @@ fun App() {
   MaterialTheme {
     val appStateHolder = remember { AppStateHolder() }
     Row {
-      val agents by appStateHolder.agents.collectAsState()
+      val schenarios by appStateHolder.scenarios.collectAsState()
       val coroutineScope = rememberCoroutineScope()
       Column(
         Modifier
@@ -81,7 +139,7 @@ fun App() {
         horizontalAlignment = Alignment.CenterHorizontally
       ) {
         Button(onClick = {
-          appStateHolder.agents.value += AgentStateHolder()
+          appStateHolder.addScenario()
         }) {
           Row(
             verticalAlignment = Alignment.CenterVertically
@@ -159,8 +217,8 @@ fun App() {
           }
         }
         LazyColumn(modifier = Modifier.weight(1f)) {
-          itemsIndexed(agents) { index, agentStateHolder ->
-            val goal by agentStateHolder.goal.collectAsState()
+          itemsIndexed(schenarios) { index, scenarioStateHolder ->
+            val goal by scenarioStateHolder.goalStateFlow.collectAsState()
             Card(
               modifier = Modifier.fillMaxWidth().padding(8.dp)
                 .clickable { appStateHolder.selectedAgentIndex.value = index },
@@ -172,7 +230,7 @@ fun App() {
                   modifier = Modifier.weight(1f),
                   text = "Goal:" + goal
                 )
-                val isArchived by agentStateHolder.isArchived.collectAsState()
+                val isArchived by scenarioStateHolder.isArchived.collectAsState()
                 if (isArchived) {
                   Icon(
                     imageVector = Icons.Default.Check,
@@ -186,7 +244,7 @@ fun App() {
                       .background(Color.Green)
                   )
                 }
-                val isRunning by agentStateHolder.isRunning.collectAsState()
+                val isRunning by scenarioStateHolder.isRunning.collectAsState()
                 if (isRunning) {
                   CircularProgressIndicator(
                     modifier = Modifier.padding(8.dp)
@@ -198,10 +256,10 @@ fun App() {
         }
       }
       val index by appStateHolder.selectedAgentIndex.collectAsState()
-      val agentStateHolder = agents.getOrNull(index)
-      if (agentStateHolder != null) {
+      val scenarioStateHolder = schenarios.getOrNull(index)
+      if (scenarioStateHolder != null) {
         Column(Modifier.weight(3f)) {
-          Agent(agentStateHolder)
+          Agent(scenarioStateHolder)
         }
       }
     }
@@ -209,10 +267,10 @@ fun App() {
 }
 
 @Composable
-private fun Agent(agentStateHolder: AgentStateHolder) {
+private fun Agent(scenarioStateHolder: AppStateHolder.ScenarioStateHolder) {
   val isAndroid by remember { mutableStateOf(true) }
-  val agentContext: Context? by agentStateHolder.contextStateFlow.collectAsState()
-  val goal by agentStateHolder.goal.collectAsState()
+  val agentContext: Context? by scenarioStateHolder.contextStateFlow.collectAsState()
+  val goal by scenarioStateHolder.goalStateFlow.collectAsState()
   var editinggoalTextState by remember(goal) { mutableStateOf(goal) }
   Column {
     Row(
@@ -264,15 +322,16 @@ private fun Agent(agentStateHolder: AgentStateHolder) {
         value = editinggoalTextState,
         onValueChange = {
           editinggoalTextState = it
+          scenarioStateHolder.onGoalChanged(it)
         },
       )
       Button(onClick = {
-        agentStateHolder.run(editinggoalTextState)
+        scenarioStateHolder.execute()
       }) {
         Text("Run")
       }
       Button(onClick = {
-        agentStateHolder.cancel()
+        scenarioStateHolder.cancel()
       }) {
         Text("Cancel")
       }
@@ -302,7 +361,6 @@ private fun Agent(agentStateHolder: AgentStateHolder) {
         }
         selectedIndex?.let { selectedIndex ->
           val turn = turns[selectedIndex]
-          val scrollableState = rememberScrollState()
           turn.message?.let { message: String ->
             val scrollableState = rememberScrollState()
             Card(

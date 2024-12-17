@@ -13,6 +13,7 @@ dependencies {
     // With compose.desktop.common you will also lose @Preview functionality
     implementation(compose.desktop.currentOs)
     implementation(project(":app"))
+    implementation("io.github.takahirom.rin:rin:0.3.0")
 }
 
 compose.desktop {

@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import javax.imageio.ImageIO
 
-val maestroInstance by lazy {
+val maestroInstance:Any by lazy {
   var dadb = Dadb.discover()!!
   val maestro = retry {
     val driver = AndroidDriver(
@@ -47,7 +47,7 @@ val maestroInstance by lazy {
 }
 
 fun closeMaestro() {
-  maestroInstance.close()
+  (maestroInstance as Maestro).close()
 }
 
 
@@ -65,23 +65,28 @@ private fun <T> retry(times: Int = 5, block: () -> T): T {
 }
 
 
-class AgentStateHolder(
-  val apiKey: String = System.getenv("API_KEY")!!,
-  val initialGoal: String = "Launch MyApp"
+class Arbiter(
+  private val interceptors: MutableList<ArbiterInterceptor>,
+  private val apiKey: String,
+  private val maestroInstance: Maestro,
 ) {
-  val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-  var job: Job? = null
+  private val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+  private var job: Job? = null
   val contextStateFlow: MutableStateFlow<Context?> = MutableStateFlow(null)
-  val isRunning: MutableStateFlow<Boolean> = MutableStateFlow(false)
-  val goal = MutableStateFlow(initialGoal)
-  val isArchived = contextStateFlow
+  val isRunningStateFlow: MutableStateFlow<Boolean> = MutableStateFlow(false)
+  private val currentGoalStateFlow = MutableStateFlow<String?>(null)
+  val isArchivedStateFlow = contextStateFlow
     .flatMapConcat { it?.turns ?: flowOf() }
     .map { it.any { it.agentCommand is GoalAchievedAgentCommand } }
     .stateIn(coroutineScope, SharingStarted.Lazily, false)
 
-  fun run(goal: String) {
-    isRunning.value = true
-    this.goal.value = goal
+  suspend fun waitUntilFinished() {
+    isRunningStateFlow.first { !it }
+  }
+
+  fun execute(goal: String) {
+    isRunningStateFlow.value = true
+    this.currentGoalStateFlow.value = goal
     val context = Context(goal)
     contextStateFlow.value = context
     job?.cancel()
@@ -111,25 +116,79 @@ class AgentStateHolder(
         for (i in 0..10) {
           yield()
           if (step(orchestra, ai, context, maestroInstance, agentCommandMap)) {
-            isRunning.value = false
+            isRunningStateFlow.value = false
             return@launch
           }
         }
         println("終わり")
-        isRunning.value = false
+        isRunningStateFlow.value = false
       } catch (e: Exception) {
         println("Failed to run agent: $e")
         e.printStackTrace()
-        isRunning.value = false
+        isRunningStateFlow.value = false
       }
     }
   }
 
   fun cancel() {
     job?.cancel()
-    isRunning.value = false
+    isRunningStateFlow.value = false
+  }
+
+  class Builder {
+    private val interceptors = mutableListOf<ArbiterInterceptor>()
+    private var apiKey: String = System.getenv("API_KEY")!!
+    private lateinit var maestroInstance: Maestro
+
+    fun addIntercepter(interceptor: ArbiterInterceptor) {
+      interceptors.add(interceptor)
+    }
+
+    fun apiKey(apiKey: String) {
+      this.apiKey = apiKey
+    }
+
+    fun maestroInstance(maestroInstance: Any) {
+      this.maestroInstance = maestroInstance as Maestro
+    }
+
+    fun build(): Arbiter {
+      return Arbiter(interceptors, apiKey, maestroInstance)
+    }
   }
 }
+
+// DSL
+fun arbiter(block: Arbiter.Builder.() -> Unit): Arbiter {
+  val builder = Arbiter.Builder()
+  builder.block()
+  return builder.build()
+}
+
+interface ArbiterInterceptor
+
+interface ArbiterDecisionInterceptor : ArbiterInterceptor {
+  fun intercept(context: ArbiterContext, chain: DecisionChain): ArbiterContext
+}
+
+interface ArbiterActionInterceptor : ArbiterInterceptor {
+  fun intercept(context: ArbiterContext, chain: ActionChain)
+}
+
+// DecisionChain
+interface DecisionChain {
+  fun proceed(context: ArbiterContext): ArbiterContext
+}
+
+// ActionChain
+interface ActionChain {
+  fun proceed(context: ArbiterContext)
+}
+
+// ArbiterContext
+data class ArbiterContext(
+  val goal: String,
+)
 
 fun main() {
   val goal = "Find best dinner for tonight in tokyo"
