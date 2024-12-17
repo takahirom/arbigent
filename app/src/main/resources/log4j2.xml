@@ -1,0 +1,6 @@
+<configuration>
+  <logger name="io.grpc.netty.shaded.io.grpc.netty" level="info">
+    <appender-ref ref="STDOUT" />
+    <appender-ref ref="CLOUD" />
+  </logger>
+</configuration>
