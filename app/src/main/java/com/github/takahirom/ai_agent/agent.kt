@@ -72,10 +72,10 @@ class Arbiter(
 ) {
   private val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
   private var job: Job? = null
-  val contextStateFlow: MutableStateFlow<Context?> = MutableStateFlow(null)
+  val arbiterContextStateFlow: MutableStateFlow<ArbiterContext?> = MutableStateFlow(null)
   val isRunningStateFlow: MutableStateFlow<Boolean> = MutableStateFlow(false)
   private val currentGoalStateFlow = MutableStateFlow<String?>(null)
-  val isArchivedStateFlow = contextStateFlow
+  val isArchivedStateFlow = arbiterContextStateFlow
     .flatMapConcat { it?.turns ?: flowOf() }
     .map { it.any { it.agentCommand is GoalAchievedAgentCommand } }
     .stateIn(coroutineScope, SharingStarted.Lazily, false)
@@ -87,8 +87,8 @@ class Arbiter(
   fun execute(goal: String) {
     isRunningStateFlow.value = true
     this.currentGoalStateFlow.value = goal
-    val context = Context(goal)
-    contextStateFlow.value = context
+    val arbiterContext = ArbiterContext(goal)
+    arbiterContextStateFlow.value = arbiterContext
     job?.cancel()
     job = coroutineScope.launch {
       try {
@@ -115,7 +115,7 @@ class Arbiter(
         }
         for (i in 0..10) {
           yield()
-          if (step(orchestra, ai, context, maestroInstance, agentCommandMap)) {
+          if (step(orchestra, ai, arbiterContext, maestroInstance, agentCommandMap)) {
             isRunningStateFlow.value = false
             return@launch
           }
@@ -168,27 +168,22 @@ fun arbiter(block: Arbiter.Builder.() -> Unit): Arbiter {
 interface ArbiterInterceptor
 
 interface ArbiterDecisionInterceptor : ArbiterInterceptor {
-  fun intercept(context: ArbiterContext, chain: DecisionChain): ArbiterContext
+  fun intercept(arbiterContext: ArbiterContext, chain: DecisionChain): ArbiterContext
 }
 
 interface ArbiterActionInterceptor : ArbiterInterceptor {
-  fun intercept(context: ArbiterContext, chain: ActionChain)
+  fun intercept(arbiterContext: ArbiterContext, chain: ActionChain)
 }
 
 // DecisionChain
 interface DecisionChain {
-  fun proceed(context: ArbiterContext): ArbiterContext
+  fun proceed(arbiterContext: ArbiterContext): ArbiterContext
 }
 
 // ActionChain
 interface ActionChain {
-  fun proceed(context: ArbiterContext)
+  fun proceed(arbiterContext: ArbiterContext)
 }
-
-// ArbiterContext
-data class ArbiterContext(
-  val goal: String,
-)
 
 fun main() {
   val goal = "Find best dinner for tonight in tokyo"
@@ -368,7 +363,7 @@ data object GoalAchievedAgentCommand : AgentCommand {
   }
 }
 
-data class Context(
+data class ArbiterContext(
   val goal: String,
 ) {
   class Turn(
@@ -422,7 +417,7 @@ fun defaultAgentCommands(): List<AgentCommand> {
 private fun step(
   orchestra: Orchestra,
   ai: Ai,
-  context: Context,
+  arbiterContext: ArbiterContext,
   maestro: Maestro,
   agentCommandMap: Map<String, AgentCommand>
 ): Boolean {
@@ -440,9 +435,9 @@ private fun step(
   } catch (e: Exception) {
     println("Failed to take screenshot: $e")
   }
-  println("Inputs: ${context.prompt()}")
+  println("Inputs: ${arbiterContext.prompt()}")
   val agentCommand = ai.decideWhatToDo(
-    context = context,
+    arbiterContext = arbiterContext,
     dumpHierarchy = maestro.viewHierarchy(false).toOptimizedString(),
     screenshotFileName = screenshotFileName,
     screenshot = null, //"screenshots/test.png",
@@ -456,22 +451,22 @@ private fun step(
     try {
       agentCommand.runOrchestraCommand(orchestra)
     } catch (e: MaestroException) {
-      context.add(
-        Context.Turn(
+      arbiterContext.add(
+        ArbiterContext.Turn(
           memo = "Failed to perform action: ${e.message}",
           screenshotFileName = screenshotFileName
         )
       )
     } catch (e: StatusRuntimeException) {
-      context.add(
-        Context.Turn(
+      arbiterContext.add(
+        ArbiterContext.Turn(
           memo = "Failed to perform action: ${e.message}",
           screenshotFileName = screenshotFileName
         )
       )
     } catch (e: IllegalStateException) {
-      context.add(
-        Context.Turn(
+      arbiterContext.add(
+        ArbiterContext.Turn(
           memo = "Failed to perform action: ${e.message}",
           screenshotFileName = screenshotFileName
         )
@@ -687,13 +682,13 @@ fun File.getResizedIamgeByteArray(scale: Float): ByteArray {
 
 class Ai(private val apiKey: String) {
   fun decideWhatToDo(
-    context: Context,
+    arbiterContext: ArbiterContext,
     dumpHierarchy: String,
     screenshot: String?,
     agentCommandMap: Map<String, AgentCommand>,
     screenshotFileName: String,
   ): AgentCommand {
-    val prompt = buildPrompt(context, dumpHierarchy, agentCommandMap)
+    val prompt = buildPrompt(arbiterContext, dumpHierarchy, agentCommandMap)
 //    val imageFile = File(screenshot)
 //    val imageBase64 = imageFile.getResizedIamgeByteArray(0.3F).encodeBase64()
     val messages: List<Message> = listOf(
@@ -724,16 +719,16 @@ class Ai(private val apiKey: String) {
     )
     val responseText = chatCompletion(messages)
     val turn = parseResponse(responseText, messages, screenshotFileName, agentCommandMap)
-    context.add(turn)
+    arbiterContext.add(turn)
     return turn.agentCommand!!
   }
 
   private fun buildPrompt(
-    context: Context,
+    arbiterContext: ArbiterContext,
     dumpHierarchy: String,
     agentCommandMap: Map<String, AgentCommand>
   ): String {
-    val contextPrompt = context.prompt()
+    val contextPrompt = arbiterContext.prompt()
     val templates = agentCommandMap.values.joinToString("\nor\n") { it.templateForAI() }
     val prompt = """
 
@@ -750,7 +745,7 @@ $templates"""
     message: List<Message>,
     screenshotFileName: String,
     agentCommandMap: Map<String, AgentCommand>
-  ): Context.Turn {
+  ): ArbiterContext.Turn {
     val json = Json { ignoreUnknownKeys = true }
     val responseObj = json.decodeFromString<ChatCompletionResponse>(response)
     val content = responseObj.choices.firstOrNull()?.message?.content ?: ""
@@ -788,7 +783,7 @@ $templates"""
         is GoalAchievedAgentCommand -> GoalAchievedAgentCommand
         else -> throw Exception("Unsupported action: $action")
       }
-      Context.Turn(
+      ArbiterContext.Turn(
         agentCommand = agentCommand,
         action = action,
         memo = jsonObject["memo"]?.jsonPrimitive?.content ?: "",

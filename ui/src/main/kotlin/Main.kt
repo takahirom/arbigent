@@ -43,7 +43,7 @@ class AppStateHolder {
         started = SharingStarted.WhileSubscribed(),
         initialValue = false
       )
-    val contextStateFlow = arbiterStateFlow.flatMapConcat { it.contextStateFlow }
+    val contextStateFlow = arbiterStateFlow.flatMapConcat { it.arbiterContextStateFlow }
       .stateIn(
         scope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
         started = SharingStarted.WhileSubscribed(),
@@ -269,7 +269,7 @@ fun App() {
 @Composable
 private fun Agent(scenarioStateHolder: AppStateHolder.ScenarioStateHolder) {
   val isAndroid by remember { mutableStateOf(true) }
-  val agentContext: Context? by scenarioStateHolder.contextStateFlow.collectAsState()
+  val agentArbiterContext: ArbiterContext? by scenarioStateHolder.contextStateFlow.collectAsState()
   val goal by scenarioStateHolder.goalStateFlow.collectAsState()
   var editinggoalTextState by remember(goal) { mutableStateOf(goal) }
   Column {
@@ -336,7 +336,7 @@ private fun Agent(scenarioStateHolder: AppStateHolder.ScenarioStateHolder) {
         Text("Cancel")
       }
     }
-    agentContext?.let { agentContext ->
+    agentArbiterContext?.let { agentContext ->
       var selectedIndex: Int? by remember(agentContext.turns.value.size) { mutableStateOf(null) }
       val turns by agentContext.turns.collectAsState()
       Row(Modifier.weight(1f)) {
