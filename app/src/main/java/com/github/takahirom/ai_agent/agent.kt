@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import javax.imageio.ImageIO
 
-val maestroInstance:Any by lazy {
+val maestroInstance: Any by lazy {
   var dadb = Dadb.discover()!!
   val maestro = retry {
     val driver = AndroidDriver(
@@ -72,6 +72,7 @@ class Arbiter(
 ) {
   private val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
   private var job: Job? = null
+  private val ai = Ai(apiKey)
   val arbiterContextStateFlow: MutableStateFlow<ArbiterContext?> = MutableStateFlow(null)
   val isRunningStateFlow: MutableStateFlow<Boolean> = MutableStateFlow(false)
   private val currentGoalStateFlow = MutableStateFlow<String?>(null)
@@ -92,7 +93,6 @@ class Arbiter(
     job?.cancel()
     job = coroutineScope.launch {
       try {
-        val ai = Ai(apiKey)
         val agentCommands: List<AgentCommand> = defaultAgentCommands()
 
         val orchestra = Orchestra(
@@ -115,7 +115,7 @@ class Arbiter(
         }
         for (i in 0..10) {
           yield()
-          if (step(orchestra, ai, arbiterContext, maestroInstance, agentCommandMap)) {
+          if (step(orchestra, arbiterContext, maestroInstance, agentCommandMap)) {
             isRunningStateFlow.value = false
             return@launch
           }
@@ -128,6 +128,67 @@ class Arbiter(
         isRunningStateFlow.value = false
       }
     }
+  }
+
+  private fun step(
+    orchestra: Orchestra,
+    arbiterContext: ArbiterContext,
+    maestro: Maestro,
+    agentCommandMap: Map<String, AgentCommand>
+  ): Boolean {
+    val screenshotFileName = System.currentTimeMillis().toString()
+    try {
+      orchestra.executeCommands(
+        commands = listOf(
+          MaestroCommand(
+            takeScreenshotCommand = TakeScreenshotCommand(
+              screenshotFileName
+            )
+          ),
+        ),
+      )
+    } catch (e: Exception) {
+      println("Failed to take screenshot: $e")
+    }
+    println("Inputs: ${arbiterContext.prompt()}")
+    val agentCommand = ai.decideWhatToDo(
+      arbiterContext = arbiterContext,
+      dumpHierarchy = maestro.viewHierarchy(false).toOptimizedString(),
+      screenshotFileName = screenshotFileName,
+      screenshot = null, //"screenshots/test.png",
+      agentCommandMap = agentCommandMap
+    )
+    println("What to do: ${agentCommand}")
+    if (agentCommand is GoalAchievedAgentCommand) {
+      println("Goal achieved")
+      return true
+    } else {
+      try {
+        agentCommand.runOrchestraCommand(orchestra)
+      } catch (e: MaestroException) {
+        arbiterContext.add(
+          ArbiterContext.Turn(
+            memo = "Failed to perform action: ${e.message}",
+            screenshotFileName = screenshotFileName
+          )
+        )
+      } catch (e: StatusRuntimeException) {
+        arbiterContext.add(
+          ArbiterContext.Turn(
+            memo = "Failed to perform action: ${e.message}",
+            screenshotFileName = screenshotFileName
+          )
+        )
+      } catch (e: IllegalStateException) {
+        arbiterContext.add(
+          ArbiterContext.Turn(
+            memo = "Failed to perform action: ${e.message}",
+            screenshotFileName = screenshotFileName
+          )
+        )
+      }
+    }
+    return false
   }
 
   fun cancel() {
@@ -192,176 +253,6 @@ fun main() {
 //  startTestAgent(ai, goal)
 }
 
-interface AgentCommand {
-  val actionName: String
-  fun runOrchestraCommand(orchestra: Orchestra)
-  fun templateForAI(): String
-}
-
-data class ClickWithTextAgentCommand(val textRegex: String) : AgentCommand {
-  override val actionName = "ClickWithText"
-
-  override fun runOrchestraCommand(orchestra: Orchestra) {
-    orchestra.executeCommands(
-      commands = listOf(
-        MaestroCommand(
-          tapOnElement = TapOnElementCommand(
-            ElementSelector(textRegex = textRegex)
-          )
-        )
-      ),
-    )
-  }
-
-  override fun templateForAI(): String {
-    return """
-        {
-            "action": "$actionName",
-            // the text should be clickable text, or content description. should be in UI hierarchy. should not resource id
-            // You can use Regex
-            "text": "..." 
-        }
-        """.trimIndent()
-  }
-}
-
-data class ClickWithIdAgentCommand(val textRegex: String) : AgentCommand {
-  override val actionName = "ClickWithId"
-
-  override fun runOrchestraCommand(orchestra: Orchestra) {
-    orchestra.executeCommands(
-      commands = listOf(
-        MaestroCommand(
-          tapOnElement = TapOnElementCommand(
-            ElementSelector(idRegex = textRegex)
-          )
-        )
-      ),
-    )
-  }
-
-  override fun templateForAI(): String {
-    return """
-        {
-            "action": "$actionName",
-            // the text should be id, should be in UI hierarchy
-            // You can use Regex
-            "text": "..." 
-        }
-        """.trimIndent()
-  }
-}
-
-data class InputTextAgentCommand(val text: String) : AgentCommand {
-  override val actionName = "InputText"
-
-  override fun runOrchestraCommand(orchestra: Orchestra) {
-    orchestra.executeCommands(
-      commands = listOf(
-        MaestroCommand(
-          inputTextCommand = InputTextCommand(
-            text
-          )
-        )
-      ),
-    )
-  }
-
-  override fun templateForAI(): String {
-    return """
-        {
-            // You have to **Click** on a text field before sending this command
-            "action": "$actionName",
-            "text": "..."
-        }
-        """.trimIndent()
-  }
-}
-
-data object BackPressAgentCommand : AgentCommand {
-  override val actionName = "BackPress"
-
-  override fun runOrchestraCommand(orchestra: Orchestra) {
-    orchestra.runFlow(
-      commands = listOf(
-        MaestroCommand(
-          backPressCommand = BackPressCommand()
-        )
-      )
-    )
-  }
-
-  override fun templateForAI(): String {
-    return """
-        {
-            "action": "$actionName"
-        }
-        """.trimIndent()
-  }
-}
-
-data object ScrollAgentCommand : AgentCommand {
-  override val actionName: String = "Scroll"
-
-  override fun runOrchestraCommand(orchestra: Orchestra) {
-    orchestra.executeCommands(
-      commands = listOf(
-        MaestroCommand(
-          scrollCommand = ScrollCommand()
-        )
-      ),
-    )
-  }
-
-  override fun templateForAI(): String {
-    return """
-        {
-            "action": "$actionName"
-        }
-        """.trimIndent()
-  }
-}
-
-data class KeyPressAgentCommand(val keyName: String) : AgentCommand {
-  override val actionName = "KeyPress"
-
-  override fun runOrchestraCommand(orchestra: Orchestra) {
-    val code = KeyCode.getByName(keyName) ?: throw MaestroException.InvalidCommand(message = "Unknown key: $keyName")
-    orchestra.executeCommands(
-      commands = listOf(
-        MaestroCommand(
-          pressKeyCommand = PressKeyCommand(
-            code
-          )
-        )
-      ),
-    )
-  }
-
-  override fun templateForAI(): String {
-    return """
-        {
-            "action": "$actionName",
-            "text": "..."
-        }
-        """.trimIndent()
-  }
-}
-
-data object GoalAchievedAgentCommand : AgentCommand {
-  override val actionName = "GoalAchieved"
-
-  override fun runOrchestraCommand(orchestra: Orchestra) {
-  }
-
-  override fun templateForAI(): String {
-    return """
-        {
-            "action": "$actionName"
-        }
-        """.trimIndent()
-  }
-}
 
 data class ArbiterContext(
   val goal: String,
@@ -412,68 +303,6 @@ fun defaultAgentCommands(): List<AgentCommand> {
     ScrollAgentCommand,
     GoalAchievedAgentCommand
   )
-}
-
-private fun step(
-  orchestra: Orchestra,
-  ai: Ai,
-  arbiterContext: ArbiterContext,
-  maestro: Maestro,
-  agentCommandMap: Map<String, AgentCommand>
-): Boolean {
-  val screenshotFileName = System.currentTimeMillis().toString()
-  try {
-    orchestra.executeCommands(
-      commands = listOf(
-        MaestroCommand(
-          takeScreenshotCommand = TakeScreenshotCommand(
-            screenshotFileName
-          )
-        ),
-      ),
-    )
-  } catch (e: Exception) {
-    println("Failed to take screenshot: $e")
-  }
-  println("Inputs: ${arbiterContext.prompt()}")
-  val agentCommand = ai.decideWhatToDo(
-    arbiterContext = arbiterContext,
-    dumpHierarchy = maestro.viewHierarchy(false).toOptimizedString(),
-    screenshotFileName = screenshotFileName,
-    screenshot = null, //"screenshots/test.png",
-    agentCommandMap = agentCommandMap
-  )
-  println("What to do: ${agentCommand}")
-  if (agentCommand is GoalAchievedAgentCommand) {
-    println("Goal achieved")
-    return true
-  } else {
-    try {
-      agentCommand.runOrchestraCommand(orchestra)
-    } catch (e: MaestroException) {
-      arbiterContext.add(
-        ArbiterContext.Turn(
-          memo = "Failed to perform action: ${e.message}",
-          screenshotFileName = screenshotFileName
-        )
-      )
-    } catch (e: StatusRuntimeException) {
-      arbiterContext.add(
-        ArbiterContext.Turn(
-          memo = "Failed to perform action: ${e.message}",
-          screenshotFileName = screenshotFileName
-        )
-      )
-    } catch (e: IllegalStateException) {
-      arbiterContext.add(
-        ArbiterContext.Turn(
-          memo = "Failed to perform action: ${e.message}",
-          screenshotFileName = screenshotFileName
-        )
-      )
-    }
-  }
-  return false
 }
 
 data class OptimizationResult(
@@ -691,8 +520,8 @@ class Ai(private val apiKey: String) {
     val prompt = buildPrompt(arbiterContext, dumpHierarchy, agentCommandMap)
 //    val imageFile = File(screenshot)
 //    val imageBase64 = imageFile.getResizedIamgeByteArray(0.3F).encodeBase64()
-    val messages: List<Message> = listOf(
-      Message(
+    val messages: List<ChatMessage> = listOf(
+      ChatMessage(
         role = "system",
         content = listOf(
           Content(
@@ -701,7 +530,7 @@ class Ai(private val apiKey: String) {
           )
         )
       ),
-      Message(
+      ChatMessage(
         role = "user",
         content = listOf(
 //          Content(
@@ -742,7 +571,7 @@ $templates"""
 
   private fun parseResponse(
     response: String,
-    message: List<Message>,
+    message: List<ChatMessage>,
     screenshotFileName: String,
     agentCommandMap: Map<String, AgentCommand>
   ): ArbiterContext.Turn {
@@ -796,7 +625,7 @@ $templates"""
     }
   }
 
-  private fun chatCompletion(messages: List<Message>): String {
+  private fun chatCompletion(messages: List<ChatMessage>): String {
     val client = OkHttpClient.Builder()
       .readTimeout(60, TimeUnit.SECONDS)
       .build()
@@ -869,65 +698,4 @@ $templates"""
     val bytes = file.readBytes()
     return Base64.getEncoder().encodeToString(bytes)
   }
-
-  @Serializable
-  private data class Message(
-    val role: String,
-    val content: List<Content>
-  )
-
-  @Serializable
-  private data class ChatCompletionRequest(
-    val model: String,
-    val messages: List<Message>,
-    @SerialName("response_format") val responseFormat: ResponseFormat?,
-  )
-
-  @Serializable
-  data class ResponseFormat(
-    val type: String,
-    @SerialName("json_schema") val jsonSchema: JsonObject
-  )
-
-  @Serializable
-  data class ChatCompletionResponse(
-    val id: String,
-    val `object`: String,
-    val created: Long,
-    val model: String,
-    val choices: List<Choice>,
-    val usage: Usage? = null
-  )
-
-  @Serializable
-  data class Choice(
-    val index: Int,
-    val message: MessageContent,
-    @SerialName("finish_reason") val finishReason: String? = null,
-  )
-
-  @Serializable
-  data class MessageContent(
-    val role: String,
-    val content: String
-  )
-
-  @Serializable
-  private data class Content(
-    val type: String,
-    val text: String? = null,
-    @SerialName("image_url") val imageUrl: ImageUrl? = null
-  )
-
-  @Serializable
-  private data class ImageUrl(
-    val url: String
-  )
-
-  @Serializable
-  data class Usage(
-    @SerialName("prompt_tokens") val promptTokens: Int,
-    @SerialName("completion_tokens") val completionTokens: Int? = null,
-    @SerialName("total_tokens") val totalTokens: Int,
-  )
 }
