@@ -26,6 +26,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ai-agent"
-include(":app")
-include(":ui")
+rootProject.name = "arbiter"
+include(":arbiter-core")
+include(":arbiter-ui")

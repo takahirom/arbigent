@@ -12,7 +12,7 @@ dependencies {
     // (in a separate module for demo project and in testMain).
     // With compose.desktop.common you will also lose @Preview functionality
     implementation(compose.desktop.currentOs)
-    implementation(project(":app"))
+    implementation(project(":arbiter-core"))
     implementation("io.github.takahirom.rin:rin:0.3.0")
 }
 
@@ -22,7 +22,7 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "ui"
+            packageName = "arbiter-ui"
             packageVersion = "1.0.0"
         }
     }
