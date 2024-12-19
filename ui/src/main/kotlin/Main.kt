@@ -16,7 +16,7 @@ import androidx.compose.ui.res.loadImageBitmap
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
-import com.github.takahirom.ai_agent.*
+import com.github.takahirom.arbiter.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.io.File

@@ -1,11 +1,9 @@
-package com.github.takahirom.ai_agent
+package com.github.takahirom.arbiter
 
 import dadb.Dadb
 import io.grpc.StatusRuntimeException
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject

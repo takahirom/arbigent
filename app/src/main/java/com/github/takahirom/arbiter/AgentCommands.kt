@@ -1,4 +1,4 @@
-package com.github.takahirom.ai_agent
+package com.github.takahirom.arbiter
 
 import maestro.KeyCode
 import maestro.MaestroException
