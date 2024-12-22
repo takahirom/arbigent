@@ -2,6 +2,7 @@ package com.github.takahirom.arbiter
 
 import dadb.Dadb
 import io.grpc.StatusRuntimeException
+import io.ktor.client.plugins.api.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.encodeToString
@@ -23,7 +24,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import javax.imageio.ImageIO
 
-val maestroInstance: Any by lazy {
+val maestroInstance: Maestro by lazy {
   var dadb = Dadb.discover()!!
   val maestro = retry {
     val driver = AndroidDriver(
@@ -64,10 +65,14 @@ private fun <T> retry(times: Int = 5, block: () -> T): T {
 
 
 class Arbiter(
-  private val interceptors: MutableList<ArbiterInterceptor>,
+  private val interceptors: List<ArbiterInterceptor>,
   private val apiKey: String,
   private val maestroInstance: Maestro,
 ) {
+  private val decisionInterceptors: List<ArbiterDecisionInterceptor> = interceptors
+    .filterIsInstance<ArbiterDecisionInterceptor>()
+  private val executeCommandInterceptors: List<ArbiterExecuteCommmandInterceptor> = interceptors
+    .filterIsInstance<ArbiterExecuteCommmandInterceptor>()
   private val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
   private var job: Job? = null
   private val ai = Ai(apiKey)
@@ -149,13 +154,24 @@ class Arbiter(
       println("Failed to take screenshot: $e")
     }
     println("Inputs: ${arbiterContext.prompt()}")
-    val agentCommand = ai.decideWhatToDo(
-      arbiterContext = arbiterContext,
-      dumpHierarchy = maestro.viewHierarchy(false).toOptimizedString(),
-      screenshotFileName = screenshotFileName,
-      screenshot = null, //"screenshots/test.png",
-      agentCommandMap = agentCommandMap
+    val agentCommand = decisionInterceptors.fold(
+      ArbiterDecisionInterceptor.Chain({
+        ai.decideWhatToDo(
+          arbiterContext = arbiterContext,
+          dumpHierarchy = maestro.viewHierarchy(false).toOptimizedString(),
+          screenshotFileName = screenshotFileName,
+          screenshot = null, //"screenshots/test.png",
+          agentCommandMap = agentCommandMap
+        )
+      }),
+      createChain = { chain, interceptor ->
+        ArbiterDecisionInterceptor.Chain { arbiterContext ->
+          interceptor.intercept(arbiterContext, chain)
+        }
+      },
+      context = arbiterContext
     )
+      .proceed(arbiterContext)
     println("What to do: ${agentCommand}")
     if (agentCommand is GoalAchievedAgentCommand) {
       println("Goal achieved")
@@ -187,6 +203,12 @@ class Arbiter(
       }
     }
     return false
+  }
+
+  private fun <I, C> List<I>.fold(chain: C, createChain: (C, I) -> C, context: ArbiterContext): C {
+    return fold(chain) { acc, interceptor ->
+      createChain(acc, interceptor)
+    }
   }
 
   fun cancel() {
@@ -227,21 +249,18 @@ fun arbiter(block: Arbiter.Builder.() -> Unit): Arbiter {
 interface ArbiterInterceptor
 
 interface ArbiterDecisionInterceptor : ArbiterInterceptor {
-  fun intercept(arbiterContext: ArbiterContext, chain: DecisionChain): ArbiterContext
+  fun intercept(arbiterContext: ArbiterContext, chain: Chain): AgentCommand
+
+  fun interface Chain {
+    fun proceed(arbiterContext: ArbiterContext): AgentCommand
+  }
 }
 
-interface ArbiterActionInterceptor : ArbiterInterceptor {
-  fun intercept(arbiterContext: ArbiterContext, chain: ActionChain)
-}
-
-// DecisionChain
-interface DecisionChain {
-  fun proceed(arbiterContext: ArbiterContext): ArbiterContext
-}
-
-// ActionChain
-interface ActionChain {
-  fun proceed(arbiterContext: ArbiterContext)
+interface ArbiterExecuteCommmandInterceptor : ArbiterInterceptor {
+  fun intercept(arbiterContext: ArbiterContext, chain: Chain)
+  interface Chain {
+    fun proceed(arbiterContext: ArbiterContext)
+  }
 }
 
 fun main() {
@@ -697,3 +716,5 @@ $templates"""
     return Base64.getEncoder().encodeToString(bytes)
   }
 }
+
+
