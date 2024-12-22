@@ -1,3 +1,5 @@
+package com.github.takahirom.arbiter.ui
+
 import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*

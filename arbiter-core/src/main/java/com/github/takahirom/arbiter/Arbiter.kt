@@ -71,8 +71,8 @@ class Arbiter(
 ) {
   private val decisionInterceptors: List<ArbiterDecisionInterceptor> = interceptors
     .filterIsInstance<ArbiterDecisionInterceptor>()
-  private val executeCommandInterceptors: List<ArbiterExecuteCommmandInterceptor> = interceptors
-    .filterIsInstance<ArbiterExecuteCommmandInterceptor>()
+  private val executeCommandInterceptors: List<ArbiterExecuteCommandInterceptor> = interceptors
+    .filterIsInstance<ArbiterExecuteCommandInterceptor>()
   private val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
   private var job: Job? = null
   private val ai = Ai(apiKey)
@@ -105,6 +105,7 @@ class Arbiter(
         val agentCommandMap = agentCommands.associateBy { it.actionName }
         repeat(10) {
           try {
+            yield()
             orchestra.executeCommands(
               commands = listOf(
                 MaestroCommand(
@@ -229,7 +230,7 @@ class Arbiter(
       this.apiKey = apiKey
     }
 
-    fun maestroInstance(maestroInstance: Any) {
+    fun maestroInstance(maestroInstance: Maestro) {
       this.maestroInstance = maestroInstance as Maestro
     }
 
@@ -240,7 +241,7 @@ class Arbiter(
 }
 
 // DSL
-fun arbiter(block: Arbiter.Builder.() -> Unit): Arbiter {
+fun arbiter(block: Arbiter.Builder.() -> Unit = {}): Arbiter {
   val builder = Arbiter.Builder()
   builder.block()
   return builder.build()
@@ -256,7 +257,7 @@ interface ArbiterDecisionInterceptor : ArbiterInterceptor {
   }
 }
 
-interface ArbiterExecuteCommmandInterceptor : ArbiterInterceptor {
+interface ArbiterExecuteCommandInterceptor : ArbiterInterceptor {
   fun intercept(arbiterContext: ArbiterContext, chain: Chain)
   interface Chain {
     fun proceed(arbiterContext: ArbiterContext)

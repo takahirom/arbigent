@@ -29,3 +29,4 @@ dependencyResolutionManagement {
 rootProject.name = "arbiter"
 include(":arbiter-core")
 include(":arbiter-ui")
+include(":sample-test")
