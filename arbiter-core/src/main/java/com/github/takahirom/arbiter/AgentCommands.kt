@@ -6,15 +6,15 @@ import maestro.orchestra.*
 
 interface AgentCommand {
   val actionName: String
-  fun runOrchestraCommand(orchestra: Orchestra)
+  fun runOrchestraCommand(device: Device)
   fun templateForAI(): String
 }
 
 data class ClickWithTextAgentCommand(val textRegex: String) : AgentCommand {
   override val actionName = "ClickWithText"
 
-  override fun runOrchestraCommand(orchestra: Orchestra) {
-    orchestra.executeCommands(
+  override fun runOrchestraCommand(device: Device) {
+    device.executeCommands(
       commands = listOf(
         MaestroCommand(
           tapOnElement = TapOnElementCommand(
@@ -40,8 +40,8 @@ data class ClickWithTextAgentCommand(val textRegex: String) : AgentCommand {
 data class ClickWithIdAgentCommand(val textRegex: String) : AgentCommand {
   override val actionName = "ClickWithId"
 
-  override fun runOrchestraCommand(orchestra: Orchestra) {
-    orchestra.executeCommands(
+  override fun runOrchestraCommand(device: Device) {
+    device.executeCommands(
       commands = listOf(
         MaestroCommand(
           tapOnElement = TapOnElementCommand(
@@ -67,8 +67,8 @@ data class ClickWithIdAgentCommand(val textRegex: String) : AgentCommand {
 data class InputTextAgentCommand(val text: String) : AgentCommand {
   override val actionName = "InputText"
 
-  override fun runOrchestraCommand(orchestra: Orchestra) {
-    orchestra.executeCommands(
+  override fun runOrchestraCommand(device: Device) {
+    device.executeCommands(
       commands = listOf(
         MaestroCommand(
           inputTextCommand = InputTextCommand(
@@ -93,8 +93,8 @@ data class InputTextAgentCommand(val text: String) : AgentCommand {
 data object BackPressAgentCommand : AgentCommand {
   override val actionName = "BackPress"
 
-  override fun runOrchestraCommand(orchestra: Orchestra) {
-    orchestra.runFlow(
+  override fun runOrchestraCommand(device: Device) {
+    device.executeCommands(
       commands = listOf(
         MaestroCommand(
           backPressCommand = BackPressCommand()
@@ -115,8 +115,8 @@ data object BackPressAgentCommand : AgentCommand {
 data object ScrollAgentCommand : AgentCommand {
   override val actionName: String = "Scroll"
 
-  override fun runOrchestraCommand(orchestra: Orchestra) {
-    orchestra.executeCommands(
+  override fun runOrchestraCommand(device: Device) {
+    device.executeCommands(
       commands = listOf(
         MaestroCommand(
           scrollCommand = ScrollCommand()
@@ -137,9 +137,9 @@ data object ScrollAgentCommand : AgentCommand {
 data class KeyPressAgentCommand(val keyName: String) : AgentCommand {
   override val actionName = "KeyPress"
 
-  override fun runOrchestraCommand(orchestra: Orchestra) {
+  override fun runOrchestraCommand(device: Device) {
     val code = KeyCode.getByName(keyName) ?: throw MaestroException.InvalidCommand(message = "Unknown key: $keyName")
-    orchestra.executeCommands(
+    device.executeCommands(
       commands = listOf(
         MaestroCommand(
           pressKeyCommand = PressKeyCommand(
@@ -163,7 +163,7 @@ data class KeyPressAgentCommand(val keyName: String) : AgentCommand {
 data object GoalAchievedAgentCommand : AgentCommand {
   override val actionName = "GoalAchieved"
 
-  override fun runOrchestraCommand(orchestra: Orchestra) {
+  override fun runOrchestraCommand(device: Device) {
   }
 
   override fun templateForAI(): String {

@@ -28,5 +28,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "arbiter"
 include(":arbiter-core")
+include(":arbiter-device-maestro")
+include(":arbiter-ai-openai")
 include(":arbiter-ui")
 include(":sample-test")

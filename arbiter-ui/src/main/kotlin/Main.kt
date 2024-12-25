@@ -124,7 +124,7 @@ class AppStateHolder {
 
 private fun createArbiter() = arbiter {
   apiKey(System.getenv("API_KEY")!!)
-  maestroInstance(maestroInstance)
+  device(MaestroDevice(maestroInstance))
 }
 
 @Composable

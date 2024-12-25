@@ -1,0 +1,228 @@
+package com.github.takahirom.arbiter
+
+import io.grpc.StatusRuntimeException
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody
+import java.awt.image.BufferedImage
+import java.io.File
+import java.util.*
+import java.util.concurrent.TimeUnit
+import javax.imageio.ImageIO
+
+class OpenAIAi(private val apiKey: String) : Ai {
+  override fun decideWhatToDo(
+    arbiterContext: ArbiterContext,
+    dumpHierarchy: String,
+    screenshot: String?,
+    agentCommandMap: Map<String, AgentCommand>,
+    screenshotFileName: String,
+  ): AgentCommand {
+    val prompt = buildPrompt(arbiterContext, dumpHierarchy, agentCommandMap)
+//    val imageFile = File(screenshot)
+//    val imageBase64 = imageFile.getResizedIamgeByteArray(0.3F).encodeBase64()
+    val messages: List<ChatMessage> = listOf(
+      ChatMessage(
+        role = "system",
+        content = listOf(
+          Content(
+            type = "text",
+            text = "You are an agent that achieve the user's goal automatically. Please be careful not to repeat the same action."
+          )
+        )
+      ),
+      ChatMessage(
+        role = "user",
+        content = listOf(
+//          Content(
+//            type = "image_url",
+//            imageUrl = ImageUrl(
+//              url = "data:image/png;base64,$imageBase64"
+//            )
+//          ),
+          Content(
+            type = "text",
+            text = prompt
+          ),
+        )
+      )
+    )
+    val responseText = chatCompletion(messages)
+    val turn = parseResponse(responseText, messages, screenshotFileName, agentCommandMap)
+    arbiterContext.add(turn)
+    return turn.agentCommand!!
+  }
+
+  private fun buildPrompt(
+    arbiterContext: ArbiterContext,
+    dumpHierarchy: String,
+    agentCommandMap: Map<String, AgentCommand>
+  ): String {
+    val contextPrompt = arbiterContext.prompt()
+    val templates = agentCommandMap.values.joinToString("\nor\n") { it.templateForAI() }
+    val prompt = """
+
+UI Hierarchy:
+$dumpHierarchy
+
+Based on the above, decide on the next action to achieve the goal. Please ensure not to repeat the same action. The action must be one of the following:
+$templates"""
+    return contextPrompt + (prompt.trimIndent())
+  }
+
+  private fun parseResponse(
+    response: String,
+    message: List<ChatMessage>,
+    screenshotFileName: String,
+    agentCommandMap: Map<String, AgentCommand>
+  ): ArbiterContext.Turn {
+    val json = Json { ignoreUnknownKeys = true }
+    val responseObj = json.decodeFromString<ChatCompletionResponse>(response)
+    val content = responseObj.choices.firstOrNull()?.message?.content ?: ""
+    println("OpenAI content: $content")
+    return try {
+      val jsonElement = json.parseToJsonElement(content)
+      val jsonObject = jsonElement.jsonObject
+      val action =
+        jsonObject["action"]?.jsonPrimitive?.content ?: throw Exception("Action not found")
+      val commandPrototype = agentCommandMap[action] ?: throw Exception("Unknown action: $action")
+      val agentCommand = when (commandPrototype) {
+        is ClickWithTextAgentCommand -> {
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
+          ClickWithTextAgentCommand(text)
+        }
+
+        is ClickWithIdAgentCommand -> {
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
+          ClickWithIdAgentCommand(text)
+        }
+
+        is InputTextAgentCommand -> {
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
+          InputTextAgentCommand(text)
+        }
+
+        is BackPressAgentCommand -> BackPressAgentCommand
+        is KeyPressAgentCommand -> {
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
+          KeyPressAgentCommand(text)
+        }
+
+        is ScrollAgentCommand -> ScrollAgentCommand
+
+        is GoalAchievedAgentCommand -> GoalAchievedAgentCommand
+        else -> throw Exception("Unsupported action: $action")
+      }
+      ArbiterContext.Turn(
+        agentCommand = agentCommand,
+        action = action,
+        memo = jsonObject["memo"]?.jsonPrimitive?.content ?: "",
+        whatYouSaw = jsonObject["summary-of-what-you-saw"]?.jsonPrimitive?.content ?: "",
+        message = message.toString(),
+        screenshotFileName = screenshotFileName
+      )
+    } catch (e: Exception) {
+      throw Exception("Failed to parse OpenAI response: $e")
+    }
+  }
+
+  private fun chatCompletion(messages: List<ChatMessage>): String {
+    val client = OkHttpClient.Builder()
+      .readTimeout(60, TimeUnit.SECONDS)
+      .build()
+    val url = "https://api.openai.com/v1/chat/completions"
+    val json = Json { ignoreUnknownKeys = true }
+    val requestBodyJson = json.encodeToString(
+      ChatCompletionRequest(
+        model = "gpt-4o-mini",
+        messages = messages,
+        ResponseFormat(
+          type = "json_schema",
+          jsonSchema = buildActionSchema(),
+        ),
+      )
+    )
+    val requestBody = RequestBody.create(
+      "application/json".toMediaType(), requestBodyJson
+    )
+    val request = Request.Builder()
+      .url(url)
+      .header("Authorization", "Bearer $apiKey")
+      .post(requestBody)
+      .build()
+    println(
+      "OpenAI request: ${
+        messages.flatMap { it.content }.filter { it.type == "text" }.joinToString("\n")
+      }"
+    )
+    val response = client.newCall(request).execute()
+    val responseBody = response.body?.string() ?: ""
+    println("OpenAI response: $responseBody")
+    return responseBody
+  }
+
+  private fun buildActionSchema(): JsonObject {
+    val actions = defaultAgentCommands().map { it.actionName }.joinToString { "\"$it\"" }
+    val schemaJson = """
+    {
+      "name": "ActionSchema",
+      "description": "Schema for user actions",
+      "strict": true,
+      "schema": {
+        "type": "object",
+        "required": ["summary-of-what-you-saw", "memo",  "action", "text"],
+        "additionalProperties": false,
+        "properties": {
+          "summary-of-what-you-saw": {
+            "type": "string"
+          },
+          "memo": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [$actions]
+          },
+          "text": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      }
+    }
+    """.trimIndent()
+    return Json.parseToJsonElement(schemaJson).jsonObject
+  }
+
+  private fun readFileAsBase64(filename: String): String {
+    val file = File(filename)
+    val bytes = file.readBytes()
+    return Base64.getEncoder().encodeToString(bytes)
+  }
+}
+
+fun File.getResizedIamgeByteArray(scale: Float): ByteArray {
+  val image = ImageIO.read(this)
+  val scaledImage = image.getScaledInstance(
+    (image.width * scale).toInt(),
+    (image.height * scale).toInt(),
+    BufferedImage.SCALE_SMOOTH
+  )
+  val bufferedImage = BufferedImage(
+    scaledImage.getWidth(null),
+    scaledImage.getHeight(null),
+    BufferedImage.TYPE_INT_RGB
+  )
+  bufferedImage.graphics.drawImage(scaledImage, 0, 0, null)
+  val output = File.createTempFile("scaled", ".png")
+  ImageIO.write(bufferedImage, "png", output)
+  return output.readBytes()
+}

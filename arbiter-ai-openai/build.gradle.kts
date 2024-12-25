@@ -5,8 +5,7 @@ plugins {
 
 
 dependencies {
-    api("dev.mobile:maestro-orchestra:1.39.1")
-    api("dev.mobile:maestro-client:1.39.1")
+    implementation(project(":arbiter-core"))
 
     // To expose requestBuilderModifier
     api(libs.ktor.client.core)
