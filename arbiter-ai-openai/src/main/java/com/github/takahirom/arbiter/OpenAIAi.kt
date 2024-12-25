@@ -1,8 +1,5 @@
 package com.github.takahirom.arbiter
 
-import io.grpc.StatusRuntimeException
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -19,16 +16,9 @@ import java.util.concurrent.TimeUnit
 import javax.imageio.ImageIO
 
 class OpenAIAi(private val apiKey: String) : Ai {
-  override fun decideWhatToDo(
-    arbiterContext: ArbiterContext,
-    dumpHierarchy: String,
-    screenshot: String?,
-    agentCommandMap: Map<String, AgentCommand>,
-    screenshotFileName: String,
-  ): AgentCommand {
-    val prompt = buildPrompt(arbiterContext, dumpHierarchy, agentCommandMap)
-//    val imageFile = File(screenshot)
-//    val imageBase64 = imageFile.getResizedIamgeByteArray(0.3F).encodeBase64()
+  override fun decideWhatToDo(decisionInput: Ai.DecisionInput): Ai.DecisionOutput {
+    val (arbiterContext, dumpHierarchy, agentCommandTypes, screenshotFileName) = decisionInput
+    val prompt = buildPrompt(arbiterContext, dumpHierarchy, agentCommandTypes)
     val messages: List<ChatMessage> = listOf(
       ChatMessage(
         role = "system",
@@ -56,18 +46,18 @@ class OpenAIAi(private val apiKey: String) : Ai {
       )
     )
     val responseText = chatCompletion(messages)
-    val turn = parseResponse(responseText, messages, screenshotFileName, agentCommandMap)
-    arbiterContext.add(turn)
-    return turn.agentCommand!!
+    val turn = parseResponse(responseText, messages, screenshotFileName, agentCommandTypes)
+    arbiterContext.addTurn(turn)
+    return  Ai.DecisionOutput(listOf(turn.agentCommand!!))
   }
 
   private fun buildPrompt(
-    arbiterContext: ArbiterContext,
+    arbiterContextHolder: ArbiterContextHolder,
     dumpHierarchy: String,
-    agentCommandMap: Map<String, AgentCommand>
+    agentCommandTypes: List<AgentCommandType>
   ): String {
-    val contextPrompt = arbiterContext.prompt()
-    val templates = agentCommandMap.values.joinToString("\nor\n") { it.templateForAI() }
+    val contextPrompt = arbiterContextHolder.prompt()
+    val templates = agentCommandTypes.joinToString("\nor\n") { it.templateForAI() }
     val prompt = """
 
 UI Hierarchy:
@@ -82,8 +72,8 @@ $templates"""
     response: String,
     message: List<ChatMessage>,
     screenshotFileName: String,
-    agentCommandMap: Map<String, AgentCommand>
-  ): ArbiterContext.Turn {
+    agentCommandMap: Map<String, AgentCommandType>
+  ): ArbiterContextHolder.Turn {
     val json = Json { ignoreUnknownKeys = true }
     val responseObj = json.decodeFromString<ChatCompletionResponse>(response)
     val content = responseObj.choices.firstOrNull()?.message?.content ?: ""
@@ -94,34 +84,34 @@ $templates"""
       val action =
         jsonObject["action"]?.jsonPrimitive?.content ?: throw Exception("Action not found")
       val commandPrototype = agentCommandMap[action] ?: throw Exception("Unknown action: $action")
-      val agentCommand = when (commandPrototype) {
-        is ClickWithTextAgentCommand -> {
+      val agentCommand: AgentCommand = when (commandPrototype) {
+        ClickWithTextAgentCommand -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
           ClickWithTextAgentCommand(text)
         }
 
-        is ClickWithIdAgentCommand -> {
+        ClickWithIdAgentCommand -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
           ClickWithIdAgentCommand(text)
         }
 
-        is InputTextAgentCommand -> {
+        InputTextAgentCommand -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
           InputTextAgentCommand(text)
         }
 
-        is BackPressAgentCommand -> BackPressAgentCommand
-        is KeyPressAgentCommand -> {
+        BackPressAgentCommand -> BackPressAgentCommand()
+        KeyPressAgentCommand -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
           KeyPressAgentCommand(text)
         }
 
-        is ScrollAgentCommand -> ScrollAgentCommand
+        ScrollAgentCommand -> ScrollAgentCommand()
 
-        is GoalAchievedAgentCommand -> GoalAchievedAgentCommand
+        GoalAchievedAgentCommand -> GoalAchievedAgentCommand()
         else -> throw Exception("Unsupported action: $action")
       }
-      ArbiterContext.Turn(
+      ArbiterContextHolder.Turn(
         agentCommand = agentCommand,
         action = action,
         memo = jsonObject["memo"]?.jsonPrimitive?.content ?: "",
@@ -170,7 +160,7 @@ $templates"""
   }
 
   private fun buildActionSchema(): JsonObject {
-    val actions = defaultAgentCommands().map { it.actionName }.joinToString { "\"$it\"" }
+    val actions = defaultAgentCommandTypes().map { it.actionName }.joinToString { "\"$it\"" }
     val schemaJson = """
     {
       "name": "ActionSchema",

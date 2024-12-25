@@ -7,11 +7,15 @@ import maestro.orchestra.*
 interface AgentCommand {
   val actionName: String
   fun runOrchestraCommand(device: Device)
+}
+
+interface AgentCommandType {
+  val actionName: String
   fun templateForAI(): String
 }
 
 data class ClickWithTextAgentCommand(val textRegex: String) : AgentCommand {
-  override val actionName = "ClickWithText"
+  override val actionName = Companion.actionName
 
   override fun runOrchestraCommand(device: Device) {
     device.executeCommands(
@@ -25,8 +29,11 @@ data class ClickWithTextAgentCommand(val textRegex: String) : AgentCommand {
     )
   }
 
-  override fun templateForAI(): String {
-    return """
+  companion object : AgentCommandType {
+    override val actionName = "ClickWithText"
+
+    override fun templateForAI(): String {
+      return """
         {
             "action": "$actionName",
             // the text should be clickable text, or content description. should be in UI hierarchy. should not resource id
@@ -34,11 +41,13 @@ data class ClickWithTextAgentCommand(val textRegex: String) : AgentCommand {
             "text": "..." 
         }
         """.trimIndent()
+    }
+
   }
 }
 
 data class ClickWithIdAgentCommand(val textRegex: String) : AgentCommand {
-  override val actionName = "ClickWithId"
+  override val actionName = Companion.actionName
 
   override fun runOrchestraCommand(device: Device) {
     device.executeCommands(
@@ -52,8 +61,11 @@ data class ClickWithIdAgentCommand(val textRegex: String) : AgentCommand {
     )
   }
 
-  override fun templateForAI(): String {
-    return """
+  companion object : AgentCommandType {
+    override val actionName = "ClickWithId"
+
+    override fun templateForAI(): String {
+      return """
         {
             "action": "$actionName",
             // the text should be id, should be in UI hierarchy
@@ -61,11 +73,13 @@ data class ClickWithIdAgentCommand(val textRegex: String) : AgentCommand {
             "text": "..." 
         }
         """.trimIndent()
+    }
+
   }
 }
 
 data class InputTextAgentCommand(val text: String) : AgentCommand {
-  override val actionName = "InputText"
+  override val actionName = Companion.actionName
 
   override fun runOrchestraCommand(device: Device) {
     device.executeCommands(
@@ -79,19 +93,24 @@ data class InputTextAgentCommand(val text: String) : AgentCommand {
     )
   }
 
-  override fun templateForAI(): String {
-    return """
+  companion object : AgentCommandType {
+    override val actionName = "InputText"
+
+    override fun templateForAI(): String {
+      return """
         {
             // You have to **Click** on a text field before sending this command
             "action": "$actionName",
             "text": "..."
         }
         """.trimIndent()
+    }
+
   }
 }
 
-data object BackPressAgentCommand : AgentCommand {
-  override val actionName = "BackPress"
+class BackPressAgentCommand() : AgentCommand {
+  override val actionName = Companion.actionName
 
   override fun runOrchestraCommand(device: Device) {
     device.executeCommands(
@@ -103,16 +122,21 @@ data object BackPressAgentCommand : AgentCommand {
     )
   }
 
-  override fun templateForAI(): String {
-    return """
+  companion object : AgentCommandType {
+    override val actionName = "BackPress"
+
+    override fun templateForAI(): String {
+      return """
         {
             "action": "$actionName"
         }
         """.trimIndent()
+    }
+
   }
 }
 
-data object ScrollAgentCommand : AgentCommand {
+class ScrollAgentCommand : AgentCommand {
   override val actionName: String = "Scroll"
 
   override fun runOrchestraCommand(device: Device) {
@@ -125,12 +149,17 @@ data object ScrollAgentCommand : AgentCommand {
     )
   }
 
-  override fun templateForAI(): String {
-    return """
+  companion object : AgentCommandType {
+    override val actionName = "Scroll"
+
+    override fun templateForAI(): String {
+      return """
         {
             "action": "$actionName"
         }
         """.trimIndent()
+    }
+
   }
 }
 
@@ -150,27 +179,37 @@ data class KeyPressAgentCommand(val keyName: String) : AgentCommand {
     )
   }
 
-  override fun templateForAI(): String {
-    return """
+  companion object : AgentCommandType {
+    override val actionName = "KeyPress"
+
+    override fun templateForAI(): String {
+      return """
         {
             "action": "$actionName",
             "text": "..."
         }
         """.trimIndent()
+    }
+
   }
 }
 
-data object GoalAchievedAgentCommand : AgentCommand {
+class GoalAchievedAgentCommand : AgentCommand {
   override val actionName = "GoalAchieved"
 
   override fun runOrchestraCommand(device: Device) {
   }
 
-  override fun templateForAI(): String {
-    return """
+  companion object : AgentCommandType {
+    override val actionName = "GoalAchieved"
+
+    override fun templateForAI(): String {
+      return """
         {
             "action": "$actionName"
         }
         """.trimIndent()
+    }
+
   }
 }

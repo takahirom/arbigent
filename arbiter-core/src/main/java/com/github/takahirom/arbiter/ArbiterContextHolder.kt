@@ -2,7 +2,7 @@ package com.github.takahirom.arbiter
 
 import kotlinx.coroutines.flow.MutableStateFlow
 
-data class ArbiterContext(
+data class ArbiterContextHolder(
   val goal: String,
 ) {
   class Turn(
@@ -23,7 +23,7 @@ data class ArbiterContext(
   }
 
   val turns = MutableStateFlow<List<Turn>>(listOf())
-  fun add(turn: Turn) {
+  fun addTurn(turn: Turn) {
     turns.value = turns.value.toMutableList() + turn
   }
 

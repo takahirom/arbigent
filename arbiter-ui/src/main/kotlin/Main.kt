@@ -45,7 +45,7 @@ class AppStateHolder {
         started = SharingStarted.WhileSubscribed(),
         initialValue = false
       )
-    val contextStateFlow = arbiterStateFlow.flatMapConcat { it.arbiterContextStateFlow }
+    val contextStateFlow = arbiterStateFlow.flatMapConcat { it.arbiterContextHolderStateFlow }
       .stateIn(
         scope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
         started = SharingStarted.WhileSubscribed(),
@@ -123,7 +123,7 @@ class AppStateHolder {
 }
 
 private fun createArbiter() = arbiter {
-  apiKey(System.getenv("API_KEY")!!)
+  ai(OpenAIAi(System.getenv("API_KEY")!!))
   device(MaestroDevice(maestroInstance))
 }
 
@@ -271,7 +271,7 @@ fun App() {
 @Composable
 private fun Agent(scenarioStateHolder: AppStateHolder.ScenarioStateHolder) {
   val isAndroid by remember { mutableStateOf(true) }
-  val agentArbiterContext: ArbiterContext? by scenarioStateHolder.contextStateFlow.collectAsState()
+  val agentArbiterContextHolder: ArbiterContextHolder? by scenarioStateHolder.contextStateFlow.collectAsState()
   val goal by scenarioStateHolder.goalStateFlow.collectAsState()
   var editinggoalTextState by remember(goal) { mutableStateOf(goal) }
   Column {
@@ -338,7 +338,7 @@ private fun Agent(scenarioStateHolder: AppStateHolder.ScenarioStateHolder) {
         Text("Cancel")
       }
     }
-    agentArbiterContext?.let { agentContext ->
+    agentArbiterContextHolder?.let { agentContext ->
       var selectedIndex: Int? by remember(agentContext.turns.value.size) { mutableStateOf(null) }
       val turns by agentContext.turns.collectAsState()
       Row(Modifier.weight(1f)) {

@@ -13,6 +13,7 @@ dependencies {
     // With compose.desktop.common you will also lose @Preview functionality
     implementation(compose.desktop.currentOs)
     implementation(project(":arbiter-core"))
+    implementation(project(":arbiter-ai-openai"))
     implementation("io.github.takahirom.rin:rin:0.3.0")
 }
 

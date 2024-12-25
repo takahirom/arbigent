@@ -1,5 +1,6 @@
 package com.github.takahirom.arbiter
 
+import com.github.takahirom.arbiter.Arbiter.*
 import io.grpc.StatusRuntimeException
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -7,26 +8,59 @@ import maestro.MaestroException
 import maestro.orchestra.BackPressCommand
 import maestro.orchestra.MaestroCommand
 import maestro.orchestra.TakeScreenshotCommand
-import java.awt.image.BufferedImage
-import java.io.File
-import javax.imageio.ImageIO
-
 
 class Arbiter(
-  private val interceptors: List<ArbiterInterceptor>,
+  interceptors: List<ArbiterInterceptor>,
   private val ai: Ai,
-  private val device: Device
+  private val device: Device,
 ) {
   private val decisionInterceptors: List<ArbiterDecisionInterceptor> = interceptors
     .filterIsInstance<ArbiterDecisionInterceptor>()
-  private val executeCommandInterceptors: List<ArbiterExecuteCommandInterceptor> = interceptors
-    .filterIsInstance<ArbiterExecuteCommandInterceptor>()
+  private val decisionChain: (Ai.DecisionInput) -> Ai.DecisionOutput = decisionInterceptors.foldRight(
+    { input: Ai.DecisionInput -> ai.decideWhatToDo(input) },
+    { interceptor, acc ->
+      { input ->
+        interceptor.intercept(input) { decisionInput -> acc(decisionInput) }
+      }
+    }
+  )
+  private val executeCommandsInterceptors: List<ArbiterExecuteCommandsInterceptor> = interceptors
+    .filterIsInstance<ArbiterExecuteCommandsInterceptor>()
+  private val executeCommandChain: (ExecuteCommandsInput) -> ExecuteCommandsOutput =
+    executeCommandsInterceptors.foldRight(
+      { input: ExecuteCommandsInput -> executeCommands(input) },
+      { interceptor: ArbiterExecuteCommandsInterceptor, acc: (ExecuteCommandsInput) -> ExecuteCommandsOutput ->
+        { input ->
+          interceptor.intercept(input) { executeCommandsInput -> acc(executeCommandsInput) }
+        }
+      }
+    )
+  private val initializerInterceptors: List<ArbiterInitializerInterceptor> = interceptors
+    .filterIsInstance<ArbiterInitializerInterceptor>()
+  private val initializerChain: (Device) -> Unit = initializerInterceptors.foldRight(
+    { device: Device -> initialize(device) },
+    { interceptor, acc ->
+      { device ->
+        interceptor.intercept(device) { device -> acc(device) }
+      }
+    }
+  )
+  private val stepInterceptors: List<ArbiterStepInterceptor> = interceptors
+    .filterIsInstance<ArbiterStepInterceptor>()
+  private val stepChain: (StepInput) -> StepResult = stepInterceptors.foldRight(
+    { input: StepInput -> step(input) },
+    { interceptor, acc ->
+      { input ->
+        interceptor.intercept(input) { stepInput -> acc(stepInput) }
+      }
+    }
+  )
   private val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
   private var job: Job? = null
-  val arbiterContextStateFlow: MutableStateFlow<ArbiterContext?> = MutableStateFlow(null)
+  val arbiterContextHolderStateFlow: MutableStateFlow<ArbiterContextHolder?> = MutableStateFlow(null)
   val isRunningStateFlow: MutableStateFlow<Boolean> = MutableStateFlow(false)
   private val currentGoalStateFlow = MutableStateFlow<String?>(null)
-  val isArchivedStateFlow = arbiterContextStateFlow
+  val isArchivedStateFlow = arbiterContextHolderStateFlow
     .flatMapConcat { it?.turns ?: flowOf() }
     .map { it.any { it.agentCommand is GoalAchievedAgentCommand } }
     .stateIn(coroutineScope, SharingStarted.Lazily, false)
@@ -35,38 +69,41 @@ class Arbiter(
     isRunningStateFlow.first { !it }
   }
 
-  fun execute(goal: String) {
+  fun execute(
+    goal: String,
+    maxStep: Int = 10,
+    agentCommandTypes: List<AgentCommandType> = defaultAgentCommandTypes()
+  ) {
     isRunningStateFlow.value = true
     this.currentGoalStateFlow.value = goal
-    val arbiterContext = ArbiterContext(goal)
-    arbiterContextStateFlow.value = arbiterContext
+    val arbiterContextHolder = ArbiterContextHolder(goal)
+    arbiterContextHolderStateFlow.value = arbiterContextHolder
     job?.cancel()
     job = coroutineScope.launch {
       try {
-        val agentCommands: List<AgentCommand> = defaultAgentCommands()
-        val agentCommandMap = agentCommands.associateBy { it.actionName }
-        repeat(10) {
-          try {
-            yield()
-            device.executeCommands(
-              commands = listOf(
-                MaestroCommand(
-                  backPressCommand = BackPressCommand()
-                )
-              ),
-            )
-          } catch (e: Exception) {
-            println("Failed to back press: $e")
-          }
-        }
-        for (i in 0..10) {
+        initializerChain(device)
+        repeat(maxStep) {
           yield()
-          if (step(arbiterContext, agentCommandMap)) {
-            isRunningStateFlow.value = false
-            return@launch
+          val stepInput = StepInput(
+            arbiterContextHolder = arbiterContextHolder,
+            agentCommandTypes = agentCommandTypes,
+            device = device,
+            ai = ai,
+            decisionChain = decisionChain,
+            executeCommandChain = executeCommandChain
+          )
+          when (stepChain(stepInput)) {
+            StepResult.GoalAchieved -> {
+              isRunningStateFlow.value = false
+              return@launch
+            }
+
+            StepResult.Continue -> {
+              // continue
+            }
           }
         }
-        println("終わり")
+        println("Finish")
         isRunningStateFlow.value = false
       } catch (e: Exception) {
         println("Failed to run agent: $e")
@@ -76,81 +113,29 @@ class Arbiter(
     }
   }
 
-  private fun step(
-    arbiterContext: ArbiterContext,
-    agentCommandMap: Map<String, AgentCommand>
-  ): Boolean {
-    val screenshotFileName = System.currentTimeMillis().toString()
-    try {
-      device.executeCommands(
-        commands = listOf(
-          MaestroCommand(
-            takeScreenshotCommand = TakeScreenshotCommand(
-              screenshotFileName
-            )
-          ),
-        ),
-      )
-    } catch (e: Exception) {
-      println("Failed to take screenshot: $e")
-    }
-    println("Inputs: ${arbiterContext.prompt()}")
-    val agentCommand = decisionInterceptors.fold(
-      ArbiterDecisionInterceptor.Chain({
-        ai.decideWhatToDo(
-          arbiterContext = arbiterContext,
-          dumpHierarchy = device.viewTreeString(),
-          screenshotFileName = screenshotFileName,
-          screenshot = null, //"screenshots/test.png",
-          agentCommandMap = agentCommandMap
-        )
-      }),
-      createChain = { chain, interceptor ->
-        ArbiterDecisionInterceptor.Chain { arbiterContext ->
-          interceptor.intercept(arbiterContext, chain)
-        }
-      },
-      context = arbiterContext
-    )
-      .proceed(arbiterContext)
-    println("What to do: ${agentCommand}")
-    if (agentCommand is GoalAchievedAgentCommand) {
-      println("Goal achieved")
-      return true
-    } else {
-      try {
-        agentCommand.runOrchestraCommand(device)
-      } catch (e: MaestroException) {
-        arbiterContext.add(
-          ArbiterContext.Turn(
-            memo = "Failed to perform action: ${e.message}",
-            screenshotFileName = screenshotFileName
-          )
-        )
-      } catch (e: StatusRuntimeException) {
-        arbiterContext.add(
-          ArbiterContext.Turn(
-            memo = "Failed to perform action: ${e.message}",
-            screenshotFileName = screenshotFileName
-          )
-        )
-      } catch (e: IllegalStateException) {
-        arbiterContext.add(
-          ArbiterContext.Turn(
-            memo = "Failed to perform action: ${e.message}",
-            screenshotFileName = screenshotFileName
-          )
-        )
-      }
-    }
-    return false
+  data class StepInput(
+    val arbiterContextHolder: ArbiterContextHolder,
+    val agentCommandTypes: List<AgentCommandType>,
+    val device: Device,
+    val ai: Ai,
+    val decisionChain: (Ai.DecisionInput) -> Ai.DecisionOutput,
+    val executeCommandChain: (ExecuteCommandsInput) -> ExecuteCommandsOutput,
+  )
+
+  sealed interface StepResult {
+    object GoalAchieved : StepResult
+    object Continue : StepResult
   }
 
-  private fun <I, C> List<I>.fold(chain: C, createChain: (C, I) -> C, context: ArbiterContext): C {
-    return fold(chain) { acc, interceptor ->
-      createChain(acc, interceptor)
-    }
-  }
+  data class ExecuteCommandsInput(
+    val decisionOutput: Ai.DecisionOutput,
+    val arbiterContextHolder: ArbiterContextHolder,
+    val screenshotFileName: String,
+    val device: Device,
+  )
+
+  class ExecuteCommandsOutput
+
 
   fun cancel() {
     job?.cancel()
@@ -180,7 +165,6 @@ class Arbiter(
   }
 }
 
-// DSL
 fun arbiter(block: Arbiter.Builder.() -> Unit = {}): Arbiter {
   val builder = Arbiter.Builder()
   builder.block()
@@ -189,32 +173,134 @@ fun arbiter(block: Arbiter.Builder.() -> Unit = {}): Arbiter {
 
 interface ArbiterInterceptor
 
+interface ArbiterInitializerInterceptor : ArbiterInterceptor {
+  fun intercept(device: Device, chain: Chain)
+  fun interface Chain {
+    fun proceed(device: Device)
+  }
+}
+
 interface ArbiterDecisionInterceptor : ArbiterInterceptor {
-  fun intercept(arbiterContext: ArbiterContext, chain: Chain): AgentCommand
+  fun intercept(decisionInput: Ai.DecisionInput, chain: Chain): Ai.DecisionOutput
 
   fun interface Chain {
-    fun proceed(arbiterContext: ArbiterContext): AgentCommand
+    fun proceed(decisionInput: Ai.DecisionInput): Ai.DecisionOutput
   }
 }
 
-interface ArbiterExecuteCommandInterceptor : ArbiterInterceptor {
-  fun intercept(arbiterContext: ArbiterContext, chain: Chain)
-  interface Chain {
-    fun proceed(arbiterContext: ArbiterContext)
+interface ArbiterExecuteCommandsInterceptor : ArbiterInterceptor {
+  fun intercept(executeCommandsInput: ExecuteCommandsInput, chain: Chain): Arbiter.ExecuteCommandsOutput
+  fun interface Chain {
+    fun proceed(executeCommandsInput: ExecuteCommandsInput): Arbiter.ExecuteCommandsOutput
   }
 }
 
+interface ArbiterStepInterceptor : ArbiterInterceptor {
+  fun intercept(stepInput: StepInput, chain: Chain): Arbiter.StepResult
+  fun interface Chain {
+    fun proceed(stepInput: StepInput): Arbiter.StepResult
+  }
+}
 
-
-fun defaultAgentCommands(): List<AgentCommand> {
+fun defaultAgentCommandTypes(): List<AgentCommandType> {
   return listOf(
-    ClickWithTextAgentCommand(""),
-    ClickWithIdAgentCommand(""),
-    InputTextAgentCommand(""),
+    ClickWithIdAgentCommand,
+    ClickWithTextAgentCommand,
+    InputTextAgentCommand,
     BackPressAgentCommand,
-    KeyPressAgentCommand(""),
+    KeyPressAgentCommand,
     ScrollAgentCommand,
     GoalAchievedAgentCommand
   )
 }
 
+private fun initialize(device: Device) {
+  repeat(10) {
+    try {
+      device.executeCommands(
+        commands = listOf(
+          MaestroCommand(
+            backPressCommand = BackPressCommand()
+          )
+        ),
+      )
+    } catch (e: Exception) {
+      println("Failed to back press: $e")
+    }
+  }
+}
+
+
+private fun executeCommands(
+  executeCommandsInput: ExecuteCommandsInput,
+): ExecuteCommandsOutput {
+  val (decisionOutput, arbiterContextHolder, screenshotFileName, device) = executeCommandsInput
+  decisionOutput.agentCommands.forEach { agentCommand ->
+    try {
+      agentCommand.runOrchestraCommand(device)
+    } catch (e: MaestroException) {
+      arbiterContextHolder.addTurn(
+        ArbiterContextHolder.Turn(
+          memo = "Failed to perform action: ${e.message}",
+          screenshotFileName = screenshotFileName
+        )
+      )
+    } catch (e: StatusRuntimeException) {
+      arbiterContextHolder.addTurn(
+        ArbiterContextHolder.Turn(
+          memo = "Failed to perform action: ${e.message}",
+          screenshotFileName = screenshotFileName
+        )
+      )
+    } catch (e: IllegalStateException) {
+      arbiterContextHolder.addTurn(
+        ArbiterContextHolder.Turn(
+          memo = "Failed to perform action: ${e.message}",
+          screenshotFileName = screenshotFileName
+        )
+      )
+    }
+  }
+  return ExecuteCommandsOutput()
+}
+
+private fun step(
+  stepInput: StepInput
+): StepResult {
+  val (arbiterContextHolder, agentCommandTypes, device, ai, decisionChain, executeCommandChain) = stepInput
+  val screenshotFileName = System.currentTimeMillis().toString()
+  try {
+    device.executeCommands(
+      commands = listOf(
+        MaestroCommand(
+          takeScreenshotCommand = TakeScreenshotCommand(
+            screenshotFileName
+          )
+        ),
+      ),
+    )
+  } catch (e: Exception) {
+    println("Failed to take screenshot: $e")
+  }
+  println("Inputs: ${arbiterContextHolder.prompt()}")
+  val decisionInput = Ai.DecisionInput(
+    arbiterContextHolder = arbiterContextHolder,
+    dumpHierarchy = device.viewTreeString(),
+    agentCommandTypes = agentCommandTypes,
+    screenshotFileName = screenshotFileName
+  )
+  val decisionOutput = decisionChain(decisionInput)
+  if (decisionOutput.agentCommands.size == 1 && decisionOutput.agentCommands.first() is GoalAchievedAgentCommand) {
+    println("Goal achieved")
+    return StepResult.GoalAchieved
+  }
+  executeCommandChain(
+    ExecuteCommandsInput(
+      decisionOutput = decisionOutput,
+      arbiterContextHolder = arbiterContextHolder,
+      screenshotFileName = screenshotFileName,
+      device = device
+    )
+  )
+  return StepResult.Continue
+}
