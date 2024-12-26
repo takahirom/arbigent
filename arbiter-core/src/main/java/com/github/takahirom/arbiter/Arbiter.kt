@@ -8,6 +8,7 @@ import maestro.MaestroException
 import maestro.orchestra.BackPressCommand
 import maestro.orchestra.MaestroCommand
 import maestro.orchestra.TakeScreenshotCommand
+import kotlin.time.Duration.Companion.milliseconds
 
 class Arbiter(
   interceptors: List<ArbiterInterceptor>,
@@ -57,6 +58,7 @@ class Arbiter(
   )
   private val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
   private var job: Job? = null
+  val arbiterContextHistoryStateFlow: MutableStateFlow<List<ArbiterContextHolder>> = MutableStateFlow(listOf())
   val arbiterContextHolderStateFlow: MutableStateFlow<ArbiterContextHolder?> = MutableStateFlow(null)
   val isRunningStateFlow: MutableStateFlow<Boolean> = MutableStateFlow(false)
   private val currentGoalStateFlow = MutableStateFlow<String?>(null)
@@ -86,6 +88,12 @@ class Arbiter(
       do {
         execute(goal, maxStep, agentCommandTypes)
         yield()
+        try {
+          withTimeout(100.milliseconds) {
+            isArchivedStateFlow.first { it }
+          }
+        } catch (e: TimeoutCancellationException) {
+        }
       } while (isArchivedStateFlow.value.not() && remainRetry-- > 0)
     }
   }
@@ -101,9 +109,11 @@ class Arbiter(
       val arbiterContextHolder = ArbiterContextHolder(goal)
       println("Setting new ArbiterContextHolder: $arbiterContextHolder")
       arbiterContextHolderStateFlow.value = arbiterContextHolder
+      arbiterContextHistoryStateFlow.value = arbiterContextHistoryStateFlow.value + arbiterContextHolder
 
       initializerChain(device)
-      repeat(maxStep) {
+      var stepRemain = maxStep
+      while(stepRemain-- > 0 && isArchivedStateFlow.value.not()) {
         val stepInput = StepInput(
           arbiterContextHolder = arbiterContextHolder,
           agentCommandTypes = agentCommandTypes,
@@ -115,7 +125,7 @@ class Arbiter(
         when (stepChain(stepInput)) {
           StepResult.GoalAchieved -> {
             isRunningStateFlow.value = false
-            return@repeat
+            break
           }
 
           StepResult.Continue -> {

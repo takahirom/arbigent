@@ -1,11 +1,11 @@
 package com.github.takahirom.arbiter
 
-import dadb.Dadb
-import maestro.*
-import maestro.drivers.AndroidDriver
-import maestro.orchestra.*
+import maestro.Maestro
+import maestro.TreeNode
+import maestro.ViewHierarchy
+import maestro.orchestra.MaestroCommand
+import maestro.orchestra.Orchestra
 import java.io.File
-import java.util.concurrent.TimeoutException
 
 interface Device {
   fun executeCommands(commands: List<MaestroCommand>)
@@ -181,41 +181,3 @@ class MaestroDevice(
   }
 }
 
-val maestroInstance: Maestro by lazy {
-  var dadb = Dadb.discover()!!
-  val maestro = retry {
-    val driver = AndroidDriver(
-      dadb
-    )
-    try {
-      dadb.close()
-      dadb = Dadb.discover()!!
-      Maestro.android(
-        driver
-      )
-    } catch (e: Exception) {
-      driver.close()
-      dadb.close()
-      throw e
-    }
-  }
-  maestro
-}
-
-private fun <T> retry(times: Int = 5, block: () -> T): T {
-  repeat(times) {
-    try {
-      return block()
-    } catch (e: Exception) {
-      println("Failed to run agent: $e")
-      e.printStackTrace()
-    }
-  }
-
-  throw TimeoutException("Failed to run agent")
-}
-
-
-fun closeMaestro() {
-  (maestroInstance as Maestro).close()
-}
