@@ -219,16 +219,16 @@ interface ArbiterDecisionInterceptor : ArbiterInterceptor {
 }
 
 interface ArbiterExecuteCommandsInterceptor : ArbiterInterceptor {
-  fun intercept(executeCommandsInput: ExecuteCommandsInput, chain: Chain): Arbiter.ExecuteCommandsOutput
+  fun intercept(executeCommandsInput: ExecuteCommandsInput, chain: Chain): ExecuteCommandsOutput
   fun interface Chain {
-    fun proceed(executeCommandsInput: ExecuteCommandsInput): Arbiter.ExecuteCommandsOutput
+    fun proceed(executeCommandsInput: ExecuteCommandsInput): ExecuteCommandsOutput
   }
 }
 
 interface ArbiterStepInterceptor : ArbiterInterceptor {
-  fun intercept(stepInput: StepInput, chain: Chain): Arbiter.StepResult
+  fun intercept(stepInput: StepInput, chain: Chain): StepResult
   fun interface Chain {
-    fun proceed(stepInput: StepInput): Arbiter.StepResult
+    fun proceed(stepInput: StepInput): StepResult
   }
 }
 

@@ -12,6 +12,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Button
 import androidx.compose.material.Card
@@ -49,8 +51,6 @@ import com.github.takahirom.arbiter.Arbiter
 import com.github.takahirom.arbiter.ArbiterContextHolder
 import com.github.takahirom.arbiter.GoalAchievedAgentCommand
 import com.github.takahirom.arbiter.MaestroDevice
-import com.github.takahirom.arbiter.OpenAIAi
-import com.github.takahirom.arbiter.arbiter
 import dadb.Dadb
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -89,7 +89,7 @@ class AppStateHolder {
 
   fun addScenario() {
     scenarios.value += ScenarioStateHolder(
-      createArbiter((deviceConnectionState.value as DeviceConnectionState.Connected).maestro)
+      MaestroDevice((deviceConnectionState.value as DeviceConnectionState.Connected).maestro)
     )
     selectedAgentIndex.value = scenarios.value.size - 1
   }
@@ -114,9 +114,6 @@ class AppStateHolder {
     scenarios.value.forEach { it.cancel() }
     job = coroutineScope.launch {
       scenarios.value.withIndex().filter { scenario ->
-//        scenario.contextStateFlow.value?.turns?.value?. {
-//          scenario.agentCommand is GoalAchievedAgentCommand
-//        } ?: true
         !scenario.value.isGoalAchieved()
       }.forEach { (index, scenario: ScenarioStateHolder) ->
         selectedAgentIndex.value = index
@@ -140,7 +137,7 @@ class AppStateHolder {
     }
     scenarios.value = file.readLines().map {
       ScenarioStateHolder(
-        createArbiter((deviceConnectionState.value as DeviceConnectionState.Connected).maestro)
+          MaestroDevice((deviceConnectionState.value as DeviceConnectionState.Connected).maestro)
       ).apply {
         onGoalChanged(it)
       }
@@ -152,10 +149,6 @@ class AppStateHolder {
   }
 }
 
-private fun createArbiter(maestro: Maestro) = arbiter {
-  ai(OpenAIAi(System.getenv("API_KEY")!!))
-  device(MaestroDevice(maestro))
-}
 
 class DevicesStateHolder {
   val isAndroid: MutableStateFlow<Boolean> = MutableStateFlow(true)
@@ -374,10 +367,6 @@ fun App(
 private fun Agent(scenarioStateHolder: ScenarioStateHolder) {
   val isAndroid by remember { mutableStateOf(true) }
   val arbiter: Arbiter? by scenarioStateHolder.arbiterStateFlow.collectAsState()
-  if (arbiter == null) {
-    return
-  }
-  arbiter!!
   val goal by scenarioStateHolder.goalStateFlow.collectAsState()
   var editingGoalTextState by remember(goal) { mutableStateOf(goal) }
   Column {
@@ -405,7 +394,10 @@ private fun Agent(scenarioStateHolder: ScenarioStateHolder) {
       }
     }
     Row(modifier = Modifier.padding(8.dp)) {
-      Column {
+      Column(
+        modifier = Modifier.padding(8.dp)
+      ) {
+        Text("Device inputs:")
         Row(
           verticalAlignment = Alignment.CenterVertically
         ) {
@@ -425,60 +417,113 @@ private fun Agent(scenarioStateHolder: ScenarioStateHolder) {
           Text("TV")
         }
       }
-      
+      Column(
+        modifier = Modifier.padding(8.dp)
+      ) {
+        val initializeMethods by scenarioStateHolder.initializeMethodsStateFlow.collectAsState()
+        Text("Initialize method:")
+        Row(
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          RadioButton(
+            selected = initializeMethods == InitializeMethods.Back,
+            onClick = { scenarioStateHolder.initializeMethodsStateFlow.value = InitializeMethods.Back }
+          )
+          Text("Back")
+        }
+        Row(
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          var editingText by remember { mutableStateOf("") }
+          RadioButton(
+            selected = initializeMethods is InitializeMethods.OpenApp,
+            onClick = { scenarioStateHolder.initializeMethodsStateFlow.value = InitializeMethods.OpenApp(editingText) }
+          )
+          Column {
+            Text("Launch app")
+            BasicTextField(
+              modifier = Modifier
+                .background(
+                  color = MaterialTheme.colors.surface,
+                  shape = RoundedCornerShape(6.dp)
+                )
+                .padding(4.dp)
+              ,
+              enabled = initializeMethods is InitializeMethods.OpenApp,
+              textStyle = MaterialTheme.typography.body2,
+              value = editingText,
+              onValueChange = {
+                editingText = it
+                scenarioStateHolder.initializeMethodsStateFlow.value = InitializeMethods.OpenApp(it)
+              },
+            )
+          }
+        }
+      }
+    }
+    if (arbiter == null) {
+      return
     }
     val histories by arbiter!!.arbiterContextHistoryStateFlow.collectAsState()
     if (histories.isEmpty()) {
       return
     }
-    // History Tabs
-    var selectedTabIndex by remember { mutableStateOf(histories.lastIndex) }
-    TabRow(
-      selectedTabIndex = minOf(selectedTabIndex, histories.lastIndex),
-      backgroundColor = MaterialTheme.colors.primary,
-      contentColor = Color.White
-    ) {
-      histories.forEachIndexed { index, history ->
-        Tab(
-          text = {
-            Row {
-              val isRunning by arbiter!!.isRunningStateFlow.collectAsState()
-              val isRunningItem = index == histories.lastIndex && isRunning
-              val text = if (isRunningItem) {
-                "Running"
-              } else {
-                "History"
-              }
-              Text("$text ${index + 1}")
-              if (isRunningItem) {
-                CircularProgressIndicator(
-                  modifier = Modifier.size(16.dp),
-                  color = Color.White
-                )
-              } else if (!history.turns.value.any { it.agentCommand is GoalAchievedAgentCommand }) {
-                Icon(
-                  imageVector = Icons.Default.Warning,
-                  contentDescription = "Goal not achieved",
-                  tint = Color.White
-                )
-              } else {
-                Icon(
-                  imageVector = Icons.Default.Check,
-                  contentDescription = "Goal achieved",
-                  tint = Color.White
-                )
-              }
+    ArbiterContextHistories(histories, arbiter)
+  }
+}
+
+@Composable
+private fun ArbiterContextHistories(
+  histories: List<ArbiterContextHolder>,
+  arbiter: Arbiter?
+) {
+  // History Tabs
+  var selectedTabIndex by remember { mutableStateOf(histories.lastIndex) }
+  TabRow(
+    selectedTabIndex = minOf(selectedTabIndex, histories.lastIndex),
+    backgroundColor = MaterialTheme.colors.primary,
+    contentColor = Color.White
+  ) {
+    histories.forEachIndexed { index, history ->
+      Tab(
+        text = {
+          Row {
+            val isRunning by arbiter!!.isRunningStateFlow.collectAsState()
+            val isRunningItem = index == histories.lastIndex && isRunning
+            val text = if (isRunningItem) {
+              "Running"
+            } else {
+              "History"
             }
-          },
-          selected = selectedTabIndex == index,
-          onClick = { selectedTabIndex = index }
-        )
-      }
+            Text("$text ${index + 1}")
+            if (isRunningItem) {
+              CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                color = Color.White
+              )
+            } else if (!history.turns.value.any { it.agentCommand is GoalAchievedAgentCommand }) {
+              Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = "Goal not achieved",
+                tint = Color.White
+              )
+            } else {
+              Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = "Goal achieved",
+                tint = Color.White
+              )
+            }
+          }
+        },
+        selected = selectedTabIndex == index,
+        onClick = { selectedTabIndex = index }
+      )
     }
-    val slectedHistory = histories.getOrNull(selectedTabIndex)
-    slectedHistory?.let { agentContext ->
-      ArbiterContext(agentContext)
-    }
+  }
+  val slectedHistory = histories.getOrNull(selectedTabIndex)
+  slectedHistory?.let { agentContext ->
+    ArbiterContext(agentContext)
   }
 }
 

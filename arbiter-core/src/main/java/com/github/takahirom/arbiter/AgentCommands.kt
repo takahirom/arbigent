@@ -67,8 +67,8 @@ data class ClickWithTextAgentCommand(val textRegex: String) : AgentCommand {
             "action": "$actionName",
             // the text should be clickable text, or content description. should be in UI hierarchy. should not resource id
             // You can use Regex.
-            // If you want to click second button, you can use text[index] e.g.: "text[1]" 
-            "text": "..." 
+            // If you want to click second button, you can use text[index] e.g.: "text[1]". Be careful, the index starts from 0.
+            "text": "...[index]" 
         }
         """.trimIndent()
     }
