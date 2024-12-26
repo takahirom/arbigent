@@ -61,8 +61,12 @@ class Arbiter(
   val isRunningStateFlow: MutableStateFlow<Boolean> = MutableStateFlow(false)
   private val currentGoalStateFlow = MutableStateFlow<String?>(null)
   val isArchivedStateFlow = arbiterContextHolderStateFlow
-    .flatMapConcat { it?.turns ?: flowOf() }
-    .map { it.any { it.agentCommand is GoalAchievedAgentCommand } }
+    .flatMapLatest {
+      it?.turns ?: flowOf()
+    }
+    .map { turns: List<ArbiterContextHolder.Turn> ->
+      turns.any { it.agentCommand is GoalAchievedAgentCommand }
+    }
     .stateIn(coroutineScope, SharingStarted.Lazily, false)
 
   suspend fun waitUntilFinished() {
@@ -72,44 +76,60 @@ class Arbiter(
   fun execute(
     goal: String,
     maxStep: Int = 10,
+    retry: Int = 3,
     agentCommandTypes: List<AgentCommandType> = defaultAgentCommandTypes()
   ) {
-    isRunningStateFlow.value = true
-    this.currentGoalStateFlow.value = goal
-    val arbiterContextHolder = ArbiterContextHolder(goal)
-    arbiterContextHolderStateFlow.value = arbiterContextHolder
+    println("Start executing goal: $goal")
     job?.cancel()
     job = coroutineScope.launch {
-      try {
-        initializerChain(device)
-        repeat(maxStep) {
-          yield()
-          val stepInput = StepInput(
-            arbiterContextHolder = arbiterContextHolder,
-            agentCommandTypes = agentCommandTypes,
-            device = device,
-            ai = ai,
-            decisionChain = decisionChain,
-            executeCommandChain = executeCommandChain
-          )
-          when (stepChain(stepInput)) {
-            StepResult.GoalAchieved -> {
-              isRunningStateFlow.value = false
-              return@launch
-            }
+      var remainRetry = retry
+      do {
+        execute(goal, maxStep, agentCommandTypes)
+        yield()
+      } while (isArchivedStateFlow.value.not() && remainRetry-- > 0)
+    }
+  }
 
-            StepResult.Continue -> {
-              // continue
-            }
+  private suspend fun execute(
+      goal: String,
+      maxStep: Int,
+      agentCommandTypes: List<AgentCommandType>
+  ) {
+    try {
+      isRunningStateFlow.value = true
+      currentGoalStateFlow.value = goal
+      val arbiterContextHolder = ArbiterContextHolder(goal)
+      println("Setting new ArbiterContextHolder: $arbiterContextHolder")
+      arbiterContextHolderStateFlow.value = arbiterContextHolder
+
+      initializerChain(device)
+      repeat(maxStep) {
+        val stepInput = StepInput(
+          arbiterContextHolder = arbiterContextHolder,
+          agentCommandTypes = agentCommandTypes,
+          device = device,
+          ai = ai,
+          decisionChain = decisionChain,
+          executeCommandChain = executeCommandChain
+        )
+        when (stepChain(stepInput)) {
+          StepResult.GoalAchieved -> {
+            isRunningStateFlow.value = false
+            return@repeat
+          }
+
+          StepResult.Continue -> {
+            // continue
+            delay(1000)
           }
         }
-        println("Finish")
-        isRunningStateFlow.value = false
-      } catch (e: Exception) {
-        println("Failed to run agent: $e")
-        e.printStackTrace()
-        isRunningStateFlow.value = false
       }
+      println("Finish")
+      isRunningStateFlow.value = false
+    } catch (e: Exception) {
+      println("Failed to run agent: $e")
+      e.printStackTrace()
+      isRunningStateFlow.value = false
     }
   }
 
@@ -239,6 +259,7 @@ private fun executeCommands(
     try {
       agentCommand.runOrchestraCommand(device)
     } catch (e: MaestroException) {
+      e.printStackTrace()
       arbiterContextHolder.addTurn(
         ArbiterContextHolder.Turn(
           memo = "Failed to perform action: ${e.message}",
@@ -246,6 +267,7 @@ private fun executeCommands(
         )
       )
     } catch (e: StatusRuntimeException) {
+      e.printStackTrace()
       arbiterContextHolder.addTurn(
         ArbiterContextHolder.Turn(
           memo = "Failed to perform action: ${e.message}",
@@ -253,6 +275,7 @@ private fun executeCommands(
         )
       )
     } catch (e: IllegalStateException) {
+      e.printStackTrace()
       arbiterContextHolder.addTurn(
         ArbiterContextHolder.Turn(
           memo = "Failed to perform action: ${e.message}",

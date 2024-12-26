@@ -72,7 +72,7 @@ $templates"""
     response: String,
     message: List<ChatMessage>,
     screenshotFileName: String,
-    agentCommandMap: Map<String, AgentCommandType>
+    agentCommandList: List<AgentCommandType>
   ): ArbiterContextHolder.Turn {
     val json = Json { ignoreUnknownKeys = true }
     val responseObj = json.decodeFromString<ChatCompletionResponse>(response)
@@ -83,8 +83,10 @@ $templates"""
       val jsonObject = jsonElement.jsonObject
       val action =
         jsonObject["action"]?.jsonPrimitive?.content ?: throw Exception("Action not found")
+      val agentCommandMap = agentCommandList.associateBy { it.actionName }
       val commandPrototype = agentCommandMap[action] ?: throw Exception("Unknown action: $action")
       val agentCommand: AgentCommand = when (commandPrototype) {
+        GoalAchievedAgentCommand -> GoalAchievedAgentCommand()
         ClickWithTextAgentCommand -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
           ClickWithTextAgentCommand(text)
@@ -108,7 +110,6 @@ $templates"""
 
         ScrollAgentCommand -> ScrollAgentCommand()
 
-        GoalAchievedAgentCommand -> GoalAchievedAgentCommand()
         else -> throw Exception("Unsupported action: $action")
       }
       ArbiterContextHolder.Turn(

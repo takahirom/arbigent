@@ -14,19 +14,48 @@ interface AgentCommandType {
   fun templateForAI(): String
 }
 
+private fun getRegexToIndex(text: String): Pair<String, String> {
+  val regex = Regex("""(.*)\[(\d+)]""")
+  val matchResult = regex.find(text) ?: return Pair(text, "0")
+  val (regexText, index) = matchResult.destructured
+  return Pair(regexText, index)
+}
+
 data class ClickWithTextAgentCommand(val textRegex: String) : AgentCommand {
   override val actionName = Companion.actionName
 
   override fun runOrchestraCommand(device: Device) {
-    device.executeCommands(
-      commands = listOf(
-        MaestroCommand(
-          tapOnElement = TapOnElementCommand(
-            ElementSelector(textRegex = textRegex)
-          )
-        )
-      ),
+    val (textRegex, index) = getRegexToIndex(textRegex)
+    val maestroCommand = MaestroCommand(
+      tapOnElement = TapOnElementCommand(
+        selector = ElementSelector(
+          textRegex = "$textRegex",
+          index = index
+        ),
+        waitToSettleTimeoutMs = 500,
+        retryIfNoChange = false,
+        waitUntilVisible = false
+      )
     )
+    try {
+      device.executeCommands(
+        commands = listOf(
+          maestroCommand
+        ),
+      )
+    } catch (e: MaestroException) {
+      device.executeCommands(
+        commands = listOf(
+          maestroCommand.copy(
+            tapOnElement = maestroCommand.tapOnElement!!.copy(
+              selector = maestroCommand.tapOnElement!!.selector.copy(
+                textRegex = ".*$textRegex.*"
+              )
+            )
+          )
+        ),
+      )
+    }
   }
 
   companion object : AgentCommandType {
@@ -37,7 +66,8 @@ data class ClickWithTextAgentCommand(val textRegex: String) : AgentCommand {
         {
             "action": "$actionName",
             // the text should be clickable text, or content description. should be in UI hierarchy. should not resource id
-            // You can use Regex
+            // You can use Regex.
+            // If you want to click second button, you can use text[index] e.g.: "text[1]" 
             "text": "..." 
         }
         """.trimIndent()
@@ -50,11 +80,17 @@ data class ClickWithIdAgentCommand(val textRegex: String) : AgentCommand {
   override val actionName = Companion.actionName
 
   override fun runOrchestraCommand(device: Device) {
+    val (textRegex, index) = getRegexToIndex(textRegex)
     device.executeCommands(
       commands = listOf(
         MaestroCommand(
           tapOnElement = TapOnElementCommand(
-            ElementSelector(idRegex = textRegex)
+            selector = ElementSelector(
+              idRegex = textRegex,
+              index = index
+            ),
+            waitToSettleTimeoutMs = 500,
+            waitUntilVisible = false
           )
         )
       ),
@@ -70,6 +106,7 @@ data class ClickWithIdAgentCommand(val textRegex: String) : AgentCommand {
             "action": "$actionName",
             // the text should be id, should be in UI hierarchy
             // You can use Regex
+            // If you want to click second button, you can use "button[1]"
             "text": "..." 
         }
         """.trimIndent()

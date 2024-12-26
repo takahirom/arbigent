@@ -30,27 +30,27 @@ class AppStateHolder {
     val goalStateFlow: MutableStateFlow<String> = MutableStateFlow("")
     val goal get() = goalStateFlow.value
     val arbiterStateFlow: MutableStateFlow<Arbiter> = MutableStateFlow(initialArbiter)
-    val arbiter get() = arbiterStateFlow.value
     val isArchived = arbiterStateFlow
-      .flatMapConcat { it?.isArchivedStateFlow ?: MutableStateFlow(false) }
+      .flatMapLatest { it.isArchivedStateFlow }
       .stateIn(
         scope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
         started = SharingStarted.WhileSubscribed(),
         initialValue = false
       )
     val isRunning = arbiterStateFlow
-      .flatMapConcat { it.isRunningStateFlow }
+      .flatMapLatest { it.isRunningStateFlow }
       .stateIn(
         scope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
         started = SharingStarted.WhileSubscribed(),
         initialValue = false
       )
-    val contextStateFlow = arbiterStateFlow.flatMapConcat { it.arbiterContextHolderStateFlow }
+    val contextStateFlow = arbiterStateFlow.flatMapLatest { it.arbiterContextHolderStateFlow }
       .stateIn(
         scope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
         started = SharingStarted.WhileSubscribed(),
         initialValue = null
       )
+
     fun execute() {
       arbiterStateFlow.value!!.execute(goal)
     }
@@ -233,6 +233,7 @@ fun App() {
                   text = "Goal:" + goal
                 )
                 val isArchived by scenarioStateHolder.isArchived.collectAsState()
+                println("Compose isArchived: $isArchived")
                 if (isArchived) {
                   Icon(
                     imageVector = Icons.Default.Check,
@@ -271,9 +272,13 @@ fun App() {
 @Composable
 private fun Agent(scenarioStateHolder: AppStateHolder.ScenarioStateHolder) {
   val isAndroid by remember { mutableStateOf(true) }
-  val agentArbiterContextHolder: ArbiterContextHolder? by scenarioStateHolder.contextStateFlow.collectAsState()
+  val arbiter: Arbiter? by scenarioStateHolder.arbiterStateFlow.collectAsState()
+  if (arbiter == null) {
+    return
+  }
+  val agentArbiterContextHolder by arbiter!!.arbiterContextHolderStateFlow.collectAsState()
   val goal by scenarioStateHolder.goalStateFlow.collectAsState()
-  var editinggoalTextState by remember(goal) { mutableStateOf(goal) }
+  var editingGoalTextState by remember(goal) { mutableStateOf(goal) }
   Column {
     Row(
       verticalAlignment = Alignment.CenterVertically
@@ -321,9 +326,9 @@ private fun Agent(scenarioStateHolder: AppStateHolder.ScenarioStateHolder) {
       Text("Goal:")
       TextField(
         modifier = Modifier.weight(1f),
-        value = editinggoalTextState,
+        value = editingGoalTextState,
         onValueChange = {
-          editinggoalTextState = it
+          editingGoalTextState = it
           scenarioStateHolder.onGoalChanged(it)
         },
       )

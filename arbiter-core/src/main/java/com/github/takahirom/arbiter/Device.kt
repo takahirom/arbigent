@@ -20,14 +20,22 @@ class MaestroDevice(
     maestro = maestro,
     screenshotsDir = screenshotsDir
   )
+
   override fun executeCommands(commands: List<MaestroCommand>) {
-    orchestra.executeCommands(commands)
+    // If the jsEngine is already initialized, we don't need to reinitialize it
+    val shouldJsReinit = if (orchestra::class.java.getDeclaredField("jsEngine").apply {
+        isAccessible = true
+      }.get(orchestra) != null) {
+      false
+    } else {
+      true
+    }
+    orchestra.executeCommands(commands, shouldReinitJsEngine = shouldJsReinit)
   }
 
   override fun viewTreeString(): String {
     return maestro.viewHierarchy(false).toOptimizedString()
   }
-
 
 
   data class OptimizationResult(
@@ -43,14 +51,20 @@ class MaestroDevice(
     // Optimize children
     val childResults = children
       .filter {
-        it.attributes["resource-id"] != "status_bar_container"
+        it.attributes["resource-id"]?.contains("status_bar_container").let {
+            if(it != null) !it
+            else true
+        }
       }
       .map { it.optimizeTree(false, meaningfulAttributes, viewHierarchy) }
     val optimizedChildren = childResults.flatMap {
       it.node?.let { node -> listOf(node) } ?: it.promotedChildren
     }
-    val hasContent = attributes.keys.any { it in meaningfulAttributes }
-      && (children.isNotEmpty() || viewHierarchy.isVisible(this))
+    val hasContent = children.isNotEmpty()
+            || (attributes.keys.any { it in meaningfulAttributes })
+    if(!hasContent) {
+        println("Node has no content: $this viewHierarchy.isVisible(this):${viewHierarchy.isVisible(this)}")
+    }
     val singleChild = optimizedChildren.singleOrNull()
 
     return when {
@@ -88,18 +102,6 @@ class MaestroDevice(
   }
 
   fun TreeNode.optimizedToString(depth: Int, enableDepth: Boolean = false): String {
-    /**
-     * data class TreeNode(
-     *     val attributes: MutableMap<String, String> = mutableMapOf(),
-     *     val children: List<TreeNode> = emptyList(),
-     *     val clickable: Boolean? = null,
-     *     val enabled: Boolean? = null,
-     *     val focused: Boolean? = null,
-     *     val checked: Boolean? = null,
-     *     val selected: Boolean? = null,
-     * )
-     * if it is not true, it shouldn't be included in the output
-     */
     val blank = " ".repeat(depth)
     fun StringBuilder.appendString(str: String) {
       if (enableDepth) {
@@ -110,17 +112,18 @@ class MaestroDevice(
       }
     }
     return buildString {
-      appendString("Node(")
+      val className = attributes["class"]?.substringAfterLast('.') ?: "Node"
+      appendString("$className(")
 //    appendString("attributes=$attributes, ")
       if (attributes.isNotEmpty()) {
 //      appendString("attr={")
         attributes.forEach { (key, value) ->
           if (key == "class") {
-            appendString("class=${value.substringAfterLast('.')}, ")
+            // Skip class name
           } else if (key == "resource-id" && value.isNotBlank()) {
             appendString("id=${value.substringAfterLast('/')}, ")
           } else if (key == "clickable") {
-            appendString("clickable=$value, ")
+            // Skip clickable
           } else if (key == "enabled") {
             if (value == "false") {
               appendString("enabled=$value, ")
@@ -131,7 +134,8 @@ class MaestroDevice(
         }
 //      appendString("}, ")
       }
-      if (clickable != null && clickable!!) {
+      val clickable = clickable ?: attributes["clickable"]
+      if (clickable != null) {
         appendString("clickable=$clickable, ")
       }
       if (enabled != null && !enabled!!) {
@@ -171,8 +175,9 @@ class MaestroDevice(
     )
     val optimizedTree = result.node ?: result.promotedChildren.firstOrNull()
     println("Before optimization (length): ${this.toString().length}")
-    println("After optimization (length): ${optimizedTree?.optimizedToString(depth = 0)?.length}")
-    return optimizedTree?.optimizedToString(depth = 0) ?: ""
+    val optimizedToString = optimizedTree?.optimizedToString(depth = 0)
+    println("After optimization (length): ${optimizedToString?.length}")
+    return optimizedToString ?: ""
   }
 }
 
@@ -209,7 +214,6 @@ private fun <T> retry(times: Int = 5, block: () -> T): T {
 
   throw TimeoutException("Failed to run agent")
 }
-
 
 
 fun closeMaestro() {

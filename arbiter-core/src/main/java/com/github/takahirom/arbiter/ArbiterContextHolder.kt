@@ -2,7 +2,7 @@ package com.github.takahirom.arbiter
 
 import kotlinx.coroutines.flow.MutableStateFlow
 
-data class ArbiterContextHolder(
+class ArbiterContextHolder(
   val goal: String,
 ) {
   class Turn(
