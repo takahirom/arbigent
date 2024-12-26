@@ -384,26 +384,6 @@ private fun Agent(scenarioStateHolder: ScenarioStateHolder) {
     Row(
       verticalAlignment = Alignment.CenterVertically
     ) {
-      Column(modifier = Modifier.padding(8.dp)) {
-        Row(
-          verticalAlignment = Alignment.CenterVertically
-        ) {
-          RadioButton(
-            selected = isAndroid,
-            onClick = { }
-          )
-          Text("Mobile")
-        }
-        Row(
-          verticalAlignment = Alignment.CenterVertically
-        ) {
-          RadioButton(
-            selected = !isAndroid,
-            onClick = { }
-          )
-          Text("TV")
-        }
-      }
       Text("Goal:")
       TextField(
         modifier = Modifier.weight(1f),
@@ -423,6 +403,29 @@ private fun Agent(scenarioStateHolder: ScenarioStateHolder) {
       }) {
         Text("Cancel")
       }
+    }
+    Row(modifier = Modifier.padding(8.dp)) {
+      Column {
+        Row(
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          RadioButton(
+            selected = isAndroid,
+            onClick = { }
+          )
+          Text("Mobile")
+        }
+        Row(
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          RadioButton(
+            selected = !isAndroid,
+            onClick = { }
+          )
+          Text("TV")
+        }
+      }
+      
     }
     val histories by arbiter!!.arbiterContextHistoryStateFlow.collectAsState()
     if (histories.isEmpty()) {
@@ -574,7 +577,6 @@ fun main() = application {
           appStateHolder.fileSelectionState.value = FileSelectionState.NotSelected
         }
       )
-      return@Window
     } else if (fileSelectionState is FileSelectionState.Saving) {
       FileSaveDialog(
         title = "Save a file",
@@ -583,7 +585,6 @@ fun main() = application {
           appStateHolder.fileSelectionState.value = FileSelectionState.NotSelected
         }
       )
-      return@Window
     }
     App(
       appStateHolder = appStateHolder,
