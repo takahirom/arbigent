@@ -47,8 +47,7 @@ class OpenAIAi(private val apiKey: String) : Ai {
     )
     val responseText = chatCompletion(messages)
     val turn = parseResponse(responseText, messages, screenshotFileName, agentCommandTypes)
-    arbiterContext.addTurn(turn)
-    return  Ai.DecisionOutput(listOf(turn.agentCommand!!))
+    return  Ai.DecisionOutput(listOf(turn.agentCommand!!), turn)
   }
 
   private fun buildPrompt(

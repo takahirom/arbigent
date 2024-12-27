@@ -8,7 +8,8 @@ interface Ai {
     val screenshotFileName: String,
   )
   data class DecisionOutput(
-    val agentCommands: List<AgentCommand>
+    val agentCommands: List<AgentCommand>,
+    val turn: ArbiterContextHolder.Turn
   )
   fun decideWhatToDo(
     decisionInput: DecisionInput

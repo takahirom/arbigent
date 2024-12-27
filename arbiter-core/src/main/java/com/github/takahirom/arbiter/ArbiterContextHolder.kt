@@ -24,6 +24,7 @@ class ArbiterContextHolder(
 
   val turns = MutableStateFlow<List<Turn>>(listOf())
   fun addTurn(turn: Turn) {
+    println("addTurn: $turn")
     turns.value = turns.value.toMutableList() + turn
   }
 

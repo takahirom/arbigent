@@ -1,8 +1,11 @@
 package com.github.takahirom.arbiter
 
+import maestro.DeviceInfo
 import maestro.Maestro
 import maestro.TreeNode
+import maestro.UiElement.Companion.toUiElementOrNull
 import maestro.ViewHierarchy
+import maestro.filterOutOfBounds
 import maestro.orchestra.MaestroCommand
 import maestro.orchestra.Orchestra
 import java.io.File
@@ -34,7 +37,10 @@ class MaestroDevice(
   }
 
   override fun viewTreeString(): String {
-    return maestro.viewHierarchy(false).toOptimizedString()
+
+    return maestro.viewHierarchy(false).toOptimizedString(
+      deviceInfo = maestro.cachedDeviceInfo
+    )
   }
 
 
@@ -52,18 +58,28 @@ class MaestroDevice(
     val childResults = children
       .filter {
         it.attributes["resource-id"]?.contains("status_bar_container").let {
-            if(it != null) !it
-            else true
-        }
+          if (it != null) !it
+          else true
+        } &&
+          (it.toUiElementOrNull()?.bounds?.let {
+            it.width > 0 && it.height > 0
+          }) ?: true
       }
       .map { it.optimizeTree(false, meaningfulAttributes, viewHierarchy) }
     val optimizedChildren = childResults.flatMap {
       it.node?.let { node -> listOf(node) } ?: it.promotedChildren
     }
-    val hasContent = children.isNotEmpty()
-            || (attributes.keys.any { it in meaningfulAttributes })
-    if(!hasContent) {
-        println("Node has no content: $this viewHierarchy.isVisible(this):${viewHierarchy.isVisible(this)}")
+    val hasContent =
+      children.isNotEmpty()
+        || (attributes.keys.any { it in meaningfulAttributes })
+    if (!hasContent) {
+      println(
+        "Node has no content: $this viewHierarchy.isVisible(this):${
+          viewHierarchy.isVisible(
+            this
+          )
+        }"
+      )
     }
     val singleChild = optimizedChildren.singleOrNull()
 
@@ -165,10 +181,14 @@ class MaestroDevice(
   }
 
   fun ViewHierarchy.toOptimizedString(
-    meaningfulAttributes: Set<String> = setOf("text", "content description", "hintText")
+    meaningfulAttributes: Set<String> = setOf("text", "content description", "hintText"),
+    deviceInfo: DeviceInfo
   ): String {
     val root = root
-    val result = root.optimizeTree(
+    val result = root.filterOutOfBounds(
+      width = deviceInfo.widthPixels,
+      height = deviceInfo.heightPixels
+    )!!.optimizeTree(
       isRoot = true,
       viewHierarchy = this,
       meaningfulAttributes = meaningfulAttributes
