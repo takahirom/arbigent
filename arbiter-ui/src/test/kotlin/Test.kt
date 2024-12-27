@@ -69,13 +69,13 @@ class FakeAi : Ai {
 
 @OptIn(ExperimentalTestApi::class)
 @RunWith(Parameterized::class)
-class Tests(val behavior: DescribedBehavior<ComposeUiTest>) {
+class Tests(val behavior: DescribedBehavior<TestRobot>) {
   @Test
   fun test() {
     runComposeUiTest {
       setContent()
       runTest {
-        behavior.execute(this@runComposeUiTest)
+        behavior.execute(TestRobot(this@runComposeUiTest))
       }
     }
   }
@@ -95,55 +95,45 @@ class Tests(val behavior: DescribedBehavior<ComposeUiTest>) {
   companion object {
     @JvmStatic
     @Parameterized.Parameters(name = "{0}")
-    fun data(): DescribedBehaviors<ComposeUiTest> {
-      return describeBehaviors<ComposeUiTest>("Tests") {
-        describe("when the user opens the app") {
+    fun data(): DescribedBehaviors<TestRobot> {
+      return describeBehaviors<TestRobot>("Tests") {
+        describe("when opens the app") {
           itShould("have a Connect to device button") {
-            onNode(hasText("Connect to device")).assertExists()
+            assertConnectToDeviceButtonExists()
             capture(it)
           }
-          describe("when the user clicks the Connect to device button") {
+          describe("when clicks the Connect to device button") {
             doIt {
-              onNode(hasText("Connect to device")).performClick()
+              clickConnectToDeviceButton()
             }
             itShould("show the Add scenario button") {
-              onNode(hasText("Add scenario")).assertExists()
+              assertAddScenarioButtonExists()
               capture(it)
             }
-            describe("when the user clicks the Add scenario button") {
+            describe("when clicks the Add scenario button") {
               doIt {
-                onNode(hasText("Add scenario")).performClick()
+                clickAddScenarioButton()
               }
               itShould("show the Add scenario button") {
                 capture(it)
-                onNode(hasTestTag("goal")).assertExists()
+                assertGoalInputExists()
               }
               describe("when enter goals and run") {
                 doIt {
-                  onNode(hasTestTag("goal")).performTextInput("launch the app")
-                  onNode(hasText("Run")).performClick()
+                  enterGoal("launch the app")
+                  clickRunButton()
                 }
                 itShould("show the Add scenario button") {
                   capture(it)
-                  onNode(hasTestTag("scenario_running")).assertExists()
+                  assertScenarioRunning()
                 }
                 describe("should finish the scenario") {
                   doIt {
-                    waitUntil(
-                      timeoutMillis = 5000
-                    ) {
-                      try {
-                        onNode(hasTestTag("scenario_running")).assertExists()
-                        false
-                      } catch (e: AssertionError) {
-                        true
-                      }
-                    }
+                    waitUntilScenarioRunning()
                   }
                   itShould("show goal achieved") {
                     capture(it)
-                    onNode(hasTestTag("scenario_running")).assertDoesNotExist()
-                    onNode(hasText("GoalAchieved", true)).assertExists()
+                    assertGoalAchieved()
                   }
                 }
               }
@@ -156,5 +146,62 @@ class Tests(val behavior: DescribedBehavior<ComposeUiTest>) {
     private fun ComposeUiTest.capture(it: DescribedBehavior<ComposeUiTest>) {
       onRoot().captureRoboImage("$it.png")
     }
+  }
+}
+
+@ExperimentalTestApi
+class TestRobot(val composeUiTest: ComposeUiTest) {
+  fun clickConnectToDeviceButton() {
+    composeUiTest.onNode(hasText("Connect to device")).performClick()
+  }
+
+  fun clickAddScenarioButton() {
+    composeUiTest.onNode(hasText("Add scenario")).performClick()
+  }
+
+  fun enterGoal(goal: String) {
+    composeUiTest.onNode(hasTestTag("goal")).performTextInput(goal)
+  }
+
+  fun clickRunButton() {
+    composeUiTest.onNode(hasText("Run")).performClick()
+  }
+
+  fun waitUntilScenarioRunning() {
+    composeUiTest.waitUntil(
+      timeoutMillis = 5000
+    ) {
+      try {
+        composeUiTest.onNode(hasTestTag("scenario_running")).assertExists()
+        false
+      } catch (e: AssertionError) {
+        true
+      }
+    }
+  }
+
+  fun assertGoalAchieved() {
+    composeUiTest.onNode(hasTestTag("scenario_running")).assertDoesNotExist()
+    composeUiTest.onNode(hasText("GoalAchieved", true)).assertExists()
+  }
+
+  fun assertConnectToDeviceButtonExists() {
+    composeUiTest.onNode(hasText("Connect to device")).assertExists()
+  }
+
+  fun assertAddScenarioButtonExists() {
+    composeUiTest.onNode(hasText("Add scenario")).assertExists()
+  }
+
+  fun assertGoalInputExists() {
+    composeUiTest.onNode(hasTestTag("goal")).assertExists()
+  }
+
+  fun assertScenarioRunning() {
+    composeUiTest.onNode(hasTestTag("scenario_running")).assertExists()
+  }
+
+  fun capture(describedBehavior: DescribedBehavior<TestRobot>) {
+    composeUiTest.onRoot().captureRoboImage("$describedBehavior.png")
   }
 }
