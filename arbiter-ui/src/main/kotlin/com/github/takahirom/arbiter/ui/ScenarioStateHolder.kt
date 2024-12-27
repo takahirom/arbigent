@@ -14,12 +14,21 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import maestro.orchestra.LaunchAppCommand
 import maestro.orchestra.MaestroCommand
 
+@Serializable
 sealed interface InitializeMethods {
+  @Serializable
+  @SerialName("Back")
   object Back : InitializeMethods
+  @Serializable
+  @SerialName("Noop")
   object Noop : InitializeMethods
+  @Serializable
+  @SerialName("OpenApp")
   data class OpenApp(val packageName: String) : InitializeMethods
 }
 

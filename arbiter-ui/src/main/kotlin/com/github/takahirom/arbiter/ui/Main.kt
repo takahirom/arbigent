@@ -27,6 +27,7 @@ import androidx.compose.material.Tab
 import androidx.compose.material.TabRow
 import androidx.compose.material.Text
 import androidx.compose.material.TextField
+import androidx.compose.material.TextFieldDefaults
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
@@ -401,7 +402,11 @@ private fun Agent(
         Row(
           verticalAlignment = Alignment.CenterVertically
         ) {
-          var editingText by remember { mutableStateOf("") }
+          var editingText by remember(initializeMethods) {
+            mutableStateOf(
+              (initializeMethods as? InitializeMethods.OpenApp)?.packageName ?: ""
+            )
+          }
           RadioButton(
             selected = initializeMethods is InitializeMethods.OpenApp,
             onClick = {
@@ -414,7 +419,7 @@ private fun Agent(
             BasicTextField(
               modifier = Modifier
                 .background(
-                  color = MaterialTheme.colors.surface,
+                  color = TextFieldDefaults.textFieldColors().backgroundColor(true).value,
                   shape = RoundedCornerShape(6.dp)
                 )
                 .padding(4.dp),
@@ -435,7 +440,7 @@ private fun Agent(
         BasicTextField(
           modifier = Modifier
             .background(
-              color = MaterialTheme.colors.surface,
+              color = TextFieldDefaults.textFieldColors().backgroundColor(true).value,
               shape = RoundedCornerShape(6.dp)
             )
             .testTag("dependency_text_field")

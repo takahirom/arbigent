@@ -6,6 +6,7 @@ plugins {
     id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.plugin.compose")
     id("io.github.takahirom.roborazzi") version "1.38.0"
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 dependencies {
@@ -14,6 +15,8 @@ dependencies {
     // (in a separate module for demo project and in testMain).
     // With compose.desktop.common you will also lose @Preview functionality
     implementation(compose.desktop.currentOs)
+//    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    implementation("com.charleskorn.kaml:kaml:0.67.0")
     // kotlin-test
     testImplementation(kotlin("test"))
     @OptIn(ExperimentalComposeLibrary::class)

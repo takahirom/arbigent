@@ -201,23 +201,26 @@ class AppStateHolder(
     }
   }
 
+  private val scenarioSerializer = ScenarioSerializer()
   fun saveGoals(file: File?) {
     if (file == null) {
       return
     }
-    file.writeText(scenariosStateFlow.value.map { it.goal }.joinToString("\n") { it })
+    scenarioSerializer.save(scenariosStateFlow.value, file)
   }
 
   fun loadGoals(file: File?) {
     if (file == null) {
       return
     }
-    scenariosStateFlow.value = file.readLines().map {
+    scenariosStateFlow.value = scenarioSerializer.load(file).map {
       ScenarioStateHolder(
         (deviceConnectionState.value as DeviceConnectionState.Connected).device,
         ai = aiFacotry()
       ).apply {
-        onGoalChanged(it)
+        onGoalChanged(it.goal)
+        dependencyScenarioStateFlow.value = it.dependency
+        initializeMethodsStateFlow.value = it.initializeMethods
       }
     }
   }
