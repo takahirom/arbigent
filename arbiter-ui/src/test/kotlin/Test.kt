@@ -98,23 +98,23 @@ class Tests(val behavior: DescribedBehavior<TestRobot>) {
     fun data(): DescribedBehaviors<TestRobot> {
       return describeBehaviors<TestRobot>("Tests") {
         describe("when opens the app") {
-          itShould("have a Connect to device button") {
+          itShould("have a Connect to device") {
             assertConnectToDeviceButtonExists()
             capture(it)
           }
-          describe("when clicks the Connect to device button") {
+          describe("when clicks the Connect to device") {
             doIt {
               clickConnectToDeviceButton()
             }
-            itShould("show the Add scenario button") {
+            itShould("show the Add scenario") {
               assertAddScenarioButtonExists()
               capture(it)
             }
-            describe("when clicks the Add scenario button") {
+            describe("when clicks the Add scenario") {
               doIt {
                 clickAddScenarioButton()
               }
-              itShould("show the Add scenario button") {
+              itShould("show the Add scenario") {
                 capture(it)
                 assertGoalInputExists()
               }
@@ -123,7 +123,7 @@ class Tests(val behavior: DescribedBehavior<TestRobot>) {
                   enterGoal("launch the app")
                   clickRunButton()
                 }
-                itShould("show the Add scenario button") {
+                itShould("show the Add scenario") {
                   capture(it)
                   assertScenarioRunning()
                 }
@@ -134,6 +134,47 @@ class Tests(val behavior: DescribedBehavior<TestRobot>) {
                   itShould("show goal achieved") {
                     capture(it)
                     assertGoalAchieved()
+                  }
+                }
+              }
+              describe("when add scenarios") {
+                doIt {
+                  enterGoal("launch the app")
+                  clickAddScenarioButton()
+                  enterGoal("launch the app2")
+                }
+                describe("when run all") {
+                  doIt {
+                    clickRunAllButton()
+                  }
+                  itShould("show the Add scenario") {
+                    capture(it)
+                    assertScenarioRunning()
+                  }
+                  describe("should finish the scenario") {
+                    doIt {
+                      waitUntilScenarioRunning()
+                    }
+                    itShould("show goal achieved") {
+                      capture(it)
+                      assertGoalAchieved()
+                    }
+                  }
+                }
+                describe("when add dependency and run") {
+                  doIt {
+                    clickDependencyTextField()
+                    typeDependencyTextField("launch the app")
+                    clickRunAllButton()
+                  }
+                  describe("should finish the scenario") {
+                    doIt {
+                      waitUntilScenarioRunning()
+                    }
+                    itShould("show goal achieved") {
+                      capture(it)
+                      assertGoalAchieved()
+                    }
                   }
                 }
               }
@@ -167,15 +208,21 @@ class TestRobot(val composeUiTest: ComposeUiTest) {
     composeUiTest.onNode(hasText("Run")).performClick()
   }
 
+  fun clickRunAllButton() {
+    composeUiTest.onNode(hasText("Run all scenarios")).performClick()
+  }
+
   fun waitUntilScenarioRunning() {
-    composeUiTest.waitUntil(
-      timeoutMillis = 5000
-    ) {
-      try {
-        composeUiTest.onNode(hasTestTag("scenario_running")).assertExists()
-        false
-      } catch (e: AssertionError) {
-        true
+    repeat(5) {
+      composeUiTest.waitUntil(
+        timeoutMillis = 5000
+      ) {
+        try {
+          composeUiTest.onNode(hasTestTag("scenario_running")).assertExists()
+          false
+        } catch (e: AssertionError) {
+          true
+        }
       }
     }
   }
@@ -199,6 +246,14 @@ class TestRobot(val composeUiTest: ComposeUiTest) {
 
   fun assertScenarioRunning() {
     composeUiTest.onNode(hasTestTag("scenario_running")).assertExists()
+  }
+
+  fun clickDependencyTextField() {
+    composeUiTest.onNode(hasTestTag("dependency_text_field")).performClick()
+  }
+
+  fun typeDependencyTextField(text: String) {
+    composeUiTest.onNode(hasTestTag("dependency_text_field")).performTextInput(text)
   }
 
   fun capture(describedBehavior: DescribedBehavior<TestRobot>) {
