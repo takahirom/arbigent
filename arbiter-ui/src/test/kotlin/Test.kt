@@ -2,6 +2,7 @@ package com.github.takahirom.arbiter.ui
 
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onRoot
@@ -69,7 +70,7 @@ class FakeAi : Ai {
 
 @OptIn(ExperimentalTestApi::class)
 @RunWith(Parameterized::class)
-class Tests(val behavior: DescribedBehavior<TestRobot>) {
+class Tests(private val behavior: DescribedBehavior<TestRobot>) {
   @Test
   fun test() {
     runComposeUiTest {
@@ -197,7 +198,7 @@ class TestRobot(val composeUiTest: ComposeUiTest) {
   }
 
   fun clickAddScenarioButton() {
-    composeUiTest.onNode(hasText("Add scenario")).performClick()
+    composeUiTest.onNode(hasText("Add")).performClick()
   }
 
   fun enterGoal(goal: String) {
@@ -205,11 +206,11 @@ class TestRobot(val composeUiTest: ComposeUiTest) {
   }
 
   fun clickRunButton() {
-    composeUiTest.onNode(hasText("Run")).performClick()
+    composeUiTest.onNode(hasContentDescription("Run")).performClick()
   }
 
   fun clickRunAllButton() {
-    composeUiTest.onNode(hasText("Run all scenarios")).performClick()
+    composeUiTest.onNode(hasContentDescription("Run all")).performClick()
   }
 
   fun waitUntilScenarioRunning() {
@@ -237,7 +238,7 @@ class TestRobot(val composeUiTest: ComposeUiTest) {
   }
 
   fun assertAddScenarioButtonExists() {
-    composeUiTest.onNode(hasText("Add scenario")).assertExists()
+    composeUiTest.onNode(hasText("Add")).assertExists()
   }
 
   fun assertGoalInputExists() {

@@ -81,7 +81,7 @@ class AppStateHolder(
       initialValue = emptyList()
     )
   val selectedAgentIndex: MutableStateFlow<Int> = MutableStateFlow(0)
-  val coroutineScope = CoroutineScope(ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob())
+  private val coroutineScope = CoroutineScope(ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob())
 
   fun addScenario() {
     scenariosStateFlow.value += ScenarioStateHolder(
@@ -97,8 +97,8 @@ class AppStateHolder(
     job?.cancel()
     scenariosStateFlow.value.forEach { it.cancel() }
     job = coroutineScope.launch {
-      scenariosStateFlow.value.forEachIndexed { index, scenario ->
-        selectedAgentIndex.value = index
+      sortedScenariosAndDepthsStateFlow.value.map { it.first }.forEachIndexed { index, scenario ->
+        selectedAgentIndex.value = sortedScenariosAndDepthsStateFlow.value.indexOfFirst { it.first == scenario }
         executeWithDependencies(scenario)
         delay(10)
       }
@@ -109,7 +109,7 @@ class AppStateHolder(
     job?.cancel()
     scenariosStateFlow.value.forEach { it.cancel() }
     job = coroutineScope.launch {
-      selectedAgentIndex.value = scenariosStateFlow.value.indexOf(scenario)
+      selectedAgentIndex.value = sortedScenariosAndDepthsStateFlow.value.indexOfFirst { it.first == scenario }
       executeWithDependencies(scenario)
     }
   }
@@ -190,10 +190,10 @@ class AppStateHolder(
     job?.cancel()
     scenariosStateFlow.value.forEach { it.cancel() }
     job = coroutineScope.launch {
-      scenariosStateFlow.value.withIndex().filter { scenario ->
-        !scenario.value.isGoalAchieved()
-      }.forEach { (index, scenario: ScenarioStateHolder) ->
-        selectedAgentIndex.value = index
+      sortedScenariosAndDepthsStateFlow.value.map { it.first }.filter { scenario ->
+        !scenario.isGoalAchieved()
+      }.forEach { scenario: ScenarioStateHolder ->
+        selectedAgentIndex.value = sortedScenariosAndDepthsStateFlow.value.indexOfFirst { it.first == scenario }
         executeWithDependencies(scenario)
         delay(10)
         scenario.waitUntilFinished()
@@ -231,5 +231,10 @@ class AppStateHolder(
 
   fun onClickConnect(devicesStateHolder: DevicesStateHolder) {
     deviceConnectionState.value = DeviceConnectionState.Connected(deviceFactory(devicesStateHolder))
+  }
+
+  fun removeScenario(scenario: ScenarioStateHolder) {
+    scenario.arbiterStateFlow.value?.cancel()
+    scenariosStateFlow.value = scenariosStateFlow.value.filter { it != scenario }
   }
 }

@@ -31,7 +31,6 @@ import androidx.compose.material.TextFieldDefaults
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.Composable
@@ -162,6 +161,7 @@ fun App(
           }
         )
       }
+      val scenarioIndex by appStateHolder.selectedAgentIndex.collectAsState()
       Row {
         val schenarioAndDepths by appStateHolder.sortedScenariosAndDepthsStateFlow.collectAsState()
         val coroutineScope = rememberCoroutineScope()
@@ -170,6 +170,7 @@ fun App(
             .weight(1f),
           horizontalAlignment = Alignment.CenterHorizontally
         ) {
+          Text("Scenarios")
           Button(onClick = {
             appStateHolder.addScenario()
           }) {
@@ -178,74 +179,65 @@ fun App(
             ) {
               Icon(
                 imageVector = Icons.Default.Add,
-                contentDescription = "Add scenario",
+                contentDescription = "Add",
                 tint = Color.White
               )
-              Text("Add scenario")
+              Text("Add")
             }
           }
-          Button(onClick = {
-            appStateHolder.runAll()
-          }) {
-            Row(
-              verticalAlignment = Alignment.CenterVertically
-            ) {
-              Icon(
-                imageVector = Icons.Default.PlayArrow,
-                contentDescription = "Run all scenarios",
-                tint = Color.Green
-              )
-              Text("Run all scenarios")
+          Row {
+            Button(onClick = {
+              appStateHolder.runAll()
+            }) {
+              Row(
+                verticalAlignment = Alignment.CenterVertically
+              ) {
+                Icon(
+                  imageVector = Icons.Default.PlayArrow,
+                  contentDescription = "Run all",
+                  tint = Color.Green
+                )
+              }
+            }
+            Button(onClick = {
+              coroutineScope.launch {
+                appStateHolder.runAllFailed()
+              }
+            }) {
+              Row(
+                verticalAlignment = Alignment.CenterVertically
+              ) {
+                Icon(
+                  imageVector = Icons.Default.PlayArrow,
+                  contentDescription = "Run all failed",
+                  tint = Color.Green
+                )
+                Icon(
+                  imageVector = Icons.Default.Warning,
+                  contentDescription = "Run all failed",
+                  tint = Color.Yellow
+                )
+              }
             }
           }
-
-          Button(onClick = {
-            coroutineScope.launch {
-              appStateHolder.runAllFailed()
+          Row {
+            Button(onClick = {
+              appStateHolder.fileSelectionState.value = FileSelectionState.Saving
+            }) {
+              Row(
+                verticalAlignment = Alignment.CenterVertically
+              ) {
+                Text("Save")
+              }
             }
-          }) {
-            Row(
-              verticalAlignment = Alignment.CenterVertically
-            ) {
-              Icon(
-                imageVector = Icons.Default.PlayArrow,
-                contentDescription = "Run all failed scenarios",
-                tint = Color.Green
-              )
-              Icon(
-                imageVector = Icons.Default.Warning,
-                contentDescription = "Run all failed scenario",
-                tint = Color.Yellow
-              )
-              Text("Run failed scenarios")
-            }
-          }
-          Button(onClick = {
-            appStateHolder.fileSelectionState.value = FileSelectionState.Saving
-          }) {
-            Row(
-              verticalAlignment = Alignment.CenterVertically
-            ) {
-              Icon(
-                imageVector = Icons.Default.Edit,
-                contentDescription = "Save all scenarios",
-                tint = Color.White
-              )
-              Text("Save all scenarios")
-            }
-          }
-          Button(onClick = {
-            appStateHolder.fileSelectionState.value = FileSelectionState.Loading
-          }) {
-            Row(
-              verticalAlignment = Alignment.CenterVertically
-            ) {
-              Icon(
-                imageVector = Icons.Default.Edit,
-                contentDescription = "Load all scenarios",
-                tint = Color.White
-              )
-              Text("Load all scenarios")
+            Button(onClick = {
+              appStateHolder.fileSelectionState.value = FileSelectionState.Loading
+            }) {
+              Row(
+                verticalAlignment = Alignment.CenterVertically
+              ) {
+                Text("Load")
+              }
             }
           }
           LazyColumn(modifier = Modifier.weight(1f)) {
@@ -260,6 +252,11 @@ fun App(
                     bottom = 4.dp
                   )
                   .clickable { appStateHolder.selectedAgentIndex.value = index },
+                backgroundColor = if (index == scenarioIndex) {
+                  Color.LightGray
+                } else {
+                  Color.White
+                }
               ) {
                 Row(
                   modifier = Modifier.padding(8.dp),
@@ -294,17 +291,19 @@ fun App(
             }
           }
         }
-        val index by appStateHolder.selectedAgentIndex.collectAsState()
-        val scenarioStateHolder = schenarioAndDepths.getOrNull(index)
+        val scenarioStateHolder = schenarioAndDepths.getOrNull(scenarioIndex)
         if (scenarioStateHolder != null) {
           Column(Modifier.weight(3f)) {
-            Agent(
+            Scenario(
               scenarioStateHolder = scenarioStateHolder.first,
               onExecute = {
                 appStateHolder.run(it)
               },
               onCancel = {
                 it.cancel()
+              },
+              onRemove = {
+                appStateHolder.removeScenario(it)
               }
             )
           }
@@ -315,10 +314,11 @@ fun App(
 }
 
 @Composable
-private fun Agent(
+private fun Scenario(
   scenarioStateHolder: ScenarioStateHolder,
   onExecute: (ScenarioStateHolder) -> Unit,
-  onCancel: (ScenarioStateHolder) -> Unit
+  onCancel: (ScenarioStateHolder) -> Unit,
+  onRemove: (ScenarioStateHolder) -> Unit
 ) {
   val isAndroid by remember { mutableStateOf(true) }
   val arbiter: Arbiter? by scenarioStateHolder.arbiterStateFlow.collectAsState()
@@ -340,12 +340,21 @@ private fun Agent(
       Button(onClick = {
         onExecute(scenarioStateHolder)
       }) {
-        Text("Run")
+        Icon(
+          imageVector = Icons.Default.PlayArrow,
+          contentDescription = "Run",
+          tint = Color.Green
+        )
       }
       Button(onClick = {
         onCancel(scenarioStateHolder)
       }) {
         Text("Cancel")
+      }
+      Button(onClick = {
+        onRemove(scenarioStateHolder)
+      }) {
+        Text("Remove")
       }
     }
     Row(modifier = Modifier.padding(8.dp)) {
@@ -498,7 +507,7 @@ private fun ArbiterContextHistories(
                 ""
               }
             } else {
-              "History"
+              ""
             }
             Text(
               modifier = Modifier.weight(1f),
@@ -635,10 +644,10 @@ private fun ApplicationScope.AppWindow(
           Item("Run all failed") {
             appStateHolder.runAllFailed()
           }
-          Item("Save scenarios") {
+          Item("Save") {
             appStateHolder.fileSelectionState.value = FileSelectionState.Saving
           }
-          Item("Load scenarios") {
+          Item("Load") {
             appStateHolder.fileSelectionState.value = FileSelectionState.Loading
           }
         }
