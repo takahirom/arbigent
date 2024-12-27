@@ -14,7 +14,12 @@ dependencies {
     // compose.desktop.currentOs should be used in launcher-sourceSet
     // (in a separate module for demo project and in testMain).
     // With compose.desktop.common you will also lose @Preview functionality
-    implementation(compose.desktop.currentOs)
+    implementation(compose.desktop.currentOs) {
+        exclude(group = "org.jetbrains.compose.material")
+    }
+    implementation("org.jetbrains.jewel:jewel-int-ui-standalone-243:0.27.0")
+    implementation("org.jetbrains.jewel:jewel-int-ui-decorated-window-243:0.27.0")
+    implementation("com.jetbrains.intellij.platform:icons:243.22562.218")
 //    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("com.charleskorn.kaml:kaml:0.67.0")
     // kotlin-test
@@ -31,7 +36,7 @@ dependencies {
 
 compose.desktop {
     application {
-        mainClass = "MainKt"
+        mainClass = "com.github.takahirom.arbiter.ui.MainKt"
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
