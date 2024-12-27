@@ -20,8 +20,8 @@ import androidx.compose.material.Card
 import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.Icon
 import androidx.compose.material.MaterialTheme
-import androidx.compose.material.ProvideTextStyle
 import androidx.compose.material.RadioButton
+import androidx.compose.material.Surface
 import androidx.compose.material.Tab
 import androidx.compose.material.TabRow
 import androidx.compose.material.Text
@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,9 +46,11 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.loadImageBitmap
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.LocalWindowExceptionHandlerFactory
 import androidx.compose.ui.window.MenuBar
 import androidx.compose.ui.window.Window
@@ -55,10 +58,13 @@ import androidx.compose.ui.window.WindowExceptionHandler
 import androidx.compose.ui.window.WindowExceptionHandlerFactory
 import androidx.compose.ui.window.application
 import com.github.takahirom.arbiter.Agent
+import com.github.takahirom.arbiter.Ai
 import com.github.takahirom.arbiter.Arbiter
 import com.github.takahirom.arbiter.ArbiterContextHolder
 import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
+import com.github.takahirom.arbiter.Device
 import com.github.takahirom.arbiter.MaestroDevice
+import com.github.takahirom.arbiter.OpenAIAi
 import dadb.Dadb
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -82,7 +88,7 @@ import java.io.FileInputStream
 
 sealed interface DeviceConnectionState {
   object NotConnected : DeviceConnectionState
-  data class Connected(val maestro: Maestro) : DeviceConnectionState
+  data class Connected(val device: Device) : DeviceConnectionState
 }
 
 sealed interface FileSelectionState {
@@ -91,7 +97,30 @@ sealed interface FileSelectionState {
   object Saving : FileSelectionState
 }
 
-class AppStateHolder {
+class AppStateHolder(
+  val aiFacotry: () -> Ai,
+  val deviceFactory: (DevicesStateHolder) -> Device = { devicesStateHolder ->
+    if (!devicesStateHolder.isAndroid.value) {
+      throw NotImplementedError("iOS is not supported yet")
+    }
+    var dadb = devicesStateHolder.selectedDevice.value
+      ?: devicesStateHolder.devices.value.firstOrNull()
+      ?: throw IllegalStateException("No device selected")
+    val driver = AndroidDriver(
+      dadb
+    )
+    val maestro = try {
+      Maestro.android(
+        driver
+      )
+    } catch (e: Exception) {
+      driver.close()
+      dadb.close()
+      throw e
+    }
+    MaestroDevice(maestro)
+  }
+) {
   val deviceConnectionState: MutableStateFlow<DeviceConnectionState> =
     MutableStateFlow(DeviceConnectionState.NotConnected)
   val fileSelectionState: MutableStateFlow<FileSelectionState> =
@@ -121,7 +150,8 @@ class AppStateHolder {
 
   fun addScenario() {
     scenariosStateFlow.value += ScenarioStateHolder(
-      MaestroDevice((deviceConnectionState.value as DeviceConnectionState.Connected).maestro)
+      device = (deviceConnectionState.value as DeviceConnectionState.Connected).device,
+      ai = aiFacotry()
     )
     selectedAgentIndex.value = scenariosStateFlow.value.size - 1
   }
@@ -172,7 +202,8 @@ class AppStateHolder {
         Arbiter.Task(
           goal = scenario.goal,
           agentConfig = scenario.createAgentConfig(
-            scenario.device
+            scenario.device,
+            scenario.ai
           ),
         )
       )
@@ -187,7 +218,7 @@ class AppStateHolder {
     val dependentMap = mutableMapOf<ScenarioStateHolder, MutableList<ScenarioStateHolder>>()
     val rootScenarios = mutableListOf<ScenarioStateHolder>()
 
-    allScenarios.forEach { scenario->
+    allScenarios.forEach { scenario ->
       allScenarios.firstOrNull { it.goal == scenario.dependencyScenarioStateFlow.value }?.let {
         if (it == scenario) {
           rootScenarios.add(scenario)
@@ -248,7 +279,8 @@ class AppStateHolder {
     }
     scenariosStateFlow.value = file.readLines().map {
       ScenarioStateHolder(
-        MaestroDevice((deviceConnectionState.value as DeviceConnectionState.Connected).maestro)
+        (deviceConnectionState.value as DeviceConnectionState.Connected).device,
+        ai = aiFacotry()
       ).apply {
         onGoalChanged(it)
       }
@@ -257,6 +289,10 @@ class AppStateHolder {
 
   fun close() {
     coroutineScope.cancel()
+  }
+
+  fun onClickConnect(devicesStateHolder: DevicesStateHolder) {
+    deviceConnectionState.value = DeviceConnectionState.Connected(deviceFactory(devicesStateHolder))
   }
 }
 
@@ -308,25 +344,7 @@ fun ConnectionSettingScreen(
       }
     }
     Button(onClick = {
-      if (!devicesStateHolder.isAndroid.value) {
-        throw NotImplementedError("iOS is not supported yet")
-      }
-      var dadb = devicesStateHolder.selectedDevice.value
-        ?: devicesStateHolder.devices.value.firstOrNull()
-        ?: throw IllegalStateException("No device selected")
-      val driver = AndroidDriver(
-        dadb
-      )
-      val maestro = try {
-        Maestro.android(
-          driver
-        )
-      } catch (e: Exception) {
-        driver.close()
-        dadb.close()
-        throw e
-      }
-      appStateHolder.deviceConnectionState.value = DeviceConnectionState.Connected(maestro)
+      appStateHolder.onClickConnect(devicesStateHolder)
     }) {
       Text("Connect to device")
     }
@@ -338,151 +356,178 @@ fun App(
   appStateHolder: AppStateHolder
 ) {
   MaterialTheme {
-    Row {
-      val schenarioAndDepths by appStateHolder.sortedScenariosAndDepthsStateFlow.collectAsState()
-      val coroutineScope = rememberCoroutineScope()
-      Column(
-        Modifier
-          .weight(1f),
-        horizontalAlignment = Alignment.CenterHorizontally
-      ) {
-        Button(onClick = {
-          appStateHolder.addScenario()
-        }) {
-          Row(
-            verticalAlignment = Alignment.CenterVertically
-          ) {
-            Icon(
-              imageVector = Icons.Default.Add,
-              contentDescription = "Add scenario",
-              tint = Color.White
-            )
-            Text("Add scenario")
+    Surface {
+      val deviceConnectionState by appStateHolder.deviceConnectionState.collectAsState()
+      if (deviceConnectionState is DeviceConnectionState.NotConnected) {
+        ConnectionSettingScreen(
+          appStateHolder = appStateHolder
+        )
+        return@Surface
+      }
+      val fileSelectionState by appStateHolder.fileSelectionState.collectAsState()
+      if (fileSelectionState is FileSelectionState.Loading) {
+        FileLoadDialog(
+          title = "Choose a file",
+          onCloseRequest = { file ->
+            appStateHolder.loadGoals(file)
+            appStateHolder.fileSelectionState.value = FileSelectionState.NotSelected
           }
-        }
-        Button(onClick = {
-          appStateHolder.runAll()
-        }) {
-          Row(
-            verticalAlignment = Alignment.CenterVertically
-          ) {
-            Icon(
-              imageVector = Icons.Default.PlayArrow,
-              contentDescription = "Run all scenarios",
-              tint = Color.Green
-            )
-            Text("Run all scenarios")
+        )
+      } else if (fileSelectionState is FileSelectionState.Saving) {
+        FileSaveDialog(
+          title = "Save a file",
+          onCloseRequest = { file ->
+            appStateHolder.saveGoals(file)
+            appStateHolder.fileSelectionState.value = FileSelectionState.NotSelected
           }
-        }
-
-        Button(onClick = {
-          coroutineScope.launch {
-            appStateHolder.runAllFailed()
-          }
-        }) {
-          Row(
-            verticalAlignment = Alignment.CenterVertically
-          ) {
-            Icon(
-              imageVector = Icons.Default.PlayArrow,
-              contentDescription = "Run all failed scenarios",
-              tint = Color.Green
-            )
-            Icon(
-              imageVector = Icons.Default.Warning,
-              contentDescription = "Run all failed scenario",
-              tint = Color.Yellow
-            )
-            Text("Run failed scenarios")
-          }
-        }
-        Button(onClick = {
-          appStateHolder.fileSelectionState.value = FileSelectionState.Saving
-        }) {
-          Row(
-            verticalAlignment = Alignment.CenterVertically
-          ) {
-            Icon(
-              imageVector = Icons.Default.Edit,
-              contentDescription = "Save all scenarios",
-              tint = Color.White
-            )
-            Text("Save all scenarios")
-          }
-        }
-        Button(onClick = {
-          appStateHolder.fileSelectionState.value = FileSelectionState.Loading
-        }) {
-          Row(
-            verticalAlignment = Alignment.CenterVertically
-          ) {
-            Icon(
-              imageVector = Icons.Default.Edit,
-              contentDescription = "Load all scenarios",
-              tint = Color.White
-            )
-            Text("Load all scenarios")
-          }
-        }
-        LazyColumn(modifier = Modifier.weight(1f)) {
-          itemsIndexed(schenarioAndDepths) { index, (scenarioStateHolder, depth) ->
-            val goal by scenarioStateHolder.goalStateFlow.collectAsState()
-            Card(
-              modifier = Modifier.fillMaxWidth()
-                .padding(
-                  start = 8.dp + 12.dp * depth,
-                  top = if(depth == 0) 8.dp else 0.dp,
-                  end = 8.dp,
-                  bottom = 4.dp
-                )
-                .clickable { appStateHolder.selectedAgentIndex.value = index },
+        )
+      }
+      Row {
+        val schenarioAndDepths by appStateHolder.sortedScenariosAndDepthsStateFlow.collectAsState()
+        val coroutineScope = rememberCoroutineScope()
+        Column(
+          Modifier
+            .weight(1f),
+          horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+          Button(onClick = {
+            appStateHolder.addScenario()
+          }) {
+            Row(
+              verticalAlignment = Alignment.CenterVertically
             ) {
-              Row(
-                modifier = Modifier.padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+              Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = "Add scenario",
+                tint = Color.White
+              )
+              Text("Add scenario")
+            }
+          }
+          Button(onClick = {
+            appStateHolder.runAll()
+          }) {
+            Row(
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              Icon(
+                imageVector = Icons.Default.PlayArrow,
+                contentDescription = "Run all scenarios",
+                tint = Color.Green
+              )
+              Text("Run all scenarios")
+            }
+          }
+
+          Button(onClick = {
+            coroutineScope.launch {
+              appStateHolder.runAllFailed()
+            }
+          }) {
+            Row(
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              Icon(
+                imageVector = Icons.Default.PlayArrow,
+                contentDescription = "Run all failed scenarios",
+                tint = Color.Green
+              )
+              Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = "Run all failed scenario",
+                tint = Color.Yellow
+              )
+              Text("Run failed scenarios")
+            }
+          }
+          Button(onClick = {
+            appStateHolder.fileSelectionState.value = FileSelectionState.Saving
+          }) {
+            Row(
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              Icon(
+                imageVector = Icons.Default.Edit,
+                contentDescription = "Save all scenarios",
+                tint = Color.White
+              )
+              Text("Save all scenarios")
+            }
+          }
+          Button(onClick = {
+            appStateHolder.fileSelectionState.value = FileSelectionState.Loading
+          }) {
+            Row(
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              Icon(
+                imageVector = Icons.Default.Edit,
+                contentDescription = "Load all scenarios",
+                tint = Color.White
+              )
+              Text("Load all scenarios")
+            }
+          }
+          LazyColumn(modifier = Modifier.weight(1f)) {
+            itemsIndexed(schenarioAndDepths) { index, (scenarioStateHolder, depth) ->
+              val goal by scenarioStateHolder.goalStateFlow.collectAsState()
+              Card(
+                modifier = Modifier.fillMaxWidth()
+                  .padding(
+                    start = 8.dp + 12.dp * depth,
+                    top = if (depth == 0) 8.dp else 0.dp,
+                    end = 8.dp,
+                    bottom = 4.dp
+                  )
+                  .clickable { appStateHolder.selectedAgentIndex.value = index },
               ) {
-                Text(
-                  modifier = Modifier.weight(1f),
-                  text = "Goal:" + goal
-                )
-                val isArchived by scenarioStateHolder.isArchived.collectAsState()
-                if (isArchived) {
-                  Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = "Archived",
-                    tint = Color.White,
-                    modifier = Modifier.padding(8.dp)
-                      .size(40.dp)
-                      .clip(
-                        CircleShape
-                      )
-                      .background(Color.Green)
+                Row(
+                  modifier = Modifier.padding(8.dp),
+                  verticalAlignment = Alignment.CenterVertically
+                ) {
+                  Text(
+                    modifier = Modifier.weight(1f),
+                    text = "Goal:" + goal
                   )
-                }
-                val isRunning by scenarioStateHolder.isRunning.collectAsState()
-                if (isRunning) {
-                  CircularProgressIndicator(
-                    modifier = Modifier.padding(8.dp)
-                  )
+                  val isArchived by scenarioStateHolder.isArchived.collectAsState()
+                  if (isArchived) {
+                    Icon(
+                      imageVector = Icons.Default.Check,
+                      contentDescription = "Archived",
+                      tint = Color.White,
+                      modifier = Modifier.padding(8.dp)
+                        .size(40.dp)
+                        .clip(
+                          CircleShape
+                        )
+                        .background(Color.Green)
+                    )
+                  }
+                  val isRunning by scenarioStateHolder.isRunning.collectAsState()
+                  if (isRunning) {
+                    CircularProgressIndicator(
+                      modifier = Modifier.padding(8.dp)
+                    )
+                  }
                 }
               }
             }
           }
         }
-      }
-      val index by appStateHolder.selectedAgentIndex.collectAsState()
-      val scenarioStateHolder = schenarioAndDepths.getOrNull(index)
-      if (scenarioStateHolder != null) {
-        Column(Modifier.weight(3f)) {
-          Agent(
-            scenarioStateHolder = scenarioStateHolder.first,
-            onExecute = {
-              appStateHolder.run(it)
-            },
-            onCancel = {
-              it.cancel()
-            }
-          )
+        val index by appStateHolder.selectedAgentIndex.collectAsState()
+        val scenarioStateHolder = schenarioAndDepths.getOrNull(index)
+        if (scenarioStateHolder != null) {
+          Column(Modifier.weight(3f)) {
+            Agent(
+              scenarioStateHolder = scenarioStateHolder.first,
+              onExecute = {
+                appStateHolder.run(it)
+              },
+              onCancel = {
+                it.cancel()
+              }
+            )
+          }
         }
       }
     }
@@ -505,7 +550,7 @@ private fun Agent(
     ) {
       Text("Goal:")
       TextField(
-        modifier = Modifier.weight(1f),
+        modifier = Modifier.weight(1f).testTag("goal"),
         value = editingGoalTextState,
         onValueChange = {
           editingGoalTextState = it
@@ -678,7 +723,7 @@ private fun ArbiterContextHistories(
             val isArchived by agent.isArchivedStateFlow.collectAsState()
             if (isRunning) {
               CircularProgressIndicator(
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(16.dp).testTag("scenario_running"),
                 color = Color.White
               )
             } else if (!isArchived) {
@@ -761,7 +806,20 @@ private fun ArbiterContext(agentContext: ArbiterContextHolder) {
 
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() = application {
-  val appStateHolder = remember { AppStateHolder() }
+  val appStateHolder = remember {
+    AppStateHolder(
+      aiFacotry = { OpenAIAi(System.getenv("API_KEY")!!) },
+    )
+  }
+  AppWindow(appStateHolder, LocalWindowExceptionHandlerFactory)
+}
+
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+private fun ApplicationScope.AppWindow(
+  appStateHolder: AppStateHolder,
+  LocalWindowExceptionHandlerFactory: ProvidableCompositionLocal<WindowExceptionHandlerFactory>
+) {
   Window(
     title = "App Test AI Agent",
     onCloseRequest = {
@@ -769,7 +827,7 @@ fun main() = application {
       exitApplication()
     }) {
     CompositionLocalProvider(
-      LocalWindowExceptionHandlerFactory provides object: WindowExceptionHandlerFactory{
+      LocalWindowExceptionHandlerFactory provides object : WindowExceptionHandlerFactory {
         override fun exceptionHandler(window: Window): WindowExceptionHandler {
           return WindowExceptionHandler { throwable ->
             throwable.printStackTrace()
@@ -799,31 +857,6 @@ fun main() = application {
             appStateHolder.fileSelectionState.value = FileSelectionState.Loading
           }
         }
-      }
-      val deviceConnectionState by appStateHolder.deviceConnectionState.collectAsState()
-      if (deviceConnectionState is DeviceConnectionState.NotConnected) {
-        ConnectionSettingScreen(
-          appStateHolder = appStateHolder
-        )
-        return@CompositionLocalProvider
-      }
-      val fileSelectionState by appStateHolder.fileSelectionState.collectAsState()
-      if (fileSelectionState is FileSelectionState.Loading) {
-        FileLoadDialog(
-          title = "Choose a file",
-          onCloseRequest = { file ->
-            appStateHolder.loadGoals(file)
-            appStateHolder.fileSelectionState.value = FileSelectionState.NotSelected
-          }
-        )
-      } else if (fileSelectionState is FileSelectionState.Saving) {
-        FileSaveDialog(
-          title = "Save a file",
-          onCloseRequest = { file ->
-            appStateHolder.saveGoals(file)
-            appStateHolder.fileSelectionState.value = FileSelectionState.NotSelected
-          }
-        )
       }
       App(
         appStateHolder = appStateHolder,

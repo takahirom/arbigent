@@ -1,10 +1,10 @@
 package com.github.takahirom.arbiter.ui
 
+import com.github.takahirom.arbiter.Ai
 import com.github.takahirom.arbiter.Arbiter
 import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
 import com.github.takahirom.arbiter.ArbiterInitializerInterceptor
 import com.github.takahirom.arbiter.Device
-import com.github.takahirom.arbiter.OpenAIAi
 import com.github.takahirom.arbiter.agentConfig
 import com.github.takahirom.arbiter.arbiter
 import kotlinx.coroutines.CoroutineScope
@@ -23,7 +23,7 @@ sealed interface InitializeMethods {
   data class OpenApp(val packageName: String) : InitializeMethods
 }
 
-class ScenarioStateHolder(val device: Device) {
+class ScenarioStateHolder(val device: Device, val ai: Ai) {
   // (var goal: String?, var arbiter: Arbiter?)
   val goalStateFlow: MutableStateFlow<String> = MutableStateFlow("")
   val goal get() = goalStateFlow.value
@@ -74,8 +74,8 @@ class ScenarioStateHolder(val device: Device) {
     goalStateFlow.value = goal
   }
 
-  fun createAgentConfig(device: Device) = agentConfig {
-    ai(OpenAIAi(System.getenv("API_KEY")!!))
+  fun createAgentConfig(device: Device, ai: Ai) = agentConfig {
+    ai(ai)
     device(device)
     when (val method = initializeMethodsStateFlow.value) {
       InitializeMethods.Back -> {
