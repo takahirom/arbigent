@@ -100,8 +100,8 @@ class AppStateHolder(
     }
   }
 
-  suspend fun executeWithDependencies(schenario: ScenarioStateHolder) {
-    schenario.execute(scenarioDependencyList(schenario))
+  suspend fun executeWithDependencies(scenario: ScenarioStateHolder) {
+    scenario.execute(scenarioDependencyList(scenario))
   }
 
   fun scenarioDependencyList(
@@ -131,7 +131,10 @@ class AppStateHolder(
     }
     dfs(scenario)
     println("executing:" + result)
-    return Arbiter.Scenario(result)
+    return Arbiter.Scenario(
+      tasks = result,
+      retry = scenario.retryStateFlow.value
+    )
   }
 
   private fun sortedScenarioAndDepth(allScenarios: List<ScenarioStateHolder>): List<Pair<ScenarioStateHolder, Int>> {
@@ -208,6 +211,7 @@ class AppStateHolder(
         onGoalChanged(it.goal)
         dependencyScenarioStateFlow.value = it.dependency
         initializeMethodsStateFlow.value = it.initializeMethods
+        retryStateFlow.value = it.retry
       }
     }
   }

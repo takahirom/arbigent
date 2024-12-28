@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -43,6 +44,7 @@ import androidx.compose.ui.window.application
 import com.github.takahirom.arbiter.Agent
 import com.github.takahirom.arbiter.Arbiter
 import com.github.takahirom.arbiter.ArbiterContextHolder
+import com.github.takahirom.arbiter.GoalAchievedAgentCommand
 import com.github.takahirom.arbiter.OpenAIAi
 import com.github.takahirom.arbiter.ui.AppStateHolder.DeviceConnectionState
 import com.github.takahirom.arbiter.ui.AppStateHolder.FileSelectionState
@@ -193,9 +195,10 @@ fun App(
                   modifier = Modifier.padding(8.dp),
                   verticalAlignment = Alignment.CenterVertically
                 ) {
+                  val runningInfo by scenarioStateHolder.runningInfo.collectAsState()
                   Text(
                     modifier = Modifier.weight(1f),
-                    text = "Goal:" + goal
+                    text = "Goal:" + goal + "\n" + runningInfo?.toString().orEmpty()
                   )
                   val isArchived by scenarioStateHolder.isArchived.collectAsState()
                   if (isArchived) {
@@ -231,7 +234,8 @@ fun App(
                 appStateHolder.run(it)
               },
               onCancel = {
-                it.cancel()
+                appStateHolder.close()
+                scenarioStateHolder.first.cancel()
               },
               onRemove = {
                 appStateHolder.removeScenario(it)
@@ -371,6 +375,23 @@ private fun Scenario(
         }
       }
       Column(Modifier.weight(1F)) {
+        GroupHeader("Retry count")
+        Row(
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          val retry by scenarioStateHolder.retryStateFlow.collectAsState()
+          // Retry count
+          TextField(
+            modifier = Modifier
+              .padding(4.dp),
+            value = retry.toString(),
+            onValueChange = {
+              scenarioStateHolder.retryStateFlow.value = it.toIntOrNull() ?: 0
+            },
+          )
+        }
+      }
+      Column(Modifier.weight(1F)) {
         GroupHeader("Scenario dependency")
         val dependency by scenarioStateHolder.dependencyScenarioStateFlow.collectAsState()
 
@@ -404,93 +425,101 @@ private fun Scenario(
 private fun ArbiterContextHistories(
   taskToAgents: List<Pair<Arbiter.Task, Agent>>
 ) {
-  // History Tabs
-  var selectedTabIndex by remember { mutableStateOf(0) }
-  TabStrip(
-    style = TabStyle.Default.light(),
-    modifier = Modifier.fillMaxWidth(),
-    tabs = taskToAgents.mapIndexed { index, taskToAgent ->
-      val (task, agent) = taskToAgent
-      val isRunning by agent!!.isRunningStateFlow.collectAsState()
-      val isArchived by agent.isArchivedStateFlow.collectAsState()
-      TabData.Default(
-        selected = selectedTabIndex == index,
-        onClick = { selectedTabIndex = index },
-        closable = false,
-        content = {
-          SimpleTabContent(
-            state = TabState.of(selected = selectedTabIndex == index),
-            label = run {
-              val text = task.goal + ":" + if (isRunning) {
-                val latestContext by agent.latestArbiterContextStateFlow.collectAsState()
-                latestContext?.let {
-                  val turns: List<ArbiterContextHolder.Turn>? by it.turns.collectAsState()
-                  if (turns.isNullOrEmpty()) {
-                    "Initializing"
-                  } else {
-                    "Running"
-                  }
-                } ?: {
-                  ""
-                }
-              } else {
-                ""
-              }
-              text
-            },
-            iconKey = if (isRunning) {
-              AllIconsKeys.Nodes.WarningMark
-            } else if (!isArchived) {
-              AllIconsKeys.Nodes.WarningMark
-            } else {
-              AllIconsKeys.Actions.Checked
-            },
-          )
-        },
-      )
-    }
-  )
-  val taskToAgent = taskToAgents.getOrNull(selectedTabIndex)
-  taskToAgent?.let { (task, agent) ->
-    val latestContext by agent!!.latestArbiterContextStateFlow.collectAsState()
-    latestContext?.let {
-      ArbiterContext(it)
-    }
-  }
+//  // History Tabs
+//  var selectedTabIndex by remember { mutableStateOf(0) }
+//  TabStrip(
+//    style = TabStyle.Default.light(),
+//    modifier = Modifier.fillMaxWidth(),
+//    tabs = taskToAgents.mapIndexed { index, taskToAgent ->
+//      val (task, agent) = taskToAgent
+//      val isRunning by agent!!.isRunningStateFlow.collectAsState()
+//      val isArchived by agent.isArchivedStateFlow.collectAsState()
+//      TabData.Default(
+//        selected = selectedTabIndex == index,
+//        onClick = { selectedTabIndex = index },
+//        closable = false,
+//        content = {
+//          SimpleTabContent(
+//            state = TabState.of(selected = selectedTabIndex == index),
+//            label = run {
+//              val text = task.goal + ":" + if (isRunning) {
+//                val latestContext by agent.latestArbiterContextStateFlow.collectAsState()
+//                latestContext?.let {
+//                  val turns: List<ArbiterContextHolder.Turn>? by it.turns.collectAsState()
+//                  if (turns.isNullOrEmpty()) {
+//                    "Initializing"
+//                  } else {
+//                    "Running"
+//                  }
+//                } ?: {
+//                  ""
+//                }
+//              } else {
+//                ""
+//              }
+//              text
+//            },
+//            iconKey = if (isRunning) {
+//              AllIconsKeys.Nodes.WarningMark
+//            } else if (!isArchived) {
+//              AllIconsKeys.Nodes.WarningMark
+//            } else {
+//              AllIconsKeys.Actions.Checked
+//            },
+//          )
+//        },
+//      )
+//    }
+//  )
+  ContentPanel(taskToAgents)
 }
 
 @Composable
-private fun ArbiterContext(agentContext: ArbiterContextHolder) {
-  var selectedTurn: Int? by remember(agentContext.turns.value.size) { mutableStateOf(null) }
-  val turns by agentContext.turns.collectAsState()
+private fun ContentPanel(tasksToAgent: List<Pair<Arbiter.Task, Agent>>) {
+  var selectedTurn: ArbiterContextHolder.Turn? by remember { mutableStateOf(null) }
   Row(Modifier) {
     LazyColumn(modifier = Modifier.weight(1f)) {
-      items(turns.size) { index ->
-        val turn = turns[index]
-        Column(
-          Modifier.padding(8.dp)
-            .background(
-              color = if (turn.memo.contains("Failed")) {
-                Color.Red
-              } else {
-                Color.White
-              },
-            )
-            .clickable { selectedTurn = index },
-        ) {
+      itemsIndexed(items = tasksToAgent) { index, (tasks, agent) ->
+        val latestContext by agent.latestArbiterContextStateFlow.collectAsState()
+        val latestTurnsStateFlow = latestContext?.turns ?: return@itemsIndexed
+        val turns: List<ArbiterContextHolder.Turn> by latestTurnsStateFlow.collectAsState()
+
+        if (turns.isEmpty()) {
+          return@itemsIndexed
+        }
+        Column {
           GroupHeader(
             modifier = Modifier.fillMaxWidth(),
-            text = "Turn ${index + 1}",
+            text = tasks.goal + "(" + (index + 1) + "/" + tasksToAgent.size + ")",
           )
-          Text(
-            modifier = Modifier.padding(8.dp),
-            text = turn.text()
-          )
+          turns.forEachIndexed { index, turn ->
+            Column(
+              Modifier.padding(8.dp)
+                .background(
+                  color = if (turn.memo.contains("Failed")) {
+                    Color.Red
+                  } else if(turn.agentCommand is GoalAchievedAgentCommand) {
+                    Color.Green
+                  } else {
+                    Color.White
+                  },
+                )
+                .clickable { selectedTurn = turn },
+            ) {
+              GroupHeader(
+                modifier = Modifier.fillMaxWidth(),
+                text = "Turn ${index + 1}",
+              )
+              Text(
+                modifier = Modifier.padding(8.dp),
+                text = turn.text()
+              )
+            }
+          }
         }
       }
     }
-    selectedTurn?.let { selectedIndex ->
-      val turn = turns[selectedIndex]
+    selectedTurn?.let { turn ->
       turn.message?.let { message: String ->
         val scrollableState = rememberScrollState()
         Text(

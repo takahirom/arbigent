@@ -5,12 +5,14 @@ import com.github.takahirom.arbiter.Arbiter
 import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
 import com.github.takahirom.arbiter.ArbiterInitializerInterceptor
 import com.github.takahirom.arbiter.Device
+import com.github.takahirom.arbiter.RunningInfo
 import com.github.takahirom.arbiter.agentConfig
 import com.github.takahirom.arbiter.arbiter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
@@ -24,9 +26,11 @@ sealed interface InitializeMethods {
   @Serializable
   @SerialName("Back")
   object Back : InitializeMethods
+
   @Serializable
   @SerialName("Noop")
   object Noop : InitializeMethods
+
   @Serializable
   @SerialName("OpenApp")
   data class OpenApp(val packageName: String) : InitializeMethods
@@ -36,12 +40,14 @@ class ScenarioStateHolder(val device: Device, val ai: Ai) {
   // (var goal: String?, var arbiter: Arbiter?)
   val goalStateFlow: MutableStateFlow<String> = MutableStateFlow("")
   val goal get() = goalStateFlow.value
+  val retryStateFlow: MutableStateFlow<Int> = MutableStateFlow(3)
   val initializeMethodsStateFlow: MutableStateFlow<InitializeMethods> =
     MutableStateFlow(InitializeMethods.Back)
   val dependencyScenarioStateFlow = MutableStateFlow<String?>(null)
   val arbiterStateFlow = MutableStateFlow<Arbiter?>(null)
-  private val coroutineScope =
-    CoroutineScope(ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob())
+  private val coroutineScope = CoroutineScope(
+    ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob()
+  )
   val isArchived = arbiterStateFlow
     .flatMapLatest { it?.isArchivedStateFlow ?: flowOf() }
     .stateIn(
@@ -57,9 +63,17 @@ class ScenarioStateHolder(val device: Device, val ai: Ai) {
       initialValue = false
     )
 
+  val runningInfo: StateFlow<RunningInfo?> = arbiterStateFlow
+    .flatMapLatest { it?.runningInfoStateFlow ?: flowOf() }
+    .stateIn(
+      scope = coroutineScope,
+      started = SharingStarted.WhileSubscribed(),
+      initialValue = null
+    )
+
   suspend fun execute(scenario: Arbiter.Scenario) {
     arbiterStateFlow.value?.cancel()
-    val arbiter = arbiter{
+    val arbiter = arbiter {
     }
     arbiterStateFlow.value = arbiter
     arbiterStateFlow.value!!.execute(

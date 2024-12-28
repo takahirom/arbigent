@@ -18,7 +18,8 @@ class ScenarioSerializer {
   class ScenarioContent(
     val goal: String,
     val dependency: String?,
-    val initializeMethods: InitializeMethods
+    val initializeMethods: InitializeMethods,
+    val retry: Int = 0
   )
 
   private val module = SerializersModule {
@@ -36,7 +37,8 @@ class ScenarioSerializer {
       ScenarioContent(
         it.goal,
         it.dependencyScenarioStateFlow.value,
-        it.initializeMethodsStateFlow.value
+        it.initializeMethodsStateFlow.value,
+        it.retryStateFlow.value
       )
     })
     val jsonString = yaml.encodeToString(FileContent.serializer(), fileContent)

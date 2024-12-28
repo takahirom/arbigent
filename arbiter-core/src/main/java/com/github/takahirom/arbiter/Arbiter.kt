@@ -1,8 +1,6 @@
 package com.github.takahirom.arbiter
 
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
@@ -16,9 +14,20 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 
-object ArbiterCorotuinesDispatcher {
-  var dispatcher: CoroutineDispatcher = Dispatchers.Default
+data class RunningInfo(
+  val allTasks: Int,
+  val runningTasks: Int,
+  val retriedTasks: Int,
+  val maxRetry: Int,
+) {
+  override fun toString(): String {
+    return """
+        task:$runningTasks/$allTasks
+        retry:$retriedTasks/$maxRetry
+    """.trimIndent()
+  }
 }
 
 class Arbiter {
@@ -29,6 +38,7 @@ class Arbiter {
 
   data class Scenario(
     val tasks: List<Task>,
+    val retry: Int = 0,
   )
 
   private val _taskToAgentStateFlow = MutableStateFlow<List<Pair<Task, Agent>>>(listOf())
@@ -36,6 +46,8 @@ class Arbiter {
   private var executeJob: Job? = null
   private val coroutineScope =
     CoroutineScope(ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob())
+  private val _runningInfoStateFlow: MutableStateFlow<RunningInfo?> = MutableStateFlow(null)
+  val runningInfoStateFlow: StateFlow<RunningInfo?> = _runningInfoStateFlow.asStateFlow()
   val isArchivedStateFlow = taskToAgentStateFlow.flatMapLatest { taskToAgents ->
     val flows: List<Flow<Boolean>> = taskToAgents.map { taskToAgent ->
       taskToAgent.second.isArchivedStateFlow
@@ -80,19 +92,37 @@ class Arbiter {
 
   suspend fun execute(scenario: Scenario) {
     println("Arbiter.execute start")
-    _taskToAgentStateFlow.value.forEach {
-      it.second.cancel()
-    }
-    _taskToAgentStateFlow.value = scenario.tasks.map { task ->
-      task to Agent(task.agentConfig)
-    }
-    for ((task, agent) in taskToAgentStateFlow.value) {
-      agent.execute(task.goal)
-      if (!agent.isArchivedStateFlow.value) {
-        println("Arbiter.execute break because agent is not archived")
-        break
+
+    var finishedSuccessfully = false
+    var retryRemain = scenario.retry
+    do {
+      _taskToAgentStateFlow.value.forEach {
+        it.second.cancel()
       }
-    }
+      _taskToAgentStateFlow.value = scenario.tasks.map { task ->
+        task to Agent(task.agentConfig)
+      }
+      for ((index, taskAgent) in taskToAgentStateFlow.value.withIndex()) {
+        val (task, agent) = taskAgent
+        _runningInfoStateFlow.value = RunningInfo(
+          allTasks = taskToAgentStateFlow.value.size,
+          runningTasks = index + 1,
+          retriedTasks = scenario.retry - retryRemain,
+          maxRetry = scenario.retry,
+        )
+        agent.execute(task.goal)
+        if (!agent.isArchivedStateFlow.value) {
+          println("Arbiter.execute break because agent is not archived")
+          break
+        }
+        if (index == taskToAgentStateFlow.value.size - 1) {
+          println("Arbiter.execute all agents are archived")
+          finishedSuccessfully = true
+        }
+        yield()
+      }
+    } while (!finishedSuccessfully && retryRemain-- > 0)
+    _runningInfoStateFlow.value = null
     println("Arbiter.execute end")
   }
 
