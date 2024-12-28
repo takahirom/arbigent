@@ -85,15 +85,15 @@ class Agent(
 
   fun executeAsync(
     goal: String,
-    maxStep: Int = 10,
-    retry: Int = 1,
+    maxTurn: Int = 10,
+    maxRetry: Int = 1,
     agentCommandTypes: List<AgentCommandType> = defaultAgentCommandTypes()
   ) {
     job?.cancel()
     job = coroutineScope.launch {
-      var remainRetry = retry
+      var remainRetry = maxRetry
       do {
-        execute(goal, maxStep, agentCommandTypes)
+        execute(goal, maxTurn, agentCommandTypes)
         yield()
         try {
           withTimeout(100.milliseconds) {
@@ -107,7 +107,7 @@ class Agent(
 
   suspend fun execute(
     goal: String,
-    maxStep: Int = 10,
+    maxTurn: Int = 10,
     agentCommandTypes: List<AgentCommandType> = defaultAgentCommandTypes()
   ) {
     println("Arbiter.execute agent.execute start $goal")
@@ -120,7 +120,7 @@ class Agent(
       arbiterContextHistoryStateFlow.value += arbiterContextHolder
 
       initializerChain(device)
-      var stepRemain = maxStep
+      var stepRemain = maxTurn
       while (stepRemain-- > 0 && isArchivedStateFlow.value.not()) {
         val stepInput = StepInput(
           arbiterContextHolder = arbiterContextHolder,

@@ -115,7 +115,7 @@ class Arbiter {
           )
           agent.execute(
             task.goal,
-            maxStep = scenario.maxTurnCount,
+            maxTurn = scenario.maxTurnCount,
           )
           if (!agent.isArchivedStateFlow.value) {
             println("Arbiter.execute break because agent is not archived")
