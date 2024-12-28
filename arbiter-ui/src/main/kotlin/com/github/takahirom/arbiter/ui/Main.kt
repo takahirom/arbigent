@@ -1,6 +1,5 @@
 package com.github.takahirom.arbiter.ui
 
-
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -9,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -44,20 +44,12 @@ import androidx.compose.ui.window.application
 import com.github.takahirom.arbiter.Agent
 import com.github.takahirom.arbiter.Arbiter
 import com.github.takahirom.arbiter.ArbiterContextHolder
-import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
 import com.github.takahirom.arbiter.OpenAIAi
 import com.github.takahirom.arbiter.ui.AppStateHolder.DeviceConnectionState
 import com.github.takahirom.arbiter.ui.AppStateHolder.FileSelectionState
-import dadb.Dadb
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.intui.standalone.styling.Default
-import org.jetbrains.jewel.intui.standalone.styling.light
 import org.jetbrains.jewel.intui.standalone.theme.IntUiTheme
 import org.jetbrains.jewel.intui.standalone.theme.default
 import org.jetbrains.jewel.intui.standalone.theme.lightThemeDefinition
@@ -76,7 +68,6 @@ import org.jetbrains.jewel.ui.component.TabState
 import org.jetbrains.jewel.ui.component.TabStrip
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.TextField
-import org.jetbrains.jewel.ui.component.styling.GroupHeaderStyle
 import org.jetbrains.jewel.ui.component.styling.TabStyle
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
@@ -86,217 +77,167 @@ import java.awt.Window
 import java.io.FileInputStream
 
 
-class DevicesStateHolder {
-  val isAndroid: MutableStateFlow<Boolean> = MutableStateFlow(true)
-  val devices: MutableStateFlow<List<Dadb>> = MutableStateFlow(listOf())
-  val selectedDevice: MutableStateFlow<Dadb?> = MutableStateFlow(null)
-
-  init {
-    isAndroid.onEach { isAndroid ->
-      devices.value = if (isAndroid) {
-        Dadb.list()
-      } else {
-        throw NotImplementedError("iOS is not supported yet")
-      }
-    }.launchIn(CoroutineScope(ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob()))
-  }
-}
-
-@Composable
-fun ConnectionSettingScreen(
-  appStateHolder: AppStateHolder
-) {
-  val devicesStateHolder = remember { DevicesStateHolder() }
-  Column {
-    Row {
-      val isAndroid by devicesStateHolder.isAndroid.collectAsState()
-      RadioButton(
-        selected = isAndroid,
-        onClick = { devicesStateHolder.isAndroid.value = true }
-      )
-      Text("Android")
-      RadioButton(
-        selected = !isAndroid,
-        onClick = { devicesStateHolder.isAndroid.value = false }
-      )
-      Text("iOS")
-    }
-    val devices by devicesStateHolder.devices.collectAsState()
-    Row {
-      devices.forEachIndexed { index, dadb ->
-        val selectedDevice by devicesStateHolder.selectedDevice.collectAsState()
-        RadioButton(
-          selected = dadb == selectedDevice || (selectedDevice == null && index == 0),
-          onClick = { devicesStateHolder.selectedDevice.value = dadb }
-        )
-        Text(dadb.toString())
-      }
-    }
-    OutlinedButton(onClick = {
-      appStateHolder.onClickConnect(devicesStateHolder)
-    }) {
-      Text("Connect to device")
-    }
-  }
-}
-
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun App(
   appStateHolder: AppStateHolder
 ) {
   IntUiTheme {
-    val deviceConnectionState by appStateHolder.deviceConnectionState.collectAsState()
-    if (deviceConnectionState is DeviceConnectionState.NotConnected) {
-      ConnectionSettingScreen(
-        appStateHolder = appStateHolder
-      )
-      return@IntUiTheme
-    }
-    val fileSelectionState by appStateHolder.fileSelectionState.collectAsState()
-    if (fileSelectionState is FileSelectionState.Loading) {
-      FileLoadDialog(
-        title = "Choose a file",
-        onCloseRequest = { file ->
-          appStateHolder.loadGoals(file)
-          appStateHolder.fileSelectionState.value = FileSelectionState.NotSelected
-        }
-      )
-    } else if (fileSelectionState is FileSelectionState.Saving) {
-      FileSaveDialog(
-        title = "Save a file",
-        onCloseRequest = { file ->
-          appStateHolder.saveGoals(file)
-          appStateHolder.fileSelectionState.value = FileSelectionState.NotSelected
-        }
-      )
-    }
-    val scenarioIndex by appStateHolder.selectedAgentIndex.collectAsState()
-    Row {
-      val schenarioAndDepths by appStateHolder.sortedScenariosAndDepthsStateFlow.collectAsState()
-      val coroutineScope = rememberCoroutineScope()
-      Column(
-        Modifier
-          .weight(1f),
-        horizontalAlignment = Alignment.CenterHorizontally
-      ) {
-        Text("Scenarios")
-        FlowRow {
-          IconButton(onClick = {
-            appStateHolder.addScenario()
-          }) {
-            Icon(
-              key = AllIconsKeys.FileTypes.AddAny,
-              contentDescription = "Add",
-              hint = Size(28)
-            )
+    Box(
+      Modifier.fillMaxSize().background(JewelTheme.globalColors.panelBackground)
+    ) {
+      val deviceConnectionState by appStateHolder.deviceConnectionState.collectAsState()
+      if (deviceConnectionState is DeviceConnectionState.NotConnected) {
+        ConnectionSettingScreen(
+          appStateHolder = appStateHolder
+        )
+        return@IntUiTheme
+      }
+      val fileSelectionState by appStateHolder.fileSelectionState.collectAsState()
+      if (fileSelectionState is FileSelectionState.Loading) {
+        FileLoadDialog(
+          title = "Choose a file",
+          onCloseRequest = { file ->
+            appStateHolder.loadGoals(file)
+            appStateHolder.fileSelectionState.value = FileSelectionState.NotSelected
           }
-          IconButton(onClick = {
-            appStateHolder.runAll()
-          }) {
-            Icon(
-              key = AllIconsKeys.Actions.RunAll,
-              contentDescription = "Run all",
-              hint = Size(28)
-            )
+        )
+      } else if (fileSelectionState is FileSelectionState.Saving) {
+        FileSaveDialog(
+          title = "Save a file",
+          onCloseRequest = { file ->
+            appStateHolder.saveGoals(file)
+            appStateHolder.fileSelectionState.value = FileSelectionState.NotSelected
           }
-          IconButton(onClick = {
-            coroutineScope.launch {
-              appStateHolder.runAllFailed()
+        )
+      }
+      val scenarioIndex by appStateHolder.selectedAgentIndex.collectAsState()
+      Row {
+        val schenarioAndDepths by appStateHolder.sortedScenariosAndDepthsStateFlow.collectAsState()
+        val coroutineScope = rememberCoroutineScope()
+        Column(
+          Modifier
+            .weight(1f),
+          horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+          Text("Scenarios")
+          FlowRow {
+            IconButton(onClick = {
+              appStateHolder.addScenario()
+            }) {
+              Icon(
+                key = AllIconsKeys.FileTypes.AddAny,
+                contentDescription = "Add",
+                hint = Size(28)
+              )
             }
-          }) {
-            Icon(
-              key = AllIconsKeys.Actions.Rerun,
-              contentDescription = "Run all failed",
-              hint = Size(28)
-            )
+            IconButton(onClick = {
+              appStateHolder.runAll()
+            }) {
+              Icon(
+                key = AllIconsKeys.Actions.RunAll,
+                contentDescription = "Run all",
+                hint = Size(28)
+              )
+            }
+            IconButton(onClick = {
+              coroutineScope.launch {
+                appStateHolder.runAllFailed()
+              }
+            }) {
+              Icon(
+                key = AllIconsKeys.Actions.Rerun,
+                contentDescription = "Run all failed",
+                hint = Size(28)
+              )
+            }
+            IconButton(onClick = {
+              appStateHolder.fileSelectionState.value = FileSelectionState.Saving
+            }) {
+              Icon(
+                key = AllIconsKeys.Actions.MenuSaveall,
+                contentDescription = "Save",
+                hint = Size(28)
+              )
+            }
+            IconButton(onClick = {
+              appStateHolder.fileSelectionState.value = FileSelectionState.Loading
+            }) {
+              Icon(
+                key = AllIconsKeys.Actions.MenuOpen,
+                contentDescription = "Load",
+                hint = Size(28)
+              )
+            }
           }
-          IconButton(onClick = {
-            appStateHolder.fileSelectionState.value = FileSelectionState.Saving
-          }) {
-            Icon(
-              key = AllIconsKeys.Actions.MenuSaveall,
-              contentDescription = "Save",
-              hint = Size(28)
-            )
-          }
-          IconButton(onClick = {
-            appStateHolder.fileSelectionState.value = FileSelectionState.Loading
-          }) {
-            Icon(
-              key = AllIconsKeys.Actions.MenuOpen,
-              contentDescription = "Load",
-              hint = Size(28)
-            )
-          }
-        }
-        LazyColumn(modifier = Modifier.weight(1f)) {
-          itemsIndexed(schenarioAndDepths) { index, (scenarioStateHolder, depth) ->
-            val goal by scenarioStateHolder.goalStateFlow.collectAsState()
-            Box(
-              modifier = Modifier.fillMaxWidth()
-                .padding(
-                  start = 8.dp + 12.dp * depth,
-                  top = if (depth == 0) 8.dp else 0.dp,
-                  end = 8.dp,
-                  bottom = 4.dp
-                )
-                .background(
-                  if (index == scenarioIndex) {
-                    Color.LightGray
-                  } else {
-                    Color.White
-                  }
-                )
-                .clickable { appStateHolder.selectedAgentIndex.value = index },
-            ) {
-              Row(
-                modifier = Modifier.padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+          LazyColumn(modifier = Modifier.weight(1f)) {
+            itemsIndexed(schenarioAndDepths) { index, (scenarioStateHolder, depth) ->
+              val goal by scenarioStateHolder.goalStateFlow.collectAsState()
+              Box(
+                modifier = Modifier.fillMaxWidth()
+                  .padding(
+                    start = 8.dp + 12.dp * depth,
+                    top = if (depth == 0) 8.dp else 0.dp,
+                    end = 8.dp,
+                    bottom = 4.dp
+                  )
+                  .background(
+                    if (index == scenarioIndex) {
+                      Color.LightGray
+                    } else {
+                      Color.White
+                    }
+                  )
+                  .clickable { appStateHolder.selectedAgentIndex.value = index },
               ) {
-                Text(
-                  modifier = Modifier.weight(1f),
-                  text = "Goal:" + goal
-                )
-                val isArchived by scenarioStateHolder.isArchived.collectAsState()
-                if (isArchived) {
-                  Icon(
-                    key = AllIconsKeys.Actions.Checked,
-                    contentDescription = "Archived",
-                    modifier = Modifier.padding(8.dp)
-                      .size(40.dp)
-                      .clip(
-                        CircleShape
-                      )
-                      .background(Color.Green)
+                Row(
+                  modifier = Modifier.padding(8.dp),
+                  verticalAlignment = Alignment.CenterVertically
+                ) {
+                  Text(
+                    modifier = Modifier.weight(1f),
+                    text = "Goal:" + goal
                   )
-                }
-                val isRunning by scenarioStateHolder.isRunning.collectAsState()
-                if (isRunning) {
-                  CircularProgressIndicator(
-                    modifier = Modifier.padding(8.dp)
-                  )
+                  val isArchived by scenarioStateHolder.isArchived.collectAsState()
+                  if (isArchived) {
+                    Icon(
+                      key = AllIconsKeys.Actions.Checked,
+                      contentDescription = "Archived",
+                      modifier = Modifier.padding(8.dp)
+                        .size(40.dp)
+                        .clip(
+                          CircleShape
+                        )
+                        .background(Color.Green)
+                    )
+                  }
+                  val isRunning by scenarioStateHolder.isRunning.collectAsState()
+                  if (isRunning) {
+                    CircularProgressIndicator(
+                      modifier = Modifier.padding(8.dp)
+                    )
+                  }
                 }
               }
             }
           }
         }
-      }
-      val scenarioStateHolder = schenarioAndDepths.getOrNull(scenarioIndex)
-      if (scenarioStateHolder != null) {
-        Column(Modifier.weight(3f)) {
-          Scenario(
-            scenarioStateHolder = scenarioStateHolder.first,
-            onExecute = {
-              appStateHolder.run(it)
-            },
-            onCancel = {
-              it.cancel()
-            },
-            onRemove = {
-              appStateHolder.removeScenario(it)
-            }
-          )
+        val scenarioStateHolder = schenarioAndDepths.getOrNull(scenarioIndex)
+        if (scenarioStateHolder != null) {
+          Column(Modifier.weight(3f)) {
+            Scenario(
+              scenarioStateHolder = scenarioStateHolder.first,
+              onExecute = {
+                appStateHolder.run(it)
+              },
+              onCancel = {
+                it.cancel()
+              },
+              onRemove = {
+                appStateHolder.removeScenario(it)
+              }
+            )
+          }
         }
       }
     }
@@ -310,7 +251,7 @@ private fun Scenario(
   onCancel: (ScenarioStateHolder) -> Unit,
   onRemove: (ScenarioStateHolder) -> Unit
 ) {
-  val isAndroid by remember { mutableStateOf(true) }
+  val deviceType by remember { mutableStateOf(true) }
   val arbiter: Arbiter? by scenarioStateHolder.arbiterStateFlow.collectAsState()
   val goal by scenarioStateHolder.goalStateFlow.collectAsState()
   var editingGoalTextState by remember(goal) { mutableStateOf(goal) }
@@ -355,7 +296,7 @@ private fun Scenario(
           verticalAlignment = Alignment.CenterVertically
         ) {
           RadioButton(
-            selected = isAndroid,
+            selected = deviceType,
             onClick = { }
           )
           Text("Mobile")
@@ -364,7 +305,7 @@ private fun Scenario(
           verticalAlignment = Alignment.CenterVertically
         ) {
           RadioButton(
-            selected = !isAndroid,
+            selected = !deviceType,
             onClick = { }
           )
           Text("TV")
@@ -462,7 +403,7 @@ private fun ArbiterContextHistories(
   taskToAgents: List<Pair<Arbiter.Task, Agent>>
 ) {
   // History Tabs
-  var selectedTabIndex by remember { mutableStateOf(taskToAgents.lastIndex) }
+  var selectedTabIndex by remember { mutableStateOf(0) }
   TabStrip(
     style = TabStyle.Default.light(),
     modifier = Modifier.fillMaxWidth(),
@@ -526,15 +467,17 @@ private fun ArbiterContext(agentContext: ArbiterContextHolder) {
         val turn = turns[index]
         Column(
           Modifier.padding(8.dp)
+            .background(
+              color = if (turn.memo.contains("Failed")) {
+                Color.Red
+              } else {
+                Color.White
+              },
+            )
             .clickable { selectedTurn = index },
         ) {
           GroupHeader(
             modifier = Modifier.fillMaxWidth(),
-            style = if (turn.memo.contains("Failed")) {
-              GroupHeaderStyle.light()
-            } else {
-              GroupHeaderStyle.light()
-            },
             text = "Turn ${index + 1}",
           )
           Text(
@@ -549,7 +492,9 @@ private fun ArbiterContext(agentContext: ArbiterContextHolder) {
       turn.message?.let { message: String ->
         val scrollableState = rememberScrollState()
         Text(
-          modifier = Modifier.verticalScroll(scrollableState).weight(2F),
+          modifier = Modifier
+            .weight(2f)
+            .verticalScroll(scrollableState),
           text = message
         )
       }

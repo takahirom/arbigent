@@ -51,7 +51,12 @@ class MaestroDevice(
 
   fun TreeNode.optimizeTree(
     isRoot: Boolean = false,
-    meaningfulAttributes: Set<String> = setOf("text", "content description", "hintText"),
+    meaningfulAttributes: Set<String> = setOf(
+      "text",
+      "accessibilityText",
+      "content description",
+      "hintText"
+    ),
     viewHierarchy: ViewHierarchy
   ): OptimizationResult {
     // Optimize children
@@ -195,6 +200,7 @@ class MaestroDevice(
     )
     val optimizedTree = result.node ?: result.promotedChildren.firstOrNull()
     println("Before optimization (length): ${this.toString().length}")
+//    println(this.toString())
     val optimizedToString = optimizedTree?.optimizedToString(depth = 0)
     println("After optimization (length): ${optimizedToString?.length}")
     return optimizedToString ?: ""

@@ -7,6 +7,8 @@ plugins {
 dependencies {
     api("dev.mobile:maestro-orchestra:1.39.1")
     api("dev.mobile:maestro-client:1.39.1")
+    api("dev.mobile:maestro-ios:1.39.1")
+    api("dev.mobile:maestro-ios-driver:1.39.1")
 
     // To expose requestBuilderModifier
     api(libs.ktor.client.core)

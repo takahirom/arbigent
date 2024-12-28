@@ -4,7 +4,7 @@ import com.github.takahirom.arbiter.Ai
 import com.github.takahirom.arbiter.Arbiter
 import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
 import com.github.takahirom.arbiter.Device
-import com.github.takahirom.arbiter.MaestroDevice
+import com.github.takahirom.arbiter.connectToDevice
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -17,32 +17,15 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import maestro.Maestro
-import maestro.drivers.AndroidDriver
 import java.io.File
 
 class AppStateHolder(
   val aiFacotry: () -> Ai,
   val deviceFactory: (DevicesStateHolder) -> Device = { devicesStateHolder ->
-    if (!devicesStateHolder.isAndroid.value) {
-      throw NotImplementedError("iOS is not supported yet")
-    }
-    var dadb = devicesStateHolder.selectedDevice.value
-      ?: devicesStateHolder.devices.value.firstOrNull()
-      ?: throw IllegalStateException("No device selected")
-    val driver = AndroidDriver(
-      dadb
+    connectToDevice(
+      availableDevice = devicesStateHolder.selectedDevice.value
+        ?: devicesStateHolder.devices.value.first()
     )
-    val maestro = try {
-      Maestro.android(
-        driver
-      )
-    } catch (e: Exception) {
-      driver.close()
-      dadb.close()
-      throw e
-    }
-    MaestroDevice(maestro)
   }
 ) {
   sealed interface DeviceConnectionState {
@@ -81,7 +64,8 @@ class AppStateHolder(
       initialValue = emptyList()
     )
   val selectedAgentIndex: MutableStateFlow<Int> = MutableStateFlow(0)
-  private val coroutineScope = CoroutineScope(ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob())
+  private val coroutineScope =
+    CoroutineScope(ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob())
 
   fun addScenario() {
     scenariosStateFlow.value += ScenarioStateHolder(
@@ -98,7 +82,8 @@ class AppStateHolder(
     scenariosStateFlow.value.forEach { it.cancel() }
     job = coroutineScope.launch {
       sortedScenariosAndDepthsStateFlow.value.map { it.first }.forEachIndexed { index, scenario ->
-        selectedAgentIndex.value = sortedScenariosAndDepthsStateFlow.value.indexOfFirst { it.first == scenario }
+        selectedAgentIndex.value =
+          sortedScenariosAndDepthsStateFlow.value.indexOfFirst { it.first == scenario }
         executeWithDependencies(scenario)
         delay(10)
       }
@@ -109,7 +94,8 @@ class AppStateHolder(
     job?.cancel()
     scenariosStateFlow.value.forEach { it.cancel() }
     job = coroutineScope.launch {
-      selectedAgentIndex.value = sortedScenariosAndDepthsStateFlow.value.indexOfFirst { it.first == scenario }
+      selectedAgentIndex.value =
+        sortedScenariosAndDepthsStateFlow.value.indexOfFirst { it.first == scenario }
       executeWithDependencies(scenario)
     }
   }
@@ -193,7 +179,8 @@ class AppStateHolder(
       sortedScenariosAndDepthsStateFlow.value.map { it.first }.filter { scenario ->
         !scenario.isGoalAchieved()
       }.forEach { scenario: ScenarioStateHolder ->
-        selectedAgentIndex.value = sortedScenariosAndDepthsStateFlow.value.indexOfFirst { it.first == scenario }
+        selectedAgentIndex.value =
+          sortedScenariosAndDepthsStateFlow.value.indexOfFirst { it.first == scenario }
         executeWithDependencies(scenario)
         delay(10)
         scenario.waitUntilFinished()
