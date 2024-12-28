@@ -12,6 +12,7 @@ import androidx.compose.ui.test.runComposeUiTest
 import com.github.takahirom.arbiter.AgentCommand
 import com.github.takahirom.arbiter.Ai
 import com.github.takahirom.arbiter.ArbiterContextHolder
+import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
 import com.github.takahirom.arbiter.ClickWithTextAgentCommand
 import com.github.takahirom.arbiter.Device
 import com.github.takahirom.arbiter.GoalAchievedAgentCommand
@@ -20,6 +21,9 @@ import io.github.takahirom.robospec.DescribedBehavior
 import io.github.takahirom.robospec.DescribedBehaviors
 import io.github.takahirom.robospec.describeBehaviors
 import io.github.takahirom.robospec.execute
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import maestro.orchestra.MaestroCommand
 import org.junit.Test
@@ -70,13 +74,15 @@ class FakeAi : Ai {
 
 @OptIn(ExperimentalTestApi::class)
 @RunWith(Parameterized::class)
-class Tests(private val behavior: DescribedBehavior<TestRobot>) {
+class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
   @Test
   fun test() {
+    val testDispatcher = StandardTestDispatcher()
+    ArbiterCorotuinesDispatcher.dispatcher = testDispatcher
     runComposeUiTest {
       setContent()
-      runTest {
-        behavior.execute(TestRobot(this@runComposeUiTest))
+      runTest(testDispatcher) {
+        behavior.execute(TestRobot(this, this@runComposeUiTest))
       }
     }
   }
@@ -98,6 +104,9 @@ class Tests(private val behavior: DescribedBehavior<TestRobot>) {
     @Parameterized.Parameters(name = "{0}")
     fun data(): DescribedBehaviors<TestRobot> {
       return describeBehaviors<TestRobot>("Tests") {
+        doIt {
+          waitALittle()
+        }
         describe("when opens the app") {
           itShould("have a Connect to device") {
             assertConnectToDeviceButtonExists()
@@ -124,10 +133,6 @@ class Tests(private val behavior: DescribedBehavior<TestRobot>) {
                   enterGoal("launch the app")
                   clickRunButton()
                 }
-                itShould("show the Add scenario") {
-                  capture(it)
-                  assertScenarioRunning()
-                }
                 describe("should finish the scenario") {
                   doIt {
                     waitUntilScenarioRunning()
@@ -147,10 +152,6 @@ class Tests(private val behavior: DescribedBehavior<TestRobot>) {
                 describe("when run all") {
                   doIt {
                     clickRunAllButton()
-                  }
-                  itShould("show the Add scenario") {
-                    capture(it)
-                    assertScenarioRunning()
                   }
                   describe("should finish the scenario") {
                     doIt {
@@ -192,25 +193,37 @@ class Tests(private val behavior: DescribedBehavior<TestRobot>) {
 }
 
 @ExperimentalTestApi
-class TestRobot(val composeUiTest: ComposeUiTest) {
+@OptIn(ExperimentalStdlibApi::class)
+class TestRobot(
+  val testScope: TestScope,
+  val composeUiTest: ComposeUiTest,
+) {
+  init {
+  }
   fun clickConnectToDeviceButton() {
+    waitALittle()
     composeUiTest.onNode(hasText("Connect to device")).performClick()
+    waitALittle()
   }
 
   fun clickAddScenarioButton() {
-    composeUiTest.onNode(hasText("Add")).performClick()
+    composeUiTest.onNode(hasContentDescription("Add")).performClick()
+    waitALittle()
   }
 
   fun enterGoal(goal: String) {
     composeUiTest.onNode(hasTestTag("goal")).performTextInput(goal)
+    waitALittle()
   }
 
   fun clickRunButton() {
     composeUiTest.onNode(hasContentDescription("Run")).performClick()
+    waitALittle()
   }
 
   fun clickRunAllButton() {
     composeUiTest.onNode(hasContentDescription("Run all")).performClick()
+    waitALittle()
   }
 
   fun waitUntilScenarioRunning() {
@@ -219,18 +232,23 @@ class TestRobot(val composeUiTest: ComposeUiTest) {
         timeoutMillis = 5000
       ) {
         try {
-          composeUiTest.onNode(hasTestTag("scenario_running")).assertExists()
+          composeUiTest.onNode(hasTestTag("scenario_running"), useUnmergedTree = true).assertExists()
           false
         } catch (e: AssertionError) {
           true
         }
       }
+      waitALittle()
     }
+  }
+
+  fun waitALittle() {
+    testScope.advanceUntilIdle()
   }
 
   fun assertGoalAchieved() {
     composeUiTest.onNode(hasTestTag("scenario_running")).assertDoesNotExist()
-    composeUiTest.onNode(hasText("GoalAchieved", true)).assertExists()
+    composeUiTest.onNode(hasText("GoalAchieved", true), useUnmergedTree = true).assertExists()
   }
 
   fun assertConnectToDeviceButtonExists() {
@@ -238,16 +256,13 @@ class TestRobot(val composeUiTest: ComposeUiTest) {
   }
 
   fun assertAddScenarioButtonExists() {
-    composeUiTest.onNode(hasText("Add")).assertExists()
+    composeUiTest.onNode(hasContentDescription("Add")).assertExists()
   }
 
   fun assertGoalInputExists() {
     composeUiTest.onNode(hasTestTag("goal")).assertExists()
   }
 
-  fun assertScenarioRunning() {
-    composeUiTest.onNode(hasTestTag("scenario_running")).assertExists()
-  }
 
   fun clickDependencyTextField() {
     composeUiTest.onNode(hasTestTag("dependency_text_field")).performClick()

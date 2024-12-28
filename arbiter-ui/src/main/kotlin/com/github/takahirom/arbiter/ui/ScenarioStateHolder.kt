@@ -115,6 +115,5 @@ class ScenarioStateHolder(val device: Device, val ai: Ai) {
         })
       }
     }
-
   }
 }

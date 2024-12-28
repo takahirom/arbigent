@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
@@ -61,7 +60,7 @@ import org.jetbrains.jewel.ui.component.GroupHeader
 import org.jetbrains.jewel.ui.component.Icon
 import org.jetbrains.jewel.ui.component.IconButton
 import org.jetbrains.jewel.ui.component.OutlinedButton
-import org.jetbrains.jewel.ui.component.RadioButton
+import org.jetbrains.jewel.ui.component.RadioButtonRow
 import org.jetbrains.jewel.ui.component.SimpleTabContent
 import org.jetbrains.jewel.ui.component.TabData
 import org.jetbrains.jewel.ui.component.TabState
@@ -215,6 +214,7 @@ fun App(
                   if (isRunning) {
                     CircularProgressIndicator(
                       modifier = Modifier.padding(8.dp)
+                        .testTag("scenario_running")
                     )
                   }
                 }
@@ -289,54 +289,54 @@ private fun Scenario(
     }
     Row(modifier = Modifier.padding(8.dp)) {
       Column(
-        modifier = Modifier.padding(8.dp)
+        modifier = Modifier.padding(8.dp).weight(1F)
       ) {
-        Text("Device inputs:")
+        GroupHeader("Device inputs:")
         Row(
           verticalAlignment = Alignment.CenterVertically
         ) {
-          RadioButton(
+          RadioButtonRow(
+            text = "Mobile",
             selected = deviceType,
             onClick = { }
           )
-          Text("Mobile")
         }
         Row(
           verticalAlignment = Alignment.CenterVertically
         ) {
-          RadioButton(
+          RadioButtonRow(
+            text = "TV",
             selected = !deviceType,
             onClick = { }
           )
-          Text("TV")
         }
       }
       Column(
-        modifier = Modifier.padding(8.dp)
+        modifier = Modifier.padding(8.dp).weight(1F)
       ) {
         val initializeMethods by scenarioStateHolder.initializeMethodsStateFlow.collectAsState()
-        Text("Initialize method:")
+        GroupHeader("Initialize method:")
         Row(
           verticalAlignment = Alignment.CenterVertically
         ) {
-          RadioButton(
+          RadioButtonRow(
             selected = initializeMethods == InitializeMethods.Back,
+            text = "Back",
             onClick = {
               scenarioStateHolder.initializeMethodsStateFlow.value = InitializeMethods.Back
             }
           )
-          Text("Back")
         }
         Row(
           verticalAlignment = Alignment.CenterVertically
         ) {
-          RadioButton(
+          RadioButtonRow(
+            text = "Do nothing",
             selected = initializeMethods is InitializeMethods.Noop,
             onClick = {
               scenarioStateHolder.initializeMethodsStateFlow.value = InitializeMethods.Noop
             }
           )
-          Text("Do nothing")
         }
         Row(
           verticalAlignment = Alignment.CenterVertically
@@ -346,30 +346,32 @@ private fun Scenario(
               (initializeMethods as? InitializeMethods.OpenApp)?.packageName ?: ""
             )
           }
-          RadioButton(
+          RadioButtonRow(
             selected = initializeMethods is InitializeMethods.OpenApp,
             onClick = {
               scenarioStateHolder.initializeMethodsStateFlow.value =
                 InitializeMethods.OpenApp(editingText)
             }
-          )
-          Column {
-            Text("Launch app")
-            TextField(
-              modifier = Modifier
-                .padding(4.dp),
-              enabled = initializeMethods is InitializeMethods.OpenApp,
-              value = editingText,
-              onValueChange = {
-                editingText = it
-                scenarioStateHolder.initializeMethodsStateFlow.value = InitializeMethods.OpenApp(it)
-              },
-            )
+          ) {
+            Column {
+              Text(modifier = Modifier.padding(top = 4.dp), text = "Launch app")
+              TextField(
+                modifier = Modifier
+                  .padding(4.dp),
+                enabled = initializeMethods is InitializeMethods.OpenApp,
+                value = editingText,
+                onValueChange = {
+                  editingText = it
+                  scenarioStateHolder.initializeMethodsStateFlow.value =
+                    InitializeMethods.OpenApp(it)
+                },
+              )
+            }
           }
         }
       }
-      Column(Modifier.width(200.dp)) {
-        Text("Scenario dependency")
+      Column(Modifier.weight(1F)) {
+        GroupHeader("Scenario dependency")
         val dependency by scenarioStateHolder.dependencyScenarioStateFlow.collectAsState()
 
         TextField(
