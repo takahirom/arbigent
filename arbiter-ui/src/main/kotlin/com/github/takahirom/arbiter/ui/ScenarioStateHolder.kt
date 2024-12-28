@@ -40,10 +40,11 @@ class ScenarioStateHolder(val device: Device, val ai: Ai) {
   // (var goal: String?, var arbiter: Arbiter?)
   val goalStateFlow: MutableStateFlow<String> = MutableStateFlow("")
   val goal get() = goalStateFlow.value
-  val retryStateFlow: MutableStateFlow<Int> = MutableStateFlow(3)
+  val maxRetryStateFlow: MutableStateFlow<Int> = MutableStateFlow(3)
+  val maxTurnStateFlow: MutableStateFlow<Int> = MutableStateFlow(10)
   val initializeMethodsStateFlow: MutableStateFlow<InitializeMethods> =
     MutableStateFlow(InitializeMethods.Back)
-  val dependencyScenarioStateFlow = MutableStateFlow<String?>(null)
+  val dependencyScenarioStateFlow = MutableStateFlow<ScenarioStateHolder?>(null)
   val arbiterStateFlow = MutableStateFlow<Arbiter?>(null)
   private val coroutineScope = CoroutineScope(
     ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob()
@@ -71,7 +72,7 @@ class ScenarioStateHolder(val device: Device, val ai: Ai) {
       initialValue = null
     )
 
-  suspend fun execute(scenario: Arbiter.Scenario) {
+  suspend fun onExecute(scenario: Arbiter.Scenario) {
     arbiterStateFlow.value?.cancel()
     val arbiter = arbiter {
     }

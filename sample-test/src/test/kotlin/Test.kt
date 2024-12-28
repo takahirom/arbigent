@@ -114,7 +114,8 @@ class Test {
       listOf(
         Arbiter.Task("goal1", agentConfig),
         Arbiter.Task("goal2", agentConfig)
-      )
+      ),
+      maxTurnCount = 10
     )
     arbiter.executeAsync(
       scenario

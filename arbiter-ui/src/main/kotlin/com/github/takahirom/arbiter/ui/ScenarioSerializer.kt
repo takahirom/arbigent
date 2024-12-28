@@ -1,6 +1,7 @@
 package com.github.takahirom.arbiter.ui
 
 import com.charleskorn.kaml.Yaml
+import com.charleskorn.kaml.YamlConfiguration
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
@@ -19,7 +20,8 @@ class ScenarioSerializer {
     val goal: String,
     val dependency: String?,
     val initializeMethods: InitializeMethods,
-    val retry: Int = 0
+    val maxRetry: Int = 3,
+    val maxTurn: Int = 10,
   )
 
   private val module = SerializersModule {
@@ -30,15 +32,18 @@ class ScenarioSerializer {
     }
   }
 
-  private val yaml = Yaml(module)
+  private val yaml = Yaml(module, YamlConfiguration(
+    strictMode = false
+  ))
 
   fun save(scenarios: List<ScenarioStateHolder>, file: File) {
     val fileContent = FileContent(scenarios.map {
       ScenarioContent(
         it.goal,
-        it.dependencyScenarioStateFlow.value,
+        it.dependencyScenarioStateFlow.value?.goal,
         it.initializeMethodsStateFlow.value,
-        it.retryStateFlow.value
+        it.maxRetryStateFlow.value,
+        it.maxTurnStateFlow.value
       )
     })
     val jsonString = yaml.encodeToString(FileContent.serializer(), fileContent)

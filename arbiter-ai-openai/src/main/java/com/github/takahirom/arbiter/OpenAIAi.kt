@@ -116,7 +116,8 @@ $templates"""
         action = action,
         memo = jsonObject["memo"]?.jsonPrimitive?.content ?: "",
         whatYouSaw = jsonObject["summary-of-what-you-saw"]?.jsonPrimitive?.content ?: "",
-        message = message.toString(),
+        aiRequest = message.toString(),
+        aiResponse = content,
         screenshotFileName = screenshotFileName
       )
     } catch (e: Exception) {

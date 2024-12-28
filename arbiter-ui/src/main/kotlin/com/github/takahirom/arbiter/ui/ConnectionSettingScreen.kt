@@ -16,10 +16,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.arbiter.DeviceType
+import org.jetbrains.jewel.ui.component.DefaultButton
 import org.jetbrains.jewel.ui.component.GroupHeader
 import org.jetbrains.jewel.ui.component.Icon
 import org.jetbrains.jewel.ui.component.IconButton
-import org.jetbrains.jewel.ui.component.OutlinedButton
 import org.jetbrains.jewel.ui.component.RadioButtonRow
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
@@ -35,7 +35,9 @@ fun BoxScope.ConnectionSettingScreen(
     verticalArrangement = Arrangement.Center
   ) {
     GroupHeader("Device Type")
-    Row {
+    Row(
+      Modifier.padding(8.dp)
+    ) {
       val deviceType by devicesStateHolder.deviceType.collectAsState()
       RadioButtonRow(
         text = "Android",
@@ -50,17 +52,19 @@ fun BoxScope.ConnectionSettingScreen(
     }
     val devices by devicesStateHolder.devices.collectAsState()
     Column(Modifier) {
-      GroupHeader("Devices")
-      IconButton(
-        modifier = Modifier.padding(8.dp),
-        onClick = {
-          devicesStateHolder.fetchDevices()
-        }) {
-        Icon(
-          key = AllIconsKeys.Actions.Refresh,
-          contentDescription = "Refresh",
-          hint = Size(28)
-        )
+      Row {
+        GroupHeader("Devices", modifier = Modifier.weight(1F).align(Alignment.CenterVertically))
+        IconButton(
+          modifier = Modifier.padding(8.dp).align(Alignment.CenterVertically),
+          onClick = {
+            devicesStateHolder.fetchDevices()
+          }) {
+          Icon(
+            key = AllIconsKeys.Actions.Refresh,
+            contentDescription = "Refresh",
+            hint = Size(28)
+          )
+        }
       }
       if (devices.isEmpty()) {
         Text(
@@ -80,8 +84,8 @@ fun BoxScope.ConnectionSettingScreen(
       }
     }
     if (devices.isNotEmpty()) {
-      OutlinedButton(
-        modifier = Modifier, onClick = {
+      DefaultButton(
+        modifier = Modifier.align(Alignment.CenterHorizontally), onClick = {
           appStateHolder.onClickConnect(devicesStateHolder)
         }) {
         Text("Connect to device")

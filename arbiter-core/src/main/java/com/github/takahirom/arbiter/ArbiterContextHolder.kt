@@ -10,7 +10,8 @@ class ArbiterContextHolder(
     val action: String? = null,
     val memo: String,
     val whatYouSaw: String? = null,
-    val message: String? = null,
+    val aiRequest: String? = null,
+    val aiResponse: String? = null,
     val screenshotFileName: String
   ) {
     fun text(): String {

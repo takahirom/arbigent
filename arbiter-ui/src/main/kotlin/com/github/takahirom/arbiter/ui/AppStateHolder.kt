@@ -8,10 +8,10 @@ import com.github.takahirom.arbiter.connectToDevice
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
@@ -44,7 +44,7 @@ class AppStateHolder(
   val fileSelectionState: MutableStateFlow<FileSelectionState> =
     MutableStateFlow(FileSelectionState.NotSelected)
   val scenariosStateFlow: MutableStateFlow<List<ScenarioStateHolder>> = MutableStateFlow(listOf())
-  val sortedScenariosAndDepthsStateFlow = scenariosStateFlow
+  val sortedScenariosAndDepthsStateFlow: StateFlow<List<Pair<ScenarioStateHolder, Int>>> = scenariosStateFlow
     .flatMapLatest { scenarios: List<ScenarioStateHolder> ->
       combine(scenarios.map { scenario ->
         scenario.dependencyScenarioStateFlow
@@ -101,7 +101,7 @@ class AppStateHolder(
   }
 
   suspend fun executeWithDependencies(scenario: ScenarioStateHolder) {
-    scenario.execute(scenarioDependencyList(scenario))
+    scenario.onExecute(scenarioDependencyList(scenario))
   }
 
   fun scenarioDependencyList(
@@ -115,7 +115,7 @@ class AppStateHolder(
       }
       visited.add(scenario)
       scenario.dependencyScenarioStateFlow.value?.let { dependency ->
-        scenariosStateFlow.value.find { it.goal == dependency }?.let {
+        scenariosStateFlow.value.find { it == dependency }?.let {
           dfs(it)
         }
       }
@@ -133,7 +133,8 @@ class AppStateHolder(
     println("executing:" + result)
     return Arbiter.Scenario(
       tasks = result,
-      retry = scenario.retryStateFlow.value
+      maxRetry = scenario.maxRetryStateFlow.value,
+      maxTurnCount = scenario.maxTurnStateFlow.value
     )
   }
 
@@ -143,7 +144,7 @@ class AppStateHolder(
     val rootScenarios = mutableListOf<ScenarioStateHolder>()
 
     allScenarios.forEach { scenario ->
-      allScenarios.firstOrNull { it.goal == scenario.dependencyScenarioStateFlow.value }?.let {
+      allScenarios.firstOrNull { it == scenario.dependencyScenarioStateFlow.value }?.let {
         if (it == scenario) {
           rootScenarios.add(scenario)
           return@forEach
@@ -203,21 +204,27 @@ class AppStateHolder(
     if (file == null) {
       return
     }
-    scenariosStateFlow.value = scenarioSerializer.load(file).map {
+    val scenarioContents = scenarioSerializer.load(file)
+    val scenarioStateHolders = scenarioContents.map { scenarioContent ->
       ScenarioStateHolder(
         (deviceConnectionState.value as DeviceConnectionState.Connected).device,
         ai = aiFacotry()
       ).apply {
-        onGoalChanged(it.goal)
-        dependencyScenarioStateFlow.value = it.dependency
-        initializeMethodsStateFlow.value = it.initializeMethods
-        retryStateFlow.value = it.retry
+        onGoalChanged(scenarioContent.goal)
+        initializeMethodsStateFlow.value = scenarioContent.initializeMethods
+        maxRetryStateFlow.value = scenarioContent.maxRetry
+        maxTurnStateFlow.value = scenarioContent.maxTurn
       }
     }
+    scenarioContents.forEachIndexed { index, scenarioContent ->
+      scenarioStateHolders[index].dependencyScenarioStateFlow.value =
+        scenarioStateHolders.firstOrNull { it.goal == scenarioContent.dependency }
+    }
+    scenariosStateFlow.value = scenarioStateHolders
   }
 
   fun close() {
-    coroutineScope.cancel()
+    job?.cancel()
   }
 
   fun onClickConnect(devicesStateHolder: DevicesStateHolder) {

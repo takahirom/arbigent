@@ -38,7 +38,8 @@ class Arbiter {
 
   data class Scenario(
     val tasks: List<Task>,
-    val retry: Int = 0,
+    val maxRetry: Int = 0,
+    val maxTurnCount: Int = 10,
   )
 
   private val _taskToAgentStateFlow = MutableStateFlow<List<Pair<Task, Agent>>>(listOf())
@@ -94,35 +95,45 @@ class Arbiter {
     println("Arbiter.execute start")
 
     var finishedSuccessfully = false
-    var retryRemain = scenario.retry
-    do {
+    var retryRemain = scenario.maxRetry
+    try {
+      do {
+        yield()
+        _taskToAgentStateFlow.value.forEach {
+          it.second.cancel()
+        }
+        _taskToAgentStateFlow.value = scenario.tasks.map { task ->
+          task to Agent(task.agentConfig)
+        }
+        for ((index, taskAgent) in taskToAgentStateFlow.value.withIndex()) {
+          val (task, agent) = taskAgent
+          _runningInfoStateFlow.value = RunningInfo(
+            allTasks = taskToAgentStateFlow.value.size,
+            runningTasks = index + 1,
+            retriedTasks = scenario.maxRetry - retryRemain,
+            maxRetry = scenario.maxRetry,
+          )
+          agent.execute(
+            task.goal,
+            maxStep = scenario.maxTurnCount,
+          )
+          if (!agent.isArchivedStateFlow.value) {
+            println("Arbiter.execute break because agent is not archived")
+            break
+          }
+          if (index == taskToAgentStateFlow.value.size - 1) {
+            println("Arbiter.execute all agents are archived")
+            finishedSuccessfully = true
+          }
+          yield()
+        }
+      } while (!finishedSuccessfully && retryRemain-- > 0)
+    } finally {
+      _runningInfoStateFlow.value = null
       _taskToAgentStateFlow.value.forEach {
         it.second.cancel()
       }
-      _taskToAgentStateFlow.value = scenario.tasks.map { task ->
-        task to Agent(task.agentConfig)
-      }
-      for ((index, taskAgent) in taskToAgentStateFlow.value.withIndex()) {
-        val (task, agent) = taskAgent
-        _runningInfoStateFlow.value = RunningInfo(
-          allTasks = taskToAgentStateFlow.value.size,
-          runningTasks = index + 1,
-          retriedTasks = scenario.retry - retryRemain,
-          maxRetry = scenario.retry,
-        )
-        agent.execute(task.goal)
-        if (!agent.isArchivedStateFlow.value) {
-          println("Arbiter.execute break because agent is not archived")
-          break
-        }
-        if (index == taskToAgentStateFlow.value.size - 1) {
-          println("Arbiter.execute all agents are archived")
-          finishedSuccessfully = true
-        }
-        yield()
-      }
-    } while (!finishedSuccessfully && retryRemain-- > 0)
-    _runningInfoStateFlow.value = null
+    }
     println("Arbiter.execute end")
   }
 

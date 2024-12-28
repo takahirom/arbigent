@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -50,7 +49,6 @@ import com.github.takahirom.arbiter.ui.AppStateHolder.DeviceConnectionState
 import com.github.takahirom.arbiter.ui.AppStateHolder.FileSelectionState
 import kotlinx.coroutines.launch
 import org.jetbrains.jewel.foundation.theme.JewelTheme
-import org.jetbrains.jewel.intui.standalone.styling.Default
 import org.jetbrains.jewel.intui.standalone.theme.IntUiTheme
 import org.jetbrains.jewel.intui.standalone.theme.default
 import org.jetbrains.jewel.intui.standalone.theme.lightThemeDefinition
@@ -58,25 +56,21 @@ import org.jetbrains.jewel.intui.window.decoratedWindow
 import org.jetbrains.jewel.intui.window.styling.light
 import org.jetbrains.jewel.ui.ComponentStyling
 import org.jetbrains.jewel.ui.component.CircularProgressIndicator
+import org.jetbrains.jewel.ui.component.Dropdown
 import org.jetbrains.jewel.ui.component.GroupHeader
 import org.jetbrains.jewel.ui.component.Icon
 import org.jetbrains.jewel.ui.component.IconButton
+import org.jetbrains.jewel.ui.component.MenuScope
 import org.jetbrains.jewel.ui.component.OutlinedButton
 import org.jetbrains.jewel.ui.component.RadioButtonRow
-import org.jetbrains.jewel.ui.component.SimpleTabContent
-import org.jetbrains.jewel.ui.component.TabData
-import org.jetbrains.jewel.ui.component.TabState
-import org.jetbrains.jewel.ui.component.TabStrip
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.TextField
-import org.jetbrains.jewel.ui.component.styling.TabStyle
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
 import org.jetbrains.jewel.window.DecoratedWindow
 import org.jetbrains.jewel.window.styling.TitleBarStyle
 import java.awt.Window
 import java.io.FileInputStream
-
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -230,6 +224,19 @@ fun App(
           Column(Modifier.weight(3f)) {
             Scenario(
               scenarioStateHolder = scenarioStateHolder.first,
+              dependencyScenarioMenu = {
+                appStateHolder.sortedScenariosAndDepthsStateFlow.value.map { it.first }.forEach {
+                  selectableItem(
+                    selected = scenarioStateHolder.first.dependencyScenarioStateFlow.value == it,
+                    onClick = {
+                      scenarioStateHolder.first.dependencyScenarioStateFlow.value = it
+                    },
+                    content = {
+                      Text(it.goal)
+                    }
+                  )
+                }
+              },
               onExecute = {
                 appStateHolder.run(it)
               },
@@ -251,9 +258,10 @@ fun App(
 @Composable
 private fun Scenario(
   scenarioStateHolder: ScenarioStateHolder,
+  dependencyScenarioMenu: MenuScope.() -> Unit,
   onExecute: (ScenarioStateHolder) -> Unit,
   onCancel: (ScenarioStateHolder) -> Unit,
-  onRemove: (ScenarioStateHolder) -> Unit
+  onRemove: (ScenarioStateHolder) -> Unit,
 ) {
   val deviceType by remember { mutableStateOf(true) }
   val arbiter: Arbiter? by scenarioStateHolder.arbiterStateFlow.collectAsState()
@@ -295,7 +303,21 @@ private fun Scenario(
       Column(
         modifier = Modifier.padding(8.dp).weight(1F)
       ) {
-        GroupHeader("Device inputs:")
+        GroupHeader("Scenario dependency")
+        val dependency by scenarioStateHolder.dependencyScenarioStateFlow.collectAsState()
+
+        Dropdown(
+          modifier = Modifier
+            .padding(4.dp),
+          menuContent = dependencyScenarioMenu
+        ) {
+          Text(dependency?.goal ?: "Select dependency")
+        }
+      }
+      Column(
+        modifier = Modifier.padding(8.dp).weight(1F)
+      ) {
+        GroupHeader("Device inputs(Not yet implemented):")
         Row(
           verticalAlignment = Alignment.CenterVertically
         ) {
@@ -374,40 +396,39 @@ private fun Scenario(
           }
         }
       }
-      Column(Modifier.weight(1F)) {
-        GroupHeader("Retry count")
+      Column(
+        modifier = Modifier.padding(8.dp).weight(1F)
+      ) {
+        GroupHeader("Max retry count")
         Row(
           verticalAlignment = Alignment.CenterVertically
         ) {
-          val retry by scenarioStateHolder.retryStateFlow.collectAsState()
+          val maxRetry by scenarioStateHolder.maxRetryStateFlow.collectAsState()
           // Retry count
           TextField(
             modifier = Modifier
               .padding(4.dp),
-            value = retry.toString(),
+            value = maxRetry.toString(),
             onValueChange = {
-              scenarioStateHolder.retryStateFlow.value = it.toIntOrNull() ?: 0
+              scenarioStateHolder.maxRetryStateFlow.value = it.toIntOrNull() ?: 0
             },
           )
         }
-      }
-      Column(Modifier.weight(1F)) {
-        GroupHeader("Scenario dependency")
-        val dependency by scenarioStateHolder.dependencyScenarioStateFlow.collectAsState()
-
-        TextField(
-          modifier = Modifier
-            .testTag("dependency_text_field")
-            .padding(4.dp),
-          value = dependency ?: "",
-          onValueChange = {
-            if (it.isEmpty()) {
-              scenarioStateHolder.dependencyScenarioStateFlow.value = null
-            } else {
-              scenarioStateHolder.dependencyScenarioStateFlow.value = it
-            }
-          },
-        )
+        GroupHeader("Max turn count")
+        Row(
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          val maxTurnCount by scenarioStateHolder.maxTurnStateFlow.collectAsState()
+          // Retry count
+          TextField(
+            modifier = Modifier
+              .padding(4.dp),
+            value = maxTurnCount.toString(),
+            onValueChange = {
+              scenarioStateHolder.maxTurnStateFlow.value = it.toIntOrNull() ?: 0
+            },
+          )
+        }
       }
     }
     if (arbiter == null) {
@@ -417,61 +438,8 @@ private fun Scenario(
     if (taskToAgents.isEmpty()) {
       return
     }
-    ArbiterContextHistories(taskToAgents)
+    ContentPanel(taskToAgents)
   }
-}
-
-@Composable
-private fun ArbiterContextHistories(
-  taskToAgents: List<Pair<Arbiter.Task, Agent>>
-) {
-//  // History Tabs
-//  var selectedTabIndex by remember { mutableStateOf(0) }
-//  TabStrip(
-//    style = TabStyle.Default.light(),
-//    modifier = Modifier.fillMaxWidth(),
-//    tabs = taskToAgents.mapIndexed { index, taskToAgent ->
-//      val (task, agent) = taskToAgent
-//      val isRunning by agent!!.isRunningStateFlow.collectAsState()
-//      val isArchived by agent.isArchivedStateFlow.collectAsState()
-//      TabData.Default(
-//        selected = selectedTabIndex == index,
-//        onClick = { selectedTabIndex = index },
-//        closable = false,
-//        content = {
-//          SimpleTabContent(
-//            state = TabState.of(selected = selectedTabIndex == index),
-//            label = run {
-//              val text = task.goal + ":" + if (isRunning) {
-//                val latestContext by agent.latestArbiterContextStateFlow.collectAsState()
-//                latestContext?.let {
-//                  val turns: List<ArbiterContextHolder.Turn>? by it.turns.collectAsState()
-//                  if (turns.isNullOrEmpty()) {
-//                    "Initializing"
-//                  } else {
-//                    "Running"
-//                  }
-//                } ?: {
-//                  ""
-//                }
-//              } else {
-//                ""
-//              }
-//              text
-//            },
-//            iconKey = if (isRunning) {
-//              AllIconsKeys.Nodes.WarningMark
-//            } else if (!isArchived) {
-//              AllIconsKeys.Nodes.WarningMark
-//            } else {
-//              AllIconsKeys.Actions.Checked
-//            },
-//          )
-//        },
-//      )
-//    }
-//  )
-  ContentPanel(taskToAgents)
 }
 
 @Composable
@@ -487,7 +455,7 @@ private fun ContentPanel(tasksToAgent: List<Pair<Arbiter.Task, Agent>>) {
         if (turns.isEmpty()) {
           return@itemsIndexed
         }
-        Column {
+        Column(Modifier.padding(8.dp)) {
           GroupHeader(
             modifier = Modifier.fillMaxWidth(),
             text = tasks.goal + "(" + (index + 1) + "/" + tasksToAgent.size + ")",
@@ -498,7 +466,7 @@ private fun ContentPanel(tasksToAgent: List<Pair<Arbiter.Task, Agent>>) {
                 .background(
                   color = if (turn.memo.contains("Failed")) {
                     Color.Red
-                  } else if(turn.agentCommand is GoalAchievedAgentCommand) {
+                  } else if (turn.agentCommand is GoalAchievedAgentCommand) {
                     Color.Green
                   } else {
                     Color.White
@@ -520,20 +488,43 @@ private fun ContentPanel(tasksToAgent: List<Pair<Arbiter.Task, Agent>>) {
       }
     }
     selectedTurn?.let { turn ->
-      turn.message?.let { message: String ->
-        val scrollableState = rememberScrollState()
-        Text(
-          modifier = Modifier
-            .weight(2f)
-            .verticalScroll(scrollableState),
-          text = message
-        )
+      val scrollableState = rememberScrollState()
+      Column(
+        Modifier
+          .weight(2f)
+          .padding(8.dp)
+          .verticalScroll(scrollableState),
+      ) {
+        turn.aiRequest?.let { request: String ->
+          GroupHeader(
+            modifier = Modifier.fillMaxWidth(),
+            text = "AI Request"
+          )
+          Text(
+            modifier = Modifier
+              .padding(8.dp)
+              .background(JewelTheme.globalColors.panelBackground),
+            text = request
+          )
+        }
+        turn.aiResponse?.let { response: String ->
+          GroupHeader(
+            modifier = Modifier.fillMaxWidth(),
+            text = "AI Response"
+          )
+          Text(
+            modifier = Modifier
+              .padding(8.dp)
+              .background(JewelTheme.globalColors.panelBackground),
+            text = response
+          )
+        }
       }
       turn.screenshotFileName.let {
         Image(
           bitmap = loadImageBitmap(FileInputStream("screenshots/" + it + ".png")),
           contentDescription = "screenshot",
-          modifier = Modifier.weight(2F)
+          modifier = Modifier.weight(1.5F)
         )
       }
     }
