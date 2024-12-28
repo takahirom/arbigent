@@ -124,7 +124,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
               doIt {
                 clickAddScenarioButton()
               }
-              itShould("show the Add scenario") {
+              itShould("show goal input") {
                 capture(it)
                 assertGoalInputExists()
               }
@@ -169,7 +169,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
                     typeDependencyTextField("launch the app")
                     clickRunAllButton()
                   }
-                  describe("should finish the scenario") {
+                  describe("when finish the scenario") {
                     doIt {
                       waitUntilScenarioRunning()
                     }
@@ -193,13 +193,11 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
 }
 
 @ExperimentalTestApi
-@OptIn(ExperimentalStdlibApi::class)
 class TestRobot(
   val testScope: TestScope,
   val composeUiTest: ComposeUiTest,
 ) {
-  init {
-  }
+
   fun clickConnectToDeviceButton() {
     waitALittle()
     composeUiTest.onNode(hasText("Connect to device")).performClick()
@@ -232,7 +230,8 @@ class TestRobot(
         timeoutMillis = 5000
       ) {
         try {
-          composeUiTest.onNode(hasTestTag("scenario_running"), useUnmergedTree = true).assertExists()
+          composeUiTest.onNode(hasTestTag("scenario_running"), useUnmergedTree = true)
+            .assertExists()
           false
         } catch (e: AssertionError) {
           true
