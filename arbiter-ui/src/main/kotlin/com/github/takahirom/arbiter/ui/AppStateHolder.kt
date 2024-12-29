@@ -31,6 +31,8 @@ class AppStateHolder(
   sealed interface DeviceConnectionState {
     object NotConnected : DeviceConnectionState
     data class Connected(val device: Device) : DeviceConnectionState
+
+    fun isConnected(): Boolean = this is Connected
   }
 
   sealed interface FileSelectionState {
@@ -44,25 +46,26 @@ class AppStateHolder(
   val fileSelectionState: MutableStateFlow<FileSelectionState> =
     MutableStateFlow(FileSelectionState.NotSelected)
   val scenariosStateFlow: MutableStateFlow<List<ScenarioStateHolder>> = MutableStateFlow(listOf())
-  val sortedScenariosAndDepthsStateFlow: StateFlow<List<Pair<ScenarioStateHolder, Int>>> = scenariosStateFlow
-    .flatMapLatest { scenarios: List<ScenarioStateHolder> ->
-      combine(scenarios.map { scenario ->
-        scenario.dependencyScenarioStateFlow
-          .map { scenario to it }
-      }) { list ->
-        list
+  val sortedScenariosAndDepthsStateFlow: StateFlow<List<Pair<ScenarioStateHolder, Int>>> =
+    scenariosStateFlow
+      .flatMapLatest { scenarios: List<ScenarioStateHolder> ->
+        combine(scenarios.map { scenario ->
+          scenario.dependencyScenarioStateFlow
+            .map { scenario to it }
+        }) { list ->
+          list
+        }
       }
-    }
-    .map {
-      val result = sortedScenarioAndDepth(it.map { it.first })
-      println("sortedScenariosAndDepthsStateFlow: ${it.map { it.first.goal }} -> ${result.map { it.first.goal }}")
-      result
-    }
-    .stateIn(
-      scope = CoroutineScope(ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob()),
-      started = SharingStarted.WhileSubscribed(),
-      initialValue = emptyList()
-    )
+      .map {
+        val result = sortedScenarioAndDepth(it.map { it.first })
+        println("sortedScenariosAndDepthsStateFlow: ${it.map { it.first.goal }} -> ${result.map { it.first.goal }}")
+        result
+      }
+      .stateIn(
+        scope = CoroutineScope(ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob()),
+        started = SharingStarted.WhileSubscribed(),
+        initialValue = emptyList()
+      )
   val selectedAgentIndex: MutableStateFlow<Int> = MutableStateFlow(0)
   private val coroutineScope =
     CoroutineScope(ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob())
@@ -133,8 +136,8 @@ class AppStateHolder(
     println("executing:" + result)
     return Arbiter.Scenario(
       tasks = result,
-      maxRetry = scenario.maxRetryStateFlow.value,
-      maxTurnCount = scenario.maxTurnStateFlow.value
+      maxRetry = scenario.maxRetryState.text.toString().toIntOrNull() ?: 3,
+      maxTurnCount = scenario.maxTurnState.text.toString().toIntOrNull() ?: 10
     )
   }
 
@@ -212,8 +215,12 @@ class AppStateHolder(
       ).apply {
         onGoalChanged(scenarioContent.goal)
         initializeMethodsStateFlow.value = scenarioContent.initializeMethods
-        maxRetryStateFlow.value = scenarioContent.maxRetry
-        maxTurnStateFlow.value = scenarioContent.maxTurn
+        maxRetryState.edit {
+          replace(0, length, scenarioContent.maxRetry.toString())
+        }
+        maxTurnState.edit {
+          replace(0, length, scenarioContent.maxTurn.toString())
+        }
       }
     }
     scenarioContents.forEachIndexed { index, scenarioContent ->

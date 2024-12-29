@@ -42,8 +42,8 @@ class ScenarioSerializer {
         it.goal,
         it.dependencyScenarioStateFlow.value?.goal,
         it.initializeMethodsStateFlow.value,
-        it.maxRetryStateFlow.value,
-        it.maxTurnStateFlow.value
+        it.maxRetryState.text.toString().toIntOrNull() ?: 3,
+        it.maxTurnState.text.toString().toIntOrNull() ?: 10
       )
     })
     val jsonString = yaml.encodeToString(FileContent.serializer(), fileContent)

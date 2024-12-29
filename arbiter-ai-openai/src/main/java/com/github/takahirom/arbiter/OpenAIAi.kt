@@ -1,5 +1,6 @@
 package com.github.takahirom.arbiter
 
+import io.ktor.client.request.request
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -8,14 +9,20 @@ import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.RequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.awt.image.BufferedImage
 import java.io.File
 import java.util.*
 import java.util.concurrent.TimeUnit
 import javax.imageio.ImageIO
 
-class OpenAIAi(private val apiKey: String) : Ai {
+class OpenAIAi(
+  private val apiKey: String,
+  private val model: String = "gpt-4o-mini",
+  private val requestBuilder: (String) -> Request = { requestBodyJson ->
+    createRequest(requestBodyJson, apiKey)
+  }
+) : Ai {
   override fun decideWhatToDo(decisionInput: Ai.DecisionInput): Ai.DecisionOutput {
     val (arbiterContext, dumpHierarchy, agentCommandTypes, screenshotFileName) = decisionInput
     val prompt = buildPrompt(arbiterContext, dumpHierarchy, agentCommandTypes)
@@ -47,7 +54,7 @@ class OpenAIAi(private val apiKey: String) : Ai {
     )
     val responseText = chatCompletion(messages)
     val turn = parseResponse(responseText, messages, screenshotFileName, agentCommandTypes)
-    return  Ai.DecisionOutput(listOf(turn.agentCommand!!), turn)
+    return Ai.DecisionOutput(listOf(turn.agentCommand!!), turn)
   }
 
   private fun buildPrompt(
@@ -129,11 +136,10 @@ $templates"""
     val client = OkHttpClient.Builder()
       .readTimeout(60, TimeUnit.SECONDS)
       .build()
-    val url = "https://api.openai.com/v1/chat/completions"
     val json = Json { ignoreUnknownKeys = true }
     val requestBodyJson = json.encodeToString(
       ChatCompletionRequest(
-        model = "gpt-4o-mini",
+        model = model,
         messages = messages,
         ResponseFormat(
           type = "json_schema",
@@ -141,14 +147,7 @@ $templates"""
         ),
       )
     )
-    val requestBody = RequestBody.create(
-      "application/json".toMediaType(), requestBodyJson
-    )
-    val request = Request.Builder()
-      .url(url)
-      .header("Authorization", "Bearer $apiKey")
-      .post(requestBody)
-      .build()
+    val request = requestBuilder(requestBodyJson)
     println(
       "OpenAI request: ${
         messages.flatMap { it.content }.filter { it.type == "text" }.joinToString("\n")
@@ -216,4 +215,15 @@ fun File.getResizedIamgeByteArray(scale: Float): ByteArray {
   val output = File.createTempFile("scaled", ".png")
   ImageIO.write(bufferedImage, "png", output)
   return output.readBytes()
+}
+
+private fun createRequest(requestBodyJson: String, apiKey: String): Request {
+  val requestBody = requestBodyJson
+    .toRequestBody("application/json".toMediaType())
+  val request = Request.Builder()
+    .url("https://api.openai.com/v1/chat/completions")
+    .header("Authorization", "Bearer $apiKey")
+    .post(requestBody)
+    .build()
+  return request
 }

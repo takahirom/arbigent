@@ -1,5 +1,9 @@
 package com.github.takahirom.arbiter.ui
 
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
 import com.github.takahirom.arbiter.Ai
 import com.github.takahirom.arbiter.Arbiter
 import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
@@ -38,10 +42,10 @@ sealed interface InitializeMethods {
 
 class ScenarioStateHolder(val device: Device, val ai: Ai) {
   // (var goal: String?, var arbiter: Arbiter?)
-  val goalStateFlow: MutableStateFlow<String> = MutableStateFlow("")
-  val goal get() = goalStateFlow.value
-  val maxRetryStateFlow: MutableStateFlow<Int> = MutableStateFlow(3)
-  val maxTurnStateFlow: MutableStateFlow<Int> = MutableStateFlow(10)
+  val goalState = TextFieldState("")
+  val goal get() = goalState.text.toString()
+  val maxRetryState: TextFieldState = TextFieldState("3")
+  val maxTurnState: TextFieldState = TextFieldState("10")
   val initializeMethodsStateFlow: MutableStateFlow<InitializeMethods> =
     MutableStateFlow(InitializeMethods.Back)
   val dependencyScenarioStateFlow = MutableStateFlow<ScenarioStateHolder?>(null)
@@ -95,7 +99,9 @@ class ScenarioStateHolder(val device: Device, val ai: Ai) {
   }
 
   fun onGoalChanged(goal: String) {
-    goalStateFlow.value = goal
+    goalState.edit {
+      replace(0, goalState.text.length, goal)
+    }
   }
 
   fun createAgentConfig(device: Device, ai: Ai) = agentConfig {

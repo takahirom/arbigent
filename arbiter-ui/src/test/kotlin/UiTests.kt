@@ -1,14 +1,24 @@
 package com.github.takahirom.arbiter.ui
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.unit.dp
 import com.github.takahirom.arbiter.AgentCommand
 import com.github.takahirom.arbiter.Ai
 import com.github.takahirom.arbiter.ArbiterContextHolder
@@ -89,13 +99,28 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
 
   @OptIn(ExperimentalTestApi::class)
   private fun ComposeUiTest.setContent() {
+    val appStateHolder = AppStateHolder(
+      aiFacotry = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+    )
     setContent {
-      App(
-        appStateHolder = AppStateHolder(
-          aiFacotry = { FakeAi() },
-          deviceFactory = { FakeDevice() },
-        ),
-      )
+      AppTheme {
+        Column {
+          Row(
+            horizontalArrangement = Arrangement.SpaceBetween,
+          ) {
+            Box(Modifier.padding(8.dp)) {
+              ScenarioFileControls(appStateHolder)
+            }
+            Box(Modifier.padding(8.dp)) {
+              ScenarioControls(appStateHolder)
+            }
+          }
+          App(
+            appStateHolder = appStateHolder,
+          )
+        }
+      }
     }
   }
 
@@ -175,7 +200,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
                     }
                     itShould("show goal achieved") {
                       capture(it)
-                      assertGoalAchieved()
+                      assertTwoGoalAchieved()
                     }
                   }
                 }
@@ -250,6 +275,12 @@ class TestRobot(
     composeUiTest.onNode(hasText("GoalAchieved", true), useUnmergedTree = true).assertExists()
   }
 
+  fun assertTwoGoalAchieved() {
+    composeUiTest.onNode(hasTestTag("scenario_running")).assertDoesNotExist()
+    composeUiTest.onAllNodes(hasText("GoalAchieved", true), useUnmergedTree = true)
+      .assertCountEquals(2)
+  }
+
   fun assertConnectToDeviceButtonExists() {
     composeUiTest.onNode(hasText("Connect to device")).assertExists()
   }
@@ -264,14 +295,14 @@ class TestRobot(
 
 
   fun clickDependencyTextField() {
-    composeUiTest.onNode(hasTestTag("dependency_text_field")).performClick()
+    composeUiTest.onNode(hasTestTag("dependency_dropdown")).performClick()
   }
 
   fun typeDependencyTextField(text: String) {
-    composeUiTest.onNode(hasTestTag("dependency_text_field")).performTextInput(text)
+    composeUiTest.onNode(hasText(text)).performClick()
   }
 
   fun capture(describedBehavior: DescribedBehavior<TestRobot>) {
-    composeUiTest.onRoot().captureRoboImage("$describedBehavior.png")
+    composeUiTest.onAllNodes(isRoot()).onLast().captureRoboImage("$describedBehavior.png")
   }
 }

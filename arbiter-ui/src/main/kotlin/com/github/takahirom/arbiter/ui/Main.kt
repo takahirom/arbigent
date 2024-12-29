@@ -16,10 +16,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,8 +33,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.loadImageBitmap
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.ApplicationScope
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.LocalWindowExceptionHandlerFactory
 import androidx.compose.ui.window.MenuBar
 import androidx.compose.ui.window.WindowExceptionHandler
@@ -53,13 +54,13 @@ import org.jetbrains.jewel.intui.standalone.theme.IntUiTheme
 import org.jetbrains.jewel.intui.standalone.theme.default
 import org.jetbrains.jewel.intui.standalone.theme.lightThemeDefinition
 import org.jetbrains.jewel.intui.window.decoratedWindow
-import org.jetbrains.jewel.intui.window.styling.light
+import org.jetbrains.jewel.intui.window.styling.lightWithLightHeader
 import org.jetbrains.jewel.ui.ComponentStyling
 import org.jetbrains.jewel.ui.component.CircularProgressIndicator
 import org.jetbrains.jewel.ui.component.Dropdown
 import org.jetbrains.jewel.ui.component.GroupHeader
 import org.jetbrains.jewel.ui.component.Icon
-import org.jetbrains.jewel.ui.component.IconButton
+import org.jetbrains.jewel.ui.component.IconActionButton
 import org.jetbrains.jewel.ui.component.MenuScope
 import org.jetbrains.jewel.ui.component.OutlinedButton
 import org.jetbrains.jewel.ui.component.RadioButtonRow
@@ -67,7 +68,9 @@ import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.TextField
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
+import org.jetbrains.jewel.ui.theme.colorPalette
 import org.jetbrains.jewel.window.DecoratedWindow
+import org.jetbrains.jewel.window.TitleBar
 import org.jetbrains.jewel.window.styling.TitleBarStyle
 import java.awt.Window
 import java.io.FileInputStream
@@ -77,155 +80,114 @@ import java.io.FileInputStream
 fun App(
   appStateHolder: AppStateHolder
 ) {
-  IntUiTheme {
-    Box(
-      Modifier.fillMaxSize().background(JewelTheme.globalColors.panelBackground)
-    ) {
-      val deviceConnectionState by appStateHolder.deviceConnectionState.collectAsState()
-      if (deviceConnectionState is DeviceConnectionState.NotConnected) {
-        ConnectionSettingScreen(
-          appStateHolder = appStateHolder
-        )
-        return@IntUiTheme
-      }
-      val fileSelectionState by appStateHolder.fileSelectionState.collectAsState()
-      if (fileSelectionState is FileSelectionState.Loading) {
-        FileLoadDialog(
-          title = "Choose a file",
-          onCloseRequest = { file ->
-            appStateHolder.loadGoals(file)
-            appStateHolder.fileSelectionState.value = FileSelectionState.NotSelected
-          }
-        )
-      } else if (fileSelectionState is FileSelectionState.Saving) {
-        FileSaveDialog(
-          title = "Save a file",
-          onCloseRequest = { file ->
-            appStateHolder.saveGoals(file)
-            appStateHolder.fileSelectionState.value = FileSelectionState.NotSelected
-          }
-        )
-      }
-      val scenarioIndex by appStateHolder.selectedAgentIndex.collectAsState()
-      Row {
-        val schenarioAndDepths by appStateHolder.sortedScenariosAndDepthsStateFlow.collectAsState()
-        val coroutineScope = rememberCoroutineScope()
-        Column(
-          Modifier
-            .weight(1f),
-          horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-          Text("Scenarios")
-          FlowRow {
-            IconButton(onClick = {
-              appStateHolder.addScenario()
-            }) {
-              Icon(
-                key = AllIconsKeys.FileTypes.AddAny,
-                contentDescription = "Add",
-                hint = Size(28)
-              )
-            }
-            IconButton(onClick = {
-              appStateHolder.runAll()
-            }) {
-              Icon(
-                key = AllIconsKeys.Actions.RunAll,
-                contentDescription = "Run all",
-                hint = Size(28)
-              )
-            }
-            IconButton(onClick = {
-              coroutineScope.launch {
-                appStateHolder.runAllFailed()
-              }
-            }) {
-              Icon(
-                key = AllIconsKeys.Actions.Rerun,
-                contentDescription = "Run all failed",
-                hint = Size(28)
-              )
-            }
-            IconButton(onClick = {
-              appStateHolder.fileSelectionState.value = FileSelectionState.Saving
-            }) {
-              Icon(
-                key = AllIconsKeys.Actions.MenuSaveall,
-                contentDescription = "Save",
-                hint = Size(28)
-              )
-            }
-            IconButton(onClick = {
-              appStateHolder.fileSelectionState.value = FileSelectionState.Loading
-            }) {
-              Icon(
-                key = AllIconsKeys.Actions.MenuOpen,
-                contentDescription = "Load",
-                hint = Size(28)
-              )
-            }
-          }
-          LazyColumn(modifier = Modifier.weight(1f)) {
-            itemsIndexed(schenarioAndDepths) { index, (scenarioStateHolder, depth) ->
-              val goal by scenarioStateHolder.goalStateFlow.collectAsState()
-              Box(
-                modifier = Modifier.fillMaxWidth()
-                  .padding(
-                    start = 8.dp + 12.dp * depth,
-                    top = if (depth == 0) 8.dp else 0.dp,
-                    end = 8.dp,
-                    bottom = 4.dp
-                  )
-                  .background(
-                    if (index == scenarioIndex) {
-                      Color.LightGray
-                    } else {
-                      Color.White
-                    }
-                  )
-                  .clickable { appStateHolder.selectedAgentIndex.value = index },
+  Box(
+    Modifier.fillMaxSize().background(JewelTheme.globalColors.panelBackground)
+  ) {
+    val deviceConnectionState by appStateHolder.deviceConnectionState.collectAsState()
+    if (deviceConnectionState is DeviceConnectionState.NotConnected) {
+      ConnectionSettingScreen(
+        appStateHolder = appStateHolder
+      )
+      return@Box
+    }
+    val fileSelectionState by appStateHolder.fileSelectionState.collectAsState()
+    if (fileSelectionState is FileSelectionState.Loading) {
+      FileLoadDialog(
+        title = "Choose a file",
+        onCloseRequest = { file ->
+          appStateHolder.loadGoals(file)
+          appStateHolder.fileSelectionState.value = FileSelectionState.NotSelected
+        }
+      )
+    } else if (fileSelectionState is FileSelectionState.Saving) {
+      FileSaveDialog(
+        title = "Save a file",
+        onCloseRequest = { file ->
+          appStateHolder.saveGoals(file)
+          appStateHolder.fileSelectionState.value = FileSelectionState.NotSelected
+        }
+      )
+    }
+    val scenarioIndex by appStateHolder.selectedAgentIndex.collectAsState()
+    Row {
+      val schenarioAndDepths by appStateHolder.sortedScenariosAndDepthsStateFlow.collectAsState()
+      Column(
+        Modifier
+          .weight(1f),
+        horizontalAlignment = Alignment.CenterHorizontally
+      ) {
+        LazyColumn(modifier = Modifier.weight(1f)) {
+          itemsIndexed(schenarioAndDepths) { index, (scenarioStateHolder, depth) ->
+            val goal = scenarioStateHolder.goalState.text
+            Box(
+              modifier = Modifier.fillMaxWidth()
+                .padding(
+                  start = 8.dp + 12.dp * depth,
+                  top = if (depth == 0) 8.dp else 0.dp,
+                  end = 8.dp,
+                  bottom = 4.dp
+                )
+                .background(
+                  if (index == scenarioIndex) {
+                    Color.LightGray
+                  } else {
+                    Color.White
+                  }
+                )
+                .clickable { appStateHolder.selectedAgentIndex.value = index },
+            ) {
+              Row(
+                modifier = Modifier.padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically
               ) {
-                Row(
-                  modifier = Modifier.padding(8.dp),
-                  verticalAlignment = Alignment.CenterVertically
-                ) {
-                  val runningInfo by scenarioStateHolder.runningInfo.collectAsState()
-                  Text(
-                    modifier = Modifier.weight(1f),
-                    text = "Goal:" + goal + "\n" + runningInfo?.toString().orEmpty()
+                val runningInfo by scenarioStateHolder.runningInfo.collectAsState()
+                Text(
+                  modifier = Modifier.weight(1f),
+                  text = "Goal:" + goal + "\n" + runningInfo?.toString().orEmpty()
+                )
+                val isArchived by scenarioStateHolder.isArchived.collectAsState()
+                if (isArchived) {
+                  Icon(
+                    key = AllIconsKeys.Actions.Checked,
+                    contentDescription = "Archived",
+                    modifier = Modifier.padding(8.dp)
+                      .size(40.dp)
+                      .clip(
+                        CircleShape
+                      )
+                      .background(Color.Green)
                   )
-                  val isArchived by scenarioStateHolder.isArchived.collectAsState()
-                  if (isArchived) {
-                    Icon(
-                      key = AllIconsKeys.Actions.Checked,
-                      contentDescription = "Archived",
-                      modifier = Modifier.padding(8.dp)
-                        .size(40.dp)
-                        .clip(
-                          CircleShape
-                        )
-                        .background(Color.Green)
-                    )
-                  }
-                  val isRunning by scenarioStateHolder.isRunning.collectAsState()
-                  if (isRunning) {
-                    CircularProgressIndicator(
-                      modifier = Modifier.padding(8.dp)
-                        .testTag("scenario_running")
-                    )
-                  }
+                }
+                val isRunning by scenarioStateHolder.isRunning.collectAsState()
+                if (isRunning) {
+                  CircularProgressIndicator(
+                    modifier = Modifier.padding(8.dp)
+                      .testTag("scenario_running")
+                  )
                 }
               }
             }
           }
         }
-        val scenarioStateHolder = schenarioAndDepths.getOrNull(scenarioIndex)
-        if (scenarioStateHolder != null) {
-          Column(Modifier.weight(3f)) {
-            Scenario(
-              scenarioStateHolder = scenarioStateHolder.first,
-              dependencyScenarioMenu = {
-                appStateHolder.sortedScenariosAndDepthsStateFlow.value.map { it.first }.forEach {
+      }
+      val scenarioStateHolder = schenarioAndDepths.getOrNull(scenarioIndex)
+      if (scenarioStateHolder != null) {
+        Column(Modifier.weight(3f)) {
+          Scenario(
+            scenarioStateHolder = scenarioStateHolder.first,
+            dependencyScenarioMenu = {
+              selectableItem(
+                selected = scenarioStateHolder.first.dependencyScenarioStateFlow.value == null,
+                onClick = {
+                  scenarioStateHolder.first.dependencyScenarioStateFlow.value = null
+                },
+                content = {
+                  Text("No dependency")
+                }
+              )
+              appStateHolder.sortedScenariosAndDepthsStateFlow.value.map { it.first }
+                .filter { it != scenarioStateHolder.first }
+                .forEach {
                   selectableItem(
                     selected = scenarioStateHolder.first.dependencyScenarioStateFlow.value == it,
                     onClick = {
@@ -236,22 +198,78 @@ fun App(
                     }
                   )
                 }
-              },
-              onExecute = {
-                appStateHolder.run(it)
-              },
-              onCancel = {
-                appStateHolder.close()
-                scenarioStateHolder.first.cancel()
-              },
-              onRemove = {
-                appStateHolder.removeScenario(it)
-              }
-            )
-          }
+            },
+            onExecute = {
+              appStateHolder.run(it)
+            },
+            onCancel = {
+              appStateHolder.close()
+              scenarioStateHolder.first.cancel()
+            },
+            onRemove = {
+              appStateHolder.removeScenario(it)
+            }
+          )
         }
       }
     }
+  }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun ScenarioFileControls(appStateHolder: AppStateHolder) {
+  FlowRow {
+    IconActionButton(
+      key = AllIconsKeys.Actions.MenuSaveall,
+      onClick = {
+        appStateHolder.fileSelectionState.value = FileSelectionState.Saving
+      },
+      contentDescription = "Save",
+      hint = Size(28)
+    )
+    IconActionButton(
+      key = AllIconsKeys.Actions.MenuOpen,
+      onClick = {
+        appStateHolder.fileSelectionState.value = FileSelectionState.Loading
+      },
+      contentDescription = "Load",
+      hint = Size(28)
+    )
+  }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun ScenarioControls(appStateHolder: AppStateHolder) {
+  val coroutineScope = rememberCoroutineScope()
+  FlowRow {
+    IconActionButton(
+      key = AllIconsKeys.FileTypes.AddAny,
+      onClick = {
+        appStateHolder.addScenario()
+      },
+      contentDescription = "Add",
+      hint = Size(28)
+    )
+    IconActionButton(
+      key = AllIconsKeys.Actions.RunAll,
+      onClick = {
+        appStateHolder.runAll()
+      },
+      contentDescription = "Run all",
+      hint = Size(28)
+    )
+    IconActionButton(
+      key = AllIconsKeys.Actions.Rerun,
+      onClick = {
+        coroutineScope.launch {
+          appStateHolder.runAllFailed()
+        }
+      },
+      contentDescription = "Run all failed",
+      hint = Size(28)
+    )
   }
 }
 
@@ -265,41 +283,73 @@ private fun Scenario(
 ) {
   val deviceType by remember { mutableStateOf(true) }
   val arbiter: Arbiter? by scenarioStateHolder.arbiterStateFlow.collectAsState()
-  val goal by scenarioStateHolder.goalStateFlow.collectAsState()
-  var editingGoalTextState by remember(goal) { mutableStateOf(goal) }
-  Column {
+  val goal = scenarioStateHolder.goalState
+  Column(
+    modifier = Modifier.padding(8.dp)
+  ) {
     Row(
       verticalAlignment = Alignment.CenterVertically
     ) {
       TextField(
-        modifier = Modifier.weight(1f).testTag("goal"),
-        value = editingGoalTextState,
+        modifier = Modifier.weight(1f).padding(4.dp).testTag("goal"),
+        state = goal,
         placeholder = { Text("Goal") },
-        onValueChange = {
-          editingGoalTextState = it
-          scenarioStateHolder.onGoalChanged(it)
-        },
       )
-      OutlinedButton(onClick = {
-        onExecute(scenarioStateHolder)
-      }) {
-        Icon(
-          key = AllIconsKeys.RunConfigurations.TestState.Run,
-          contentDescription = "Run",
-        )
-      }
-      OutlinedButton(onClick = {
-        onCancel(scenarioStateHolder)
-      }) {
-        Text("Cancel")
-      }
-      OutlinedButton(onClick = {
-        onRemove(scenarioStateHolder)
-      }) {
-        Text("Remove")
+      IconActionButton(
+        key = AllIconsKeys.RunConfigurations.TestState.Run,
+        onClick = {
+          onExecute(scenarioStateHolder)
+        },
+        contentDescription = "Run",
+        hint = Size(28)
+      )
+      IconActionButton(
+        key = AllIconsKeys.Actions.Cancel,
+        onClick = {
+          onCancel(scenarioStateHolder)
+        },
+        contentDescription = "Cancel",
+        hint = Size(28)
+      )
+      var removeDialogShowing by remember { mutableStateOf(false) }
+      IconActionButton(
+        key = AllIconsKeys.General.Delete,
+        onClick = {
+          removeDialogShowing = true
+        },
+        contentDescription = "Remove",
+        hint = Size(28)
+      )
+      if (removeDialogShowing) {
+        Dialog(
+          onDismissRequest = { removeDialogShowing = false }
+        ) {
+          Column(
+            modifier = Modifier.background(JewelTheme.globalColors.panelBackground).padding(8.dp)
+          ) {
+            Text("Are you sure you want to remove this scenario?")
+            Row {
+              OutlinedButton(
+                onClick = {
+                  removeDialogShowing = false
+                }
+              ) {
+                Text("Cancel")
+              }
+              OutlinedButton(
+                onClick = {
+                  removeDialogShowing = false
+                  onRemove(scenarioStateHolder)
+                }
+              ) {
+                Text("Remove")
+              }
+            }
+          }
+        }
       }
     }
-    Row(modifier = Modifier.padding(8.dp)) {
+    Row(modifier = Modifier.padding(4.dp)) {
       Column(
         modifier = Modifier.padding(8.dp).weight(1F)
       ) {
@@ -308,6 +358,7 @@ private fun Scenario(
 
         Dropdown(
           modifier = Modifier
+            .testTag("dependency_dropdown")
             .padding(4.dp),
           menuContent = dependencyScenarioMenu
         ) {
@@ -403,30 +454,24 @@ private fun Scenario(
         Row(
           verticalAlignment = Alignment.CenterVertically
         ) {
-          val maxRetry by scenarioStateHolder.maxRetryStateFlow.collectAsState()
           // Retry count
           TextField(
+            state = scenarioStateHolder.maxRetryState,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier
               .padding(4.dp),
-            value = maxRetry.toString(),
-            onValueChange = {
-              scenarioStateHolder.maxRetryStateFlow.value = it.toIntOrNull() ?: 0
-            },
           )
         }
         GroupHeader("Max turn count")
         Row(
           verticalAlignment = Alignment.CenterVertically
         ) {
-          val maxTurnCount by scenarioStateHolder.maxTurnStateFlow.collectAsState()
           // Retry count
           TextField(
             modifier = Modifier
               .padding(4.dp),
-            value = maxTurnCount.toString(),
-            onValueChange = {
-              scenarioStateHolder.maxTurnStateFlow.value = it.toIntOrNull() ?: 0
-            },
+            state = scenarioStateHolder.maxTurnState,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
           )
         }
       }
@@ -531,34 +576,33 @@ private fun ContentPanel(tasksToAgent: List<Pair<Arbiter.Task, Agent>>) {
   }
 }
 
-@OptIn(ExperimentalComposeUiApi::class)
 fun main() = application {
   val appStateHolder = remember {
     AppStateHolder(
       aiFacotry = { OpenAIAi(System.getenv("API_KEY")!!) },
     )
   }
-  AppWindow(appStateHolder, LocalWindowExceptionHandlerFactory)
+  AppWindow(
+    appStateHolder = appStateHolder,
+    onExit = {
+      appStateHolder.close()
+      exitApplication()
+    }
+  )
 }
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun ApplicationScope.AppWindow(
+fun AppWindow(
   appStateHolder: AppStateHolder,
-  LocalWindowExceptionHandlerFactory: ProvidableCompositionLocal<WindowExceptionHandlerFactory>
+  onExit: () -> Unit,
 ) {
-  IntUiTheme(
-    theme = JewelTheme.lightThemeDefinition(),
-    styling = ComponentStyling.default().decoratedWindow(
-      titleBarStyle = TitleBarStyle.light()
-    ),
-    swingCompatMode = true,
-  ) {
+  AppTheme {
     DecoratedWindow(
       title = "App Test AI Agent",
       onCloseRequest = {
         appStateHolder.close()
-        exitApplication()
+        onExit()
       }) {
       CompositionLocalProvider(
         LocalWindowExceptionHandlerFactory provides object : WindowExceptionHandlerFactory {
@@ -569,10 +613,25 @@ private fun ApplicationScope.AppWindow(
           }
         }
       ) {
-
+        val deviceConnectionState by appStateHolder.deviceConnectionState.collectAsState()
+        val isDeviceConnected = deviceConnectionState.isConnected()
+        TitleBar(
+          style = TitleBarStyle
+            .lightWithLightHeader(),
+          gradientStartColor = JewelTheme.colorPalette.purple(8),
+        ) {
+          if (isDeviceConnected) {
+            Box(Modifier.padding(8.dp).align(Alignment.Start)) {
+              ScenarioFileControls(appStateHolder)
+            }
+            Box(Modifier.padding(8.dp).align(Alignment.End)) {
+              ScenarioControls(appStateHolder)
+            }
+          }
+        }
         MenuBar {
           Menu("Scenarios") {
-            if (!(appStateHolder.deviceConnectionState.value is DeviceConnectionState.Connected)) {
+            if (!(isDeviceConnected)) {
               return@Menu
             }
             Item("Add") {
@@ -600,3 +659,15 @@ private fun ApplicationScope.AppWindow(
   }
 }
 
+@Composable
+fun AppTheme(content: @Composable () -> Unit) {
+  IntUiTheme(
+    theme = JewelTheme.lightThemeDefinition(),
+    styling = ComponentStyling.default().decoratedWindow(
+      titleBarStyle = TitleBarStyle.lightWithLightHeader()
+    ),
+    swingCompatMode = true,
+  ) {
+    content()
+  }
+}
