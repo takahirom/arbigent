@@ -68,7 +68,8 @@ class Agent(
     .stateIn(coroutineScope, SharingStarted.Lazily, null)
   private val arbiterContextHolderStateFlow: MutableStateFlow<ArbiterContextHolder?> =
     MutableStateFlow(null)
-  val isRunningStateFlow: MutableStateFlow<Boolean> = MutableStateFlow(false)
+  private val _isRunningStateFlow: MutableStateFlow<Boolean> = MutableStateFlow(false)
+  val isRunningStateFlow: StateFlow<Boolean> = _isRunningStateFlow.asStateFlow()
   private val currentGoalStateFlow = MutableStateFlow<String?>(null)
   val isArchivedStateFlow = arbiterContextHolderStateFlow
     .flatMapLatest {
@@ -112,7 +113,7 @@ class Agent(
   ) {
     println("Arbiter.execute agent.execute start $goal")
     try {
-      isRunningStateFlow.value = true
+      _isRunningStateFlow.value = true
       currentGoalStateFlow.value = goal
       val arbiterContextHolder = ArbiterContextHolder(goal)
       println("Setting new ArbiterContextHolder: $arbiterContextHolder")
@@ -132,7 +133,7 @@ class Agent(
         )
         when (stepChain(stepInput)) {
           StepResult.GoalAchieved -> {
-            isRunningStateFlow.value = false
+            _isRunningStateFlow.value = false
             isArchivedStateFlow.first { it }
             break
           }
@@ -143,11 +144,11 @@ class Agent(
           }
         }
       }
-      isRunningStateFlow.value = false
+      _isRunningStateFlow.value = false
     } catch (e: Exception) {
       println("Failed to run agent: $e")
       e.printStackTrace()
-      isRunningStateFlow.value = false
+      _isRunningStateFlow.value = false
     } finally {
       println("Arbiter.execute agent.execute end $goal")
     }
@@ -179,7 +180,7 @@ class Agent(
 
   fun cancel() {
     job?.cancel()
-    isRunningStateFlow.value = false
+    _isRunningStateFlow.value = false
   }
 }
 class AgentConfig(

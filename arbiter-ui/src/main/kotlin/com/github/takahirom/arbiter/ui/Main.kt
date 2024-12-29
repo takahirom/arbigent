@@ -75,7 +75,6 @@ import org.jetbrains.jewel.window.styling.TitleBarStyle
 import java.awt.Window
 import java.io.FileInputStream
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun App(
   appStateHolder: AppStateHolder
@@ -85,7 +84,7 @@ fun App(
   ) {
     val deviceConnectionState by appStateHolder.deviceConnectionState.collectAsState()
     if (deviceConnectionState is DeviceConnectionState.NotConnected) {
-      ConnectionSettingScreen(
+      LauncherScreen(
         appStateHolder = appStateHolder
       )
       return@Box
@@ -579,7 +578,7 @@ private fun ContentPanel(tasksToAgent: List<Pair<Arbiter.Task, Agent>>) {
 fun main() = application {
   val appStateHolder = remember {
     AppStateHolder(
-      aiFacotry = { OpenAIAi(System.getenv("API_KEY")!!) },
+      aiFacotry = { OpenAIAi(Preference.openAiApiKey) },
     )
   }
   AppWindow(
