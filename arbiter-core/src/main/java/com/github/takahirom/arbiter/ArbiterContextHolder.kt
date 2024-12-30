@@ -17,9 +17,9 @@ class ArbiterContextHolder(
   ) {
     fun text(): String {
       return """
-        action: ${agentCommand?.turnLogText()}
         memo: $memo
         whatYouSaw: $whatYouSaw
+        action done: ${agentCommand?.turnLogText()}
       """.trimIndent()
     }
   }
