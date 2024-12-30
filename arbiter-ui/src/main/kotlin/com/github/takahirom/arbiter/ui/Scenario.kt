@@ -1,10 +1,13 @@
 package com.github.takahirom.arbiter.ui
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -120,168 +123,201 @@ fun Scenario(
         }
       }
     }
-    Row(modifier = Modifier.padding(4.dp)) {
-      Column(
-        modifier = Modifier.padding(8.dp).weight(1F)
-      ) {
-        GroupHeader("Scenario dependency")
-        val dependency by scenarioStateHolder.dependencyScenarioStateFlow.collectAsState()
+    var isExpanded by remember { mutableStateOf(false) }
+    Row(
+      verticalAlignment = Alignment.CenterVertically
+    ) {
+      if (isExpanded) {
+        IconActionButton(
+          key = AllIconsKeys.General.ArrowDown,
+          onClick = {
+            isExpanded = !isExpanded
+          },
+          contentDescription = "Collapse",
+          hint = Size(28)
+        )
+      } else {
+        IconActionButton(
+          key = AllIconsKeys.General.ArrowRight,
+          onClick = {
+            isExpanded = !isExpanded
+          },
+          contentDescription = "Expand",
+          hint = Size(28)
+        )
+      }
+      GroupHeader("Options")
+    }
+    AnimatedVisibility(visible = isExpanded) {
+      ScenarioOptions(scenarioStateHolder, dependencyScenarioMenu)
+    }
+    if (arbiter != null) {
+      val taskToAgents: List<Pair<Arbiter.Task, Agent>> by arbiter!!.taskToAgentStateFlow.collectAsState()
+      if (!taskToAgents.isEmpty()) {
+        ContentPanel(taskToAgents)
+      }
+    }
+  }
+}
 
-        Dropdown(
-          modifier = Modifier
-            .testTag("dependency_dropdown")
-            .padding(4.dp),
-          menuContent = dependencyScenarioMenu
-        ) {
-          Text(dependency?.goal ?: "Select dependency")
-        }
-      }
-      Column(
-        modifier = Modifier.padding(8.dp).weight(1F)
+@Composable
+private fun ScenarioOptions(
+  scenarioStateHolder: ScenarioStateHolder,
+  dependencyScenarioMenu: MenuScope.() -> Unit
+) {
+  Row(modifier = Modifier.padding(4.dp)) {
+    Column(
+      modifier = Modifier.padding(8.dp).weight(1F)
+    ) {
+      GroupHeader("Scenario dependency")
+      val dependency by scenarioStateHolder.dependencyScenarioStateFlow.collectAsState()
+
+      Dropdown(
+        modifier = Modifier
+          .testTag("dependency_dropdown")
+          .padding(4.dp),
+        menuContent = dependencyScenarioMenu
       ) {
-        val inputCommandType by scenarioStateHolder.deviceFormFactorStateFlow.collectAsState()
-        GroupHeader("Device formfactor")
-        Row(
-          verticalAlignment = Alignment.CenterVertically
-        ) {
-          RadioButtonRow(
-            text = "Mobile",
-            selected = inputCommandType.isMobile(),
-            onClick = {
-              scenarioStateHolder.deviceFormFactorStateFlow.value = DeviceFormFactor.Mobile
-            }
-          )
-        }
-        Row(
-          verticalAlignment = Alignment.CenterVertically
-        ) {
-          RadioButtonRow(
-            text = "TV",
-            selected = inputCommandType.isTv(),
-            onClick = {
-              scenarioStateHolder.deviceFormFactorStateFlow.value = DeviceFormFactor.Tv
-            }
-          )
-        }
+        Text(dependency?.goal ?: "Select dependency")
       }
-      Column(
-        modifier = Modifier.padding(8.dp).weight(1F)
+    }
+    Column(
+      modifier = Modifier.padding(8.dp).weight(1F)
+    ) {
+      val inputCommandType by scenarioStateHolder.deviceFormFactorStateFlow.collectAsState()
+      GroupHeader("Device formfactor")
+      Row(
+        verticalAlignment = Alignment.CenterVertically
       ) {
-        val initializeMethods by scenarioStateHolder.initializeMethodsStateFlow.collectAsState()
-        val cleanupData by scenarioStateHolder.cleanupDataStateFlow.collectAsState()
-        GroupHeader("Initialize method")
-        CheckboxRow(
-          text = "Cleanup app data",
-          checked = cleanupData is CleanupData.Cleanup,
-          onCheckedChange = {
-            scenarioStateHolder.cleanupDataStateFlow.value = if (it) {
-              CleanupData.Cleanup((cleanupData as? CleanupData.Cleanup)?.packageName ?: "")
-            } else {
-              CleanupData.Noop
-            }
+        RadioButtonRow(
+          text = "Mobile",
+          selected = inputCommandType.isMobile(),
+          onClick = {
+            scenarioStateHolder.deviceFormFactorStateFlow.value = DeviceFormFactor.Mobile
           }
         )
+      }
+      Row(
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        RadioButtonRow(
+          text = "TV",
+          selected = inputCommandType.isTv(),
+          onClick = {
+            scenarioStateHolder.deviceFormFactorStateFlow.value = DeviceFormFactor.Tv
+          }
+        )
+      }
+    }
+    Column(
+      modifier = Modifier.padding(8.dp).weight(1F)
+    ) {
+      val initializeMethods by scenarioStateHolder.initializeMethodsStateFlow.collectAsState()
+      val cleanupData by scenarioStateHolder.cleanupDataStateFlow.collectAsState()
+      GroupHeader("Initialize method")
+      CheckboxRow(
+        text = "Cleanup app data",
+        checked = cleanupData is CleanupData.Cleanup,
+        onCheckedChange = {
+          scenarioStateHolder.cleanupDataStateFlow.value = if (it) {
+            CleanupData.Cleanup((cleanupData as? CleanupData.Cleanup)?.packageName ?: "")
+          } else {
+            CleanupData.Noop
+          }
+        }
+      )
+      TextField(
+        modifier = Modifier
+          .padding(4.dp),
+        placeholder = { Text("Package name") },
+        enabled = cleanupData is CleanupData.Cleanup,
+        value = (cleanupData as? CleanupData.Cleanup)?.packageName ?: "",
+        onValueChange = {
+          scenarioStateHolder.cleanupDataStateFlow.value = CleanupData.Cleanup(it)
+        },
+      )
+      Row(
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        RadioButtonRow(
+          selected = initializeMethods == InitializeMethods.Back,
+          text = "Back",
+          onClick = {
+            scenarioStateHolder.initializeMethodsStateFlow.value = InitializeMethods.Back
+          }
+        )
+      }
+      Row(
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        RadioButtonRow(
+          text = "Do nothing",
+          selected = initializeMethods is InitializeMethods.Noop,
+          onClick = {
+            scenarioStateHolder.initializeMethodsStateFlow.value = InitializeMethods.Noop
+          }
+        )
+      }
+      Row(
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        var editingText by remember(initializeMethods) {
+          mutableStateOf(
+            (initializeMethods as? InitializeMethods.OpenApp)?.packageName ?: ""
+          )
+        }
+        RadioButtonRow(
+          selected = initializeMethods is InitializeMethods.OpenApp,
+          onClick = {
+            scenarioStateHolder.initializeMethodsStateFlow.value =
+              InitializeMethods.OpenApp(editingText)
+          }
+        ) {
+          Column {
+            Text(modifier = Modifier.padding(top = 4.dp), text = "Launch app")
+            TextField(
+              modifier = Modifier
+                .padding(4.dp),
+              enabled = initializeMethods is InitializeMethods.OpenApp,
+              value = editingText,
+              onValueChange = {
+                editingText = it
+                scenarioStateHolder.initializeMethodsStateFlow.value =
+                  InitializeMethods.OpenApp(it)
+              },
+            )
+          }
+        }
+      }
+    }
+    Column(
+      modifier = Modifier.padding(8.dp).weight(1F)
+    ) {
+      GroupHeader("Max retry count")
+      Row(
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        // Retry count
+        TextField(
+          state = scenarioStateHolder.maxRetryState,
+          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+          modifier = Modifier
+            .padding(4.dp),
+        )
+      }
+      GroupHeader("Max turn count")
+      Row(
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        // Retry count
         TextField(
           modifier = Modifier
             .padding(4.dp),
-          placeholder = { Text("Package name") },
-          enabled = cleanupData is CleanupData.Cleanup,
-          value = (cleanupData as? CleanupData.Cleanup)?.packageName ?: "",
-          onValueChange = {
-            scenarioStateHolder.cleanupDataStateFlow.value = CleanupData.Cleanup(it)
-          },
+          state = scenarioStateHolder.maxTurnState,
+          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         )
-        Row(
-          verticalAlignment = Alignment.CenterVertically
-        ) {
-          RadioButtonRow(
-            selected = initializeMethods == InitializeMethods.Back,
-            text = "Back",
-            onClick = {
-              scenarioStateHolder.initializeMethodsStateFlow.value = InitializeMethods.Back
-            }
-          )
-        }
-        Row(
-          verticalAlignment = Alignment.CenterVertically
-        ) {
-          RadioButtonRow(
-            text = "Do nothing",
-            selected = initializeMethods is InitializeMethods.Noop,
-            onClick = {
-              scenarioStateHolder.initializeMethodsStateFlow.value = InitializeMethods.Noop
-            }
-          )
-        }
-        Row(
-          verticalAlignment = Alignment.CenterVertically
-        ) {
-          var editingText by remember(initializeMethods) {
-            mutableStateOf(
-              (initializeMethods as? InitializeMethods.OpenApp)?.packageName ?: ""
-            )
-          }
-          RadioButtonRow(
-            selected = initializeMethods is InitializeMethods.OpenApp,
-            onClick = {
-              scenarioStateHolder.initializeMethodsStateFlow.value =
-                InitializeMethods.OpenApp(editingText)
-            }
-          ) {
-            Column {
-              Text(modifier = Modifier.padding(top = 4.dp), text = "Launch app")
-              TextField(
-                modifier = Modifier
-                  .padding(4.dp),
-                enabled = initializeMethods is InitializeMethods.OpenApp,
-                value = editingText,
-                onValueChange = {
-                  editingText = it
-                  scenarioStateHolder.initializeMethodsStateFlow.value =
-                    InitializeMethods.OpenApp(it)
-                },
-              )
-            }
-          }
-        }
-      }
-      Column(
-        modifier = Modifier.padding(8.dp).weight(1F)
-      ) {
-        GroupHeader("Max retry count")
-        Row(
-          verticalAlignment = Alignment.CenterVertically
-        ) {
-          // Retry count
-          TextField(
-            state = scenarioStateHolder.maxRetryState,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            modifier = Modifier
-              .padding(4.dp),
-          )
-        }
-        GroupHeader("Max turn count")
-        Row(
-          verticalAlignment = Alignment.CenterVertically
-        ) {
-          // Retry count
-          TextField(
-            modifier = Modifier
-              .padding(4.dp),
-            state = scenarioStateHolder.maxTurnState,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-          )
-        }
       }
     }
-    if (arbiter == null) {
-      return
-    }
-    val taskToAgents: List<Pair<Arbiter.Task, Agent>> by arbiter!!.taskToAgentStateFlow.collectAsState()
-    if (taskToAgents.isEmpty()) {
-      return
-    }
-    ContentPanel(taskToAgents)
   }
 }
 
@@ -289,7 +325,7 @@ fun Scenario(
 private fun ContentPanel(tasksToAgent: List<Pair<Arbiter.Task, Agent>>) {
   var selectedTurn: ArbiterContextHolder.Turn? by remember { mutableStateOf(null) }
   Row(Modifier) {
-    LazyColumn(modifier = Modifier.weight(1f)) {
+    LazyColumn(modifier = Modifier.weight(1.5f)) {
       itemsIndexed(items = tasksToAgent) { index, (tasks, agent) ->
         val latestContext by agent.latestArbiterContextStateFlow.collectAsState()
         val latestTurnsStateFlow = latestContext?.turns ?: return@itemsIndexed
@@ -363,12 +399,21 @@ private fun ContentPanel(tasksToAgent: List<Pair<Arbiter.Task, Agent>>) {
           )
         }
       }
-      turn.screenshotFileName.let {
-        Image(
-          bitmap = loadImageBitmap(FileInputStream("screenshots/" + it + ".png")),
-          contentDescription = "screenshot",
-          modifier = Modifier.weight(1.5F)
-        )
+      turn.screenshotFileName.let { name ->
+        Column(
+          Modifier
+            .fillMaxHeight()
+            .weight(1f)
+            .padding(8.dp),
+          verticalArrangement = Arrangement.Center,
+        ) {
+          val fileName = "screenshots/$name.png"
+          Image(
+            bitmap = loadImageBitmap(FileInputStream(fileName)),
+            contentDescription = "screenshot",
+          )
+          Text("Screenshot($fileName)")
+        }
       }
     }
   }

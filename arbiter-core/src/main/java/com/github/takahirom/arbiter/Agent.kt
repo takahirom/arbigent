@@ -322,7 +322,7 @@ private fun executeCommands(
       e.printStackTrace()
       arbiterContextHolder.addTurn(
         ArbiterContextHolder.Turn(
-          memo = "Failed to perform action: ${e.message}",
+          memo = "Failed to perform action: ${e.message}. Please try other actions.",
           screenshotFileName = screenshotFileName
         )
       )
@@ -330,7 +330,7 @@ private fun executeCommands(
       e.printStackTrace()
       arbiterContextHolder.addTurn(
         ArbiterContextHolder.Turn(
-          memo = "Failed to perform action: ${e.message}",
+          memo = "Failed to perform action: ${e.message}. Please try other actions.",
           screenshotFileName = screenshotFileName
         )
       )
@@ -338,7 +338,7 @@ private fun executeCommands(
       e.printStackTrace()
       arbiterContextHolder.addTurn(
         ArbiterContextHolder.Turn(
-          memo = "Failed to perform action: ${e.message}",
+          memo = "Failed to perform action: ${e.message}. Please try other actions.",
           screenshotFileName = screenshotFileName
         )
       )

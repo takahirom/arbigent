@@ -272,9 +272,18 @@ class FakeDevice : Device {
     println("FakeDevice.executeCommands: $commands")
   }
 
+  override fun focusedTreeString(): String {
+    println("FakeDevice.focusedTreeString")
+    return "focusedTreeString"
+  }
+
   override fun viewTreeString(): String {
     println("FakeDevice.viewTreeString")
     return "viewTreeString"
+  }
+
+  override fun close() {
+    println("FakeDevice.close")
   }
 }
 

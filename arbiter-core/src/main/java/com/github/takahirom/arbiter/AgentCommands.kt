@@ -7,6 +7,7 @@ import maestro.orchestra.*
 interface AgentCommand {
   val actionName: String
   fun runOrchestraCommand(device: Device)
+  fun turnLogText(): String
 
   fun isGoal(): Boolean {
     return actionName == GoalAchievedAgentCommand.actionName
@@ -28,17 +29,17 @@ private fun getRegexToIndex(text: String): Pair<String, String> {
 data class ClickWithTextAgentCommand(val textRegex: String) : AgentCommand {
   override val actionName = Companion.actionName
 
+  override fun turnLogText(): String {
+    return "Click on text: $textRegex"
+  }
+
   override fun runOrchestraCommand(device: Device) {
     val (textRegex, index) = getRegexToIndex(textRegex)
     val maestroCommand = MaestroCommand(
       tapOnElement = TapOnElementCommand(
         selector = ElementSelector(
-          textRegex = "$textRegex",
-          index = index
-        ),
-        waitToSettleTimeoutMs = 500,
-        retryIfNoChange = false,
-        waitUntilVisible = false
+          textRegex = "$textRegex", index = index
+        ), waitToSettleTimeoutMs = 500, retryIfNoChange = false, waitUntilVisible = false
       )
     )
     try {
@@ -83,6 +84,10 @@ data class ClickWithTextAgentCommand(val textRegex: String) : AgentCommand {
 data class ClickWithIdAgentCommand(val textRegex: String) : AgentCommand {
   override val actionName = Companion.actionName
 
+  override fun turnLogText(): String {
+    return "Click on id: $textRegex"
+  }
+
   override fun runOrchestraCommand(device: Device) {
     val (textRegex, index) = getRegexToIndex(textRegex)
     device.executeCommands(
@@ -90,11 +95,8 @@ data class ClickWithIdAgentCommand(val textRegex: String) : AgentCommand {
         MaestroCommand(
           tapOnElement = TapOnElementCommand(
             selector = ElementSelector(
-              idRegex = textRegex,
-              index = index
-            ),
-            waitToSettleTimeoutMs = 500,
-            waitUntilVisible = false
+              idRegex = textRegex, index = index
+            ), waitToSettleTimeoutMs = 500, waitUntilVisible = false
           )
         )
       ),
@@ -121,6 +123,10 @@ data class ClickWithIdAgentCommand(val textRegex: String) : AgentCommand {
 
 data class DpadDownArrowAgentCommand(val count: Int) : AgentCommand {
   override val actionName = Companion.actionName
+
+  override fun turnLogText(): String {
+    return "Press down arrow key $count times"
+  }
 
   override fun runOrchestraCommand(device: Device) {
     device.executeCommands(
@@ -153,6 +159,10 @@ data class DpadDownArrowAgentCommand(val count: Int) : AgentCommand {
 data class DpadUpArrowAgentCommand(val count: Int) : AgentCommand {
   override val actionName = Companion.actionName
 
+  override fun turnLogText(): String {
+    return "Press up arrow key $count times"
+  }
+
   override fun runOrchestraCommand(device: Device) {
     device.executeCommands(
       commands = List(count) {
@@ -183,6 +193,10 @@ data class DpadUpArrowAgentCommand(val count: Int) : AgentCommand {
 
 data class DpadRightArrowAgentCommand(val count: Int) : AgentCommand {
   override val actionName = Companion.actionName
+
+  override fun turnLogText(): String {
+    return "Press right arrow key $count times"
+  }
 
   override fun runOrchestraCommand(device: Device) {
     device.executeCommands(
@@ -215,6 +229,10 @@ data class DpadRightArrowAgentCommand(val count: Int) : AgentCommand {
 data class DpadLeftArrowAgentCommand(val count: Int) : AgentCommand {
   override val actionName = Companion.actionName
 
+  override fun turnLogText(): String {
+    return "Press left arrow key $count times"
+  }
+
   override fun runOrchestraCommand(device: Device) {
     device.executeCommands(
       commands = List(count) {
@@ -245,6 +263,10 @@ data class DpadLeftArrowAgentCommand(val count: Int) : AgentCommand {
 
 data class DpadCenterAgentCommand(val count: Int) : AgentCommand {
   override val actionName = Companion.actionName
+
+  override fun turnLogText(): String {
+    return "Press center key $count times"
+  }
 
   override fun runOrchestraCommand(device: Device) {
     device.executeCommands(
@@ -277,6 +299,10 @@ data class DpadCenterAgentCommand(val count: Int) : AgentCommand {
 data class InputTextAgentCommand(val text: String) : AgentCommand {
   override val actionName = Companion.actionName
 
+  override fun turnLogText(): String {
+    return "Input text: $text"
+  }
+
   override fun runOrchestraCommand(device: Device) {
     device.executeCommands(
       commands = listOf(
@@ -308,6 +334,10 @@ data class InputTextAgentCommand(val text: String) : AgentCommand {
 class BackPressAgentCommand() : AgentCommand {
   override val actionName = Companion.actionName
 
+  override fun turnLogText(): String {
+    return "Press back button"
+  }
+
   override fun runOrchestraCommand(device: Device) {
     device.executeCommands(
       commands = listOf(
@@ -334,6 +364,10 @@ class BackPressAgentCommand() : AgentCommand {
 
 class ScrollAgentCommand : AgentCommand {
   override val actionName: String = "Scroll"
+
+  override fun turnLogText(): String {
+    return "Scroll"
+  }
 
   override fun runOrchestraCommand(device: Device) {
     device.executeCommands(
@@ -362,8 +396,13 @@ class ScrollAgentCommand : AgentCommand {
 data class KeyPressAgentCommand(val keyName: String) : AgentCommand {
   override val actionName = "KeyPress"
 
+  override fun turnLogText(): String {
+    return "Press key: $keyName"
+  }
+
   override fun runOrchestraCommand(device: Device) {
-    val code = KeyCode.getByName(keyName) ?: throw MaestroException.InvalidCommand(message = "Unknown key: $keyName")
+    val code = KeyCode.getByName(keyName)
+      ?: throw MaestroException.InvalidCommand(message = "Unknown key: $keyName")
     device.executeCommands(
       commands = listOf(
         MaestroCommand(
@@ -391,6 +430,10 @@ data class KeyPressAgentCommand(val keyName: String) : AgentCommand {
 
 class GoalAchievedAgentCommand : AgentCommand {
   override val actionName = "GoalAchieved"
+
+  override fun turnLogText(): String {
+    return "Goal achieved"
+  }
 
   override fun runOrchestraCommand(device: Device) {
   }
