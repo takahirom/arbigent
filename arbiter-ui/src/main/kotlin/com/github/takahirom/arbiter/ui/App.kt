@@ -146,7 +146,7 @@ fun App(
                     key = AllIconsKeys.Actions.Checked,
                     contentDescription = "Archived",
                     modifier = Modifier.padding(8.dp)
-                      .size(40.dp)
+                      .size(32.dp)
                       .clip(
                         CircleShape
                       )
@@ -157,6 +157,7 @@ fun App(
                 if (isRunning) {
                   CircularProgressIndicator(
                     modifier = Modifier.padding(8.dp)
+                      .size(32.dp)
                       .testTag("scenario_running")
                   )
                 }

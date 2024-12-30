@@ -1,6 +1,7 @@
 package com.github.takahirom.arbiter.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -41,6 +42,7 @@ import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.CheckboxRow
 import org.jetbrains.jewel.ui.component.Dropdown
 import org.jetbrains.jewel.ui.component.GroupHeader
+import org.jetbrains.jewel.ui.component.Icon
 import org.jetbrains.jewel.ui.component.IconActionButton
 import org.jetbrains.jewel.ui.component.MenuScope
 import org.jetbrains.jewel.ui.component.OutlinedButton
@@ -127,38 +129,37 @@ fun Scenario(
         }
       }
     }
-    var isExpanded by remember { mutableStateOf(false) }
+
+    var isOptionExpanded by remember { mutableStateOf(false) }
     Row(
-      verticalAlignment = Alignment.CenterVertically
+      verticalAlignment = Alignment.CenterVertically,
+      modifier = Modifier.clickable { isOptionExpanded = !isOptionExpanded }
     ) {
-      if (isExpanded) {
-        IconActionButton(
+      if (isOptionExpanded) {
+        Icon(
           key = AllIconsKeys.General.ArrowDown,
-          onClick = {
-            isExpanded = !isExpanded
-          },
           contentDescription = "Collapse options",
           hint = Size(28)
         )
       } else {
-        IconActionButton(
+        Icon(
           key = AllIconsKeys.General.ArrowRight,
-          onClick = {
-            isExpanded = !isExpanded
-          },
           contentDescription = "Expand options",
           hint = Size(28)
         )
       }
       GroupHeader("Options")
     }
-    AnimatedVisibility(visible = isExpanded) {
+    AnimatedVisibility(visible = isOptionExpanded) {
       ScenarioOptions(scenarioStateHolder, dependencyScenarioMenu)
     }
-    if (arbiter != null) {
-      val taskToAgents: List<Pair<Arbiter.Task, Agent>> by arbiter!!.taskToAgentStateFlow.collectAsState()
-      if (!taskToAgents.isEmpty()) {
-        ContentPanel(taskToAgents)
+    Column(Modifier.weight(1f).padding(top = 8.dp)) {
+      GroupHeader("AI Agent Logs")
+      if (arbiter != null) {
+        val taskToAgents: List<Pair<Arbiter.Task, Agent>> by arbiter!!.taskToAgentStateFlow.collectAsState()
+        if (!taskToAgents.isEmpty()) {
+          ContentPanel(taskToAgents)
+        }
       }
     }
   }
@@ -326,51 +327,56 @@ private fun ScenarioOptions(
   }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ContentPanel(tasksToAgent: List<Pair<Arbiter.Task, Agent>>) {
   var selectedTurn: ArbiterContextHolder.Turn? by remember { mutableStateOf(null) }
   Row(Modifier) {
     LazyColumn(modifier = Modifier.weight(1.5f)) {
-      itemsIndexed(items = tasksToAgent) { index, (tasks, agent) ->
-        val latestContext by agent.latestArbiterContextStateFlow.collectAsState()
-        val latestTurnsStateFlow = latestContext?.turns ?: return@itemsIndexed
-        val turns: List<ArbiterContextHolder.Turn> by latestTurnsStateFlow.collectAsState()
-
-        if (turns.isEmpty()) {
-          return@itemsIndexed
-        }
-        Column(Modifier.padding(8.dp)) {
+      tasksToAgent.forEachIndexed { index, (tasks, agent) ->
+        stickyHeader {
           val prefix = if (index + 1 == tasksToAgent.size) {
             "Goal: "
           } else {
             "Dependency goal: "
           }
           GroupHeader(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.background(JewelTheme.globalColors.panelBackground).padding(8.dp).fillMaxWidth(),
             text = prefix + tasks.goal + "(" + (index + 1) + "/" + tasksToAgent.size + ")",
           )
-          turns.forEachIndexed { index, turn ->
-            Column(
-              Modifier.padding(8.dp)
-                .background(
-                  color = if (turn.memo.contains("Failed")) {
-                    JewelTheme.colorPalette.red.get(8)
-                  } else if (turn.agentCommand is GoalAchievedAgentCommand) {
-                    JewelTheme.colorPalette.green.get(8)
-                  } else {
-                    Color.White
-                  },
+        }
+        item {
+          val latestContext by agent.latestArbiterContextStateFlow.collectAsState()
+          val latestTurnsStateFlow = latestContext?.turns ?: return@item
+          val turns: List<ArbiterContextHolder.Turn> by latestTurnsStateFlow.collectAsState()
+
+          if (turns.isEmpty()) {
+            return@item
+          }
+          Column(Modifier.padding(16.dp)) {
+            turns.forEachIndexed { index, turn ->
+              Column(
+                Modifier.padding(8.dp)
+                  .background(
+                    color = if (turn.memo.contains("Failed")) {
+                      JewelTheme.colorPalette.red.get(8)
+                    } else if (turn.agentCommand is GoalAchievedAgentCommand) {
+                      JewelTheme.colorPalette.green.get(8)
+                    } else {
+                      Color.White
+                    },
+                  )
+                  .clickable { selectedTurn = turn },
+              ) {
+                GroupHeader(
+                  modifier = Modifier.fillMaxWidth(),
+                  text = "Turn ${index + 1}",
                 )
-                .clickable { selectedTurn = turn },
-            ) {
-              GroupHeader(
-                modifier = Modifier.fillMaxWidth(),
-                text = "Turn ${index + 1}",
-              )
-              Text(
-                modifier = Modifier.padding(8.dp),
-                text = turn.text()
-              )
+                Text(
+                  modifier = Modifier.padding(8.dp),
+                  text = turn.text()
+                )
+              }
             }
           }
         }
