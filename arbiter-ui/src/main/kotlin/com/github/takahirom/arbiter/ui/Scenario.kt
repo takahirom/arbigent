@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -40,6 +39,7 @@ import com.github.takahirom.arbiter.DeviceFormFactor
 import com.github.takahirom.arbiter.GoalAchievedAgentCommand
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.CheckboxRow
+import org.jetbrains.jewel.ui.component.CircularProgressIndicator
 import org.jetbrains.jewel.ui.component.Dropdown
 import org.jetbrains.jewel.ui.component.GroupHeader
 import org.jetbrains.jewel.ui.component.Icon
@@ -49,7 +49,6 @@ import org.jetbrains.jewel.ui.component.OutlinedButton
 import org.jetbrains.jewel.ui.component.RadioButtonRow
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.TextField
-import org.jetbrains.jewel.ui.component.styling.TooltipStyle
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
 import org.jetbrains.jewel.ui.theme.colorPalette
@@ -378,9 +377,6 @@ private fun ContentPanel(tasksToAgent: List<Pair<Arbiter.Task, Agent>>) {
           val latestTurnsStateFlow = latestContext?.turns ?: return@item
           val turns: List<ArbiterContextHolder.Turn> by latestTurnsStateFlow.collectAsState()
 
-          if (turns.isEmpty()) {
-            return@item
-          }
           Column(Modifier.padding(16.dp)) {
             turns.forEachIndexed { index, turn ->
               Column(
@@ -405,6 +401,12 @@ private fun ContentPanel(tasksToAgent: List<Pair<Arbiter.Task, Agent>>) {
                   text = turn.text()
                 )
               }
+            }
+            val isRunning by agent.isRunningStateFlow.collectAsState()
+            if (isRunning) {
+              CircularProgressIndicator(
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+              )
             }
           }
         }

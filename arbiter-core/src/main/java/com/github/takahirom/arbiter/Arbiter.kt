@@ -25,8 +25,8 @@ data class RunningInfo(
 ) {
   override fun toString(): String {
     return """
-        task:$runningTasks/$allTasks
-        retry:$retriedTasks/$maxRetry
+        task: $runningTasks/$allTasks
+        retry: $retriedTasks/$maxRetry
     """.trimIndent()
   }
 }

@@ -139,7 +139,7 @@ fun App(
                 val runningInfo by scenarioStateHolder.runningInfo.collectAsState()
                 Text(
                   modifier = Modifier.weight(1f),
-                  text = "Goal:" + goal + "\n" + runningInfo?.toString().orEmpty()
+                  text = "Goal: " + goal + "\n" + runningInfo?.toString().orEmpty()
                 )
                 val isArchived by scenarioStateHolder.isArchived.collectAsState()
                 if (isArchived) {
