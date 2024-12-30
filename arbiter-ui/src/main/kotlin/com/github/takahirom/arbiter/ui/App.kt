@@ -49,6 +49,7 @@ import org.jetbrains.jewel.ui.component.SimpleListItem
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
+import org.jetbrains.jewel.ui.theme.colorPalette
 import org.jetbrains.jewel.ui.theme.simpleListItemStyle
 
 @Composable
@@ -123,7 +124,7 @@ fun App(
                 )
                 .background(
                   if (index == scenarioIndex) {
-                    Color.LightGray
+                    JewelTheme.colorPalette.purple(9)
                   } else {
                     Color.White
                   }
@@ -149,7 +150,7 @@ fun App(
                       .clip(
                         CircleShape
                       )
-                      .background(Color.Green)
+                      .background(JewelTheme.colorPalette.green(8))
                   )
                 }
                 val isRunning by scenarioStateHolder.isRunning.collectAsState()
