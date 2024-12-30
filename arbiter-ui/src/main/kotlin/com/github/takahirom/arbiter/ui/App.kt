@@ -1,5 +1,6 @@
 package com.github.takahirom.arbiter.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -207,6 +208,9 @@ fun App(
                   )
                 }
             },
+            onAddSubScenario = {
+              appStateHolder.addSubScenario(parent = it)
+            },
             onExecute = {
               appStateHolder.run(it)
             },
@@ -247,7 +251,7 @@ fun ScenarioFileControls(appStateHolder: AppStateHolder) {
   }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun ScenarioControls(appStateHolder: AppStateHolder) {
   val coroutineScope = rememberCoroutineScope()
@@ -308,7 +312,9 @@ fun ScenarioControls(appStateHolder: AppStateHolder) {
       },
       contentDescription = "Add",
       hint = Size(28)
-    )
+    ) {
+      Text("Add scenario")
+    }
     IconActionButton(
       key = AllIconsKeys.Actions.RunAll,
       onClick = {
@@ -316,7 +322,9 @@ fun ScenarioControls(appStateHolder: AppStateHolder) {
       },
       contentDescription = "Run all",
       hint = Size(28)
-    )
+    ) {
+      Text("Run all")
+    }
     IconActionButton(
       key = AllIconsKeys.Actions.Rerun,
       onClick = {
@@ -326,7 +334,9 @@ fun ScenarioControls(appStateHolder: AppStateHolder) {
       },
       contentDescription = "Run all failed",
       hint = Size(28)
-    )
+    ) {
+      Text("Run all failed")
+    }
   }
 }
 

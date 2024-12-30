@@ -49,15 +49,18 @@ import org.jetbrains.jewel.ui.component.OutlinedButton
 import org.jetbrains.jewel.ui.component.RadioButtonRow
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.TextField
+import org.jetbrains.jewel.ui.component.styling.TooltipStyle
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
 import org.jetbrains.jewel.ui.theme.colorPalette
 import java.io.FileInputStream
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun Scenario(
   scenarioStateHolder: ScenarioStateHolder,
   dependencyScenarioMenu: MenuScope.() -> Unit,
+  onAddSubScenario: (ScenarioStateHolder) -> Unit,
   onExecute: (ScenarioStateHolder) -> Unit,
   onCancel: (ScenarioStateHolder) -> Unit,
   onRemove: (ScenarioStateHolder) -> Unit,
@@ -82,7 +85,11 @@ fun Scenario(
         },
         contentDescription = "Run",
         hint = Size(28)
-      )
+      ) {
+        Text(
+          text = "Run",
+        )
+      }
       IconActionButton(
         key = AllIconsKeys.Actions.Cancel,
         onClick = {
@@ -90,7 +97,23 @@ fun Scenario(
         },
         contentDescription = "Cancel",
         hint = Size(28)
-      )
+      ) {
+        Text(
+          text = "Cancel",
+        )
+      }
+      IconActionButton(
+        key = AllIconsKeys.CodeStyle.AddNewSectionRule,
+        onClick = {
+          onAddSubScenario(scenarioStateHolder)
+        },
+        contentDescription = "Add sub scenario",
+        hint = Size(28)
+      ) {
+        Text(
+          text = "Add sub scenario",
+        )
+      }
       var removeDialogShowing by remember { mutableStateOf(false) }
       IconActionButton(
         key = AllIconsKeys.General.Delete,
@@ -99,7 +122,11 @@ fun Scenario(
         },
         contentDescription = "Remove",
         hint = Size(28)
-      )
+      ) {
+        Text(
+          text = "Remove",
+        )
+      }
       if (removeDialogShowing) {
         Dialog(
           onDismissRequest = { removeDialogShowing = false }
@@ -341,7 +368,8 @@ private fun ContentPanel(tasksToAgent: List<Pair<Arbiter.Task, Agent>>) {
             "Dependency goal: "
           }
           GroupHeader(
-            modifier = Modifier.background(JewelTheme.globalColors.panelBackground).padding(8.dp).fillMaxWidth(),
+            modifier = Modifier.background(JewelTheme.globalColors.panelBackground).padding(8.dp)
+              .fillMaxWidth(),
             text = prefix + tasks.goal + "(" + (index + 1) + "/" + tasksToAgent.size + ")",
           )
         }

@@ -71,12 +71,27 @@ class AppStateHolder(
   private val coroutineScope =
     CoroutineScope(ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob())
 
+  fun addSubScenario(parent: ScenarioStateHolder) {
+    val scenarioStateHolder = ScenarioStateHolder(
+      initialDevice = (deviceConnectionState.value as DeviceConnectionState.Connected).device,
+      ai = aiFactory()
+    ).apply {
+      dependencyScenarioStateFlow.value = parent
+      initializeMethodsStateFlow.value = InitializeMethods.Noop
+    }
+    scenariosStateFlow.value += scenarioStateHolder
+    selectedAgentIndex.value =
+      sortedScenariosAndDepthsStateFlow.value.indexOfFirst { it.first == scenarioStateHolder }
+  }
+
   fun addScenario() {
-    scenariosStateFlow.value += ScenarioStateHolder(
+    val scenarioStateHolder = ScenarioStateHolder(
       initialDevice = (deviceConnectionState.value as DeviceConnectionState.Connected).device,
       ai = aiFactory()
     )
-    selectedAgentIndex.value = scenariosStateFlow.value.size - 1
+    scenariosStateFlow.value += scenarioStateHolder
+    selectedAgentIndex.value =
+      sortedScenariosAndDepthsStateFlow.value.indexOfFirst { it.first == scenarioStateHolder }
   }
 
   var job: Job? = null
@@ -199,7 +214,8 @@ class AppStateHolder(
     if (file == null) {
       return
     }
-    scenarioSerializer.save(scenariosStateFlow.value, file)
+    val sortedScenarios = sortedScenariosAndDepthsStateFlow.value.map { it.first }
+    scenarioSerializer.save(sortedScenarios, file)
   }
 
   fun loadGoals(file: File?) {
