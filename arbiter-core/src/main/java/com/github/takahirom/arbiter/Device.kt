@@ -13,6 +13,7 @@ import java.io.File
 interface Device {
   fun executeCommands(commands: List<MaestroCommand>)
   fun viewTreeString(): String
+  fun focusedTreeString(): String
 }
 
 class MaestroDevice(
@@ -37,12 +38,32 @@ class MaestroDevice(
   }
 
   override fun viewTreeString(): String {
-
     return maestro.viewHierarchy(false).toOptimizedString(
       deviceInfo = maestro.cachedDeviceInfo
     )
   }
 
+  override fun focusedTreeString(): String {
+    return maestro.viewHierarchy(false)
+      .getFocusedNode()
+      ?.optimizedToString(0, enableDepth = false) ?: ""
+  }
+
+  private fun ViewHierarchy.getFocusedNode(): TreeNode? {
+    fun dfs(node: TreeNode): TreeNode? {
+      if (node.focused == true) {
+        return node
+      }
+      for (child in node.children) {
+        val result = dfs(child)
+        if (result != null) {
+          return result
+        }
+      }
+      return null
+    }
+    return dfs(root)
+  }
 
   data class OptimizationResult(
     val node: TreeNode?,

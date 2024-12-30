@@ -6,7 +6,7 @@ import com.github.takahirom.arbiter.Arbiter
 import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
 import com.github.takahirom.arbiter.ArbiterInitializerInterceptor
 import com.github.takahirom.arbiter.Device
-import com.github.takahirom.arbiter.InputCommandType
+import com.github.takahirom.arbiter.DeviceFormFactor
 import com.github.takahirom.arbiter.RunningInfo
 import com.github.takahirom.arbiter.AgentConfig
 import kotlinx.coroutines.CoroutineScope
@@ -19,18 +19,19 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import maestro.orchestra.ClearStateCommand
 import maestro.orchestra.LaunchAppCommand
 import maestro.orchestra.MaestroCommand
 
 @Serializable
-sealed interface ClearData {
+sealed interface CleanupData {
   @Serializable
   @SerialName("Noop")
-  data object Noop : ClearData
+  data object Noop : CleanupData
 
   @Serializable
-  @SerialName("ClearData")
-  data class Clear(val packageName: String) : ClearData
+  @SerialName("Cleanup")
+  data class Cleanup(val packageName: String) : CleanupData
 }
 
 @Serializable
@@ -54,10 +55,11 @@ class ScenarioStateHolder(val device: Device, val ai: Ai) {
   val goal get() = goalState.text.toString()
   val maxRetryState: TextFieldState = TextFieldState("3")
   val maxTurnState: TextFieldState = TextFieldState("10")
+  val cleanupDataStateFlow: MutableStateFlow<CleanupData> = MutableStateFlow(CleanupData.Noop)
   val initializeMethodsStateFlow: MutableStateFlow<InitializeMethods> =
     MutableStateFlow(InitializeMethods.Back)
-  val inputCommandTypeStateFlow: MutableStateFlow<InputCommandType> =
-    MutableStateFlow(InputCommandType.Mobile)
+  val deviceFormFactorStateFlow: MutableStateFlow<DeviceFormFactor> =
+    MutableStateFlow(DeviceFormFactor.Mobile)
   val dependencyScenarioStateFlow = MutableStateFlow<ScenarioStateHolder?>(null)
   val arbiterStateFlow = MutableStateFlow<Arbiter?>(null)
   private val coroutineScope = CoroutineScope(
@@ -117,6 +119,7 @@ class ScenarioStateHolder(val device: Device, val ai: Ai) {
   fun createAgentConfig(device: Device, ai: Ai) = AgentConfig {
     ai(ai)
     device(device)
+    deviceFormFactor(deviceFormFactorStateFlow.value)
     when (val method = initializeMethodsStateFlow.value) {
       InitializeMethods.Back -> {
         // default
@@ -142,6 +145,28 @@ class ScenarioStateHolder(val device: Device, val ai: Ai) {
                 )
               )
             )
+          }
+        })
+      }
+    }
+    when (val cleanupData = cleanupDataStateFlow.value) {
+      CleanupData.Noop -> {
+        // default
+      }
+
+      is CleanupData.Cleanup -> {
+        addInterceptor(object : ArbiterInitializerInterceptor {
+          override fun intercept(device: Device, chain: ArbiterInitializerInterceptor.Chain) {
+            device.executeCommands(
+              listOf(
+                MaestroCommand(
+                  clearStateCommand = ClearStateCommand(
+                    appId = cleanupData.packageName
+                  )
+                )
+              )
+            )
+            chain.proceed(device)
           }
         })
       }

@@ -16,6 +16,7 @@ class Agent(
   private val ai = agentConfig.ai
   private val device = agentConfig.device
   private val interceptors = agentConfig.interceptors
+  private val deviceFormFactor = agentConfig.deviceFormFactor
 
   private val decisionInterceptors: List<ArbiterDecisionInterceptor> = interceptors
     .filterIsInstance<ArbiterDecisionInterceptor>()
@@ -59,13 +60,15 @@ class Agent(
       }
     }
   )
-  private val coroutineScope = CoroutineScope(ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob())
+  private val coroutineScope =
+    CoroutineScope(ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob())
   private var job: Job? = null
   private val arbiterContextHistoryStateFlow: MutableStateFlow<List<ArbiterContextHolder>> =
     MutableStateFlow(listOf())
-  val latestArbiterContextStateFlow: StateFlow<ArbiterContextHolder?> = arbiterContextHistoryStateFlow
-    .map { it.lastOrNull() }
-    .stateIn(coroutineScope, SharingStarted.Lazily, null)
+  val latestArbiterContextStateFlow: StateFlow<ArbiterContextHolder?> =
+    arbiterContextHistoryStateFlow
+      .map { it.lastOrNull() }
+      .stateIn(coroutineScope, SharingStarted.Lazily, null)
   private val arbiterContextHolderStateFlow: MutableStateFlow<ArbiterContextHolder?> =
     MutableStateFlow(null)
   private val _isRunningStateFlow: MutableStateFlow<Boolean> = MutableStateFlow(false)
@@ -88,7 +91,10 @@ class Agent(
     goal: String,
     maxTurn: Int = 10,
     maxRetry: Int = 1,
-    agentCommandTypes: List<AgentCommandType> = defaultAgentCommandTypes()
+    agentCommandTypes: List<AgentCommandType> = when (deviceFormFactor) {
+      DeviceFormFactor.Mobile -> defaultAgentCommandTypes()
+      DeviceFormFactor.Tv -> defaultAgentCommandTypesForTv()
+    }
   ) {
     job?.cancel()
     job = coroutineScope.launch {
@@ -127,6 +133,7 @@ class Agent(
           arbiterContextHolder = arbiterContextHolder,
           agentCommandTypes = agentCommandTypes,
           device = device,
+          deviceFormFactor = deviceFormFactor,
           ai = ai,
           decisionChain = decisionChain,
           executeCommandChain = executeCommandChain
@@ -158,6 +165,7 @@ class Agent(
     val arbiterContextHolder: ArbiterContextHolder,
     val agentCommandTypes: List<AgentCommandType>,
     val device: Device,
+    val deviceFormFactor: DeviceFormFactor,
     val ai: Ai,
     val decisionChain: (Ai.DecisionInput) -> Ai.DecisionOutput,
     val executeCommandChain: (ExecuteCommandsInput) -> ExecuteCommandsOutput,
@@ -183,15 +191,18 @@ class Agent(
     _isRunningStateFlow.value = false
   }
 }
+
 class AgentConfig(
   val interceptors: List<ArbiterInterceptor>,
   val ai: Ai,
   val device: Device,
+  val deviceFormFactor: DeviceFormFactor
 ) {
   class Builder {
     private val interceptors = mutableListOf<ArbiterInterceptor>()
     private var device: Device? = null
     private var ai: Ai? = null
+    private var deviceFormFactor: DeviceFormFactor = DeviceFormFactor.Mobile
 
     fun addInterceptor(interceptor: ArbiterInterceptor) {
       interceptors.add(interceptor)
@@ -205,8 +216,17 @@ class AgentConfig(
       this.ai = ai
     }
 
+    fun deviceFormFactor(deviceFormFactor: DeviceFormFactor) {
+      this.deviceFormFactor = deviceFormFactor
+    }
+
     fun build(): AgentConfig {
-      return AgentConfig(interceptors, ai!!, device!!)
+      return AgentConfig(
+        interceptors = interceptors,
+        ai = ai!!,
+        device = device!!,
+        deviceFormFactor = deviceFormFactor
+      )
     }
   }
 }
@@ -330,7 +350,7 @@ private fun executeCommands(
 private fun step(
   stepInput: StepInput
 ): StepResult {
-  val (arbiterContextHolder, agentCommandTypes, device, ai, decisionChain, executeCommandChain) = stepInput
+  val (arbiterContextHolder, agentCommandTypes, device, deviceFormFactor, ai, decisionChain, executeCommandChain) = stepInput
   val screenshotFileName = System.currentTimeMillis().toString()
   try {
     device.executeCommands(
@@ -349,6 +369,12 @@ private fun step(
   val decisionInput = Ai.DecisionInput(
     arbiterContextHolder = arbiterContextHolder,
     dumpHierarchy = device.viewTreeString(),
+    focusedTreeString = if(deviceFormFactor.isTv()){
+      // It is important to get focused tree string for TV form factor
+      device.focusedTreeString()
+    } else {
+      null
+    },
     agentCommandTypes = agentCommandTypes,
     screenshotFileName = screenshotFileName
   )

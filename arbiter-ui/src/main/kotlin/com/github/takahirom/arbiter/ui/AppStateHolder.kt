@@ -138,7 +138,7 @@ class AppStateHolder(
       tasks = result,
       maxRetry = scenario.maxRetryState.text.toString().toIntOrNull() ?: 3,
       maxTurnCount = scenario.maxTurnState.text.toString().toIntOrNull() ?: 10,
-      inputCommandType = scenario.inputCommandTypeStateFlow.value
+      deviceFormFactor = scenario.deviceFormFactorStateFlow.value
     )
   }
 
@@ -222,7 +222,8 @@ class AppStateHolder(
         maxTurnState.edit {
           replace(0, length, scenarioContent.maxTurn.toString())
         }
-        inputCommandTypeStateFlow.value = scenarioContent.inputCommandType
+        deviceFormFactorStateFlow.value = scenarioContent.deviceFormFactor
+        cleanupDataStateFlow.value = scenarioContent.cleanupData
       }
     }
     scenarioContents.forEachIndexed { index, scenarioContent ->

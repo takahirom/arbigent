@@ -33,12 +33,14 @@ data class RunningInfo(
 
 
 @Serializable
-sealed interface InputCommandType {
+sealed interface DeviceFormFactor {
   fun isMobile(): Boolean = this is Mobile
  fun isTv(): Boolean = this is Tv
 
-  object Mobile : InputCommandType
-  object Tv : InputCommandType
+  @Serializable
+  object Mobile : DeviceFormFactor
+  @Serializable
+  object Tv : DeviceFormFactor
 }
 
 class Arbiter {
@@ -51,7 +53,7 @@ class Arbiter {
     val tasks: List<Task>,
     val maxRetry: Int = 0,
     val maxTurnCount: Int = 10,
-    val inputCommandType: InputCommandType = InputCommandType.Mobile,
+    val deviceFormFactor: DeviceFormFactor = DeviceFormFactor.Mobile,
   )
 
   private val _taskToAgentStateFlow = MutableStateFlow<List<Pair<Task, Agent>>>(listOf())
@@ -66,7 +68,7 @@ class Arbiter {
       taskToAgent.second.isArchivedStateFlow
     }
     combine(flows) { booleans ->
-      booleans.all { it as Boolean }
+      booleans.all { it }
     }
   }
     .stateIn(
@@ -128,9 +130,9 @@ class Arbiter {
           agent.execute(
             task.goal,
             maxTurn = scenario.maxTurnCount,
-            agentCommandTypes = when(scenario.inputCommandType) {
-              is InputCommandType.Mobile -> defaultAgentCommandTypes()
-              is InputCommandType.Tv -> defaultAgentCommandTypesForTv()
+            agentCommandTypes = when(scenario.deviceFormFactor) {
+              is DeviceFormFactor.Mobile -> defaultAgentCommandTypes()
+              is DeviceFormFactor.Tv -> defaultAgentCommandTypesForTv()
             }
           )
           if (!agent.isArchivedStateFlow.value) {

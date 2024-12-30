@@ -2,7 +2,7 @@ package com.github.takahirom.arbiter.ui
 
 import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
-import com.github.takahirom.arbiter.InputCommandType
+import com.github.takahirom.arbiter.DeviceFormFactor
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
@@ -23,7 +23,8 @@ class ScenarioSerializer {
     val initializeMethods: InitializeMethods,
     val maxRetry: Int = 3,
     val maxTurn: Int = 10,
-    val inputCommandType: InputCommandType = InputCommandType.Mobile,
+    val deviceFormFactor: DeviceFormFactor = DeviceFormFactor.Mobile,
+    val cleanupData: CleanupData = CleanupData.Noop
   )
 
   private val module = SerializersModule {
@@ -48,7 +49,8 @@ class ScenarioSerializer {
         initializeMethods = it.initializeMethodsStateFlow.value,
         maxRetry = it.maxRetryState.text.toString().toIntOrNull() ?: 3,
         maxTurn = it.maxTurnState.text.toString().toIntOrNull() ?: 10,
-        inputCommandType = it.inputCommandTypeStateFlow.value
+        deviceFormFactor = it.deviceFormFactorStateFlow.value,
+        cleanupData = it.cleanupDataStateFlow.value
       )
     })
     val jsonString = yaml.encodeToString(FileContent.serializer(), fileContent)

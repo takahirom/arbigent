@@ -1,9 +1,10 @@
 package com.github.takahirom.arbiter
 
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 class ArbiterContextHolder(
-  val goal: String,
+  private val goal: String,
 ) {
   class Turn(
     val agentCommand: AgentCommand? = null,
@@ -23,10 +24,11 @@ class ArbiterContextHolder(
     }
   }
 
-  val turns = MutableStateFlow<List<Turn>>(listOf())
+  private val _turns = MutableStateFlow<List<Turn>>(listOf())
+  val turns = _turns.asStateFlow()
   fun addTurn(turn: Turn) {
     println("addTurn: $turn")
-    turns.value = turns.value.toMutableList() + turn
+    _turns.value = turns.value.toMutableList() + turn
   }
 
   fun prompt(): String {

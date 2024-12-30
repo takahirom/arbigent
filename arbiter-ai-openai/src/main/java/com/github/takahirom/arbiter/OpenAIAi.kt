@@ -1,6 +1,5 @@
 package com.github.takahirom.arbiter
 
-import io.ktor.client.request.request
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -24,8 +23,8 @@ class OpenAIAi(
   }
 ) : Ai {
   override fun decideWhatToDo(decisionInput: Ai.DecisionInput): Ai.DecisionOutput {
-    val (arbiterContext, dumpHierarchy, agentCommandTypes, screenshotFileName) = decisionInput
-    val prompt = buildPrompt(arbiterContext, dumpHierarchy, agentCommandTypes)
+    val (arbiterContext, dumpHierarchy, focusedTree, agentCommandTypes, screenshotFileName) = decisionInput
+    val prompt = buildPrompt(arbiterContext, dumpHierarchy, focusedTree, agentCommandTypes)
     val messages: List<ChatMessage> = listOf(
       ChatMessage(
         role = "system",
@@ -63,15 +62,17 @@ class OpenAIAi(
   private fun buildPrompt(
     arbiterContextHolder: ArbiterContextHolder,
     dumpHierarchy: String,
+    focusedTree: String?,
     agentCommandTypes: List<AgentCommandType>
   ): String {
     val contextPrompt = arbiterContextHolder.prompt()
     val templates = agentCommandTypes.joinToString("\nor\n") { it.templateForAI() }
+    val focusedTreeText = focusedTree?.let { "\nCurrently focused Tree:\n$it\n\n" } ?: ""
     val prompt = """
 
 UI Hierarchy:
 $dumpHierarchy
-
+$focusedTreeText
 Based on the above, decide on the next action to achieve the goal. Please ensure not to repeat the same action. The action must be one of the following:
 $templates"""
     return contextPrompt + (prompt.trimIndent())
@@ -160,7 +161,10 @@ $templates"""
     }
   }
 
-  private fun chatCompletion(agentCommandTypes: List<AgentCommandType>, messages: List<ChatMessage>): String {
+  private fun chatCompletion(
+    agentCommandTypes: List<AgentCommandType>,
+    messages: List<ChatMessage>
+  ): String {
     val client = OkHttpClient.Builder()
       .readTimeout(60, TimeUnit.SECONDS)
       .build()

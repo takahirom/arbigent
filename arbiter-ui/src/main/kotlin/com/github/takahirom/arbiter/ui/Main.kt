@@ -45,7 +45,7 @@ import com.github.takahirom.arbiter.Agent
 import com.github.takahirom.arbiter.Arbiter
 import com.github.takahirom.arbiter.ArbiterContextHolder
 import com.github.takahirom.arbiter.GoalAchievedAgentCommand
-import com.github.takahirom.arbiter.InputCommandType
+import com.github.takahirom.arbiter.DeviceFormFactor
 import com.github.takahirom.arbiter.OpenAIAi
 import com.github.takahirom.arbiter.ui.AppStateHolder.DeviceConnectionState
 import com.github.takahirom.arbiter.ui.AppStateHolder.FileSelectionState
@@ -57,6 +57,7 @@ import org.jetbrains.jewel.intui.standalone.theme.lightThemeDefinition
 import org.jetbrains.jewel.intui.window.decoratedWindow
 import org.jetbrains.jewel.intui.window.styling.lightWithLightHeader
 import org.jetbrains.jewel.ui.ComponentStyling
+import org.jetbrains.jewel.ui.component.CheckboxRow
 import org.jetbrains.jewel.ui.component.CircularProgressIndicator
 import org.jetbrains.jewel.ui.component.Dropdown
 import org.jetbrains.jewel.ui.component.GroupHeader
@@ -367,8 +368,8 @@ private fun Scenario(
       Column(
         modifier = Modifier.padding(8.dp).weight(1F)
       ) {
-        val inputCommandType by scenarioStateHolder.inputCommandTypeStateFlow.collectAsState()
-        GroupHeader("Device inputs")
+        val inputCommandType by scenarioStateHolder.deviceFormFactorStateFlow.collectAsState()
+        GroupHeader("Device formfactor")
         Row(
           verticalAlignment = Alignment.CenterVertically
         ) {
@@ -376,7 +377,7 @@ private fun Scenario(
             text = "Mobile",
             selected = inputCommandType.isMobile(),
             onClick = {
-              scenarioStateHolder.inputCommandTypeStateFlow.value = InputCommandType.Mobile
+              scenarioStateHolder.deviceFormFactorStateFlow.value = DeviceFormFactor.Mobile
             }
           )
         }
@@ -387,7 +388,7 @@ private fun Scenario(
             text = "TV",
             selected = inputCommandType.isTv(),
             onClick = {
-              scenarioStateHolder.inputCommandTypeStateFlow.value = InputCommandType.Tv
+              scenarioStateHolder.deviceFormFactorStateFlow.value = DeviceFormFactor.Tv
             }
           )
         }
@@ -396,7 +397,29 @@ private fun Scenario(
         modifier = Modifier.padding(8.dp).weight(1F)
       ) {
         val initializeMethods by scenarioStateHolder.initializeMethodsStateFlow.collectAsState()
+        val cleanupData by scenarioStateHolder.cleanupDataStateFlow.collectAsState()
         GroupHeader("Initialize method:")
+        CheckboxRow(
+          text = "Cleanup",
+          checked = cleanupData is CleanupData.Cleanup,
+          onCheckedChange = {
+            scenarioStateHolder.cleanupDataStateFlow.value = if (it) {
+              CleanupData.Cleanup((cleanupData as? CleanupData.Cleanup)?.packageName ?: "")
+            } else {
+              CleanupData.Noop
+            }
+          }
+        )
+        TextField(
+          modifier = Modifier
+            .padding(4.dp),
+          placeholder = { Text("Package name") },
+          enabled = cleanupData is CleanupData.Cleanup,
+          value = (cleanupData as? CleanupData.Cleanup)?.packageName ?: "",
+          onValueChange = {
+            scenarioStateHolder.cleanupDataStateFlow.value = CleanupData.Cleanup(it)
+          },
+        )
         Row(
           verticalAlignment = Alignment.CenterVertically
         ) {

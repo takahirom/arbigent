@@ -40,7 +40,7 @@ fun connectToDevice(
       val dadb = (availableDevice as? AvailableDevice.Android)?.dadb
         ?: throw IllegalStateException("No device selected")
       val driver = AndroidDriver(
-        dadb
+        dadb,
       )
       val maestro = try {
         Maestro.android(
