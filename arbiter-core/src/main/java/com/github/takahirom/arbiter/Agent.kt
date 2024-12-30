@@ -211,7 +211,7 @@ class AgentConfig(
   }
 }
 
-fun agentConfig(block: AgentConfig.Builder.() -> Unit = {}): AgentConfig {
+fun AgentConfig(block: AgentConfig.Builder.() -> Unit = {}): AgentConfig {
   val builder = AgentConfig.Builder()
   builder.block()
   return builder.build()

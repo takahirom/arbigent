@@ -40,48 +40,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 
-class FakeDevice : Device {
-  override fun executeCommands(commands: List<MaestroCommand>) {
-    println("FakeDevice.executeCommands: $commands")
-  }
-
-  override fun viewTreeString(): String {
-    println("FakeDevice.viewTreeString")
-    return "viewTreeString"
-  }
-}
-
-class FakeAi : Ai {
-  var count = 0
-  fun createDecisionOutput(
-    agentCommand: AgentCommand = ClickWithTextAgentCommand("text")
-  ): Ai.DecisionOutput {
-    return Ai.DecisionOutput(
-      listOf(agentCommand),
-      ArbiterContextHolder.Turn(
-        agentCommand = agentCommand,
-        memo = "memo",
-        screenshotFileName = "screenshotFileName"
-      )
-    )
-  }
-
-  override fun decideWhatToDo(decisionInput: Ai.DecisionInput): Ai.DecisionOutput {
-    println("FakeAi.decideWhatToDo")
-    if (count == 0) {
-      count++
-      return createDecisionOutput()
-    } else if (count == 1) {
-      count++
-      return createDecisionOutput()
-    } else {
-      return createDecisionOutput(
-        agentCommand = GoalAchievedAgentCommand()
-      )
-    }
-  }
-}
-
 @OptIn(ExperimentalTestApi::class)
 @RunWith(Parameterized::class)
 class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
@@ -304,5 +262,47 @@ class TestRobot(
 
   fun capture(describedBehavior: DescribedBehavior<TestRobot>) {
     composeUiTest.onAllNodes(isRoot()).onLast().captureRoboImage("$describedBehavior.png")
+  }
+}
+
+class FakeDevice : Device {
+  override fun executeCommands(commands: List<MaestroCommand>) {
+    println("FakeDevice.executeCommands: $commands")
+  }
+
+  override fun viewTreeString(): String {
+    println("FakeDevice.viewTreeString")
+    return "viewTreeString"
+  }
+}
+
+class FakeAi : Ai {
+  var count = 0
+  fun createDecisionOutput(
+    agentCommand: AgentCommand = ClickWithTextAgentCommand("text")
+  ): Ai.DecisionOutput {
+    return Ai.DecisionOutput(
+      listOf(agentCommand),
+      ArbiterContextHolder.Turn(
+        agentCommand = agentCommand,
+        memo = "memo",
+        screenshotFileName = "screenshotFileName"
+      )
+    )
+  }
+
+  override fun decideWhatToDo(decisionInput: Ai.DecisionInput): Ai.DecisionOutput {
+    println("FakeAi.decideWhatToDo")
+    if (count == 0) {
+      count++
+      return createDecisionOutput()
+    } else if (count == 1) {
+      count++
+      return createDecisionOutput()
+    } else {
+      return createDecisionOutput(
+        agentCommand = GoalAchievedAgentCommand()
+      )
+    }
   }
 }

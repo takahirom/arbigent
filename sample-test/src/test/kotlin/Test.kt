@@ -54,7 +54,7 @@ class Test {
   @Test
   fun tests() = runTest {
     ArbiterCorotuinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
-    val agentConfig = agentConfig {
+    val agentConfig = AgentConfig {
       device(FakeDevice())
       ai(FakeAi())
       addInterceptor(
@@ -108,14 +108,14 @@ class Test {
         }
       )
     }
-    val arbiter = arbiter {
+    val arbiter = Arbiter {
     }
     val scenario = Arbiter.Scenario(
       listOf(
         Arbiter.Task("goal1", agentConfig),
         Arbiter.Task("goal2", agentConfig)
       ),
-      maxTurnCount = 10
+      maxTurnCount = 10,
     )
     arbiter.executeAsync(
       scenario

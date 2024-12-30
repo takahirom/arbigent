@@ -51,7 +51,7 @@ class Arbiter {
     val tasks: List<Task>,
     val maxRetry: Int = 0,
     val maxTurnCount: Int = 10,
-    val inputCommandType: InputCommandType
+    val inputCommandType: InputCommandType = InputCommandType.Mobile,
   )
 
   private val _taskToAgentStateFlow = MutableStateFlow<List<Pair<Task, Agent>>>(listOf())
@@ -167,7 +167,7 @@ class Arbiter {
   }
 }
 
-fun arbiter(block: Arbiter.Builder.() -> Unit): Arbiter {
+fun Arbiter(block: Arbiter.Builder.() -> Unit): Arbiter {
   val builder = Arbiter.Builder()
   builder.block()
   return builder.build()

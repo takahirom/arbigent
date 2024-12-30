@@ -1,9 +1,6 @@
 package com.github.takahirom.arbiter.ui
 
 import androidx.compose.foundation.text.input.TextFieldState
-import androidx.compose.foundation.text.input.rememberTextFieldState
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.mutableStateOf
 import com.github.takahirom.arbiter.Ai
 import com.github.takahirom.arbiter.Arbiter
 import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
@@ -11,8 +8,7 @@ import com.github.takahirom.arbiter.ArbiterInitializerInterceptor
 import com.github.takahirom.arbiter.Device
 import com.github.takahirom.arbiter.InputCommandType
 import com.github.takahirom.arbiter.RunningInfo
-import com.github.takahirom.arbiter.agentConfig
-import com.github.takahirom.arbiter.arbiter
+import com.github.takahirom.arbiter.AgentConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -92,7 +88,7 @@ class ScenarioStateHolder(val device: Device, val ai: Ai) {
 
   suspend fun onExecute(scenario: Arbiter.Scenario) {
     arbiterStateFlow.value?.cancel()
-    val arbiter = arbiter {
+    val arbiter = Arbiter {
     }
     arbiterStateFlow.value = arbiter
     arbiterStateFlow.value!!.execute(
@@ -118,7 +114,7 @@ class ScenarioStateHolder(val device: Device, val ai: Ai) {
     }
   }
 
-  fun createAgentConfig(device: Device, ai: Ai) = agentConfig {
+  fun createAgentConfig(device: Device, ai: Ai) = AgentConfig {
     ai(ai)
     device(device)
     when (val method = initializeMethodsStateFlow.value) {
