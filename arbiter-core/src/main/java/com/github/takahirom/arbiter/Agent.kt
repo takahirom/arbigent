@@ -68,7 +68,7 @@ class Agent(
   val latestArbiterContextStateFlow: StateFlow<ArbiterContextHolder?> =
     arbiterContextHistoryStateFlow
       .map { it.lastOrNull() }
-      .stateIn(coroutineScope, SharingStarted.Lazily, null)
+      .stateIn(coroutineScope, SharingStarted.WhileSubscribed(), null)
   private val arbiterContextHolderStateFlow: MutableStateFlow<ArbiterContextHolder?> =
     MutableStateFlow(null)
   private val _isRunningStateFlow: MutableStateFlow<Boolean> = MutableStateFlow(false)

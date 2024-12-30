@@ -15,10 +15,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -353,13 +356,37 @@ private fun ScenarioOptions(
   }
 }
 
+data class ScenarioSection(val goal: String, val isRunning: Boolean, val turns: List<TurnItem>)
+data class TurnItem(val turn: ArbiterContextHolder.Turn)
+
+@Composable
+fun buildSections(tasksToAgent: List<Pair<Arbiter.Task, Agent>>): List<ScenarioSection> {
+  val sections = mutableListOf<ScenarioSection>()
+  for ((tasks, agent) in tasksToAgent) {
+    val latestContext: ArbiterContextHolder? by agent.latestArbiterContextStateFlow.collectAsState()
+    val isRunning by agent.isRunningStateFlow.collectAsState()
+    val nonNullContext = latestContext ?: continue
+    val turns: List<ArbiterContextHolder.Turn> by nonNullContext.turns.collectAsState()
+    sections += ScenarioSection(
+      goal = tasks.goal,
+      isRunning = isRunning,
+      turns = turns.map { TurnItem(it) })
+  }
+  return sections
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ContentPanel(tasksToAgent: List<Pair<Arbiter.Task, Agent>>) {
   var selectedTurn: ArbiterContextHolder.Turn? by remember { mutableStateOf(null) }
   Row(Modifier) {
-    LazyColumn(modifier = Modifier.weight(1.5f)) {
-      tasksToAgent.forEachIndexed { index, (tasks, agent) ->
+    val lazyColumnState = rememberLazyListState()
+    LaunchedEffect(lazyColumnState.layoutInfo.totalItemsCount) {
+      lazyColumnState.animateScrollToItem(maxOf(lazyColumnState.layoutInfo.totalItemsCount - 1,0))
+    }
+    val sections: List<ScenarioSection> = buildSections(tasksToAgent)
+    LazyColumn(state = lazyColumnState, modifier = Modifier.weight(1.5f)) {
+      sections.forEachIndexed { index, section ->
         stickyHeader {
           val prefix = if (index + 1 == tasksToAgent.size) {
             "Goal: "
@@ -369,43 +396,39 @@ private fun ContentPanel(tasksToAgent: List<Pair<Arbiter.Task, Agent>>) {
           GroupHeader(
             modifier = Modifier.background(JewelTheme.globalColors.panelBackground).padding(8.dp)
               .fillMaxWidth(),
-            text = prefix + tasks.goal + "(" + (index + 1) + "/" + tasksToAgent.size + ")",
+            text = prefix + section.goal + "(" + (index + 1) + "/" + tasksToAgent.size + ")",
           )
         }
+        itemsIndexed(items = section.turns) { turnIndex, item ->
+          val turn = item.turn
+          Column(
+            Modifier.padding(8.dp)
+              .background(
+                color = if (turn.memo.contains("Failed")) {
+                  JewelTheme.colorPalette.red.get(8)
+                } else if (turn.agentCommand is GoalAchievedAgentCommand) {
+                  JewelTheme.colorPalette.green.get(8)
+                } else {
+                  Color.White
+                },
+              )
+              .clickable { selectedTurn = turn },
+          ) {
+            GroupHeader(
+              modifier = Modifier.fillMaxWidth(),
+              text = "Turn ${turnIndex + 1}",
+            )
+            Text(
+              modifier = Modifier.padding(8.dp),
+              text = turn.text()
+            )
+          }
+        }
         item {
-          val latestContext by agent.latestArbiterContextStateFlow.collectAsState()
-          val latestTurnsStateFlow = latestContext?.turns ?: return@item
-          val turns: List<ArbiterContextHolder.Turn> by latestTurnsStateFlow.collectAsState()
-
-          Column(Modifier.padding(16.dp)) {
-            turns.forEachIndexed { index, turn ->
-              Column(
-                Modifier.padding(8.dp)
-                  .background(
-                    color = if (turn.memo.contains("Failed")) {
-                      JewelTheme.colorPalette.red.get(8)
-                    } else if (turn.agentCommand is GoalAchievedAgentCommand) {
-                      JewelTheme.colorPalette.green.get(8)
-                    } else {
-                      Color.White
-                    },
-                  )
-                  .clickable { selectedTurn = turn },
-              ) {
-                GroupHeader(
-                  modifier = Modifier.fillMaxWidth(),
-                  text = "Turn ${index + 1}",
-                )
-                Text(
-                  modifier = Modifier.padding(8.dp),
-                  text = turn.text()
-                )
-              }
-            }
-            val isRunning by agent.isRunningStateFlow.collectAsState()
-            if (isRunning) {
+          if (section.isRunning) {
+            Column(Modifier.fillMaxWidth()) {
               CircularProgressIndicator(
-                modifier = Modifier.align(Alignment.CenterHorizontally),
+                modifier = Modifier.padding(8.dp).align(Alignment.CenterHorizontally),
               )
             }
           }

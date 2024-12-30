@@ -70,7 +70,8 @@ class OpenAIAi(
     val focusedTreeText = focusedTree?.let { "\nCurrently focused Tree:\n$it\n\n" } ?: ""
     val prompt = """
 
-UI Hierarchy:
+
+New UI Hierarchy:
 $dumpHierarchy
 $focusedTreeText
 Based on the above, decide on the next action to achieve the goal. Please ensure not to repeat the same action. The action must be one of the following:

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -89,7 +90,7 @@ fun App(
     var scenariosWidth by remember { mutableStateOf(200.dp) }
     Row {
       val scenarioAndDepths by appStateHolder.sortedScenariosAndDepthsStateFlow.collectAsState()
-      Column(
+      Box(
         Modifier
           .run {
             if (scenarioAndDepths.isEmpty()) {
@@ -98,7 +99,6 @@ fun App(
               width(scenariosWidth)
             }
           },
-        horizontalAlignment = Alignment.CenterHorizontally
       ) {
         if (scenarioAndDepths.isEmpty()) {
           Box(Modifier.fillMaxSize().padding(8.dp)) {
@@ -112,7 +112,22 @@ fun App(
             }
           }
         }
-        LazyColumn(modifier = Modifier.weight(1f)) {
+        if (scenarioAndDepths.isNotEmpty()) {
+          (0..scenarioAndDepths.maxOf { it.second }).forEach {
+            Divider(
+              orientation = Orientation.Vertical,
+              modifier = Modifier.padding(start = 4.dp + 12.dp * it)
+                .fillMaxHeight()
+                .background(JewelTheme.colorPalette.purple(8))
+                .width(2.dp)
+            )
+          }
+        }
+        val lazyColumnState = rememberLazyListState()
+        LazyColumn(
+          state = lazyColumnState,
+          modifier = Modifier.fillMaxSize()
+        ) {
           itemsIndexed(scenarioAndDepths) { index, (scenarioStateHolder, depth) ->
             val goal = scenarioStateHolder.goalState.text
             Box(
