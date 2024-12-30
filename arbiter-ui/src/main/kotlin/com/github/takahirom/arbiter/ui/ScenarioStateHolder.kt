@@ -50,7 +50,9 @@ sealed interface InitializeMethods {
 }
 
 
-class ScenarioStateHolder(val device: Device, val ai: Ai) {
+class ScenarioStateHolder(initialDevice: Device, private val ai: Ai) {
+  private val deviceStateFlow = MutableStateFlow(initialDevice)
+  val device get() = deviceStateFlow.value
   val goalState = TextFieldState("")
   val goal get() = goalState.text.toString()
   val maxRetryState: TextFieldState = TextFieldState("3")
@@ -116,7 +118,11 @@ class ScenarioStateHolder(val device: Device, val ai: Ai) {
     }
   }
 
-  fun createAgentConfig(device: Device, ai: Ai) = AgentConfig {
+  fun onDeviceChanged(device: Device) {
+    deviceStateFlow.value = device
+  }
+
+  fun createAgentConfig() = AgentConfig {
     ai(ai)
     device(device)
     deviceFormFactor(deviceFormFactorStateFlow.value)

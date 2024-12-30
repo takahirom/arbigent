@@ -169,7 +169,7 @@ fun Scenario(
       ) {
         val initializeMethods by scenarioStateHolder.initializeMethodsStateFlow.collectAsState()
         val cleanupData by scenarioStateHolder.cleanupDataStateFlow.collectAsState()
-        GroupHeader("Initialize method:")
+        GroupHeader("Initialize method")
         CheckboxRow(
           text = "Cleanup app data",
           checked = cleanupData is CleanupData.Cleanup,

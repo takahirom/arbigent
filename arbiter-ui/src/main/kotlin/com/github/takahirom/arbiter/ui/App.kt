@@ -32,6 +32,7 @@ import kotlinx.coroutines.launch
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.CircularProgressIndicator
 import org.jetbrains.jewel.ui.component.ComboBox
+import org.jetbrains.jewel.ui.component.DefaultButton
 import org.jetbrains.jewel.ui.component.Icon
 import org.jetbrains.jewel.ui.component.IconActionButton
 import org.jetbrains.jewel.ui.component.ListComboBox
@@ -76,14 +77,26 @@ fun App(
     }
     val scenarioIndex by appStateHolder.selectedAgentIndex.collectAsState()
     Row {
-      val schenarioAndDepths by appStateHolder.sortedScenariosAndDepthsStateFlow.collectAsState()
+      val scenarioAndDepths by appStateHolder.sortedScenariosAndDepthsStateFlow.collectAsState()
       Column(
         Modifier
           .weight(1f),
         horizontalAlignment = Alignment.CenterHorizontally
       ) {
+        if (scenarioAndDepths.isEmpty()) {
+          Box(Modifier.fillMaxSize().padding(8.dp)) {
+            DefaultButton(
+              modifier = Modifier.align(Alignment.Center),
+              onClick = {
+                appStateHolder.addScenario()
+              },
+            ) {
+              Text("Add a scenario")
+            }
+          }
+        }
         LazyColumn(modifier = Modifier.weight(1f)) {
-          itemsIndexed(schenarioAndDepths) { index, (scenarioStateHolder, depth) ->
+          itemsIndexed(scenarioAndDepths) { index, (scenarioStateHolder, depth) ->
             val goal = scenarioStateHolder.goalState.text
             Box(
               modifier = Modifier.fillMaxWidth()
@@ -136,7 +149,7 @@ fun App(
           }
         }
       }
-      val scenarioStateHolder = schenarioAndDepths.getOrNull(scenarioIndex)
+      val scenarioStateHolder = scenarioAndDepths.getOrNull(scenarioIndex)
       if (scenarioStateHolder != null) {
         Column(Modifier.weight(3f)) {
           Scenario(

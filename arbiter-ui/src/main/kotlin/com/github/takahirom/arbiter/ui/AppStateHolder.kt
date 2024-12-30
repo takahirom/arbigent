@@ -73,7 +73,7 @@ class AppStateHolder(
 
   fun addScenario() {
     scenariosStateFlow.value += ScenarioStateHolder(
-      device = (deviceConnectionState.value as DeviceConnectionState.Connected).device,
+      initialDevice = (deviceConnectionState.value as DeviceConnectionState.Connected).device,
       ai = aiFactory()
     )
     selectedAgentIndex.value = scenariosStateFlow.value.size - 1
@@ -126,10 +126,7 @@ class AppStateHolder(
       result.add(
         Arbiter.Task(
           goal = scenario.goal,
-          agentConfig = scenario.createAgentConfig(
-            scenario.device,
-            scenario.ai
-          ),
+          agentConfig = scenario.createAgentConfig(),
         )
       )
     }
@@ -246,7 +243,12 @@ class AppStateHolder(
     if (devicesStateHolder.selectedDevice.value == null) {
       devicesStateHolder.onSelectedDeviceChanged(devicesStateHolder.devices.value.firstOrNull())
     }
-    deviceConnectionState.value = DeviceConnectionState.Connected(deviceFactory(devicesStateHolder))
+    val device = deviceFactory(devicesStateHolder)
+    deviceConnectionState.value = DeviceConnectionState.Connected(device)
+
+    scenariosStateFlow.value.forEach {
+      it.onDeviceChanged(device)
+    }
   }
 
   fun removeScenario(scenario: ScenarioStateHolder) {
