@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.arbiter.DeviceOs
 import com.github.takahirom.arbiter.ui.AppStateHolder.DeviceConnectionState
@@ -90,98 +91,7 @@ fun App(
     var scenariosWidth by remember { mutableStateOf(200.dp) }
     Row {
       val scenarioAndDepths by appStateHolder.sortedScenariosAndDepthsStateFlow.collectAsState()
-      Box(
-        Modifier
-          .run {
-            if (scenarioAndDepths.isEmpty()) {
-              fillMaxSize()
-            } else {
-              width(scenariosWidth)
-            }
-          },
-      ) {
-        if (scenarioAndDepths.isEmpty()) {
-          Box(Modifier.fillMaxSize().padding(8.dp)) {
-            DefaultButton(
-              modifier = Modifier.align(Alignment.Center),
-              onClick = {
-                appStateHolder.addScenario()
-              },
-            ) {
-              Text("Add a scenario")
-            }
-          }
-        }
-        if (scenarioAndDepths.isNotEmpty()) {
-          (0..scenarioAndDepths.maxOf { it.second }).forEach {
-            Divider(
-              orientation = Orientation.Vertical,
-              modifier = Modifier.padding(start = 4.dp + 12.dp * it)
-                .fillMaxHeight()
-                .background(JewelTheme.colorPalette.purple(8))
-                .width(2.dp)
-            )
-          }
-        }
-        val lazyColumnState = rememberLazyListState()
-        LazyColumn(
-          state = lazyColumnState,
-          modifier = Modifier.fillMaxSize()
-        ) {
-          itemsIndexed(scenarioAndDepths) { index, (scenarioStateHolder, depth) ->
-            val goal = scenarioStateHolder.goalState.text
-            Box(
-              modifier = Modifier.fillMaxWidth()
-                .padding(
-                  start = 8.dp + 12.dp * depth,
-                  top = if (depth == 0) 8.dp else 0.dp,
-                  end = 8.dp,
-                  bottom = 4.dp
-                )
-                .background(
-                  if (index == scenarioIndex) {
-                    JewelTheme.colorPalette.purple(9)
-                  } else {
-                    Color.White
-                  }
-                )
-                .clickable { appStateHolder.selectedAgentIndex.value = index },
-            ) {
-              Row(
-                modifier = Modifier.padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-              ) {
-                val runningInfo by scenarioStateHolder.runningInfo.collectAsState()
-                Text(
-                  modifier = Modifier.weight(1f),
-                  text = "Goal: " + goal + "\n" + runningInfo?.toString().orEmpty()
-                )
-                val isArchived by scenarioStateHolder.isArchived.collectAsState()
-                if (isArchived) {
-                  Icon(
-                    key = AllIconsKeys.Actions.Checked,
-                    contentDescription = "Archived",
-                    modifier = Modifier.padding(8.dp)
-                      .size(32.dp)
-                      .clip(
-                        CircleShape
-                      )
-                      .background(JewelTheme.colorPalette.green(8))
-                  )
-                }
-                val isRunning by scenarioStateHolder.isRunning.collectAsState()
-                if (isRunning) {
-                  CircularProgressIndicator(
-                    modifier = Modifier.padding(8.dp)
-                      .size(32.dp)
-                      .testTag("scenario_running")
-                  )
-                }
-              }
-            }
-          }
-        }
-      }
+      LeftScenariosPanel(scenarioAndDepths, scenariosWidth, scenarioIndex, appStateHolder)
       Divider(
         orientation = Orientation.Vertical,
         modifier = Modifier
@@ -237,6 +147,107 @@ fun App(
               appStateHolder.removeScenario(it)
             }
           )
+        }
+      }
+    }
+  }
+}
+
+@Composable
+private fun LeftScenariosPanel(
+  scenarioAndDepths: List<Pair<ScenarioStateHolder, Int>>,
+  scenariosWidth: Dp,
+  selectedScenarioIndex: Int,
+  appStateHolder: AppStateHolder
+) {
+  Box(
+    Modifier
+      .run {
+        if (scenarioAndDepths.isEmpty()) {
+          fillMaxSize()
+        } else {
+          width(scenariosWidth)
+        }
+      },
+  ) {
+    if (scenarioAndDepths.isNotEmpty()) {
+      (0..scenarioAndDepths.maxOf { it.second }).forEach {
+        Divider(
+          orientation = Orientation.Vertical,
+          modifier = Modifier.padding(start = 4.dp + 12.dp * it)
+            .fillMaxHeight()
+            .background(JewelTheme.colorPalette.purple(8))
+            .width(2.dp)
+        )
+      }
+    }
+    val lazyColumnState = rememberLazyListState()
+    LazyColumn(
+      state = lazyColumnState,
+      modifier = Modifier.fillMaxSize()
+    ) {
+      itemsIndexed(scenarioAndDepths) { index, (scenarioStateHolder, depth) ->
+        val goal = scenarioStateHolder.goalState.text
+        Box(
+          modifier = Modifier.fillMaxWidth()
+            .padding(
+              start = 8.dp + 12.dp * depth,
+              top = if (depth == 0) 8.dp else 0.dp,
+              end = 8.dp,
+              bottom = 4.dp
+            )
+            .background(
+              if (index == selectedScenarioIndex) {
+                JewelTheme.colorPalette.purple(9)
+              } else {
+                Color.White
+              }
+            )
+            .clickable { appStateHolder.selectedAgentIndex.value = index },
+        ) {
+          Row(
+            modifier = Modifier.padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            val runningInfo by scenarioStateHolder.runningInfo.collectAsState()
+            Text(
+              modifier = Modifier.weight(1f),
+              text = "Goal: " + goal + "\n" + runningInfo?.toString().orEmpty()
+            )
+            val isArchived by scenarioStateHolder.isArchived.collectAsState()
+            if (isArchived) {
+              Icon(
+                key = AllIconsKeys.Actions.Checked,
+                contentDescription = "Archived",
+                modifier = Modifier.padding(8.dp)
+                  .size(32.dp)
+                  .clip(
+                    CircleShape
+                  )
+                  .background(JewelTheme.colorPalette.green(8))
+              )
+            }
+            val isRunning by scenarioStateHolder.isRunning.collectAsState()
+            if (isRunning) {
+              CircularProgressIndicator(
+                modifier = Modifier.padding(8.dp)
+                  .size(32.dp)
+                  .testTag("scenario_running")
+              )
+            }
+          }
+        }
+      }
+    }
+    if (scenarioAndDepths.isEmpty()) {
+      Box(Modifier.fillMaxSize().padding(8.dp)) {
+        DefaultButton(
+          modifier = Modifier.align(Alignment.Center),
+          onClick = {
+            appStateHolder.addScenario()
+          },
+        ) {
+          Text("Add a scenario")
         }
       }
     }

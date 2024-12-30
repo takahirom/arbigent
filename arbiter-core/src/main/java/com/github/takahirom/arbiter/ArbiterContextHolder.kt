@@ -34,7 +34,7 @@ class ArbiterContextHolder(
   fun prompt(): String {
     return """
 Goal: "$goal"
-Turns so far:
+What you did so far:
 ${
       turns.value.mapIndexed { index, turn ->
         "${index + 1}. \n" +
