@@ -150,6 +150,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
                 }
                 describe("when add dependency and run") {
                   doIt {
+                    expandOptions()
                     clickDependencyTextField()
                     typeDependencyTextField("launch the app")
                     clickRunAllButton()
@@ -232,12 +233,12 @@ class TestRobot(
 
   fun assertGoalAchieved() {
     composeUiTest.onNode(hasTestTag("scenario_running")).assertDoesNotExist()
-    composeUiTest.onNode(hasText("GoalAchieved", true), useUnmergedTree = true).assertExists()
+    composeUiTest.onNode(hasText("Goal achieved", true), useUnmergedTree = true).assertExists()
   }
 
   fun assertTwoGoalAchieved() {
     composeUiTest.onNode(hasTestTag("scenario_running")).assertDoesNotExist()
-    composeUiTest.onAllNodes(hasText("GoalAchieved", true), useUnmergedTree = true)
+    composeUiTest.onAllNodes(hasText("Goal achieved", true), useUnmergedTree = true)
       .assertCountEquals(2)
   }
 
@@ -253,6 +254,9 @@ class TestRobot(
     composeUiTest.onNode(hasTestTag("goal")).assertExists()
   }
 
+  fun expandOptions() {
+    composeUiTest.onNode(hasContentDescription("Expand options")).performClick()
+  }
 
   fun clickDependencyTextField() {
     composeUiTest.onNode(hasTestTag("dependency_dropdown")).performClick()

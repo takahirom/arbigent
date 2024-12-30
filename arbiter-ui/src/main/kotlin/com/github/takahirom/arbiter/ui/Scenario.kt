@@ -133,7 +133,7 @@ fun Scenario(
           onClick = {
             isExpanded = !isExpanded
           },
-          contentDescription = "Collapse",
+          contentDescription = "Collapse options",
           hint = Size(28)
         )
       } else {
@@ -142,7 +142,7 @@ fun Scenario(
           onClick = {
             isExpanded = !isExpanded
           },
-          contentDescription = "Expand",
+          contentDescription = "Expand options",
           hint = Size(28)
         )
       }
