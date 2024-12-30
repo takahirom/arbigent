@@ -45,6 +45,7 @@ import com.github.takahirom.arbiter.Agent
 import com.github.takahirom.arbiter.Arbiter
 import com.github.takahirom.arbiter.ArbiterContextHolder
 import com.github.takahirom.arbiter.GoalAchievedAgentCommand
+import com.github.takahirom.arbiter.InputCommandType
 import com.github.takahirom.arbiter.OpenAIAi
 import com.github.takahirom.arbiter.ui.AppStateHolder.DeviceConnectionState
 import com.github.takahirom.arbiter.ui.AppStateHolder.FileSelectionState
@@ -280,7 +281,6 @@ private fun Scenario(
   onCancel: (ScenarioStateHolder) -> Unit,
   onRemove: (ScenarioStateHolder) -> Unit,
 ) {
-  val deviceType by remember { mutableStateOf(true) }
   val arbiter: Arbiter? by scenarioStateHolder.arbiterStateFlow.collectAsState()
   val goal = scenarioStateHolder.goalState
   Column(
@@ -367,14 +367,17 @@ private fun Scenario(
       Column(
         modifier = Modifier.padding(8.dp).weight(1F)
       ) {
-        GroupHeader("Device inputs(Not yet implemented):")
+        val inputCommandType by scenarioStateHolder.inputCommandTypeStateFlow.collectAsState()
+        GroupHeader("Device inputs")
         Row(
           verticalAlignment = Alignment.CenterVertically
         ) {
           RadioButtonRow(
             text = "Mobile",
-            selected = deviceType,
-            onClick = { }
+            selected = inputCommandType.isMobile(),
+            onClick = {
+              scenarioStateHolder.inputCommandTypeStateFlow.value = InputCommandType.Mobile
+            }
           )
         }
         Row(
@@ -382,8 +385,10 @@ private fun Scenario(
         ) {
           RadioButtonRow(
             text = "TV",
-            selected = !deviceType,
-            onClick = { }
+            selected = inputCommandType.isTv(),
+            onClick = {
+              scenarioStateHolder.inputCommandTypeStateFlow.value = InputCommandType.Tv
+            }
           )
         }
       }

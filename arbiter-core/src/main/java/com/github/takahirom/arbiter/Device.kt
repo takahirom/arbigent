@@ -186,7 +186,7 @@ class MaestroDevice(
   }
 
   fun ViewHierarchy.toOptimizedString(
-    meaningfulAttributes: Set<String> = setOf("text", "content description", "hintText"),
+    meaningfulAttributes: Set<String> = setOf("text", "content description", "hintText", "focused"),
     deviceInfo: DeviceInfo
   ): String {
     val root = root

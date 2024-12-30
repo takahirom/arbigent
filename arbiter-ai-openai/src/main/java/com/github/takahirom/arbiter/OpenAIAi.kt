@@ -52,7 +52,10 @@ class OpenAIAi(
         )
       )
     )
-    val responseText = chatCompletion(messages)
+    val responseText = chatCompletion(
+      agentCommandTypes = agentCommandTypes,
+      messages = messages,
+    )
     val turn = parseResponse(responseText, messages, screenshotFileName, agentCommandTypes)
     return Ai.DecisionOutput(listOf(turn.agentCommand!!), turn)
   }
@@ -103,6 +106,31 @@ $templates"""
           ClickWithIdAgentCommand(text)
         }
 
+        DpadUpArrowAgentCommand -> {
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
+          DpadUpArrowAgentCommand(text.toIntOrNull() ?: 1)
+        }
+
+        DpadDownArrowAgentCommand -> {
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
+          DpadDownArrowAgentCommand(text.toIntOrNull() ?: 1)
+        }
+
+        DpadLeftArrowAgentCommand -> {
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
+          DpadLeftArrowAgentCommand(text.toIntOrNull() ?: 1)
+        }
+
+        DpadRightArrowAgentCommand -> {
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
+          DpadRightArrowAgentCommand(text.toIntOrNull() ?: 1)
+        }
+
+        DpadCenterAgentCommand -> {
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
+          DpadCenterAgentCommand(text.toIntOrNull() ?: 1)
+        }
+
         InputTextAgentCommand -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
           InputTextAgentCommand(text)
@@ -132,7 +160,7 @@ $templates"""
     }
   }
 
-  private fun chatCompletion(messages: List<ChatMessage>): String {
+  private fun chatCompletion(agentCommandTypes: List<AgentCommandType>, messages: List<ChatMessage>): String {
     val client = OkHttpClient.Builder()
       .readTimeout(60, TimeUnit.SECONDS)
       .build()
@@ -143,7 +171,7 @@ $templates"""
         messages = messages,
         ResponseFormat(
           type = "json_schema",
-          jsonSchema = buildActionSchema(),
+          jsonSchema = buildActionSchema(agentCommandTypes = agentCommandTypes),
         ),
       )
     )
@@ -159,8 +187,8 @@ $templates"""
     return responseBody
   }
 
-  private fun buildActionSchema(): JsonObject {
-    val actions = defaultAgentCommandTypes().map { it.actionName }.joinToString { "\"$it\"" }
+  private fun buildActionSchema(agentCommandTypes: List<AgentCommandType>): JsonObject {
+    val actions = agentCommandTypes.map { it.actionName }.joinToString { "\"$it\"" }
     val schemaJson = """
     {
       "name": "ActionSchema",

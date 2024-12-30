@@ -137,7 +137,8 @@ class AppStateHolder(
     return Arbiter.Scenario(
       tasks = result,
       maxRetry = scenario.maxRetryState.text.toString().toIntOrNull() ?: 3,
-      maxTurnCount = scenario.maxTurnState.text.toString().toIntOrNull() ?: 10
+      maxTurnCount = scenario.maxTurnState.text.toString().toIntOrNull() ?: 10,
+      inputCommandType = scenario.inputCommandTypeStateFlow.value
     )
   }
 
@@ -221,6 +222,7 @@ class AppStateHolder(
         maxTurnState.edit {
           replace(0, length, scenarioContent.maxTurn.toString())
         }
+        inputCommandTypeStateFlow.value = scenarioContent.inputCommandType
       }
     }
     scenarioContents.forEachIndexed { index, scenarioContent ->

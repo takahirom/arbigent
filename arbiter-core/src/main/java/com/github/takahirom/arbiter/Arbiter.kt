@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
+import kotlinx.serialization.Serializable
 
 data class RunningInfo(
   val allTasks: Int,
@@ -30,6 +31,16 @@ data class RunningInfo(
   }
 }
 
+
+@Serializable
+sealed interface InputCommandType {
+  fun isMobile(): Boolean = this is Mobile
+ fun isTv(): Boolean = this is Tv
+
+  object Mobile : InputCommandType
+  object Tv : InputCommandType
+}
+
 class Arbiter {
   data class Task(
     val goal: String,
@@ -40,6 +51,7 @@ class Arbiter {
     val tasks: List<Task>,
     val maxRetry: Int = 0,
     val maxTurnCount: Int = 10,
+    val inputCommandType: InputCommandType
   )
 
   private val _taskToAgentStateFlow = MutableStateFlow<List<Pair<Task, Agent>>>(listOf())
@@ -116,6 +128,10 @@ class Arbiter {
           agent.execute(
             task.goal,
             maxTurn = scenario.maxTurnCount,
+            agentCommandTypes = when(scenario.inputCommandType) {
+              is InputCommandType.Mobile -> defaultAgentCommandTypes()
+              is InputCommandType.Tv -> defaultAgentCommandTypesForTv()
+            }
           )
           if (!agent.isArchivedStateFlow.value) {
             println("Arbiter.execute break because agent is not archived")

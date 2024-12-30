@@ -260,6 +260,20 @@ fun defaultAgentCommandTypes(): List<AgentCommandType> {
   )
 }
 
+fun defaultAgentCommandTypesForTv(): List<AgentCommandType> {
+  return listOf(
+    DpadUpArrowAgentCommand,
+    DpadDownArrowAgentCommand,
+    DpadLeftArrowAgentCommand,
+    DpadRightArrowAgentCommand,
+    DpadCenterAgentCommand,
+    InputTextAgentCommand,
+    BackPressAgentCommand,
+    KeyPressAgentCommand,
+    GoalAchievedAgentCommand
+  )
+}
+
 private fun initialize(device: Device) {
   repeat(10) {
     try {

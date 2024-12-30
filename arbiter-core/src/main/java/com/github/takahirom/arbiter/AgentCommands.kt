@@ -7,6 +7,10 @@ import maestro.orchestra.*
 interface AgentCommand {
   val actionName: String
   fun runOrchestraCommand(device: Device)
+
+  fun isGoal(): Boolean {
+    return actionName == GoalAchievedAgentCommand.actionName
+  }
 }
 
 interface AgentCommandType {
@@ -108,6 +112,161 @@ data class ClickWithIdAgentCommand(val textRegex: String) : AgentCommand {
             // You can use Regex
             // If you want to click second button, you can use "button[1]"
             "text": "..." 
+        }
+        """.trimIndent()
+    }
+
+  }
+}
+
+data class DpadDownArrowAgentCommand(val count: Int) : AgentCommand {
+  override val actionName = Companion.actionName
+
+  override fun runOrchestraCommand(device: Device) {
+    device.executeCommands(
+      commands = List(count) {
+        MaestroCommand(
+          pressKeyCommand = PressKeyCommand(
+            code = KeyCode.REMOTE_DOWN
+          )
+        )
+      },
+    )
+  }
+
+  companion object : AgentCommandType {
+    override val actionName = "DpadDownArrow"
+
+    override fun templateForAI(): String {
+      return """
+        {
+            "action": "$actionName",
+            // Count of down arrow key press
+            "text": "1"
+        }
+        """.trimIndent()
+    }
+
+  }
+}
+
+data class DpadUpArrowAgentCommand(val count: Int) : AgentCommand {
+  override val actionName = Companion.actionName
+
+  override fun runOrchestraCommand(device: Device) {
+    device.executeCommands(
+      commands = List(count) {
+        MaestroCommand(
+          pressKeyCommand = PressKeyCommand(
+            code = KeyCode.REMOTE_UP
+          )
+        )
+      },
+    )
+  }
+
+  companion object : AgentCommandType {
+    override val actionName = "DpadUpArrow"
+
+    override fun templateForAI(): String {
+      return """
+        {
+            "action": "$actionName",
+            // Count of up arrow key press
+            "text": "1"
+        }
+        """.trimIndent()
+    }
+
+  }
+}
+
+data class DpadRightArrowAgentCommand(val count: Int) : AgentCommand {
+  override val actionName = Companion.actionName
+
+  override fun runOrchestraCommand(device: Device) {
+    device.executeCommands(
+      commands = List(count) {
+        MaestroCommand(
+          pressKeyCommand = PressKeyCommand(
+            code = KeyCode.REMOTE_RIGHT
+          )
+        )
+      },
+    )
+  }
+
+  companion object : AgentCommandType {
+    override val actionName = "DpadRightArrow"
+
+    override fun templateForAI(): String {
+      return """
+        {
+            "action": "$actionName",
+            // Count of right arrow key press
+            "text": "1"
+        }
+        """.trimIndent()
+    }
+
+  }
+}
+
+data class DpadLeftArrowAgentCommand(val count: Int) : AgentCommand {
+  override val actionName = Companion.actionName
+
+  override fun runOrchestraCommand(device: Device) {
+    device.executeCommands(
+      commands = List(count) {
+        MaestroCommand(
+          pressKeyCommand = PressKeyCommand(
+            code = KeyCode.REMOTE_LEFT
+          )
+        )
+      },
+    )
+  }
+
+  companion object : AgentCommandType {
+    override val actionName = "DpadLeftArrow"
+
+    override fun templateForAI(): String {
+      return """
+        {
+            "action": "$actionName",
+            // Count of left arrow key press
+            "text": "1"
+        }
+        """.trimIndent()
+    }
+
+  }
+}
+
+data class DpadCenterAgentCommand(val count: Int) : AgentCommand {
+  override val actionName = Companion.actionName
+
+  override fun runOrchestraCommand(device: Device) {
+    device.executeCommands(
+      commands = List(count) {
+        MaestroCommand(
+          pressKeyCommand = PressKeyCommand(
+            code = KeyCode.REMOTE_CENTER
+          )
+        )
+      },
+    )
+  }
+
+  companion object : AgentCommandType {
+    override val actionName = "DpadCenter"
+
+    override fun templateForAI(): String {
+      return """
+        {
+            "action": "$actionName",
+            // Count of center key press
+            "text": "1"
         }
         """.trimIndent()
     }
@@ -227,7 +386,6 @@ data class KeyPressAgentCommand(val keyName: String) : AgentCommand {
         }
         """.trimIndent()
     }
-
   }
 }
 

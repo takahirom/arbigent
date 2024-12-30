@@ -2,6 +2,7 @@ package com.github.takahirom.arbiter.ui
 
 import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
+import com.github.takahirom.arbiter.InputCommandType
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
@@ -22,6 +23,7 @@ class ScenarioSerializer {
     val initializeMethods: InitializeMethods,
     val maxRetry: Int = 3,
     val maxTurn: Int = 10,
+    val inputCommandType: InputCommandType = InputCommandType.Mobile,
   )
 
   private val module = SerializersModule {
@@ -32,18 +34,21 @@ class ScenarioSerializer {
     }
   }
 
-  private val yaml = Yaml(module, YamlConfiguration(
-    strictMode = false
-  ))
+  private val yaml = Yaml(
+    module, YamlConfiguration(
+      strictMode = false
+    )
+  )
 
   fun save(scenarios: List<ScenarioStateHolder>, file: File) {
     val fileContent = FileContent(scenarios.map {
       ScenarioContent(
-        it.goal,
-        it.dependencyScenarioStateFlow.value?.goal,
-        it.initializeMethodsStateFlow.value,
-        it.maxRetryState.text.toString().toIntOrNull() ?: 3,
-        it.maxTurnState.text.toString().toIntOrNull() ?: 10
+        goal = it.goal,
+        dependency = it.dependencyScenarioStateFlow.value?.goal,
+        initializeMethods = it.initializeMethodsStateFlow.value,
+        maxRetry = it.maxRetryState.text.toString().toIntOrNull() ?: 3,
+        maxTurn = it.maxTurnState.text.toString().toIntOrNull() ?: 10,
+        inputCommandType = it.inputCommandTypeStateFlow.value
       )
     })
     val jsonString = yaml.encodeToString(FileContent.serializer(), fileContent)

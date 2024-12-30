@@ -9,6 +9,7 @@ import com.github.takahirom.arbiter.Arbiter
 import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
 import com.github.takahirom.arbiter.ArbiterInitializerInterceptor
 import com.github.takahirom.arbiter.Device
+import com.github.takahirom.arbiter.InputCommandType
 import com.github.takahirom.arbiter.RunningInfo
 import com.github.takahirom.arbiter.agentConfig
 import com.github.takahirom.arbiter.arbiter
@@ -26,28 +27,41 @@ import maestro.orchestra.LaunchAppCommand
 import maestro.orchestra.MaestroCommand
 
 @Serializable
+sealed interface ClearData {
+  @Serializable
+  @SerialName("Noop")
+  data object Noop : ClearData
+
+  @Serializable
+  @SerialName("ClearData")
+  data class Clear(val packageName: String) : ClearData
+}
+
+@Serializable
 sealed interface InitializeMethods {
   @Serializable
   @SerialName("Back")
-  object Back : InitializeMethods
+  data object Back : InitializeMethods
 
   @Serializable
   @SerialName("Noop")
-  object Noop : InitializeMethods
+  data object Noop : InitializeMethods
 
   @Serializable
   @SerialName("OpenApp")
   data class OpenApp(val packageName: String) : InitializeMethods
 }
 
+
 class ScenarioStateHolder(val device: Device, val ai: Ai) {
-  // (var goal: String?, var arbiter: Arbiter?)
   val goalState = TextFieldState("")
   val goal get() = goalState.text.toString()
   val maxRetryState: TextFieldState = TextFieldState("3")
   val maxTurnState: TextFieldState = TextFieldState("10")
   val initializeMethodsStateFlow: MutableStateFlow<InitializeMethods> =
     MutableStateFlow(InitializeMethods.Back)
+  val inputCommandTypeStateFlow: MutableStateFlow<InputCommandType> =
+    MutableStateFlow(InputCommandType.Mobile)
   val dependencyScenarioStateFlow = MutableStateFlow<ScenarioStateHolder?>(null)
   val arbiterStateFlow = MutableStateFlow<Arbiter?>(null)
   private val coroutineScope = CoroutineScope(
