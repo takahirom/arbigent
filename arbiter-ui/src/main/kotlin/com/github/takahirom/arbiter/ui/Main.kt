@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
@@ -44,8 +45,9 @@ import androidx.compose.ui.window.application
 import com.github.takahirom.arbiter.Agent
 import com.github.takahirom.arbiter.Arbiter
 import com.github.takahirom.arbiter.ArbiterContextHolder
-import com.github.takahirom.arbiter.GoalAchievedAgentCommand
 import com.github.takahirom.arbiter.DeviceFormFactor
+import com.github.takahirom.arbiter.DeviceOs
+import com.github.takahirom.arbiter.GoalAchievedAgentCommand
 import com.github.takahirom.arbiter.OpenAIAi
 import com.github.takahirom.arbiter.ui.AppStateHolder.DeviceConnectionState
 import com.github.takahirom.arbiter.ui.AppStateHolder.FileSelectionState
@@ -59,18 +61,23 @@ import org.jetbrains.jewel.intui.window.styling.lightWithLightHeader
 import org.jetbrains.jewel.ui.ComponentStyling
 import org.jetbrains.jewel.ui.component.CheckboxRow
 import org.jetbrains.jewel.ui.component.CircularProgressIndicator
+import org.jetbrains.jewel.ui.component.ComboBox
 import org.jetbrains.jewel.ui.component.Dropdown
 import org.jetbrains.jewel.ui.component.GroupHeader
 import org.jetbrains.jewel.ui.component.Icon
 import org.jetbrains.jewel.ui.component.IconActionButton
+import org.jetbrains.jewel.ui.component.ListComboBox
+import org.jetbrains.jewel.ui.component.ListItemState
 import org.jetbrains.jewel.ui.component.MenuScope
 import org.jetbrains.jewel.ui.component.OutlinedButton
 import org.jetbrains.jewel.ui.component.RadioButtonRow
+import org.jetbrains.jewel.ui.component.SimpleListItem
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.TextField
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
 import org.jetbrains.jewel.ui.theme.colorPalette
+import org.jetbrains.jewel.ui.theme.simpleListItemStyle
 import org.jetbrains.jewel.window.DecoratedWindow
 import org.jetbrains.jewel.window.TitleBar
 import org.jetbrains.jewel.window.styling.TitleBarStyle
@@ -245,6 +252,55 @@ fun ScenarioFileControls(appStateHolder: AppStateHolder) {
 fun ScenarioControls(appStateHolder: AppStateHolder) {
   val coroutineScope = rememberCoroutineScope()
   FlowRow {
+    val devicesStateHolder = appStateHolder.devicesStateHolder
+    ListComboBox(
+      items = DeviceOs.entries.map { it.name },
+      modifier = Modifier.width(100.dp).padding(end = 2.dp),
+      isEditable = false,
+      maxPopupHeight = 150.dp,
+      onSelectedItemChange = { itemText ->
+        devicesStateHolder.selectedDeviceOs.value = DeviceOs.valueOf(itemText)
+        devicesStateHolder.fetchDevices()
+        devicesStateHolder.onSelectedDeviceChanged(null)
+      },
+    ) { itemText, isSelected, isActive, isItemHovered, isPreviewSelection ->
+      SimpleListItem(
+        text = itemText,
+        state = ListItemState(isSelected, isItemHovered, isPreviewSelection),
+        modifier = Modifier,
+        style = JewelTheme.simpleListItemStyle,
+        contentDescription = itemText,
+      )
+    }
+    val selectedDevice by devicesStateHolder.selectedDevice.collectAsState()
+    val items = devicesStateHolder.devices.collectAsState().value.map { it.name }
+    println("selectedDevice: $selectedDevice")
+    ComboBox(
+      modifier = Modifier.width(170.dp).padding(end = 2.dp),
+      labelText = selectedDevice?.name ?: "Select device",
+      maxPopupHeight = 150.dp,
+    ) {
+      Column {
+        items.forEach { itemText ->
+          val isSelected = itemText == selectedDevice?.name
+          val isItemHovered = false
+          val isPreviewSelection = false
+          SimpleListItem(
+            text = itemText,
+            state = ListItemState(isSelected, isItemHovered, isPreviewSelection),
+            modifier = Modifier
+              .clickable {
+                devicesStateHolder.onSelectedDeviceChanged(devicesStateHolder.devices.value.firstOrNull { it.name == itemText })
+                devicesStateHolder.selectedDevice.value?.let {
+                  appStateHolder.onClickConnect(devicesStateHolder)
+                }
+              },
+            style = JewelTheme.simpleListItemStyle,
+            contentDescription = itemText,
+          )
+        }
+      }
+    }
     IconActionButton(
       key = AllIconsKeys.FileTypes.AddAny,
       onClick = {
@@ -400,7 +456,7 @@ private fun Scenario(
         val cleanupData by scenarioStateHolder.cleanupDataStateFlow.collectAsState()
         GroupHeader("Initialize method:")
         CheckboxRow(
-          text = "Cleanup",
+          text = "Cleanup app data",
           checked = cleanupData is CleanupData.Cleanup,
           onCheckedChange = {
             scenarioStateHolder.cleanupDataStateFlow.value = if (it) {
@@ -606,7 +662,7 @@ private fun ContentPanel(tasksToAgent: List<Pair<Arbiter.Task, Agent>>) {
 fun main() = application {
   val appStateHolder = remember {
     AppStateHolder(
-      aiFacotry = { OpenAIAi(Preference.openAiApiKey) },
+      aiFactory = { OpenAIAi(Preference.openAiApiKey) },
     )
   }
   AppWindow(

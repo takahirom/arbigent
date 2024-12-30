@@ -11,7 +11,7 @@ import xcuitest.XCTestClient
 import xcuitest.XCTestDriverClient
 import xcuitest.installer.LocalXCTestInstaller
 
-enum class DeviceType {
+enum class DeviceOs {
   Android,
   iOS;
   fun isAndroid() = this == Android
@@ -19,14 +19,15 @@ enum class DeviceType {
 }
 
 sealed interface AvailableDevice {
-  val deviceType: DeviceType
+  val deviceOs: DeviceOs
   val name: String
-  data class Android(val dadb: Dadb) : AvailableDevice {
-    override val deviceType: DeviceType = DeviceType.Android
+  // Do not use data class because dadb return true for equals
+  class Android(val dadb: Dadb) : AvailableDevice {
+    override val deviceOs: DeviceOs = DeviceOs.Android
     override val name: String = dadb.toString()
   }
-  data class IOS(val device: SimctlList.Device) : AvailableDevice {
-    override val deviceType: DeviceType = DeviceType.iOS
+  class IOS(val device: SimctlList.Device) : AvailableDevice {
+    override val deviceOs: DeviceOs = DeviceOs.iOS
     override val name: String = device.name
   }
 }
@@ -34,9 +35,9 @@ sealed interface AvailableDevice {
 fun connectToDevice(
   availableDevice: AvailableDevice
 ): MaestroDevice {
-  val deviceType = availableDevice.deviceType
+  val deviceType = availableDevice.deviceOs
   return when (deviceType) {
-    DeviceType.Android -> {
+    DeviceOs.Android -> {
       val dadb = (availableDevice as? AvailableDevice.Android)?.dadb
         ?: throw IllegalStateException("No device selected")
       val driver = AndroidDriver(
@@ -54,7 +55,7 @@ fun connectToDevice(
       MaestroDevice(maestro)
     }
 
-    DeviceType.iOS -> {
+    DeviceOs.iOS -> {
       val device = (availableDevice as? AvailableDevice.IOS)?.device
         ?: throw IllegalStateException("No device selected")
       val port = 8080

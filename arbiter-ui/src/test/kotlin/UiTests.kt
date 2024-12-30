@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
@@ -58,13 +59,14 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
   @OptIn(ExperimentalTestApi::class)
   private fun ComposeUiTest.setContent() {
     val appStateHolder = AppStateHolder(
-      aiFacotry = { FakeAi() },
+      aiFactory = { FakeAi() },
       deviceFactory = { FakeDevice() },
     )
     setContent {
       AppTheme {
         Column {
           Row(
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
           ) {
             Box(Modifier.padding(8.dp)) {

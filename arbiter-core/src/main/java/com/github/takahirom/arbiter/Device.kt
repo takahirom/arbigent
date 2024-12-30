@@ -14,6 +14,7 @@ interface Device {
   fun executeCommands(commands: List<MaestroCommand>)
   fun viewTreeString(): String
   fun focusedTreeString(): String
+  fun close()
 }
 
 class MaestroDevice(
@@ -221,10 +222,14 @@ class MaestroDevice(
     )
     val optimizedTree = result.node ?: result.promotedChildren.firstOrNull()
     println("Before optimization (length): ${this.toString().length}")
-//    println(this.toString())
+    println(this.toString())
     val optimizedToString = optimizedTree?.optimizedToString(depth = 0)
     println("After optimization (length): ${optimizedToString?.length}")
     return optimizedToString ?: ""
+  }
+
+  override fun close() {
+    maestro.close()
   }
 }
 

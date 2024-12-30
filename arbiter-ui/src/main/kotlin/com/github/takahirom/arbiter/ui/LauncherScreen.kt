@@ -16,13 +16,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import com.github.takahirom.arbiter.DeviceType
+import com.github.takahirom.arbiter.DeviceOs
 import org.jetbrains.jewel.intui.standalone.styling.light
 import org.jetbrains.jewel.ui.component.DefaultButton
 import org.jetbrains.jewel.ui.component.GroupHeader
@@ -38,7 +37,7 @@ import org.jetbrains.jewel.ui.painter.hints.Size
 fun BoxScope.LauncherScreen(
   appStateHolder: AppStateHolder
 ) {
-  val devicesStateHolder = remember { DevicesStateHolder() }
+  val devicesStateHolder = appStateHolder.devicesStateHolder
   Column(
     Modifier.align(Alignment.Center).width(400.dp).fillMaxHeight(),
     verticalArrangement = Arrangement.Center
@@ -47,16 +46,16 @@ fun BoxScope.LauncherScreen(
     Row(
       Modifier.padding(8.dp)
     ) {
-      val deviceType by devicesStateHolder.deviceType.collectAsState()
+      val deviceOs by devicesStateHolder.selectedDeviceOs.collectAsState()
       RadioButtonRow(
         text = "Android",
-        selected = deviceType.isAndroid(),
-        onClick = { devicesStateHolder.deviceType.value = DeviceType.Android }
+        selected = deviceOs.isAndroid(),
+        onClick = { devicesStateHolder.selectedDeviceOs.value = DeviceOs.Android }
       )
       RadioButtonRow(
         text = "iOS",
-        selected = deviceType.isIOS(),
-        onClick = { devicesStateHolder.deviceType.value = DeviceType.iOS }
+        selected = deviceOs.isIOS(),
+        onClick = { devicesStateHolder.selectedDeviceOs.value = DeviceOs.iOS }
       )
     }
     val devices by devicesStateHolder.devices.collectAsState()
@@ -87,7 +86,9 @@ fun BoxScope.LauncherScreen(
             modifier = Modifier.padding(8.dp),
             text = device.name,
             selected = device == selectedDevice || (selectedDevice == null && index == 0),
-            onClick = { devicesStateHolder.selectedDevice.value = device }
+            onClick = {
+              devicesStateHolder.onSelectedDeviceChanged(device)
+            }
           )
         }
       }

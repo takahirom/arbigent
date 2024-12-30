@@ -20,25 +20,26 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 class AppStateHolder(
-  val aiFacotry: () -> Ai,
+  val aiFactory: () -> Ai,
   val deviceFactory: (DevicesStateHolder) -> Device = { devicesStateHolder ->
     connectToDevice(
-      availableDevice = devicesStateHolder.selectedDevice.value
-        ?: devicesStateHolder.devices.value.first()
+      availableDevice = devicesStateHolder.selectedDevice.value!!
     )
   }
 ) {
+  val devicesStateHolder = DevicesStateHolder()
+
   sealed interface DeviceConnectionState {
-    object NotConnected : DeviceConnectionState
+    data object NotConnected : DeviceConnectionState
     data class Connected(val device: Device) : DeviceConnectionState
 
     fun isConnected(): Boolean = this is Connected
   }
 
   sealed interface FileSelectionState {
-    object NotSelected : FileSelectionState
-    object Loading : FileSelectionState
-    object Saving : FileSelectionState
+    data object NotSelected : FileSelectionState
+    data object Loading : FileSelectionState
+    data object Saving : FileSelectionState
   }
 
   val deviceConnectionState: MutableStateFlow<DeviceConnectionState> =
@@ -73,7 +74,7 @@ class AppStateHolder(
   fun addScenario() {
     scenariosStateFlow.value += ScenarioStateHolder(
       device = (deviceConnectionState.value as DeviceConnectionState.Connected).device,
-      ai = aiFacotry()
+      ai = aiFactory()
     )
     selectedAgentIndex.value = scenariosStateFlow.value.size - 1
   }
@@ -212,7 +213,7 @@ class AppStateHolder(
     val scenarioStateHolders = scenarioContents.map { scenarioContent ->
       ScenarioStateHolder(
         (deviceConnectionState.value as DeviceConnectionState.Connected).device,
-        ai = aiFacotry()
+        ai = aiFactory()
       ).apply {
         onGoalChanged(scenarioContent.goal)
         initializeMethodsStateFlow.value = scenarioContent.initializeMethods
@@ -238,6 +239,13 @@ class AppStateHolder(
   }
 
   fun onClickConnect(devicesStateHolder: DevicesStateHolder) {
+    val currentConnection = deviceConnectionState.value
+    if(currentConnection is DeviceConnectionState.Connected) {
+      currentConnection.device.close()
+    }
+    if (devicesStateHolder.selectedDevice.value == null) {
+      devicesStateHolder.onSelectedDeviceChanged(devicesStateHolder.devices.value.firstOrNull())
+    }
     deviceConnectionState.value = DeviceConnectionState.Connected(deviceFactory(devicesStateHolder))
   }
 
