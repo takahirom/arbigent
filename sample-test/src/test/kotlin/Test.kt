@@ -34,7 +34,7 @@ class FakeAi : Ai {
   ): Ai.DecisionOutput {
     return Ai.DecisionOutput(
       listOf(agentCommand),
-      ArbiterContextHolder.Turn(
+      ArbiterContextHolder.Step(
         agentCommand = agentCommand,
         memo = "memo",
         screenshotFileName = "screenshotFileName"
@@ -124,7 +124,7 @@ class Test {
         Arbiter.Task("goal1", agentConfig),
         Arbiter.Task("goal2", agentConfig)
       ),
-      maxTurnCount = 10,
+      maxStepCount = 10,
     )
     arbiter.executeAsync(
       scenario

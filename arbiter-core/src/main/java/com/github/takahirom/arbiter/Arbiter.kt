@@ -52,7 +52,7 @@ class Arbiter {
   data class Scenario(
     val tasks: List<Task>,
     val maxRetry: Int = 0,
-    val maxTurnCount: Int = 10,
+    val maxStepCount: Int = 10,
     val deviceFormFactor: DeviceFormFactor = DeviceFormFactor.Mobile,
   )
 
@@ -129,7 +129,7 @@ class Arbiter {
           )
           agent.execute(
             task.goal,
-            maxTurn = scenario.maxTurnCount,
+            maxStep = scenario.maxStepCount,
             agentCommandTypes = when(scenario.deviceFormFactor) {
               is DeviceFormFactor.Mobile -> defaultAgentCommandTypes()
               is DeviceFormFactor.Tv -> defaultAgentCommandTypesForTv()

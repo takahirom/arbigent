@@ -11,7 +11,7 @@ interface Ai {
   )
   data class DecisionOutput(
     val agentCommands: List<AgentCommand>,
-    val turn: ArbiterContextHolder.Turn
+    val step: ArbiterContextHolder.Step
   )
   fun decideWhatToDo(
     decisionInput: DecisionInput

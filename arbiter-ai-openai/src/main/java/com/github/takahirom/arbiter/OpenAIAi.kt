@@ -55,8 +55,8 @@ class OpenAIAi(
       agentCommandTypes = agentCommandTypes,
       messages = messages,
     )
-    val turn = parseResponse(responseText, messages, screenshotFileName, agentCommandTypes)
-    return Ai.DecisionOutput(listOf(turn.agentCommand!!), turn)
+    val step = parseResponse(responseText, messages, screenshotFileName, agentCommandTypes)
+    return Ai.DecisionOutput(listOf(step.agentCommand!!), step)
   }
 
   private fun buildPrompt(
@@ -84,7 +84,7 @@ $templates"""
     message: List<ChatMessage>,
     screenshotFileName: String,
     agentCommandList: List<AgentCommandType>
-  ): ArbiterContextHolder.Turn {
+  ): ArbiterContextHolder.Step {
     val json = Json { ignoreUnknownKeys = true }
     val responseObj = json.decodeFromString<ChatCompletionResponse>(response)
     val content = responseObj.choices.firstOrNull()?.message?.content ?: ""
@@ -148,7 +148,7 @@ $templates"""
 
         else -> throw Exception("Unsupported action: $action")
       }
-      ArbiterContextHolder.Turn(
+      ArbiterContextHolder.Step(
         agentCommand = agentCommand,
         action = action,
         memo = jsonObject["memo"]?.jsonPrimitive?.content ?: "",

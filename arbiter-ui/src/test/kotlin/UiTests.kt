@@ -298,7 +298,7 @@ class FakeAi : Ai {
   ): Ai.DecisionOutput {
     return Ai.DecisionOutput(
       listOf(agentCommand),
-      ArbiterContextHolder.Turn(
+      ArbiterContextHolder.Step(
         agentCommand = agentCommand,
         memo = "memo",
         screenshotFileName = "screenshotFileName"

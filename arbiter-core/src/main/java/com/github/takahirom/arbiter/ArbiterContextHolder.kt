@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.asStateFlow
 class ArbiterContextHolder(
   private val goal: String,
 ) {
-  class Turn(
+  class Step(
     val agentCommand: AgentCommand? = null,
     val action: String? = null,
     val memo: String,
@@ -19,16 +19,15 @@ class ArbiterContextHolder(
       return """
         memo: $memo
         whatYouSaw: $whatYouSaw
-        action done: ${agentCommand?.turnLogText()}
+        action done: ${agentCommand?.stepLogText()}
       """.trimIndent()
     }
   }
 
-  private val _turns = MutableStateFlow<List<Turn>>(listOf())
-  val turns = _turns.asStateFlow()
-  fun addTurn(turn: Turn) {
-    println("addTurn: $turn")
-    _turns.value = turns.value.toMutableList() + turn
+  private val _steps = MutableStateFlow<List<Step>>(listOf())
+  val steps = _steps.asStateFlow()
+  fun addStep(step: Step) {
+    _steps.value = steps.value.toMutableList() + step
   }
 
   fun prompt(): String {
@@ -36,7 +35,7 @@ class ArbiterContextHolder(
 Goal: "$goal"
 What you did so far:
 ${
-      turns.value.mapIndexed { index, turn ->
+      steps.value.mapIndexed { index, turn ->
         "${index + 1}. \n" +
           turn.text()
       }.joinToString("\n")

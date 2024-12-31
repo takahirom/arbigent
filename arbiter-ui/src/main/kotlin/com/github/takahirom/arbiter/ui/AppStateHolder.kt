@@ -150,7 +150,7 @@ class AppStateHolder(
     return Arbiter.Scenario(
       tasks = result,
       maxRetry = scenario.maxRetryState.text.toString().toIntOrNull() ?: 3,
-      maxTurnCount = scenario.maxTurnState.text.toString().toIntOrNull() ?: 10,
+      maxStepCount = scenario.maxTurnState.text.toString().toIntOrNull() ?: 10,
       deviceFormFactor = scenario.deviceFormFactorStateFlow.value
     )
   }

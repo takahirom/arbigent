@@ -340,7 +340,7 @@ private fun ScenarioOptions(
             .padding(4.dp),
         )
       }
-      GroupHeader("Max turn count")
+      GroupHeader("Max step count")
       Row(
         verticalAlignment = Alignment.CenterVertically
       ) {
@@ -357,7 +357,7 @@ private fun ScenarioOptions(
 }
 
 data class ScenarioSection(val goal: String, val isRunning: Boolean, val turns: List<TurnItem>)
-data class TurnItem(val turn: ArbiterContextHolder.Turn)
+data class TurnItem(val step: ArbiterContextHolder.Step)
 
 @Composable
 fun buildSections(tasksToAgent: List<Pair<Arbiter.Task, Agent>>): List<ScenarioSection> {
@@ -366,11 +366,11 @@ fun buildSections(tasksToAgent: List<Pair<Arbiter.Task, Agent>>): List<ScenarioS
     val latestContext: ArbiterContextHolder? by agent.latestArbiterContextStateFlow.collectAsState()
     val isRunning by agent.isRunningStateFlow.collectAsState()
     val nonNullContext = latestContext ?: continue
-    val turns: List<ArbiterContextHolder.Turn> by nonNullContext.turns.collectAsState()
+    val steps: List<ArbiterContextHolder.Step> by nonNullContext.steps.collectAsState()
     sections += ScenarioSection(
       goal = tasks.goal,
       isRunning = isRunning,
-      turns = turns.map { TurnItem(it) })
+      turns = steps.map { TurnItem(it) })
   }
   return sections
 }
@@ -378,7 +378,7 @@ fun buildSections(tasksToAgent: List<Pair<Arbiter.Task, Agent>>): List<ScenarioS
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ContentPanel(tasksToAgent: List<Pair<Arbiter.Task, Agent>>) {
-  var selectedTurn: ArbiterContextHolder.Turn? by remember { mutableStateOf(null) }
+  var selectedStep: ArbiterContextHolder.Step? by remember { mutableStateOf(null) }
   Row(Modifier) {
     val lazyColumnState = rememberLazyListState()
     LaunchedEffect(lazyColumnState.layoutInfo.totalItemsCount) {
@@ -400,7 +400,7 @@ private fun ContentPanel(tasksToAgent: List<Pair<Arbiter.Task, Agent>>) {
           )
         }
         itemsIndexed(items = section.turns) { turnIndex, item ->
-          val turn = item.turn
+          val turn = item.step
           Column(
             Modifier.padding(8.dp)
               .background(
@@ -412,7 +412,7 @@ private fun ContentPanel(tasksToAgent: List<Pair<Arbiter.Task, Agent>>) {
                   Color.White
                 },
               )
-              .clickable { selectedTurn = turn },
+              .clickable { selectedStep = turn },
           ) {
             GroupHeader(
               modifier = Modifier.fillMaxWidth(),
@@ -435,7 +435,7 @@ private fun ContentPanel(tasksToAgent: List<Pair<Arbiter.Task, Agent>>) {
         }
       }
     }
-    selectedTurn?.let { turn ->
+    selectedStep?.let { turn ->
       val scrollableState = rememberScrollState()
       Column(
         Modifier

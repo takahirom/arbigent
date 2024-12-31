@@ -76,10 +76,10 @@ class Agent(
   private val currentGoalStateFlow = MutableStateFlow<String?>(null)
   val isArchivedStateFlow = arbiterContextHolderStateFlow
     .flatMapLatest {
-      it?.turns ?: flowOf()
+      it?.steps ?: flowOf()
     }
-    .map { turns: List<ArbiterContextHolder.Turn> ->
-      turns.any { it.agentCommand is GoalAchievedAgentCommand }
+    .map { steps: List<ArbiterContextHolder.Step> ->
+      steps.any { it.agentCommand is GoalAchievedAgentCommand }
     }
     .stateIn(coroutineScope, SharingStarted.Lazily, false)
 
@@ -114,7 +114,7 @@ class Agent(
 
   suspend fun execute(
     goal: String,
-    maxTurn: Int = 10,
+    maxStep: Int = 10,
     agentCommandTypes: List<AgentCommandType> = defaultAgentCommandTypes()
   ) {
     println("Arbiter.execute agent.execute start $goal")
@@ -127,7 +127,7 @@ class Agent(
       arbiterContextHistoryStateFlow.value += arbiterContextHolder
 
       initializerChain(device)
-      var stepRemain = maxTurn
+      var stepRemain = maxStep
       while (stepRemain-- > 0 && isArchivedStateFlow.value.not()) {
         val stepInput = StepInput(
           arbiterContextHolder = arbiterContextHolder,
@@ -320,24 +320,24 @@ private fun executeCommands(
       agentCommand.runOrchestraCommand(device)
     } catch (e: MaestroException) {
       e.printStackTrace()
-      arbiterContextHolder.addTurn(
-        ArbiterContextHolder.Turn(
+      arbiterContextHolder.addStep(
+        ArbiterContextHolder.Step(
           memo = "Failed to perform action: ${e.message}. Please try other actions.",
           screenshotFileName = screenshotFileName
         )
       )
     } catch (e: StatusRuntimeException) {
       e.printStackTrace()
-      arbiterContextHolder.addTurn(
-        ArbiterContextHolder.Turn(
+      arbiterContextHolder.addStep(
+        ArbiterContextHolder.Step(
           memo = "Failed to perform action: ${e.message}. Please try other actions.",
           screenshotFileName = screenshotFileName
         )
       )
     } catch (e: IllegalStateException) {
       e.printStackTrace()
-      arbiterContextHolder.addTurn(
-        ArbiterContextHolder.Turn(
+      arbiterContextHolder.addStep(
+        ArbiterContextHolder.Step(
           memo = "Failed to perform action: ${e.message}. Please try other actions.",
           screenshotFileName = screenshotFileName
         )
@@ -379,7 +379,7 @@ private fun step(
     screenshotFileName = screenshotFileName
   )
   val decisionOutput = decisionChain(decisionInput)
-  arbiterContextHolder.addTurn(decisionOutput.turn)
+  arbiterContextHolder.addStep(decisionOutput.step)
   if (decisionOutput.agentCommands.size == 1 && decisionOutput.agentCommands.first() is GoalAchievedAgentCommand) {
     println("Goal achieved")
     return StepResult.GoalAchieved
