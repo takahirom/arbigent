@@ -38,6 +38,7 @@ import androidx.compose.ui.window.Dialog
 import com.github.takahirom.arbiter.Agent
 import com.github.takahirom.arbiter.ArbiterScenarioExecutor
 import com.github.takahirom.arbiter.ArbiterContextHolder
+import com.github.takahirom.arbiter.ArbiterProjectSerializer
 import com.github.takahirom.arbiter.ArbiterScenarioDeviceFormFactor
 import com.github.takahirom.arbiter.GoalAchievedAgentCommand
 import org.jetbrains.jewel.foundation.theme.JewelTheme
@@ -252,12 +253,12 @@ private fun ScenarioOptions(
       GroupHeader("Initialize method")
       CheckboxRow(
         text = "Cleanup app data",
-        checked = cleanupData is CleanupData.Cleanup,
+        checked = cleanupData is ArbiterProjectSerializer.CleanupData.Cleanup,
         onCheckedChange = {
           scenarioStateHolder.cleanupDataStateFlow.value = if (it) {
-            CleanupData.Cleanup((cleanupData as? CleanupData.Cleanup)?.packageName ?: "")
+            ArbiterProjectSerializer.CleanupData.Cleanup((cleanupData as? ArbiterProjectSerializer.CleanupData.Cleanup)?.packageName ?: "")
           } else {
-            CleanupData.Noop
+            ArbiterProjectSerializer.CleanupData.Noop
           }
         }
       )
@@ -265,20 +266,20 @@ private fun ScenarioOptions(
         modifier = Modifier
           .padding(4.dp),
         placeholder = { Text("Package name") },
-        enabled = cleanupData is CleanupData.Cleanup,
-        value = (cleanupData as? CleanupData.Cleanup)?.packageName ?: "",
+        enabled = cleanupData is ArbiterProjectSerializer.CleanupData.Cleanup,
+        value = (cleanupData as? ArbiterProjectSerializer.CleanupData.Cleanup)?.packageName ?: "",
         onValueChange = {
-          scenarioStateHolder.cleanupDataStateFlow.value = CleanupData.Cleanup(it)
+          scenarioStateHolder.cleanupDataStateFlow.value = ArbiterProjectSerializer.CleanupData.Cleanup(it)
         },
       )
       Row(
         verticalAlignment = Alignment.CenterVertically
       ) {
         RadioButtonRow(
-          selected = initializeMethods == InitializeMethods.Back,
+          selected = initializeMethods == ArbiterProjectSerializer.InitializeMethods.Back,
           text = "Back",
           onClick = {
-            scenarioStateHolder.initializeMethodsStateFlow.value = InitializeMethods.Back
+            scenarioStateHolder.initializeMethodsStateFlow.value = ArbiterProjectSerializer.InitializeMethods.Back
           }
         )
       }
@@ -287,9 +288,9 @@ private fun ScenarioOptions(
       ) {
         RadioButtonRow(
           text = "Do nothing",
-          selected = initializeMethods is InitializeMethods.Noop,
+          selected = initializeMethods is ArbiterProjectSerializer.InitializeMethods.Noop,
           onClick = {
-            scenarioStateHolder.initializeMethodsStateFlow.value = InitializeMethods.Noop
+            scenarioStateHolder.initializeMethodsStateFlow.value = ArbiterProjectSerializer.InitializeMethods.Noop
           }
         )
       }
@@ -298,14 +299,14 @@ private fun ScenarioOptions(
       ) {
         var editingText by remember(initializeMethods) {
           mutableStateOf(
-            (initializeMethods as? InitializeMethods.OpenApp)?.packageName ?: ""
+            (initializeMethods as? ArbiterProjectSerializer.InitializeMethods.OpenApp)?.packageName ?: ""
           )
         }
         RadioButtonRow(
-          selected = initializeMethods is InitializeMethods.OpenApp,
+          selected = initializeMethods is ArbiterProjectSerializer.InitializeMethods.OpenApp,
           onClick = {
             scenarioStateHolder.initializeMethodsStateFlow.value =
-              InitializeMethods.OpenApp(editingText)
+              ArbiterProjectSerializer.InitializeMethods.OpenApp(editingText)
           }
         ) {
           Column {
@@ -313,12 +314,12 @@ private fun ScenarioOptions(
             TextField(
               modifier = Modifier
                 .padding(4.dp),
-              enabled = initializeMethods is InitializeMethods.OpenApp,
+              enabled = initializeMethods is ArbiterProjectSerializer.InitializeMethods.OpenApp,
               value = editingText,
               onValueChange = {
                 editingText = it
                 scenarioStateHolder.initializeMethodsStateFlow.value =
-                  InitializeMethods.OpenApp(it)
+                  ArbiterProjectSerializer.InitializeMethods.OpenApp(it)
               },
             )
           }

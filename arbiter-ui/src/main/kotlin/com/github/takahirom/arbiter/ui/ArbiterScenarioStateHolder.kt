@@ -8,6 +8,7 @@ import com.github.takahirom.arbiter.ArbiterInitializerInterceptor
 import com.github.takahirom.arbiter.ArbiterDevice
 import com.github.takahirom.arbiter.ArbiterScenarioDeviceFormFactor
 import com.github.takahirom.arbiter.AgentConfig
+import com.github.takahirom.arbiter.ArbiterProjectSerializer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,43 +23,18 @@ import maestro.orchestra.ClearStateCommand
 import maestro.orchestra.LaunchAppCommand
 import maestro.orchestra.MaestroCommand
 
-@Serializable
-sealed interface CleanupData {
-  @Serializable
-  @SerialName("Noop")
-  data object Noop : CleanupData
-
-  @Serializable
-  @SerialName("Cleanup")
-  data class Cleanup(val packageName: String) : CleanupData
-}
-
-@Serializable
-sealed interface InitializeMethods {
-  @Serializable
-  @SerialName("Back")
-  data object Back : InitializeMethods
-
-  @Serializable
-  @SerialName("Noop")
-  data object Noop : InitializeMethods
-
-  @Serializable
-  @SerialName("OpenApp")
-  data class OpenApp(val packageName: String) : InitializeMethods
-}
-
 
 class ArbiterScenarioStateHolder(initialDevice: ArbiterDevice, private val ai: ArbiterAi) {
   private val deviceStateFlow = MutableStateFlow(initialDevice)
-  val device get() = deviceStateFlow.value
+  private val device get() = deviceStateFlow.value
   val goalState = TextFieldState("")
   val goal get() = goalState.text.toString()
   val maxRetryState: TextFieldState = TextFieldState("3")
   val maxTurnState: TextFieldState = TextFieldState("10")
-  val cleanupDataStateFlow: MutableStateFlow<CleanupData> = MutableStateFlow(CleanupData.Noop)
-  val initializeMethodsStateFlow: MutableStateFlow<InitializeMethods> =
-    MutableStateFlow(InitializeMethods.Back)
+  val cleanupDataStateFlow: MutableStateFlow<ArbiterProjectSerializer.CleanupData> = MutableStateFlow(
+    ArbiterProjectSerializer.CleanupData.Noop)
+  val initializeMethodsStateFlow: MutableStateFlow<ArbiterProjectSerializer.InitializeMethods> =
+    MutableStateFlow(ArbiterProjectSerializer.InitializeMethods.Back)
   val deviceFormFactorStateFlow: MutableStateFlow<ArbiterScenarioDeviceFormFactor> =
     MutableStateFlow(ArbiterScenarioDeviceFormFactor.Mobile)
   val dependencyScenarioStateFlow = MutableStateFlow<ArbiterScenarioStateHolder?>(null)
@@ -126,11 +102,11 @@ class ArbiterScenarioStateHolder(initialDevice: ArbiterDevice, private val ai: A
     device(device)
     deviceFormFactor(deviceFormFactorStateFlow.value)
     when (val method = initializeMethodsStateFlow.value) {
-      InitializeMethods.Back -> {
+      ArbiterProjectSerializer.InitializeMethods.Back -> {
         // default
       }
 
-      InitializeMethods.Noop -> {
+      ArbiterProjectSerializer.InitializeMethods.Noop -> {
         addInterceptor(object : ArbiterInitializerInterceptor {
           override fun intercept(device: ArbiterDevice, chain: ArbiterInitializerInterceptor.Chain) {
             // do nothing
@@ -138,7 +114,7 @@ class ArbiterScenarioStateHolder(initialDevice: ArbiterDevice, private val ai: A
         })
       }
 
-      is InitializeMethods.OpenApp -> {
+      is ArbiterProjectSerializer.InitializeMethods.OpenApp -> {
         addInterceptor(object : ArbiterInitializerInterceptor {
           override fun intercept(device: ArbiterDevice, chain: ArbiterInitializerInterceptor.Chain) {
             device.executeCommands(
@@ -155,11 +131,11 @@ class ArbiterScenarioStateHolder(initialDevice: ArbiterDevice, private val ai: A
       }
     }
     when (val cleanupData = cleanupDataStateFlow.value) {
-      CleanupData.Noop -> {
+      ArbiterProjectSerializer.CleanupData.Noop -> {
         // default
       }
 
-      is CleanupData.Cleanup -> {
+      is ArbiterProjectSerializer.CleanupData.Cleanup -> {
         addInterceptor(object : ArbiterInitializerInterceptor {
           override fun intercept(device: ArbiterDevice, chain: ArbiterInitializerInterceptor.Chain) {
             device.executeCommands(

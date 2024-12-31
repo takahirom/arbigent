@@ -1,8 +1,6 @@
-package com.github.takahirom.arbiter.ui
+package com.github.takahirom.arbiter
 
-import com.charleskorn.kaml.Yaml
-import com.charleskorn.kaml.YamlConfiguration
-import com.github.takahirom.arbiter.ArbiterScenarioDeviceFormFactor
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
@@ -17,6 +15,33 @@ class ArbiterProjectSerializer {
   )
 
   @Serializable
+  sealed interface CleanupData {
+    @Serializable
+    @SerialName("Noop")
+    data object Noop : CleanupData
+
+    @Serializable
+    @SerialName("Cleanup")
+    data class Cleanup(val packageName: String) : CleanupData
+  }
+
+  @Serializable
+  sealed interface InitializeMethods {
+    @Serializable
+    @SerialName("Back")
+    data object Back : InitializeMethods
+
+    @Serializable
+    @SerialName("Noop")
+    data object Noop : InitializeMethods
+
+    @Serializable
+    @SerialName("OpenApp")
+    data class OpenApp(val packageName: String) : InitializeMethods
+  }
+
+
+  @Serializable
   class ArbiterScenario(
     val goal: String,
     val dependency: String?,
@@ -26,14 +51,16 @@ class ArbiterProjectSerializer {
     val deviceFormFactor: ArbiterScenarioDeviceFormFactor = ArbiterScenarioDeviceFormFactor.Mobile,
     val cleanupData: CleanupData = CleanupData.Noop
   ) {
-    val goalDependency get() = if(dependency?.contains(":") == true) {
-      if (dependency.startsWith("goal:")) {
-        dependency.split(":")[1]
+    val goalDependency: String?
+      get() = if (dependency?.contains(":") == true) {
+        if (dependency.startsWith("goal:")) {
+          dependency.split(":")[1]
+        } else {
+          null
+        }
       } else {
+        dependency
       }
-    } else {
-      dependency
-    }
   }
 
   private val module = SerializersModule {
@@ -44,24 +71,14 @@ class ArbiterProjectSerializer {
     }
   }
 
-  private val yaml = Yaml(
-    module, YamlConfiguration(
+  private val yaml = com.charleskorn.kaml.Yaml(
+    module, com.charleskorn.kaml.YamlConfiguration(
       strictMode = false
     )
   )
 
-  fun save(scenarios: List<ArbiterScenarioStateHolder>, file: File) {
-    val projectFile = ProjectFile(scenarios.map {
-      ArbiterScenario(
-        goal = it.goal,
-        dependency = it.dependencyScenarioStateFlow.value?.goal?.let { "goal:$it" },
-        initializeMethods = it.initializeMethodsStateFlow.value,
-        maxRetry = it.maxRetryState.text.toString().toIntOrNull() ?: 3,
-        maxTurn = it.maxTurnState.text.toString().toIntOrNull() ?: 10,
-        deviceFormFactor = it.deviceFormFactorStateFlow.value,
-        cleanupData = it.cleanupDataStateFlow.value
-      )
-    })
+  fun save(scenarios: List<ArbiterScenario>, file: File) {
+    val projectFile = ProjectFile(scenarios)
     val jsonString = yaml.encodeToString(ProjectFile.serializer(), projectFile)
     file.writeText(jsonString)
   }

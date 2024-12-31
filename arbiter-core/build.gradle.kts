@@ -15,6 +15,8 @@ dependencies {
   api("dev.mobile:maestro-ios:1.39.1")
   api("dev.mobile:maestro-ios-driver:1.39.1")
 
+  implementation("com.charleskorn.kaml:kaml:0.67.0")
+
   // To expose requestBuilderModifier
   api(libs.ktor.client.core)
   implementation(libs.kotlinx.coroutines.core)

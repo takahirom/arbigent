@@ -4,6 +4,7 @@ import com.github.takahirom.arbiter.ArbiterAi
 import com.github.takahirom.arbiter.ArbiterScenarioExecutor
 import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
 import com.github.takahirom.arbiter.ArbiterDevice
+import com.github.takahirom.arbiter.ArbiterProjectSerializer
 import com.github.takahirom.arbiter.connectToDevice
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -77,7 +78,7 @@ class AppStateHolder(
       ai = aiFactory()
     ).apply {
       dependencyScenarioStateFlow.value = parent
-      initializeMethodsStateFlow.value = InitializeMethods.Noop
+      initializeMethodsStateFlow.value = ArbiterProjectSerializer.InitializeMethods.Noop
     }
     scenariosStateFlow.value += scenarioStateHolder
     selectedAgentIndex.value =
@@ -215,7 +216,17 @@ class AppStateHolder(
       return
     }
     val sortedScenarios = sortedScenariosAndDepthsStateFlow.value.map { it.first }
-    arbiterProjectSerializer.save(sortedScenarios, file)
+    arbiterProjectSerializer.save(sortedScenarios.map {
+      ArbiterProjectSerializer.ArbiterScenario(
+        goal = it.goal,
+        dependency = it.dependencyScenarioStateFlow.value?.goal?.let { "goal:$it" },
+        initializeMethods = it.initializeMethodsStateFlow.value,
+        maxRetry = it.maxRetryState.text.toString().toIntOrNull() ?: 3,
+        maxTurn = it.maxTurnState.text.toString().toIntOrNull() ?: 10,
+        deviceFormFactor = it.deviceFormFactorStateFlow.value,
+        cleanupData = it.cleanupDataStateFlow.value
+      )
+    }, file)
   }
 
   fun loadGoals(file: File?) {
