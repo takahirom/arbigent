@@ -68,7 +68,7 @@ fun Scenario(
   onCancel: (ArbiterScenarioStateHolder) -> Unit,
   onRemove: (ArbiterScenarioStateHolder) -> Unit,
 ) {
-  val arbiterScenarioExecutor: ArbiterScenarioExecutor? by scenarioStateHolder.arbiterStateFlow.collectAsState()
+  val arbiterScenarioExecutor: ArbiterScenarioExecutor? by scenarioStateHolder.arbiterScenarioExecutorStateFlow.collectAsState()
   val goal = scenarioStateHolder.goalState
   Column(
     modifier = Modifier.padding(8.dp)
@@ -206,7 +206,7 @@ private fun ScenarioOptions(
       modifier = Modifier.padding(8.dp).width(200.dp)
     ) {
       GroupHeader("Scenario dependency")
-      val dependency by scenarioStateHolder.dependencyScenarioStateFlow.collectAsState()
+      val dependency by scenarioStateHolder.dependencyScenarioStateHolderStateFlow.collectAsState()
 
       Dropdown(
         modifier = Modifier

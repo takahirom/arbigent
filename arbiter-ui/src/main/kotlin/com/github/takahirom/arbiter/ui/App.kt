@@ -111,9 +111,9 @@ fun App(
             scenarioStateHolder = scenarioStateHolder.first,
             dependencyScenarioMenu = {
               selectableItem(
-                selected = scenarioStateHolder.first.dependencyScenarioStateFlow.value == null,
+                selected = scenarioStateHolder.first.dependencyScenarioStateHolderStateFlow.value == null,
                 onClick = {
-                  scenarioStateHolder.first.dependencyScenarioStateFlow.value = null
+                  scenarioStateHolder.first.dependencyScenarioStateHolderStateFlow.value = null
                 },
                 content = {
                   Text("No dependency")
@@ -123,9 +123,9 @@ fun App(
                 .filter { it != scenarioStateHolder.first }
                 .forEach {
                   selectableItem(
-                    selected = scenarioStateHolder.first.dependencyScenarioStateFlow.value == it,
+                    selected = scenarioStateHolder.first.dependencyScenarioStateHolderStateFlow.value == it,
                     onClick = {
-                      scenarioStateHolder.first.dependencyScenarioStateFlow.value = it
+                      scenarioStateHolder.first.dependencyScenarioStateHolderStateFlow.value = it
                     },
                     content = {
                       Text(it.goal)

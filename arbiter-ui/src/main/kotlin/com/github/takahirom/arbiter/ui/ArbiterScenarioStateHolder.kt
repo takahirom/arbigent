@@ -17,8 +17,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 import maestro.orchestra.ClearStateCommand
 import maestro.orchestra.LaunchAppCommand
 import maestro.orchestra.MaestroCommand
@@ -37,19 +35,19 @@ class ArbiterScenarioStateHolder(initialDevice: ArbiterDevice, private val ai: A
     MutableStateFlow(ArbiterProjectSerializer.InitializeMethods.Back)
   val deviceFormFactorStateFlow: MutableStateFlow<ArbiterScenarioDeviceFormFactor> =
     MutableStateFlow(ArbiterScenarioDeviceFormFactor.Mobile)
-  val dependencyScenarioStateFlow = MutableStateFlow<ArbiterScenarioStateHolder?>(null)
-  val arbiterStateFlow = MutableStateFlow<ArbiterScenarioExecutor?>(null)
+  val dependencyScenarioStateHolderStateFlow = MutableStateFlow<ArbiterScenarioStateHolder?>(null)
+  val arbiterScenarioExecutorStateFlow = MutableStateFlow<ArbiterScenarioExecutor?>(null)
   private val coroutineScope = CoroutineScope(
     ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob()
   )
-  val isArchived = arbiterStateFlow
+  val isArchived = arbiterScenarioExecutorStateFlow
     .flatMapLatest { it?.isArchivedStateFlow ?: flowOf() }
     .stateIn(
       scope = coroutineScope,
       started = SharingStarted.WhileSubscribed(),
       initialValue = false
     )
-  val isRunning = arbiterStateFlow
+  val isRunning = arbiterScenarioExecutorStateFlow
     .flatMapLatest { it?.isRunningStateFlow ?: flowOf() }
     .stateIn(
       scope = coroutineScope,
@@ -57,7 +55,7 @@ class ArbiterScenarioStateHolder(initialDevice: ArbiterDevice, private val ai: A
       initialValue = false
     )
 
-  val runningInfo: StateFlow<ArbiterScenarioExecutor.RunningInfo?> = arbiterStateFlow
+  val runningInfo: StateFlow<ArbiterScenarioExecutor.RunningInfo?> = arbiterScenarioExecutorStateFlow
     .flatMapLatest { it?.runningInfoStateFlow ?: flowOf() }
     .stateIn(
       scope = coroutineScope,
@@ -66,25 +64,25 @@ class ArbiterScenarioStateHolder(initialDevice: ArbiterDevice, private val ai: A
     )
 
   suspend fun onExecute(arbiterExecutorScenario: ArbiterScenarioExecutor.ArbiterExecutorScenario) {
-    arbiterStateFlow.value?.cancel()
-    val arbiter = ArbiterScenarioExecutor {
+    arbiterScenarioExecutorStateFlow.value?.cancel()
+    val arbiterScenarioExecutor = ArbiterScenarioExecutor {
     }
-    arbiterStateFlow.value = arbiter
-    arbiterStateFlow.value!!.execute(
+    arbiterScenarioExecutorStateFlow.value = arbiterScenarioExecutor
+    arbiterScenarioExecutorStateFlow.value!!.execute(
       arbiterExecutorScenario,
     )
   }
 
   suspend fun waitUntilFinished() {
-    arbiterStateFlow.value!!.waitUntilFinished()
+    arbiterScenarioExecutorStateFlow.value!!.waitUntilFinished()
   }
 
   fun isGoalAchieved(): Boolean {
-    return arbiterStateFlow.value?.isArchivedStateFlow?.value ?: false
+    return arbiterScenarioExecutorStateFlow.value?.isArchivedStateFlow?.value ?: false
   }
 
   fun cancel() {
-    arbiterStateFlow.value?.cancel()
+    arbiterScenarioExecutorStateFlow.value?.cancel()
   }
 
   fun onGoalChanged(goal: String) {
