@@ -10,7 +10,7 @@ import maestro.orchestra.MaestroCommand
 import maestro.orchestra.Orchestra
 import java.io.File
 
-interface Device {
+interface ArbiterDevice {
   fun executeCommands(commands: List<MaestroCommand>)
   fun viewTreeString(): String
   fun focusedTreeString(): String
@@ -20,7 +20,7 @@ interface Device {
 class MaestroDevice(
   private val maestro: Maestro,
   private val screenshotsDir: File = File("screenshots")
-) : Device {
+) : ArbiterDevice {
   private val orchestra = Orchestra(
     maestro = maestro,
     screenshotsDir = screenshotsDir

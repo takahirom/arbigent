@@ -6,7 +6,7 @@ import maestro.orchestra.*
 
 interface AgentCommand {
   val actionName: String
-  fun runOrchestraCommand(device: Device)
+  fun runOrchestraCommand(device: ArbiterDevice)
   fun stepLogText(): String
 
   fun isGoal(): Boolean {
@@ -33,7 +33,7 @@ data class ClickWithTextAgentCommand(val textRegex: String) : AgentCommand {
     return "Click on text: $textRegex"
   }
 
-  override fun runOrchestraCommand(device: Device) {
+  override fun runOrchestraCommand(device: ArbiterDevice) {
     val (textRegex, index) = getRegexToIndex(textRegex)
     val maestroCommand = MaestroCommand(
       tapOnElement = TapOnElementCommand(
@@ -88,7 +88,7 @@ data class ClickWithIdAgentCommand(val textRegex: String) : AgentCommand {
     return "Click on id: $textRegex"
   }
 
-  override fun runOrchestraCommand(device: Device) {
+  override fun runOrchestraCommand(device: ArbiterDevice) {
     val (textRegex, index) = getRegexToIndex(textRegex)
     device.executeCommands(
       commands = listOf(
@@ -128,7 +128,7 @@ data class DpadDownArrowAgentCommand(val count: Int) : AgentCommand {
     return "Press down arrow key $count times"
   }
 
-  override fun runOrchestraCommand(device: Device) {
+  override fun runOrchestraCommand(device: ArbiterDevice) {
     device.executeCommands(
       commands = List(count) {
         MaestroCommand(
@@ -163,7 +163,7 @@ data class DpadUpArrowAgentCommand(val count: Int) : AgentCommand {
     return "Press up arrow key $count times"
   }
 
-  override fun runOrchestraCommand(device: Device) {
+  override fun runOrchestraCommand(device: ArbiterDevice) {
     device.executeCommands(
       commands = List(count) {
         MaestroCommand(
@@ -198,7 +198,7 @@ data class DpadRightArrowAgentCommand(val count: Int) : AgentCommand {
     return "Press right arrow key $count times"
   }
 
-  override fun runOrchestraCommand(device: Device) {
+  override fun runOrchestraCommand(device: ArbiterDevice) {
     device.executeCommands(
       commands = List(count) {
         MaestroCommand(
@@ -233,7 +233,7 @@ data class DpadLeftArrowAgentCommand(val count: Int) : AgentCommand {
     return "Press left arrow key $count times"
   }
 
-  override fun runOrchestraCommand(device: Device) {
+  override fun runOrchestraCommand(device: ArbiterDevice) {
     device.executeCommands(
       commands = List(count) {
         MaestroCommand(
@@ -268,7 +268,7 @@ data class DpadCenterAgentCommand(val count: Int) : AgentCommand {
     return "Press center key $count times"
   }
 
-  override fun runOrchestraCommand(device: Device) {
+  override fun runOrchestraCommand(device: ArbiterDevice) {
     device.executeCommands(
       commands = List(count) {
         MaestroCommand(
@@ -303,7 +303,7 @@ data class InputTextAgentCommand(val text: String) : AgentCommand {
     return "Input text: $text"
   }
 
-  override fun runOrchestraCommand(device: Device) {
+  override fun runOrchestraCommand(device: ArbiterDevice) {
     device.executeCommands(
       commands = listOf(
         MaestroCommand(
@@ -338,7 +338,7 @@ class BackPressAgentCommand() : AgentCommand {
     return "Press back button"
   }
 
-  override fun runOrchestraCommand(device: Device) {
+  override fun runOrchestraCommand(device: ArbiterDevice) {
     device.executeCommands(
       commands = listOf(
         MaestroCommand(
@@ -369,7 +369,7 @@ class ScrollAgentCommand : AgentCommand {
     return "Scroll"
   }
 
-  override fun runOrchestraCommand(device: Device) {
+  override fun runOrchestraCommand(device: ArbiterDevice) {
     device.executeCommands(
       commands = listOf(
         MaestroCommand(
@@ -400,7 +400,7 @@ data class KeyPressAgentCommand(val keyName: String) : AgentCommand {
     return "Press key: $keyName"
   }
 
-  override fun runOrchestraCommand(device: Device) {
+  override fun runOrchestraCommand(device: ArbiterDevice) {
     val code = KeyCode.getByName(keyName)
       ?: throw MaestroException.InvalidCommand(message = "Unknown key: $keyName")
     device.executeCommands(
@@ -435,7 +435,7 @@ class GoalAchievedAgentCommand : AgentCommand {
     return "Goal achieved"
   }
 
-  override fun runOrchestraCommand(device: Device) {
+  override fun runOrchestraCommand(device: ArbiterDevice) {
   }
 
   companion object : AgentCommandType {

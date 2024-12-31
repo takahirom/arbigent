@@ -1,13 +1,12 @@
 package com.github.takahirom.arbiter.ui
 
 import androidx.compose.foundation.text.input.TextFieldState
-import com.github.takahirom.arbiter.Ai
-import com.github.takahirom.arbiter.Arbiter
+import com.github.takahirom.arbiter.ArbiterAi
+import com.github.takahirom.arbiter.ArbiterScenarioExecutor
 import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
 import com.github.takahirom.arbiter.ArbiterInitializerInterceptor
-import com.github.takahirom.arbiter.Device
-import com.github.takahirom.arbiter.DeviceFormFactor
-import com.github.takahirom.arbiter.RunningInfo
+import com.github.takahirom.arbiter.ArbiterDevice
+import com.github.takahirom.arbiter.ArbiterScenarioDeviceFormFactor
 import com.github.takahirom.arbiter.AgentConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -50,7 +49,7 @@ sealed interface InitializeMethods {
 }
 
 
-class ScenarioStateHolder(initialDevice: Device, private val ai: Ai) {
+class ArbiterScenarioStateHolder(initialDevice: ArbiterDevice, private val ai: ArbiterAi) {
   private val deviceStateFlow = MutableStateFlow(initialDevice)
   val device get() = deviceStateFlow.value
   val goalState = TextFieldState("")
@@ -60,10 +59,10 @@ class ScenarioStateHolder(initialDevice: Device, private val ai: Ai) {
   val cleanupDataStateFlow: MutableStateFlow<CleanupData> = MutableStateFlow(CleanupData.Noop)
   val initializeMethodsStateFlow: MutableStateFlow<InitializeMethods> =
     MutableStateFlow(InitializeMethods.Back)
-  val deviceFormFactorStateFlow: MutableStateFlow<DeviceFormFactor> =
-    MutableStateFlow(DeviceFormFactor.Mobile)
-  val dependencyScenarioStateFlow = MutableStateFlow<ScenarioStateHolder?>(null)
-  val arbiterStateFlow = MutableStateFlow<Arbiter?>(null)
+  val deviceFormFactorStateFlow: MutableStateFlow<ArbiterScenarioDeviceFormFactor> =
+    MutableStateFlow(ArbiterScenarioDeviceFormFactor.Mobile)
+  val dependencyScenarioStateFlow = MutableStateFlow<ArbiterScenarioStateHolder?>(null)
+  val arbiterStateFlow = MutableStateFlow<ArbiterScenarioExecutor?>(null)
   private val coroutineScope = CoroutineScope(
     ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob()
   )
@@ -82,7 +81,7 @@ class ScenarioStateHolder(initialDevice: Device, private val ai: Ai) {
       initialValue = false
     )
 
-  val runningInfo: StateFlow<RunningInfo?> = arbiterStateFlow
+  val runningInfo: StateFlow<ArbiterScenarioExecutor.RunningInfo?> = arbiterStateFlow
     .flatMapLatest { it?.runningInfoStateFlow ?: flowOf() }
     .stateIn(
       scope = coroutineScope,
@@ -90,9 +89,9 @@ class ScenarioStateHolder(initialDevice: Device, private val ai: Ai) {
       initialValue = null
     )
 
-  suspend fun onExecute(scenario: Arbiter.Scenario) {
+  suspend fun onExecute(scenario: ArbiterScenarioExecutor.Scenario) {
     arbiterStateFlow.value?.cancel()
-    val arbiter = Arbiter {
+    val arbiter = ArbiterScenarioExecutor {
     }
     arbiterStateFlow.value = arbiter
     arbiterStateFlow.value!!.execute(
@@ -118,7 +117,7 @@ class ScenarioStateHolder(initialDevice: Device, private val ai: Ai) {
     }
   }
 
-  fun onDeviceChanged(device: Device) {
+  fun onDeviceChanged(device: ArbiterDevice) {
     deviceStateFlow.value = device
   }
 
@@ -133,7 +132,7 @@ class ScenarioStateHolder(initialDevice: Device, private val ai: Ai) {
 
       InitializeMethods.Noop -> {
         addInterceptor(object : ArbiterInitializerInterceptor {
-          override fun intercept(device: Device, chain: ArbiterInitializerInterceptor.Chain) {
+          override fun intercept(device: ArbiterDevice, chain: ArbiterInitializerInterceptor.Chain) {
             // do nothing
           }
         })
@@ -141,7 +140,7 @@ class ScenarioStateHolder(initialDevice: Device, private val ai: Ai) {
 
       is InitializeMethods.OpenApp -> {
         addInterceptor(object : ArbiterInitializerInterceptor {
-          override fun intercept(device: Device, chain: ArbiterInitializerInterceptor.Chain) {
+          override fun intercept(device: ArbiterDevice, chain: ArbiterInitializerInterceptor.Chain) {
             device.executeCommands(
               listOf(
                 MaestroCommand(
@@ -162,7 +161,7 @@ class ScenarioStateHolder(initialDevice: Device, private val ai: Ai) {
 
       is CleanupData.Cleanup -> {
         addInterceptor(object : ArbiterInitializerInterceptor {
-          override fun intercept(device: Device, chain: ArbiterInitializerInterceptor.Chain) {
+          override fun intercept(device: ArbiterDevice, chain: ArbiterInitializerInterceptor.Chain) {
             device.executeCommands(
               listOf(
                 MaestroCommand(

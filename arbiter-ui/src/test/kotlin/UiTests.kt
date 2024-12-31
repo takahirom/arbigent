@@ -21,11 +21,11 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.arbiter.AgentCommand
-import com.github.takahirom.arbiter.Ai
+import com.github.takahirom.arbiter.ArbiterAi
 import com.github.takahirom.arbiter.ArbiterContextHolder
 import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
 import com.github.takahirom.arbiter.ClickWithTextAgentCommand
-import com.github.takahirom.arbiter.Device
+import com.github.takahirom.arbiter.ArbiterDevice
 import com.github.takahirom.arbiter.GoalAchievedAgentCommand
 import io.github.takahirom.roborazzi.captureRoboImage
 import io.github.takahirom.robospec.DescribedBehavior
@@ -271,7 +271,7 @@ class TestRobot(
   }
 }
 
-class FakeDevice : Device {
+class FakeDevice : ArbiterDevice {
   override fun executeCommands(commands: List<MaestroCommand>) {
     println("FakeDevice.executeCommands: $commands")
   }
@@ -291,12 +291,12 @@ class FakeDevice : Device {
   }
 }
 
-class FakeAi : Ai {
+class FakeAi : ArbiterAi {
   var count = 0
   fun createDecisionOutput(
     agentCommand: AgentCommand = ClickWithTextAgentCommand("text")
-  ): Ai.DecisionOutput {
-    return Ai.DecisionOutput(
+  ): ArbiterAi.DecisionOutput {
+    return ArbiterAi.DecisionOutput(
       listOf(agentCommand),
       ArbiterContextHolder.Step(
         agentCommand = agentCommand,
@@ -306,7 +306,7 @@ class FakeAi : Ai {
     )
   }
 
-  override fun decideWhatToDo(decisionInput: Ai.DecisionInput): Ai.DecisionOutput {
+  override fun decideWhatToDo(decisionInput: ArbiterAi.DecisionInput): ArbiterAi.DecisionOutput {
     println("FakeAi.decideWhatToDo")
     if (count == 0) {
       count++

@@ -155,7 +155,7 @@ fun App(
 
 @Composable
 private fun LeftScenariosPanel(
-  scenarioAndDepths: List<Pair<ScenarioStateHolder, Int>>,
+  scenarioAndDepths: List<Pair<ArbiterScenarioStateHolder, Int>>,
   scenariosWidth: Dp,
   selectedScenarioIndex: Int,
   appStateHolder: AppStateHolder

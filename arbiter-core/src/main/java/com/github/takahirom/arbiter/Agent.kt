@@ -20,9 +20,9 @@ class Agent(
 
   private val decisionInterceptors: List<ArbiterDecisionInterceptor> = interceptors
     .filterIsInstance<ArbiterDecisionInterceptor>()
-  private val decisionChain: (Ai.DecisionInput) -> Ai.DecisionOutput =
+  private val decisionChain: (ArbiterAi.DecisionInput) -> ArbiterAi.DecisionOutput =
     decisionInterceptors.foldRight(
-      { input: Ai.DecisionInput -> ai.decideWhatToDo(input) },
+      { input: ArbiterAi.DecisionInput -> ai.decideWhatToDo(input) },
       { interceptor, acc ->
         { input ->
           interceptor.intercept(input) { decisionInput -> acc(decisionInput) }
@@ -42,8 +42,8 @@ class Agent(
     )
   private val initializerInterceptors: List<ArbiterInitializerInterceptor> = interceptors
     .filterIsInstance<ArbiterInitializerInterceptor>()
-  private val initializerChain: (Device) -> Unit = initializerInterceptors.foldRight(
-    { device: Device -> initialize(device) },
+  private val initializerChain: (ArbiterDevice) -> Unit = initializerInterceptors.foldRight(
+    { device: ArbiterDevice -> initialize(device) },
     { interceptor, acc ->
       { device ->
         interceptor.intercept(device) { device -> acc(device) }
@@ -92,8 +92,8 @@ class Agent(
     maxTurn: Int = 10,
     maxRetry: Int = 1,
     agentCommandTypes: List<AgentCommandType> = when (deviceFormFactor) {
-      DeviceFormFactor.Mobile -> defaultAgentCommandTypes()
-      DeviceFormFactor.Tv -> defaultAgentCommandTypesForTv()
+      ArbiterScenarioDeviceFormFactor.Mobile -> defaultAgentCommandTypes()
+      ArbiterScenarioDeviceFormFactor.Tv -> defaultAgentCommandTypesForTv()
     }
   ) {
     job?.cancel()
@@ -164,10 +164,10 @@ class Agent(
   data class StepInput(
     val arbiterContextHolder: ArbiterContextHolder,
     val agentCommandTypes: List<AgentCommandType>,
-    val device: Device,
-    val deviceFormFactor: DeviceFormFactor,
-    val ai: Ai,
-    val decisionChain: (Ai.DecisionInput) -> Ai.DecisionOutput,
+    val device: ArbiterDevice,
+    val deviceFormFactor: ArbiterScenarioDeviceFormFactor,
+    val ai: ArbiterAi,
+    val decisionChain: (ArbiterAi.DecisionInput) -> ArbiterAi.DecisionOutput,
     val executeCommandChain: (ExecuteCommandsInput) -> ExecuteCommandsOutput,
   )
 
@@ -177,10 +177,10 @@ class Agent(
   }
 
   data class ExecuteCommandsInput(
-    val decisionOutput: Ai.DecisionOutput,
+    val decisionOutput: ArbiterAi.DecisionOutput,
     val arbiterContextHolder: ArbiterContextHolder,
     val screenshotFileName: String,
-    val device: Device,
+    val device: ArbiterDevice,
   )
 
   class ExecuteCommandsOutput
@@ -194,29 +194,29 @@ class Agent(
 
 class AgentConfig(
   val interceptors: List<ArbiterInterceptor>,
-  val ai: Ai,
-  val device: Device,
-  val deviceFormFactor: DeviceFormFactor
+  val ai: ArbiterAi,
+  val device: ArbiterDevice,
+  val deviceFormFactor: ArbiterScenarioDeviceFormFactor
 ) {
   class Builder {
     private val interceptors = mutableListOf<ArbiterInterceptor>()
-    private var device: Device? = null
-    private var ai: Ai? = null
-    private var deviceFormFactor: DeviceFormFactor = DeviceFormFactor.Mobile
+    private var device: ArbiterDevice? = null
+    private var ai: ArbiterAi? = null
+    private var deviceFormFactor: ArbiterScenarioDeviceFormFactor = ArbiterScenarioDeviceFormFactor.Mobile
 
     fun addInterceptor(interceptor: ArbiterInterceptor) {
       interceptors.add(interceptor)
     }
 
-    fun device(device: Device) {
+    fun device(device: ArbiterDevice) {
       this.device = device
     }
 
-    fun ai(ai: Ai) {
+    fun ai(ai: ArbiterAi) {
       this.ai = ai
     }
 
-    fun deviceFormFactor(deviceFormFactor: DeviceFormFactor) {
+    fun deviceFormFactor(deviceFormFactor: ArbiterScenarioDeviceFormFactor) {
       this.deviceFormFactor = deviceFormFactor
     }
 
@@ -240,17 +240,17 @@ fun AgentConfig(block: AgentConfig.Builder.() -> Unit = {}): AgentConfig {
 interface ArbiterInterceptor
 
 interface ArbiterInitializerInterceptor : ArbiterInterceptor {
-  fun intercept(device: Device, chain: Chain)
+  fun intercept(device: ArbiterDevice, chain: Chain)
   fun interface Chain {
-    fun proceed(device: Device)
+    fun proceed(device: ArbiterDevice)
   }
 }
 
 interface ArbiterDecisionInterceptor : ArbiterInterceptor {
-  fun intercept(decisionInput: Ai.DecisionInput, chain: Chain): Ai.DecisionOutput
+  fun intercept(decisionInput: ArbiterAi.DecisionInput, chain: Chain): ArbiterAi.DecisionOutput
 
   fun interface Chain {
-    fun proceed(decisionInput: Ai.DecisionInput): Ai.DecisionOutput
+    fun proceed(decisionInput: ArbiterAi.DecisionInput): ArbiterAi.DecisionOutput
   }
 }
 
@@ -294,7 +294,7 @@ fun defaultAgentCommandTypesForTv(): List<AgentCommandType> {
   )
 }
 
-private fun initialize(device: Device) {
+private fun initialize(device: ArbiterDevice) {
   repeat(10) {
     try {
       device.executeCommands(
@@ -366,7 +366,7 @@ private fun step(
     println("Failed to take screenshot: $e")
   }
   println("Arbiter step(): ${arbiterContextHolder.prompt()}")
-  val decisionInput = Ai.DecisionInput(
+  val decisionInput = ArbiterAi.DecisionInput(
     arbiterContextHolder = arbiterContextHolder,
     dumpHierarchy = device.viewTreeString(),
     focusedTreeString = if(deviceFormFactor.isTv()){

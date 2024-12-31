@@ -36,9 +36,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.github.takahirom.arbiter.Agent
-import com.github.takahirom.arbiter.Arbiter
+import com.github.takahirom.arbiter.ArbiterScenarioExecutor
 import com.github.takahirom.arbiter.ArbiterContextHolder
-import com.github.takahirom.arbiter.DeviceFormFactor
+import com.github.takahirom.arbiter.ArbiterScenarioDeviceFormFactor
 import com.github.takahirom.arbiter.GoalAchievedAgentCommand
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.CheckboxRow
@@ -60,14 +60,14 @@ import java.io.FileInputStream
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun Scenario(
-  scenarioStateHolder: ScenarioStateHolder,
+  scenarioStateHolder: ArbiterScenarioStateHolder,
   dependencyScenarioMenu: MenuScope.() -> Unit,
-  onAddSubScenario: (ScenarioStateHolder) -> Unit,
-  onExecute: (ScenarioStateHolder) -> Unit,
-  onCancel: (ScenarioStateHolder) -> Unit,
-  onRemove: (ScenarioStateHolder) -> Unit,
+  onAddSubScenario: (ArbiterScenarioStateHolder) -> Unit,
+  onExecute: (ArbiterScenarioStateHolder) -> Unit,
+  onCancel: (ArbiterScenarioStateHolder) -> Unit,
+  onRemove: (ArbiterScenarioStateHolder) -> Unit,
 ) {
-  val arbiter: Arbiter? by scenarioStateHolder.arbiterStateFlow.collectAsState()
+  val arbiterScenarioExecutor: ArbiterScenarioExecutor? by scenarioStateHolder.arbiterStateFlow.collectAsState()
   val goal = scenarioStateHolder.goalState
   Column(
     modifier = Modifier.padding(8.dp)
@@ -184,8 +184,8 @@ fun Scenario(
     }
     Column(Modifier.weight(1f).padding(top = 8.dp)) {
       GroupHeader("AI Agent Logs")
-      if (arbiter != null) {
-        val taskToAgents: List<Pair<Arbiter.Task, Agent>> by arbiter!!.taskToAgentStateFlow.collectAsState()
+      if (arbiterScenarioExecutor != null) {
+        val taskToAgents: List<Pair<ArbiterScenarioExecutor.ArbiterAgentTask, Agent>> by arbiterScenarioExecutor!!.agentTaskToAgentStateFlow.collectAsState()
         if (!taskToAgents.isEmpty()) {
           ContentPanel(taskToAgents)
         }
@@ -197,7 +197,7 @@ fun Scenario(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ScenarioOptions(
-  scenarioStateHolder: ScenarioStateHolder,
+  scenarioStateHolder: ArbiterScenarioStateHolder,
   dependencyScenarioMenu: MenuScope.() -> Unit
 ) {
   FlowRow(modifier = Modifier.padding(4.dp)) {
@@ -228,7 +228,7 @@ private fun ScenarioOptions(
           text = "Mobile",
           selected = inputCommandType.isMobile(),
           onClick = {
-            scenarioStateHolder.deviceFormFactorStateFlow.value = DeviceFormFactor.Mobile
+            scenarioStateHolder.deviceFormFactorStateFlow.value = ArbiterScenarioDeviceFormFactor.Mobile
           }
         )
       }
@@ -239,7 +239,7 @@ private fun ScenarioOptions(
           text = "TV",
           selected = inputCommandType.isTv(),
           onClick = {
-            scenarioStateHolder.deviceFormFactorStateFlow.value = DeviceFormFactor.Tv
+            scenarioStateHolder.deviceFormFactorStateFlow.value = ArbiterScenarioDeviceFormFactor.Tv
           }
         )
       }
@@ -360,7 +360,7 @@ data class ScenarioSection(val goal: String, val isRunning: Boolean, val turns: 
 data class TurnItem(val step: ArbiterContextHolder.Step)
 
 @Composable
-fun buildSections(tasksToAgent: List<Pair<Arbiter.Task, Agent>>): List<ScenarioSection> {
+fun buildSections(tasksToAgent: List<Pair<ArbiterScenarioExecutor.ArbiterAgentTask, Agent>>): List<ScenarioSection> {
   val sections = mutableListOf<ScenarioSection>()
   for ((tasks, agent) in tasksToAgent) {
     val latestContext: ArbiterContextHolder? by agent.latestArbiterContextStateFlow.collectAsState()
@@ -377,7 +377,7 @@ fun buildSections(tasksToAgent: List<Pair<Arbiter.Task, Agent>>): List<ScenarioS
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ContentPanel(tasksToAgent: List<Pair<Arbiter.Task, Agent>>) {
+private fun ContentPanel(tasksToAgent: List<Pair<ArbiterScenarioExecutor.ArbiterAgentTask, Agent>>) {
   var selectedStep: ArbiterContextHolder.Step? by remember { mutableStateOf(null) }
   Row(Modifier) {
     val lazyColumnState = rememberLazyListState()

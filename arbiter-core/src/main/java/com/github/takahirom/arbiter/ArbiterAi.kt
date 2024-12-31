@@ -1,6 +1,6 @@
 package com.github.takahirom.arbiter
 
-interface Ai {
+interface ArbiterAi {
   data class DecisionInput(
     val arbiterContextHolder: ArbiterContextHolder,
     val dumpHierarchy: String,

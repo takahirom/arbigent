@@ -1,9 +1,9 @@
 package com.github.takahirom.arbiter.ui
 
-import com.github.takahirom.arbiter.Ai
-import com.github.takahirom.arbiter.Arbiter
+import com.github.takahirom.arbiter.ArbiterAi
+import com.github.takahirom.arbiter.ArbiterScenarioExecutor
 import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
-import com.github.takahirom.arbiter.Device
+import com.github.takahirom.arbiter.ArbiterDevice
 import com.github.takahirom.arbiter.connectToDevice
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -20,8 +20,8 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 class AppStateHolder(
-  val aiFactory: () -> Ai,
-  val deviceFactory: (DevicesStateHolder) -> Device = { devicesStateHolder ->
+  val aiFactory: () -> ArbiterAi,
+  val deviceFactory: (DevicesStateHolder) -> ArbiterDevice = { devicesStateHolder ->
     connectToDevice(
       availableDevice = devicesStateHolder.selectedDevice.value!!
     )
@@ -31,7 +31,7 @@ class AppStateHolder(
 
   sealed interface DeviceConnectionState {
     data object NotConnected : DeviceConnectionState
-    data class Connected(val device: Device) : DeviceConnectionState
+    data class Connected(val device: ArbiterDevice) : DeviceConnectionState
 
     fun isConnected(): Boolean = this is Connected
   }
@@ -46,10 +46,10 @@ class AppStateHolder(
     MutableStateFlow(DeviceConnectionState.NotConnected)
   val fileSelectionState: MutableStateFlow<FileSelectionState> =
     MutableStateFlow(FileSelectionState.NotSelected)
-  val scenariosStateFlow: MutableStateFlow<List<ScenarioStateHolder>> = MutableStateFlow(listOf())
-  val sortedScenariosAndDepthsStateFlow: StateFlow<List<Pair<ScenarioStateHolder, Int>>> =
+  val scenariosStateFlow: MutableStateFlow<List<ArbiterScenarioStateHolder>> = MutableStateFlow(listOf())
+  val sortedScenariosAndDepthsStateFlow: StateFlow<List<Pair<ArbiterScenarioStateHolder, Int>>> =
     scenariosStateFlow
-      .flatMapLatest { scenarios: List<ScenarioStateHolder> ->
+      .flatMapLatest { scenarios: List<ArbiterScenarioStateHolder> ->
         combine(scenarios.map { scenario ->
           scenario.dependencyScenarioStateFlow
             .map { scenario to it }
@@ -71,8 +71,8 @@ class AppStateHolder(
   private val coroutineScope =
     CoroutineScope(ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob())
 
-  fun addSubScenario(parent: ScenarioStateHolder) {
-    val scenarioStateHolder = ScenarioStateHolder(
+  fun addSubScenario(parent: ArbiterScenarioStateHolder) {
+    val scenarioStateHolder = ArbiterScenarioStateHolder(
       initialDevice = (deviceConnectionState.value as DeviceConnectionState.Connected).device,
       ai = aiFactory()
     ).apply {
@@ -85,7 +85,7 @@ class AppStateHolder(
   }
 
   fun addScenario() {
-    val scenarioStateHolder = ScenarioStateHolder(
+    val scenarioStateHolder = ArbiterScenarioStateHolder(
       initialDevice = (deviceConnectionState.value as DeviceConnectionState.Connected).device,
       ai = aiFactory()
     )
@@ -109,7 +109,7 @@ class AppStateHolder(
     }
   }
 
-  fun run(scenario: ScenarioStateHolder) {
+  fun run(scenario: ArbiterScenarioStateHolder) {
     job?.cancel()
     scenariosStateFlow.value.forEach { it.cancel() }
     job = coroutineScope.launch {
@@ -119,16 +119,16 @@ class AppStateHolder(
     }
   }
 
-  suspend fun executeWithDependencies(scenario: ScenarioStateHolder) {
+  suspend fun executeWithDependencies(scenario: ArbiterScenarioStateHolder) {
     scenario.onExecute(scenarioDependencyList(scenario))
   }
 
   fun scenarioDependencyList(
-    scenario: ScenarioStateHolder,
-  ): Arbiter.Scenario {
-    val visited = mutableSetOf<ScenarioStateHolder>()
-    val result = mutableListOf<Arbiter.Task>()
-    fun dfs(scenario: ScenarioStateHolder) {
+    scenario: ArbiterScenarioStateHolder,
+  ): ArbiterScenarioExecutor.Scenario {
+    val visited = mutableSetOf<ArbiterScenarioStateHolder>()
+    val result = mutableListOf<ArbiterScenarioExecutor.ArbiterAgentTask>()
+    fun dfs(scenario: ArbiterScenarioStateHolder) {
       if (visited.contains(scenario)) {
         return
       }
@@ -139,7 +139,7 @@ class AppStateHolder(
         }
       }
       result.add(
-        Arbiter.Task(
+        ArbiterScenarioExecutor.ArbiterAgentTask(
           goal = scenario.goal,
           agentConfig = scenario.createAgentConfig(),
         )
@@ -147,18 +147,18 @@ class AppStateHolder(
     }
     dfs(scenario)
     println("executing:" + result)
-    return Arbiter.Scenario(
-      tasks = result,
+    return ArbiterScenarioExecutor.Scenario(
+      arbiterAgentTasks = result,
       maxRetry = scenario.maxRetryState.text.toString().toIntOrNull() ?: 3,
       maxStepCount = scenario.maxTurnState.text.toString().toIntOrNull() ?: 10,
       deviceFormFactor = scenario.deviceFormFactorStateFlow.value
     )
   }
 
-  private fun sortedScenarioAndDepth(allScenarios: List<ScenarioStateHolder>): List<Pair<ScenarioStateHolder, Int>> {
+  private fun sortedScenarioAndDepth(allScenarios: List<ArbiterScenarioStateHolder>): List<Pair<ArbiterScenarioStateHolder, Int>> {
     // Build dependency map using goals as keys
-    val dependentMap = mutableMapOf<ScenarioStateHolder, MutableList<ScenarioStateHolder>>()
-    val rootScenarios = mutableListOf<ScenarioStateHolder>()
+    val dependentMap = mutableMapOf<ArbiterScenarioStateHolder, MutableList<ArbiterScenarioStateHolder>>()
+    val rootScenarios = mutableListOf<ArbiterScenarioStateHolder>()
 
     allScenarios.forEach { scenario ->
       allScenarios.firstOrNull { it == scenario.dependencyScenarioStateFlow.value }?.let {
@@ -178,8 +178,8 @@ class AppStateHolder(
     }
 
     // Assign depths using BFS
-    val result = mutableListOf<Pair<ScenarioStateHolder, Int>>()
-    fun dfs(scenario: ScenarioStateHolder, depth: Int) {
+    val result = mutableListOf<Pair<ArbiterScenarioStateHolder, Int>>()
+    fun dfs(scenario: ArbiterScenarioStateHolder, depth: Int) {
       result.add(scenario to depth)
       dependentMap[scenario]?.forEach {
         dfs(it, depth + 1)
@@ -199,7 +199,7 @@ class AppStateHolder(
     job = coroutineScope.launch {
       sortedScenariosAndDepthsStateFlow.value.map { it.first }.filter { scenario ->
         !scenario.isGoalAchieved()
-      }.forEach { scenario: ScenarioStateHolder ->
+      }.forEach { scenario: ArbiterScenarioStateHolder ->
         selectedAgentIndex.value =
           sortedScenariosAndDepthsStateFlow.value.indexOfFirst { it.first == scenario }
         executeWithDependencies(scenario)
@@ -223,8 +223,8 @@ class AppStateHolder(
       return
     }
     val scenarioContents = scenarioSerializer.load(file)
-    val scenarioStateHolders = scenarioContents.map { scenarioContent ->
-      ScenarioStateHolder(
+    val arbiterScenarioStateHolders = scenarioContents.map { scenarioContent ->
+      ArbiterScenarioStateHolder(
         (deviceConnectionState.value as DeviceConnectionState.Connected).device,
         ai = aiFactory()
       ).apply {
@@ -241,10 +241,10 @@ class AppStateHolder(
       }
     }
     scenarioContents.forEachIndexed { index, scenarioContent ->
-      scenarioStateHolders[index].dependencyScenarioStateFlow.value =
-        scenarioStateHolders.firstOrNull { it.goal == scenarioContent.dependency }
+      arbiterScenarioStateHolders[index].dependencyScenarioStateFlow.value =
+        arbiterScenarioStateHolders.firstOrNull { it.goal == scenarioContent.dependency }
     }
-    scenariosStateFlow.value = scenarioStateHolders
+    scenariosStateFlow.value = arbiterScenarioStateHolders
   }
 
   fun close() {
@@ -267,7 +267,7 @@ class AppStateHolder(
     }
   }
 
-  fun removeScenario(scenario: ScenarioStateHolder) {
+  fun removeScenario(scenario: ArbiterScenarioStateHolder) {
     scenario.arbiterStateFlow.value?.cancel()
     scenariosStateFlow.value = scenariosStateFlow.value.filter { it != scenario }
   }

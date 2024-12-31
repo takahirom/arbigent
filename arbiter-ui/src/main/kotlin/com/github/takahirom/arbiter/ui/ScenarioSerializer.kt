@@ -2,7 +2,7 @@ package com.github.takahirom.arbiter.ui
 
 import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
-import com.github.takahirom.arbiter.DeviceFormFactor
+import com.github.takahirom.arbiter.ArbiterScenarioDeviceFormFactor
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
@@ -23,7 +23,7 @@ class ScenarioSerializer {
     val initializeMethods: InitializeMethods,
     val maxRetry: Int = 3,
     val maxTurn: Int = 10,
-    val deviceFormFactor: DeviceFormFactor = DeviceFormFactor.Mobile,
+    val deviceFormFactor: ArbiterScenarioDeviceFormFactor = ArbiterScenarioDeviceFormFactor.Mobile,
     val cleanupData: CleanupData = CleanupData.Noop
   )
 
@@ -41,7 +41,7 @@ class ScenarioSerializer {
     )
   )
 
-  fun save(scenarios: List<ScenarioStateHolder>, file: File) {
+  fun save(scenarios: List<ArbiterScenarioStateHolder>, file: File) {
     val fileContent = FileContent(scenarios.map {
       ScenarioContent(
         goal = it.goal,

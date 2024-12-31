@@ -7,7 +7,7 @@ import kotlinx.coroutines.test.runTest
 import maestro.orchestra.MaestroCommand
 import kotlin.test.Test
 
-class FakeDevice : Device {
+class FakeDevice : ArbiterDevice {
   override fun executeCommands(commands: List<MaestroCommand>) {
     println("FakeDevice.executeCommands: $commands")
   }
@@ -27,12 +27,12 @@ class FakeDevice : Device {
   }
 }
 
-class FakeAi : Ai {
+class FakeAi : ArbiterAi {
   var count = 0
   fun createDecisionOutput(
     agentCommand: AgentCommand = ClickWithTextAgentCommand("text")
-  ): Ai.DecisionOutput {
-    return Ai.DecisionOutput(
+  ): ArbiterAi.DecisionOutput {
+    return ArbiterAi.DecisionOutput(
       listOf(agentCommand),
       ArbiterContextHolder.Step(
         agentCommand = agentCommand,
@@ -42,7 +42,7 @@ class FakeAi : Ai {
     )
   }
 
-  override fun decideWhatToDo(decisionInput: Ai.DecisionInput): Ai.DecisionOutput {
+  override fun decideWhatToDo(decisionInput: ArbiterAi.DecisionInput): ArbiterAi.DecisionOutput {
     println("FakeAi.decideWhatToDo")
     if (count == 0) {
       count++
@@ -69,7 +69,7 @@ class Test {
       addInterceptor(
         object : ArbiterInitializerInterceptor {
           override fun intercept(
-            device: Device,
+            device: ArbiterDevice,
             chain: ArbiterInitializerInterceptor.Chain
           ) {
             println("intercept device: $device")
@@ -93,9 +93,9 @@ class Test {
       addInterceptor(
         object : ArbiterDecisionInterceptor {
           override fun intercept(
-            decisionInput: Ai.DecisionInput,
+            decisionInput: ArbiterAi.DecisionInput,
             chain: ArbiterDecisionInterceptor.Chain
-          ): Ai.DecisionOutput {
+          ): ArbiterAi.DecisionOutput {
             println("  intercept decisionInput: $decisionInput")
             val result = chain.proceed(decisionInput)
             println("  intercept decisionInput result: $result")
@@ -117,12 +117,12 @@ class Test {
         }
       )
     }
-    val arbiter = Arbiter {
+    val arbiter = ArbiterScenarioExecutor {
     }
-    val scenario = Arbiter.Scenario(
+    val scenario = ArbiterScenarioExecutor.Scenario(
       listOf(
-        Arbiter.Task("goal1", agentConfig),
-        Arbiter.Task("goal2", agentConfig)
+        ArbiterScenarioExecutor.ArbiterAgentTask("goal1", agentConfig),
+        ArbiterScenarioExecutor.ArbiterAgentTask("goal2", agentConfig)
       ),
       maxStepCount = 10,
     )

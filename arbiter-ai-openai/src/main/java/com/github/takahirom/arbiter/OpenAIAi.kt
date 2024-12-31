@@ -21,8 +21,8 @@ class OpenAIAi(
   private val requestBuilder: (String) -> Request = { requestBodyJson ->
     createRequest(requestBodyJson, apiKey)
   }
-) : Ai {
-  override fun decideWhatToDo(decisionInput: Ai.DecisionInput): Ai.DecisionOutput {
+) : ArbiterAi {
+  override fun decideWhatToDo(decisionInput: ArbiterAi.DecisionInput): ArbiterAi.DecisionOutput {
     val (arbiterContext, dumpHierarchy, focusedTree, agentCommandTypes, screenshotFileName) = decisionInput
     val prompt = buildPrompt(arbiterContext, dumpHierarchy, focusedTree, agentCommandTypes)
     val messages: List<ChatMessage> = listOf(
@@ -56,7 +56,7 @@ class OpenAIAi(
       messages = messages,
     )
     val step = parseResponse(responseText, messages, screenshotFileName, agentCommandTypes)
-    return Ai.DecisionOutput(listOf(step.agentCommand!!), step)
+    return ArbiterAi.DecisionOutput(listOf(step.agentCommand!!), step)
   }
 
   private fun buildPrompt(

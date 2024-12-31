@@ -1,5 +1,6 @@
 package com.github.takahirom.arbiter
 
+import com.google.gson.annotations.SerializedName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -17,53 +18,52 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
 import kotlinx.serialization.Serializable
 
-data class RunningInfo(
-  val allTasks: Int,
-  val runningTasks: Int,
-  val retriedTasks: Int,
-  val maxRetry: Int,
-) {
-  override fun toString(): String {
-    return """
-        task: $runningTasks/$allTasks
-        retry: $retriedTasks/$maxRetry
-    """.trimIndent()
-  }
-}
-
-
 @Serializable
-sealed interface DeviceFormFactor {
+sealed interface ArbiterScenarioDeviceFormFactor {
   fun isMobile(): Boolean = this is Mobile
  fun isTv(): Boolean = this is Tv
 
   @Serializable
-  object Mobile : DeviceFormFactor
+  object Mobile : ArbiterScenarioDeviceFormFactor
   @Serializable
-  object Tv : DeviceFormFactor
+  object Tv : ArbiterScenarioDeviceFormFactor
 }
 
-class Arbiter {
-  data class Task(
+class ArbiterScenarioExecutor {
+  data class RunningInfo(
+    val allTasks: Int,
+    val runningTasks: Int,
+    val retriedTasks: Int,
+    val maxRetry: Int,
+  ) {
+    override fun toString(): String {
+      return """
+        task: $runningTasks/$allTasks
+        retry: $retriedTasks/$maxRetry
+    """.trimIndent()
+    }
+  }
+
+  data class ArbiterAgentTask(
     val goal: String,
     val agentConfig: AgentConfig,
   )
 
   data class Scenario(
-    val tasks: List<Task>,
+    val arbiterAgentTasks: List<ArbiterAgentTask>,
     val maxRetry: Int = 0,
     val maxStepCount: Int = 10,
-    val deviceFormFactor: DeviceFormFactor = DeviceFormFactor.Mobile,
+    val deviceFormFactor: ArbiterScenarioDeviceFormFactor = ArbiterScenarioDeviceFormFactor.Mobile,
   )
 
-  private val _taskToAgentStateFlow = MutableStateFlow<List<Pair<Task, Agent>>>(listOf())
-  val taskToAgentStateFlow: StateFlow<List<Pair<Task, Agent>>> = _taskToAgentStateFlow.asStateFlow()
+  private val _taskToAgentStateFlow = MutableStateFlow<List<Pair<ArbiterAgentTask, Agent>>>(listOf())
+  val agentTaskToAgentStateFlow: StateFlow<List<Pair<ArbiterAgentTask, Agent>>> = _taskToAgentStateFlow.asStateFlow()
   private var executeJob: Job? = null
   private val coroutineScope =
     CoroutineScope(ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob())
   private val _runningInfoStateFlow: MutableStateFlow<RunningInfo?> = MutableStateFlow(null)
   val runningInfoStateFlow: StateFlow<RunningInfo?> = _runningInfoStateFlow.asStateFlow()
-  val isArchivedStateFlow = taskToAgentStateFlow.flatMapLatest { taskToAgents ->
+  val isArchivedStateFlow = agentTaskToAgentStateFlow.flatMapLatest { taskToAgents ->
     val flows: List<Flow<Boolean>> = taskToAgents.map { taskToAgent ->
       taskToAgent.second.isArchivedStateFlow
     }
@@ -76,7 +76,7 @@ class Arbiter {
       started = SharingStarted.WhileSubscribed(),
       initialValue = false
     )
-  val isRunningStateFlow = taskToAgentStateFlow.flatMapLatest { taskToAgents ->
+  val isRunningStateFlow = agentTaskToAgentStateFlow.flatMapLatest { taskToAgents ->
     val flows: List<Flow<Boolean>> = taskToAgents.map { taskToAgent ->
       taskToAgent.second.isRunningStateFlow
     }
@@ -116,13 +116,13 @@ class Arbiter {
         _taskToAgentStateFlow.value.forEach {
           it.second.cancel()
         }
-        _taskToAgentStateFlow.value = scenario.tasks.map { task ->
+        _taskToAgentStateFlow.value = scenario.arbiterAgentTasks.map { task ->
           task to Agent(task.agentConfig)
         }
-        for ((index, taskAgent) in taskToAgentStateFlow.value.withIndex()) {
+        for ((index, taskAgent) in agentTaskToAgentStateFlow.value.withIndex()) {
           val (task, agent) = taskAgent
           _runningInfoStateFlow.value = RunningInfo(
-            allTasks = taskToAgentStateFlow.value.size,
+            allTasks = agentTaskToAgentStateFlow.value.size,
             runningTasks = index + 1,
             retriedTasks = scenario.maxRetry - retryRemain,
             maxRetry = scenario.maxRetry,
@@ -131,15 +131,15 @@ class Arbiter {
             task.goal,
             maxStep = scenario.maxStepCount,
             agentCommandTypes = when(scenario.deviceFormFactor) {
-              is DeviceFormFactor.Mobile -> defaultAgentCommandTypes()
-              is DeviceFormFactor.Tv -> defaultAgentCommandTypesForTv()
+              is ArbiterScenarioDeviceFormFactor.Mobile -> defaultAgentCommandTypes()
+              is ArbiterScenarioDeviceFormFactor.Tv -> defaultAgentCommandTypesForTv()
             }
           )
           if (!agent.isArchivedStateFlow.value) {
             println("Arbiter.execute break because agent is not archived")
             break
           }
-          if (index == taskToAgentStateFlow.value.size - 1) {
+          if (index == agentTaskToAgentStateFlow.value.size - 1) {
             println("Arbiter.execute all agents are archived")
             finishedSuccessfully = true
           }
@@ -163,14 +163,14 @@ class Arbiter {
   }
 
   class Builder {
-    fun build(): Arbiter {
-      return Arbiter()
+    fun build(): ArbiterScenarioExecutor {
+      return ArbiterScenarioExecutor()
     }
   }
 }
 
-fun Arbiter(block: Arbiter.Builder.() -> Unit): Arbiter {
-  val builder = Arbiter.Builder()
+fun ArbiterScenarioExecutor(block: ArbiterScenarioExecutor.Builder.() -> Unit): ArbiterScenarioExecutor {
+  val builder = ArbiterScenarioExecutor.Builder()
   builder.block()
   return builder.build()
 }
