@@ -258,16 +258,16 @@ fun AgentConfigBuilder(block: AgentConfig.Builder.() -> Unit): AgentConfig.Build
 
 fun AgentConfigBuilder(
   deviceFormFactor: ArbiterScenarioDeviceFormFactor,
-  initializeMethods: ArbiterProjectSerializer.InitializeMethods,
-  cleanupData: ArbiterProjectSerializer.CleanupData
+  initializeMethods: ArbiterScenario.InitializeMethods,
+  cleanupData: ArbiterScenario.CleanupData
 ) = AgentConfigBuilder {
   deviceFormFactor(deviceFormFactor)
   when (val method = initializeMethods) {
-    ArbiterProjectSerializer.InitializeMethods.Back -> {
+    ArbiterScenario.InitializeMethods.Back -> {
       // default
     }
 
-    ArbiterProjectSerializer.InitializeMethods.Noop -> {
+    ArbiterScenario.InitializeMethods.Noop -> {
       addInterceptor(object : ArbiterInitializerInterceptor {
         override fun intercept(
           device: ArbiterDevice,
@@ -278,7 +278,7 @@ fun AgentConfigBuilder(
       })
     }
 
-    is ArbiterProjectSerializer.InitializeMethods.OpenApp -> {
+    is ArbiterScenario.InitializeMethods.OpenApp -> {
       addInterceptor(object : ArbiterInitializerInterceptor {
         override fun intercept(
           device: ArbiterDevice,
@@ -298,11 +298,11 @@ fun AgentConfigBuilder(
     }
   }
   when (val cleanupData = cleanupData) {
-    ArbiterProjectSerializer.CleanupData.Noop -> {
+    ArbiterScenario.CleanupData.Noop -> {
       // default
     }
 
-    is ArbiterProjectSerializer.CleanupData.Cleanup -> {
+    is ArbiterScenario.CleanupData.Cleanup -> {
       addInterceptor(object : ArbiterInitializerInterceptor {
         override fun intercept(
           device: ArbiterDevice,

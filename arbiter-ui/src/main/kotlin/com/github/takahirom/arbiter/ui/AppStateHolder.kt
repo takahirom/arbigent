@@ -3,9 +3,10 @@ package com.github.takahirom.arbiter.ui
 import com.github.takahirom.arbiter.ArbiterAi
 import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
 import com.github.takahirom.arbiter.ArbiterDevice
+import com.github.takahirom.arbiter.ArbiterProjectConfig
 import com.github.takahirom.arbiter.ArbiterProjectSerializer
+import com.github.takahirom.arbiter.ArbiterScenario
 import com.github.takahirom.arbiter.AvailableDevice
-import com.github.takahirom.arbiter.connectToDevice
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -23,9 +24,7 @@ import java.io.File
 class AppStateHolder(
   val aiFactory: () -> ArbiterAi,
   val deviceFactory: (AvailableDevice) -> ArbiterDevice = { avaiableDevice ->
-    connectToDevice(
-      availableDevice = avaiableDevice
-    )
+    avaiableDevice.connectToDevice()
   }
 ) {
   val devicesStateHolder = DevicesStateHolder()
@@ -79,7 +78,7 @@ class AppStateHolder(
       ai = aiFactory()
     ).apply {
       dependencyScenarioStateHolderStateFlow.value = parent
-      initializeMethodsStateFlow.value = ArbiterProjectSerializer.InitializeMethods.Noop
+      initializeMethodsStateFlow.value = ArbiterScenario.InitializeMethods.Noop
     }
     allScenarioStateHoldersStateFlow.value += scenarioStateHolder
     selectedAgentIndex.value =
@@ -124,9 +123,9 @@ class AppStateHolder(
   private suspend fun executeWithDependencies(scenarioStateHolder: ArbiterScenarioStateHolder) {
     val allScenarios = allScenarioStateHoldersStateFlow.value
       .map { it.createArbiterScenario() }
-    val projectConfig = ArbiterProjectSerializer.ArbiterProjectConfig(allScenarios)
+    val projectConfig = ArbiterProjectConfig(allScenarios)
     scenarioStateHolder.onExecute(arbiterExecutorScenario = projectConfig
-      .scenarioDependencyList(
+      .cerateExecutorScenario(
         scenario = scenarioStateHolder.createArbiterScenario(),
         aiFactory = aiFactory,
         deviceFactory = {
@@ -198,7 +197,7 @@ class AppStateHolder(
     }
     val sortedScenarios = sortedScenariosAndDepthsStateFlow.value.map { it.first }
     arbiterProjectSerializer.save(
-      ArbiterProjectSerializer.ArbiterProjectConfig(sortedScenarios.map {
+      ArbiterProjectConfig(sortedScenarios.map {
         it.createArbiterScenario()
       }
       ), file)

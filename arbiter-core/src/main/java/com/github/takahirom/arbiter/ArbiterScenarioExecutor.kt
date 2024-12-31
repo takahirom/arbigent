@@ -75,6 +75,8 @@ class ArbiterScenarioExecutor {
       started = SharingStarted.WhileSubscribed(),
       initialValue = false
     )
+  // isArchivedStateFlow is WhileSubscribed so we can't use it in waitUntilFinished
+  fun isArchived() = agentTaskToAgentStateFlow.value.all { it.second.isArchivedStateFlow.value }
   val isRunningStateFlow = agentTaskToAgentStateFlow.flatMapLatest { taskToAgents ->
     val flows: List<Flow<Boolean>> = taskToAgents.map { taskToAgent ->
       taskToAgent.second.isRunningStateFlow
@@ -168,7 +170,7 @@ class ArbiterScenarioExecutor {
   }
 }
 
-fun ArbiterScenarioExecutor(block: ArbiterScenarioExecutor.Builder.() -> Unit): ArbiterScenarioExecutor {
+fun ArbiterScenarioExecutor(block: ArbiterScenarioExecutor.Builder.() -> Unit = {}): ArbiterScenarioExecutor {
   val builder = ArbiterScenarioExecutor.Builder()
   builder.block()
   return builder.build()

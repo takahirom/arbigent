@@ -1,9 +1,21 @@
+import java.util.Properties
+
 plugins {
     id("org.jetbrains.kotlin.jvm") version "2.0.21"
+}
+val localProperties = Properties()
+if (rootProject.file("local.properties").exists()) {
+    localProperties.load(rootProject.file("local.properties").inputStream())
+}
+
+tasks.withType<Test> {
+    useJUnitPlatform()
+    this.systemProperty("OPENAI_API_KEY", localProperties.getProperty("OPENAI_API_KEY"))
 }
 
 dependencies {
     implementation(project(":arbiter-core"))
+    implementation(project(":arbiter-ai-openai"))
     testImplementation(kotlin("test"))
     // coroutine test
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.5.2")

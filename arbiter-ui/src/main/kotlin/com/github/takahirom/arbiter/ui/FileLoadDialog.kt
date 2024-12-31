@@ -2,6 +2,8 @@ package com.github.takahirom.arbiter.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.window.AwtWindow
+import com.google.protobuf.ExtensionLite
+import com.google.protobuf.extensionRangeOptions
 import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File

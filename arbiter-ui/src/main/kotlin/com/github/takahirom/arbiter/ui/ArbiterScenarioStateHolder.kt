@@ -2,12 +2,11 @@ package com.github.takahirom.arbiter.ui
 
 import androidx.compose.foundation.text.input.TextFieldState
 import com.github.takahirom.arbiter.ArbiterAi
-import com.github.takahirom.arbiter.ArbiterScenarioExecutor
 import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
 import com.github.takahirom.arbiter.ArbiterDevice
+import com.github.takahirom.arbiter.ArbiterScenario
 import com.github.takahirom.arbiter.ArbiterScenarioDeviceFormFactor
-import com.github.takahirom.arbiter.ArbiterProjectSerializer
-import com.github.takahirom.arbiter.AgentConfigBuilder
+import com.github.takahirom.arbiter.ArbiterScenarioExecutor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,12 +24,12 @@ class ArbiterScenarioStateHolder(initialDevice: ArbiterDevice, private val ai: A
   val goal get() = goalState.text.toString()
   val maxRetryState: TextFieldState = TextFieldState("3")
   val maxTurnState: TextFieldState = TextFieldState("10")
-  val cleanupDataStateFlow: MutableStateFlow<ArbiterProjectSerializer.CleanupData> =
+  val cleanupDataStateFlow: MutableStateFlow<ArbiterScenario.CleanupData> =
     MutableStateFlow(
-      ArbiterProjectSerializer.CleanupData.Noop
+      ArbiterScenario.CleanupData.Noop
     )
-  val initializeMethodsStateFlow: MutableStateFlow<ArbiterProjectSerializer.InitializeMethods> =
-    MutableStateFlow(ArbiterProjectSerializer.InitializeMethods.Back)
+  val initializeMethodsStateFlow: MutableStateFlow<ArbiterScenario.InitializeMethods> =
+    MutableStateFlow(ArbiterScenario.InitializeMethods.Back)
   val deviceFormFactorStateFlow: MutableStateFlow<ArbiterScenarioDeviceFormFactor> =
     MutableStateFlow(ArbiterScenarioDeviceFormFactor.Mobile)
   val dependencyScenarioStateHolderStateFlow = MutableStateFlow<ArbiterScenarioStateHolder?>(null)
@@ -94,8 +93,8 @@ class ArbiterScenarioStateHolder(initialDevice: ArbiterDevice, private val ai: A
     deviceStateFlow.value = device
   }
 
-  fun createArbiterScenario(): ArbiterProjectSerializer.ArbiterScenario {
-    return ArbiterProjectSerializer.ArbiterScenario(
+  fun createArbiterScenario(): ArbiterScenario {
+    return ArbiterScenario(
       goal = goal,
       dependency = dependencyScenarioStateHolderStateFlow.value?.goal?.let { "goal:$it" },
       initializeMethods = initializeMethodsStateFlow.value,

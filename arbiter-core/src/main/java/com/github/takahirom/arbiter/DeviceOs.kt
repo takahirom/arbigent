@@ -25,21 +25,7 @@ sealed interface AvailableDevice {
   class Android(val dadb: Dadb) : AvailableDevice {
     override val deviceOs: DeviceOs = DeviceOs.Android
     override val name: String = dadb.toString()
-  }
-  class IOS(val device: SimctlList.Device) : AvailableDevice {
-    override val deviceOs: DeviceOs = DeviceOs.iOS
-    override val name: String = device.name
-  }
-}
-
-fun connectToDevice(
-  availableDevice: AvailableDevice
-): MaestroDevice {
-  val deviceType = availableDevice.deviceOs
-  return when (deviceType) {
-    DeviceOs.Android -> {
-      val dadb = (availableDevice as? AvailableDevice.Android)?.dadb
-        ?: throw IllegalStateException("No device selected")
+    override fun connectToDevice(): MaestroDevice {
       val driver = AndroidDriver(
         dadb,
       )
@@ -52,12 +38,13 @@ fun connectToDevice(
         dadb.close()
         throw e
       }
-      MaestroDevice(maestro)
+      return MaestroDevice(maestro)
     }
-
-    DeviceOs.iOS -> {
-      val device = (availableDevice as? AvailableDevice.IOS)?.device
-        ?: throw IllegalStateException("No device selected")
+  }
+  class IOS(val device: SimctlList.Device) : AvailableDevice {
+    override val deviceOs: DeviceOs = DeviceOs.iOS
+    override val name: String = device.name
+    override fun connectToDevice(): MaestroDevice {
       val port = 8080
       val host = "[::1]"
 
@@ -79,7 +66,7 @@ fun connectToDevice(
         client = xcTestDriverClient,
         getInstalledApps = { XCRunnerCLIUtils.listApps(device.udid) },
       )
-      MaestroDevice(
+      return MaestroDevice(
         Maestro.ios(
           IOSDriver(
             xcTestDevice
@@ -88,4 +75,5 @@ fun connectToDevice(
       )
     }
   }
+  fun connectToDevice(): ArbiterDevice
 }
