@@ -9,8 +9,21 @@ import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
 import java.io.File
 
-class ArbiterProjectSerializer {
+interface FileSystem {
+  fun readText(file: File): String {
+    return file.readText()
+  }
 
+  fun writeText(file: File, text: String) {
+    file.writeText(text)
+  }
+}
+
+var fileSystem: FileSystem = object : FileSystem {}
+
+class ArbiterProjectSerializer(
+  private val fileSystem: FileSystem = object : FileSystem {}
+) {
   @Serializable
   class ArbiterProjectConfig(
     val scenarios: List<ArbiterScenario>
@@ -136,11 +149,11 @@ class ArbiterProjectSerializer {
 
   fun save(projectConfig: ArbiterProjectConfig, file: File) {
     val jsonString = yaml.encodeToString(ArbiterProjectConfig.serializer(), projectConfig)
-    file.writeText(jsonString)
+    fileSystem.writeText(file, jsonString)
   }
 
   fun load(file: File): ArbiterProjectConfig {
-    val jsonString = file.readText()
+    val jsonString = fileSystem.readText(file)
     val projectConfig = yaml.decodeFromString(ArbiterProjectConfig.serializer(), jsonString)
     return projectConfig
   }
