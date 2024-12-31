@@ -1,15 +1,34 @@
 package com.github.takahirom.arbiter
 
-import com.github.takahirom.arbiter.ArbiterAgent.*
+import com.github.takahirom.arbiter.ArbiterAgent.ExecuteCommandsInput
+import com.github.takahirom.arbiter.ArbiterAgent.ExecuteCommandsOutput
+import com.github.takahirom.arbiter.ArbiterAgent.StepInput
+import com.github.takahirom.arbiter.ArbiterAgent.StepResult
 import io.grpc.StatusRuntimeException
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
 import maestro.MaestroException
 import maestro.orchestra.BackPressCommand
 import maestro.orchestra.ClearStateCommand
 import maestro.orchestra.LaunchAppCommand
 import maestro.orchestra.MaestroCommand
 import maestro.orchestra.TakeScreenshotCommand
+import maestro.orchestra.WaitForAnimationToEndCommand
 import kotlin.time.Duration.Companion.milliseconds
 
 class ArbiterAgent(
@@ -27,7 +46,10 @@ class ArbiterAgent(
       { input: ArbiterAi.DecisionInput -> ai.decideWhatToDo(input) },
       { interceptor, acc ->
         { input ->
-          interceptor.intercept(input) { decisionInput -> acc(decisionInput) }
+          interceptor.intercept(
+            decisionInput = input,
+            chain = { decisionInput -> acc(decisionInput) }
+          )
         }
       }
     )
@@ -45,7 +67,9 @@ class ArbiterAgent(
   private val initializerInterceptors: List<ArbiterInitializerInterceptor> = interceptors
     .filterIsInstance<ArbiterInitializerInterceptor>()
   private val initializerChain: (ArbiterDevice) -> Unit = initializerInterceptors.foldRight(
-    { device: ArbiterDevice -> initialize(device) },
+    { device: ArbiterDevice ->
+      // do nothing
+    },
     { interceptor, acc ->
       { device ->
         interceptor.intercept(device) { device -> acc(device) }
@@ -204,10 +228,11 @@ class AgentConfig(
     private val interceptors = mutableListOf<ArbiterInterceptor>()
     private var device: ArbiterDevice? = null
     private var ai: ArbiterAi? = null
-    private var deviceFormFactor: ArbiterScenarioDeviceFormFactor = ArbiterScenarioDeviceFormFactor.Mobile
+    private var deviceFormFactor: ArbiterScenarioDeviceFormFactor =
+      ArbiterScenarioDeviceFormFactor.Mobile
 
     fun addInterceptor(interceptor: ArbiterInterceptor) {
-      interceptors.add(interceptor)
+      interceptors.add(0, interceptor)
     }
 
     fun device(device: ArbiterDevice) {
@@ -264,18 +289,30 @@ fun AgentConfigBuilder(
   deviceFormFactor(deviceFormFactor)
   when (val method = initializeMethods) {
     ArbiterScenario.InitializeMethods.Back -> {
-      // default
-    }
-
-    ArbiterScenario.InitializeMethods.Noop -> {
       addInterceptor(object : ArbiterInitializerInterceptor {
         override fun intercept(
           device: ArbiterDevice,
           chain: ArbiterInitializerInterceptor.Chain
         ) {
-          // do nothing
+          repeat(10) {
+            try {
+              device.executeCommands(
+                commands = listOf(
+                  MaestroCommand(
+                    backPressCommand = BackPressCommand()
+                  )
+                ),
+              )
+            } catch (e: Exception) {
+              println("Failed to back press: $e")
+            }
+          }
+          chain.proceed(device)
         }
       })
+    }
+
+    ArbiterScenario.InitializeMethods.Noop -> {
     }
 
     is ArbiterScenario.InitializeMethods.OpenApp -> {
@@ -293,13 +330,22 @@ fun AgentConfigBuilder(
               )
             )
           )
+          device.executeCommands(
+            listOf(
+              MaestroCommand(
+                waitForAnimationToEndCommand = WaitForAnimationToEndCommand(
+                  timeout = 100
+                )
+              )
+            )
+          )
+          chain.proceed(device)
         }
       })
     }
   }
   when (val cleanupData = cleanupData) {
     ArbiterScenario.CleanupData.Noop -> {
-      // default
     }
 
     is ArbiterScenario.CleanupData.Cleanup -> {
@@ -381,23 +427,6 @@ fun defaultAgentCommandTypesForTv(): List<AgentCommandType> {
   )
 }
 
-private fun initialize(device: ArbiterDevice) {
-  repeat(10) {
-    try {
-      device.executeCommands(
-        commands = listOf(
-          MaestroCommand(
-            backPressCommand = BackPressCommand()
-          )
-        ),
-      )
-    } catch (e: Exception) {
-      println("Failed to back press: $e")
-    }
-  }
-}
-
-
 private fun executeCommands(
   executeCommandsInput: ExecuteCommandsInput,
 ): ExecuteCommandsOutput {
@@ -456,7 +485,7 @@ private fun step(
   val decisionInput = ArbiterAi.DecisionInput(
     arbiterContextHolder = arbiterContextHolder,
     dumpHierarchy = device.viewTreeString(),
-    focusedTreeString = if(deviceFormFactor.isTv()){
+    focusedTreeString = if (deviceFormFactor.isTv()) {
       // It is important to get focused tree string for TV form factor
       device.focusedTreeString()
     } else {

@@ -42,19 +42,6 @@ class ArbiterProjectConfig(
       nodeScenario.goalDependency?.let { dependency ->
         val dependencyScenario = scenarios.first { it.goal == dependency }
         dfs(dependencyScenario)
-        result.add(
-          ArbiterScenarioExecutor.ArbiterAgentTask(
-            goal = dependencyScenario.goal,
-            agentConfig = AgentConfigBuilder(
-              deviceFormFactor = dependencyScenario.deviceFormFactor,
-              initializeMethods = dependencyScenario.initializeMethods,
-              cleanupData = dependencyScenario.cleanupData
-            ).apply {
-              ai(aiFactory())
-              device(deviceFactory())
-            }.build(),
-          )
-        )
       }
       result.add(
         ArbiterScenarioExecutor.ArbiterAgentTask(
@@ -84,7 +71,7 @@ class ArbiterProjectConfig(
 @Serializable
 class ArbiterScenario(
   val goal: String,
-  val dependency: String?,
+  private val dependency: String?,
   val initializeMethods: InitializeMethods,
   val maxRetry: Int = 3,
   val maxStep: Int = 10,

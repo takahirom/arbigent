@@ -19,7 +19,7 @@ class RealArbiterTest {
     ArbiterCorotuinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
 
     val project: ArbiterProjectConfig = ArbiterProjectSerializer().load(
-      this::class.java.getResourceAsStream("/projects/nowinandroidsample.toml")
+      this::class.java.getResourceAsStream("/projects/nowinandroidsample.yaml")
     )
     project.scenarios.forEach { scenario ->
       val executorScenario = project.cerateExecutorScenario(

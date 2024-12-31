@@ -9,9 +9,9 @@ scenarios:
   deviceFormFactor: !<com.github.takahirom.arbiter.ArbiterScenarioDeviceFormFactor.Mobile> {}
   cleanupData: !<Cleanup>
     packageName: "com.google.samples.apps.nowinandroid"
-- goal: "Select an interesting topic and Complete the tutorial(optional) in now in\
-    \ android. Please goal if there is an article titile in \"For you\" tab. Don't\
-    \ click an artile. If you open browser please go back."
+- goal: "Select an interesting topic in now in android. Please goal when there are\
+    \ articles in \"For you\" tab. Don't click an artile. If you open browser please\
+    \ go back."
   dependency: "goal:Just see Now in Android app from app list. Goal is just to see\
     \ list of topics. Do not interact with the app"
   initializeMethods: !<Noop> {}
