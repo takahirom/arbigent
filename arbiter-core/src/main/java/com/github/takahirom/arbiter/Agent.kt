@@ -249,12 +249,18 @@ fun AgentConfig(block: AgentConfig.Builder.() -> Unit = {}): AgentConfig {
   return builder.build()
 }
 
+fun AgentConfigBuilder(block: AgentConfig.Builder.() -> Unit): AgentConfig.Builder {
+  val builder = AgentConfig.Builder()
+  builder.block()
+  return builder
+}
 
-fun agentConfigBuilder(
+
+fun AgentConfigBuilder(
   deviceFormFactor: ArbiterScenarioDeviceFormFactor,
   initializeMethods: ArbiterProjectSerializer.InitializeMethods,
   cleanupData: ArbiterProjectSerializer.CleanupData
-) = AgentConfig {
+) = AgentConfigBuilder {
   deviceFormFactor(deviceFormFactor)
   when (val method = initializeMethods) {
     ArbiterProjectSerializer.InitializeMethods.Back -> {
@@ -316,7 +322,7 @@ fun agentConfigBuilder(
       })
     }
   }
-}.toBuilder()
+}
 
 interface ArbiterInterceptor
 

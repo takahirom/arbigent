@@ -4,12 +4,10 @@ import androidx.compose.foundation.text.input.TextFieldState
 import com.github.takahirom.arbiter.ArbiterAi
 import com.github.takahirom.arbiter.ArbiterScenarioExecutor
 import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
-import com.github.takahirom.arbiter.ArbiterInitializerInterceptor
 import com.github.takahirom.arbiter.ArbiterDevice
 import com.github.takahirom.arbiter.ArbiterScenarioDeviceFormFactor
-import com.github.takahirom.arbiter.AgentConfig
 import com.github.takahirom.arbiter.ArbiterProjectSerializer
-import com.github.takahirom.arbiter.agentConfigBuilder
+import com.github.takahirom.arbiter.AgentConfigBuilder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,9 +16,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
-import maestro.orchestra.ClearStateCommand
-import maestro.orchestra.LaunchAppCommand
-import maestro.orchestra.MaestroCommand
 
 
 class ArbiterScenarioStateHolder(initialDevice: ArbiterDevice, private val ai: ArbiterAi) {
@@ -99,7 +94,7 @@ class ArbiterScenarioStateHolder(initialDevice: ArbiterDevice, private val ai: A
     deviceStateFlow.value = device
   }
 
-  fun createAgentConfig() = agentConfigBuilder(
+  fun createAgentConfig() = AgentConfigBuilder(
     deviceFormFactor = deviceFormFactorStateFlow.value,
     initializeMethods = initializeMethodsStateFlow.value,
     cleanupData = cleanupDataStateFlow.value

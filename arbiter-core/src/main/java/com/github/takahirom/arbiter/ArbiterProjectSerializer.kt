@@ -33,7 +33,7 @@ class ArbiterProjectSerializer {
           result.add(
             ArbiterScenarioExecutor.ArbiterAgentTask(
               goal = dependencyScenario.goal,
-              agentConfig = agentConfigBuilder(
+              agentConfig = AgentConfigBuilder(
                 deviceFormFactor = dependencyScenario.deviceFormFactor,
                 initializeMethods = dependencyScenario.initializeMethods,
                 cleanupData = dependencyScenario.cleanupData
@@ -47,7 +47,7 @@ class ArbiterProjectSerializer {
         result.add(
           ArbiterScenarioExecutor.ArbiterAgentTask(
             goal = nodeScenario.goal,
-            agentConfig = agentConfigBuilder(
+            agentConfig = AgentConfigBuilder(
               deviceFormFactor = nodeScenario.deviceFormFactor,
               initializeMethods = nodeScenario.initializeMethods,
               cleanupData = nodeScenario.cleanupData
