@@ -4,6 +4,7 @@ package com.github.takahirom.arbiter.ui
 import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
 import com.github.takahirom.arbiter.AvailableDevice
 import com.github.takahirom.arbiter.DeviceOs
+import com.github.takahirom.arbiter.arbiterDebugLog
 import dadb.Dadb
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -26,7 +27,7 @@ class DevicesStateHolder {
   }
 
   fun onSelectedDeviceChanged(device: AvailableDevice?) {
-    println("onSelectedDeviceChanged: $device")
+    arbiterDebugLog("onSelectedDeviceChanged: $device")
     _selectedDevice.value = device
   }
 

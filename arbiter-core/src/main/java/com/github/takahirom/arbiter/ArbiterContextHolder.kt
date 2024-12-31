@@ -15,6 +15,7 @@ class ArbiterContextHolder(
     val aiResponse: String? = null,
     val screenshotFileName: String
   ) {
+    val screenshotFilePath = "screenshots/$screenshotFileName.png"
     fun text(): String {
       return """
         memo: $memo

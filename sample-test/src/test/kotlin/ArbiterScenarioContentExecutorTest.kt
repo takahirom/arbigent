@@ -4,11 +4,10 @@ import com.github.takahirom.arbiter.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import maestro.orchestra.MaestroCommand
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class ArbiterScenarioExecutorTest {
+class ArbiterScenarioContentExecutorTest {
   @OptIn(ExperimentalStdlibApi::class)
   @Test
   fun tests() = runTest {
@@ -22,7 +21,7 @@ class ArbiterScenarioExecutorTest {
             device: ArbiterDevice,
             chain: ArbiterInitializerInterceptor.Chain
           ) {
-            println("intercept device: $device")
+            arbiterDebugLog("intercept device: $device")
             chain.proceed(device)
           }
         }
@@ -30,7 +29,7 @@ class ArbiterScenarioExecutorTest {
     }
     val arbiterScenarioExecutor = ArbiterScenarioExecutor {
     }
-    val arbiterExecutorScenario = ArbiterScenarioExecutor.ArbiterExecutorScenario(
+    val arbiterScenario = ArbiterScenario(
       listOf(
         ArbiterScenarioExecutor.ArbiterAgentTask("goal1", agentConfig),
         ArbiterScenarioExecutor.ArbiterAgentTask("goal2", agentConfig)
@@ -38,7 +37,7 @@ class ArbiterScenarioExecutorTest {
       maxStepCount = 10,
     )
     arbiterScenarioExecutor.executeAsync(
-      arbiterExecutorScenario
+      arbiterScenario
     )
     advanceUntilIdle()
   }
@@ -78,7 +77,7 @@ class ArbiterScenarioExecutorTest {
     }
     val arbiterScenarioExecutor = ArbiterScenarioExecutor {
     }
-    val arbiterExecutorScenario = ArbiterScenarioExecutor.ArbiterExecutorScenario(
+    val arbiterScenario = ArbiterScenario(
       listOf(
         ArbiterScenarioExecutor.ArbiterAgentTask("goal1", agentConfig),
         ArbiterScenarioExecutor.ArbiterAgentTask("goal2", agentConfig)
@@ -86,7 +85,7 @@ class ArbiterScenarioExecutorTest {
       maxStepCount = 10,
     )
     arbiterScenarioExecutor.executeAsync(
-      arbiterExecutorScenario
+      arbiterScenario
     )
     advanceUntilIdle()
     assertEquals(listOf(100, 200, 300, 400, 100, 200, 300, 400), order)

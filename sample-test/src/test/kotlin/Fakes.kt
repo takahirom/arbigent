@@ -6,24 +6,25 @@ import com.github.takahirom.arbiter.ArbiterContextHolder
 import com.github.takahirom.arbiter.ArbiterDevice
 import com.github.takahirom.arbiter.ClickWithTextAgentCommand
 import com.github.takahirom.arbiter.GoalAchievedAgentCommand
+import com.github.takahirom.arbiter.arbiterDebugLog
 import maestro.orchestra.MaestroCommand
 
 class FakeDevice : ArbiterDevice {
   override fun executeCommands(commands: List<MaestroCommand>) {
-    println("FakeDevice.executeCommands: $commands")
+    arbiterDebugLog("FakeDevice.executeCommands: $commands")
   }
 
   override fun focusedTreeString(): String {
-    println("FakeDevice.focusedTreeString")
+    arbiterDebugLog("FakeDevice.focusedTreeString")
     return "focusedTreeString"
   }
 
   override fun close() {
-    println("FakeDevice.close")
+    arbiterDebugLog("FakeDevice.close")
   }
 
   override fun viewTreeString(): String {
-    println("FakeDevice.viewTreeString")
+    arbiterDebugLog("FakeDevice.viewTreeString")
     return "viewTreeString"
   }
 }
@@ -44,7 +45,7 @@ class FakeAi : ArbiterAi {
   }
 
   override fun decideWhatToDo(decisionInput: ArbiterAi.DecisionInput): ArbiterAi.DecisionOutput {
-    println("FakeAi.decideWhatToDo")
+    arbiterDebugLog("FakeAi.decideWhatToDo")
     if (count == 0) {
       count++
       return createDecisionOutput()

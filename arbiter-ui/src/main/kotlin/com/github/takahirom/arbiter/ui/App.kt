@@ -35,8 +35,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.arbiter.DeviceOs
-import com.github.takahirom.arbiter.ui.AppStateHolder.DeviceConnectionState
-import com.github.takahirom.arbiter.ui.AppStateHolder.FileSelectionState
+import com.github.takahirom.arbiter.arbiterDebugLog
+import com.github.takahirom.arbiter.ui.ArbiterAppStateHolder.DeviceConnectionState
+import com.github.takahirom.arbiter.ui.ArbiterAppStateHolder.FileSelectionState
 import kotlinx.coroutines.launch
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.Orientation
@@ -57,7 +58,7 @@ import org.jetbrains.jewel.ui.theme.simpleListItemStyle
 
 @Composable
 fun App(
-  appStateHolder: AppStateHolder
+  appStateHolder: ArbiterAppStateHolder
 ) {
   Box(
     Modifier.fillMaxSize().background(JewelTheme.globalColors.panelBackground)
@@ -158,7 +159,7 @@ private fun LeftScenariosPanel(
   scenarioAndDepths: List<Pair<ArbiterScenarioStateHolder, Int>>,
   scenariosWidth: Dp,
   selectedScenarioIndex: Int,
-  appStateHolder: AppStateHolder
+  appStateHolder: ArbiterAppStateHolder
 ) {
   Box(
     Modifier
@@ -256,7 +257,7 @@ private fun LeftScenariosPanel(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ScenarioFileControls(appStateHolder: AppStateHolder) {
+fun ScenarioFileControls(appStateHolder: ArbiterAppStateHolder) {
   FlowRow {
     IconActionButton(
       key = AllIconsKeys.Actions.MenuSaveall,
@@ -279,7 +280,7 @@ fun ScenarioFileControls(appStateHolder: AppStateHolder) {
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
-fun ScenarioControls(appStateHolder: AppStateHolder) {
+fun ScenarioControls(appStateHolder: ArbiterAppStateHolder) {
   val coroutineScope = rememberCoroutineScope()
   FlowRow {
     val devicesStateHolder = appStateHolder.devicesStateHolder
@@ -304,7 +305,7 @@ fun ScenarioControls(appStateHolder: AppStateHolder) {
     }
     val selectedDevice by devicesStateHolder.selectedDevice.collectAsState()
     val items = devicesStateHolder.devices.collectAsState().value.map { it.name }
-    println("selectedDevice: $selectedDevice")
+    arbiterDebugLog("selectedDevice: $selectedDevice")
     ComboBox(
       modifier = Modifier.width(170.dp).padding(end = 2.dp),
       labelText = selectedDevice?.name ?: "Select device",

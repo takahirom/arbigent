@@ -35,7 +35,7 @@ import org.jetbrains.jewel.ui.painter.hints.Size
 
 @Composable
 fun BoxScope.LauncherScreen(
-  appStateHolder: AppStateHolder
+  appStateHolder: ArbiterAppStateHolder
 ) {
   val devicesStateHolder = appStateHolder.devicesStateHolder
   Column(

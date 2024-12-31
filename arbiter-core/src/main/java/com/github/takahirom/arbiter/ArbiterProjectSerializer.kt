@@ -21,55 +21,53 @@ interface FileSystem {
   }
 }
 
-var fileSystem: FileSystem = object : FileSystem {}
-
 @Serializable
-class ArbiterProjectConfig(
-  val scenarios: List<ArbiterScenario>
-) {
-  fun cerateExecutorScenario(
-    scenario: ArbiterScenario,
-    aiFactory: () -> ArbiterAi,
-    deviceFactory: () -> ArbiterDevice,
-  ): ArbiterScenarioExecutor.ArbiterExecutorScenario {
-    val visited = mutableSetOf<ArbiterScenario>()
-    val result = mutableListOf<ArbiterScenarioExecutor.ArbiterAgentTask>()
-    fun dfs(nodeScenario: ArbiterScenario) {
-      if (visited.contains(nodeScenario)) {
-        return
-      }
-      visited.add(nodeScenario)
-      nodeScenario.goalDependency?.let { dependency ->
-        val dependencyScenario = scenarios.first { it.goal == dependency }
-        dfs(dependencyScenario)
-      }
-      result.add(
-        ArbiterScenarioExecutor.ArbiterAgentTask(
-          goal = nodeScenario.goal,
-          agentConfig = AgentConfigBuilder(
-            deviceFormFactor = nodeScenario.deviceFormFactor,
-            initializeMethods = nodeScenario.initializeMethods,
-            cleanupData = nodeScenario.cleanupData
-          ).apply {
-            ai(aiFactory())
-            device(deviceFactory())
-          }.build(),
-        )
-      )
+class ArbiterProjectFileContent(
+  val scenarios: List<ArbiterScenarioContent>
+)
+
+fun List<ArbiterScenarioContent>.createArbiterScenario(
+  scenario: ArbiterScenarioContent,
+  aiFactory: () -> ArbiterAi,
+  deviceFactory: () -> ArbiterDevice,
+): ArbiterScenario {
+  val visited = mutableSetOf<ArbiterScenarioContent>()
+  val result = mutableListOf<ArbiterScenarioExecutor.ArbiterAgentTask>()
+  fun dfs(nodeScenario: ArbiterScenarioContent) {
+    if (visited.contains(nodeScenario)) {
+      return
     }
-    dfs(scenario)
-    println("executing:$result")
-    return ArbiterScenarioExecutor.ArbiterExecutorScenario(
-      arbiterAgentTasks = result,
-      maxRetry = scenario.maxRetry,
-      maxStepCount = scenario.maxStep,
-      deviceFormFactor = scenario.deviceFormFactor
+    visited.add(nodeScenario)
+    nodeScenario.goalDependency?.let { dependency ->
+      val dependencyScenario = first { it.goal == dependency }
+      dfs(dependencyScenario)
+    }
+    result.add(
+      ArbiterScenarioExecutor.ArbiterAgentTask(
+        goal = nodeScenario.goal,
+        agentConfig = AgentConfigBuilder(
+          deviceFormFactor = nodeScenario.deviceFormFactor,
+          initializeMethods = nodeScenario.initializeMethods,
+          cleanupData = nodeScenario.cleanupData
+        ).apply {
+          ai(aiFactory())
+          device(deviceFactory())
+        }.build(),
+      )
     )
   }
+  dfs(scenario)
+  arbiterDebugLog("executing:$result")
+  return ArbiterScenario(
+    arbiterAgentTasks = result,
+    maxRetry = scenario.maxRetry,
+    maxStepCount = scenario.maxStep,
+    deviceFormFactor = scenario.deviceFormFactor
+  )
 }
 
 @Serializable
-class ArbiterScenario(
+class ArbiterScenarioContent(
   val goal: String,
   private val dependency: String?,
   val initializeMethods: InitializeMethods,
@@ -122,10 +120,10 @@ class ArbiterProjectSerializer(
 ) {
 
   private val module = SerializersModule {
-    polymorphic(ArbiterScenario.InitializeMethods::class) {
-      subclass(ArbiterScenario.InitializeMethods.Back::class)
-      subclass(ArbiterScenario.InitializeMethods.Noop::class)
-      subclass(ArbiterScenario.InitializeMethods.OpenApp::class)
+    polymorphic(ArbiterScenarioContent.InitializeMethods::class) {
+      subclass(ArbiterScenarioContent.InitializeMethods.Back::class)
+      subclass(ArbiterScenarioContent.InitializeMethods.Noop::class)
+      subclass(ArbiterScenarioContent.InitializeMethods.OpenApp::class)
     }
   }
 
@@ -136,22 +134,22 @@ class ArbiterProjectSerializer(
     )
   )
 
-  fun save(projectConfig: ArbiterProjectConfig, file: File) {
+  fun save(projectConfig: ArbiterProjectFileContent, file: File) {
     save(projectConfig, file.outputStream())
   }
 
-  fun save(projectConfig: ArbiterProjectConfig, outputStream: OutputStream) {
-    val jsonString = yaml.encodeToString(ArbiterProjectConfig.serializer(), projectConfig)
+  fun save(projectConfig: ArbiterProjectFileContent, outputStream: OutputStream) {
+    val jsonString = yaml.encodeToString(ArbiterProjectFileContent.serializer(), projectConfig)
     fileSystem.writeText(outputStream, jsonString)
   }
 
-  fun load(file: File): ArbiterProjectConfig {
+  fun load(file: File): ArbiterProjectFileContent {
     return load(file.inputStream())
   }
 
-  fun load(inputStream: InputStream): ArbiterProjectConfig {
+  fun load(inputStream: InputStream): ArbiterProjectFileContent {
     val jsonString = fileSystem.readText(inputStream)
-    val projectConfig = yaml.decodeFromString(ArbiterProjectConfig.serializer(), jsonString)
+    val projectConfig = yaml.decodeFromString(ArbiterProjectFileContent.serializer(), jsonString)
     return projectConfig
   }
 }

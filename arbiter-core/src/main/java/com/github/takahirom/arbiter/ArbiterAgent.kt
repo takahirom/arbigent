@@ -95,6 +95,8 @@ class ArbiterAgent(
     arbiterContextHistoryStateFlow
       .map { it.lastOrNull() }
       .stateIn(coroutineScope, SharingStarted.WhileSubscribed(), null)
+  fun latestArbiterContext(): ArbiterContextHolder? = arbiterContextHistoryStateFlow.value.lastOrNull()
+
   private val arbiterContextHolderStateFlow: MutableStateFlow<ArbiterContextHolder?> =
     MutableStateFlow(null)
   private val _isRunningStateFlow: MutableStateFlow<Boolean> = MutableStateFlow(false)
@@ -143,12 +145,12 @@ class ArbiterAgent(
     maxStep: Int = 10,
     agentCommandTypes: List<AgentCommandType> = defaultAgentCommandTypes()
   ) {
-    println("Arbiter.execute agent.execute start $goal")
+    arbiterDebugLog("Arbiter.execute agent.execute start $goal")
     try {
       _isRunningStateFlow.value = true
       currentGoalStateFlow.value = goal
       val arbiterContextHolder = ArbiterContextHolder(goal)
-      println("Setting new ArbiterContextHolder: $arbiterContextHolder")
+      arbiterDebugLog("Setting new ArbiterContextHolder: $arbiterContextHolder")
       arbiterContextHolderStateFlow.value = arbiterContextHolder
       arbiterContextHistoryStateFlow.value += arbiterContextHolder
 
@@ -179,11 +181,11 @@ class ArbiterAgent(
       }
       _isRunningStateFlow.value = false
     } catch (e: Exception) {
-      println("Failed to run agent: $e")
+      arbiterDebugLog("Failed to run agent: $e")
       e.printStackTrace()
       _isRunningStateFlow.value = false
     } finally {
-      println("Arbiter.execute agent.execute end $goal")
+      arbiterDebugLog("Arbiter.execute agent.execute end $goal")
     }
   }
 
@@ -283,12 +285,12 @@ fun AgentConfigBuilder(block: AgentConfig.Builder.() -> Unit): AgentConfig.Build
 
 fun AgentConfigBuilder(
   deviceFormFactor: ArbiterScenarioDeviceFormFactor,
-  initializeMethods: ArbiterScenario.InitializeMethods,
-  cleanupData: ArbiterScenario.CleanupData
+  initializeMethods: ArbiterScenarioContent.InitializeMethods,
+  cleanupData: ArbiterScenarioContent.CleanupData
 ) = AgentConfigBuilder {
   deviceFormFactor(deviceFormFactor)
   when (val method = initializeMethods) {
-    ArbiterScenario.InitializeMethods.Back -> {
+    ArbiterScenarioContent.InitializeMethods.Back -> {
       addInterceptor(object : ArbiterInitializerInterceptor {
         override fun intercept(
           device: ArbiterDevice,
@@ -304,7 +306,7 @@ fun AgentConfigBuilder(
                 ),
               )
             } catch (e: Exception) {
-              println("Failed to back press: $e")
+              arbiterDebugLog("Failed to back press: $e")
             }
           }
           chain.proceed(device)
@@ -312,10 +314,10 @@ fun AgentConfigBuilder(
       })
     }
 
-    ArbiterScenario.InitializeMethods.Noop -> {
+    ArbiterScenarioContent.InitializeMethods.Noop -> {
     }
 
-    is ArbiterScenario.InitializeMethods.OpenApp -> {
+    is ArbiterScenarioContent.InitializeMethods.OpenApp -> {
       addInterceptor(object : ArbiterInitializerInterceptor {
         override fun intercept(
           device: ArbiterDevice,
@@ -345,10 +347,10 @@ fun AgentConfigBuilder(
     }
   }
   when (val cleanupData = cleanupData) {
-    ArbiterScenario.CleanupData.Noop -> {
+    ArbiterScenarioContent.CleanupData.Noop -> {
     }
 
-    is ArbiterScenario.CleanupData.Cleanup -> {
+    is ArbiterScenarioContent.CleanupData.Cleanup -> {
       addInterceptor(object : ArbiterInitializerInterceptor {
         override fun intercept(
           device: ArbiterDevice,
@@ -479,9 +481,9 @@ private fun step(
       ),
     )
   } catch (e: Exception) {
-    println("Failed to take screenshot: $e")
+    arbiterDebugLog("Failed to take screenshot: $e")
   }
-  println("Arbiter step(): ${arbiterContextHolder.prompt()}")
+  arbiterDebugLog("Arbiter step(): ${arbiterContextHolder.prompt()}")
   val decisionInput = ArbiterAi.DecisionInput(
     arbiterContextHolder = arbiterContextHolder,
     dumpHierarchy = device.viewTreeString(),
@@ -497,7 +499,7 @@ private fun step(
   val decisionOutput = decisionChain(decisionInput)
   arbiterContextHolder.addStep(decisionOutput.step)
   if (decisionOutput.agentCommands.size == 1 && decisionOutput.agentCommands.first() is GoalAchievedAgentCommand) {
-    println("Goal achieved")
+    arbiterDebugLog("Goal achieved")
     return StepResult.GoalAchieved
   }
   executeCommandChain(

@@ -88,7 +88,7 @@ $templates"""
     val json = Json { ignoreUnknownKeys = true }
     val responseObj = json.decodeFromString<ChatCompletionResponse>(response)
     val content = responseObj.choices.firstOrNull()?.message?.content ?: ""
-    println("OpenAI content: $content")
+    arbiterDebugLog("OpenAI content: $content")
     return try {
       val jsonElement = json.parseToJsonElement(content)
       val jsonObject = jsonElement.jsonObject
@@ -181,14 +181,14 @@ $templates"""
       )
     )
     val request = requestBuilder(requestBodyJson)
-    println(
+    arbiterDebugLog(
       "OpenAI request: ${
         messages.flatMap { it.content }.filter { it.type == "text" }.joinToString("\n")
       }"
     )
     val response = client.newCall(request).execute()
     val responseBody = response.body?.string() ?: ""
-    println("OpenAI response: $responseBody")
+    arbiterDebugLog("OpenAI response: $responseBody")
     return responseBody
   }
 

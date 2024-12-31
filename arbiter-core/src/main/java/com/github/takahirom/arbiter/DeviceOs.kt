@@ -14,6 +14,7 @@ import xcuitest.installer.LocalXCTestInstaller
 enum class DeviceOs {
   Android,
   iOS;
+
   fun isAndroid() = this == Android
   fun isIOS() = this == iOS
 }
@@ -21,11 +22,12 @@ enum class DeviceOs {
 sealed interface AvailableDevice {
   val deviceOs: DeviceOs
   val name: String
+
   // Do not use data class because dadb return true for equals
   class Android(val dadb: Dadb) : AvailableDevice {
     override val deviceOs: DeviceOs = DeviceOs.Android
     override val name: String = dadb.toString()
-    override fun connectToDevice(): MaestroDevice {
+    override fun connectToDevice(): ArbiterDevice {
       val driver = AndroidDriver(
         dadb,
       )
@@ -41,10 +43,11 @@ sealed interface AvailableDevice {
       return MaestroDevice(maestro)
     }
   }
+
   class IOS(val device: SimctlList.Device) : AvailableDevice {
     override val deviceOs: DeviceOs = DeviceOs.iOS
     override val name: String = device.name
-    override fun connectToDevice(): MaestroDevice {
+    override fun connectToDevice(): ArbiterDevice {
       val port = 8080
       val host = "[::1]"
 
@@ -75,5 +78,6 @@ sealed interface AvailableDevice {
       )
     }
   }
+
   fun connectToDevice(): ArbiterDevice
 }

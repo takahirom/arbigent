@@ -17,7 +17,7 @@ import androidx.compose.ui.window.WindowExceptionHandler
 import androidx.compose.ui.window.WindowExceptionHandlerFactory
 import androidx.compose.ui.window.application
 import com.github.takahirom.arbiter.OpenAIAi
-import com.github.takahirom.arbiter.ui.AppStateHolder.FileSelectionState
+import com.github.takahirom.arbiter.ui.ArbiterAppStateHolder.FileSelectionState
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.intui.window.styling.lightWithLightHeader
 import org.jetbrains.jewel.ui.theme.colorPalette
@@ -29,7 +29,7 @@ import java.awt.Window
 
 fun main() = application {
   val appStateHolder = remember {
-    AppStateHolder(
+    ArbiterAppStateHolder(
       aiFactory = { OpenAIAi(Preference.openAiApiKey) },
     )
   }
@@ -45,7 +45,7 @@ fun main() = application {
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun AppWindow(
-  appStateHolder: AppStateHolder,
+  appStateHolder: ArbiterAppStateHolder,
   onExit: () -> Unit,
 ) {
   AppTheme {

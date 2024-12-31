@@ -100,7 +100,7 @@ class MaestroDevice(
       children.isNotEmpty()
         || (attributes.keys.any { it in meaningfulAttributes })
     if (!hasContent) {
-      println(
+      arbiterDebugLog(
         "Node has no content: $this viewHierarchy.isVisible(this):${
           viewHierarchy.isVisible(
             this
@@ -221,10 +221,10 @@ class MaestroDevice(
       meaningfulAttributes = meaningfulAttributes
     )
     val optimizedTree = result.node ?: result.promotedChildren.firstOrNull()
-    println("Before optimization (length): ${this.toString().length}")
-    println(this.toString())
+    arbiterDebugLog("Before optimization (length): ${this.toString().length}")
+    arbiterDebugLog(this.toString())
     val optimizedToString = optimizedTree?.optimizedToString(depth = 0)
-    println("After optimization (length): ${optimizedToString?.length}")
+    arbiterDebugLog("After optimization (length): ${optimizedToString?.length}")
     return optimizedToString ?: ""
   }
 

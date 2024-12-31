@@ -58,7 +58,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
 
   @OptIn(ExperimentalTestApi::class)
   private fun ComposeUiTest.setContent() {
-    val appStateHolder = AppStateHolder(
+    val appStateHolder = ArbiterAppStateHolder(
       aiFactory = { FakeAi() },
       deviceFactory = { FakeDevice() },
     )
@@ -273,21 +273,21 @@ class TestRobot(
 
 class FakeDevice : ArbiterDevice {
   override fun executeCommands(commands: List<MaestroCommand>) {
-    println("FakeDevice.executeCommands: $commands")
+    arbiterDebugLog("FakeDevice.executeCommands: $commands")
   }
 
   override fun focusedTreeString(): String {
-    println("FakeDevice.focusedTreeString")
+    arbiterDebugLog("FakeDevice.focusedTreeString")
     return "focusedTreeString"
   }
 
   override fun viewTreeString(): String {
-    println("FakeDevice.viewTreeString")
+    arbiterDebugLog("FakeDevice.viewTreeString")
     return "viewTreeString"
   }
 
   override fun close() {
-    println("FakeDevice.close")
+    arbiterDebugLog("FakeDevice.close")
   }
 }
 
@@ -307,7 +307,7 @@ class FakeAi : ArbiterAi {
   }
 
   override fun decideWhatToDo(decisionInput: ArbiterAi.DecisionInput): ArbiterAi.DecisionOutput {
-    println("FakeAi.decideWhatToDo")
+    arbiterDebugLog("FakeAi.decideWhatToDo")
     if (count == 0) {
       count++
       return createDecisionOutput()

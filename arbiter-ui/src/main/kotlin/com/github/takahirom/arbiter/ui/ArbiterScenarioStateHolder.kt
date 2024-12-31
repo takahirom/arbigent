@@ -5,6 +5,7 @@ import com.github.takahirom.arbiter.ArbiterAi
 import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
 import com.github.takahirom.arbiter.ArbiterDevice
 import com.github.takahirom.arbiter.ArbiterScenario
+import com.github.takahirom.arbiter.ArbiterScenarioContent
 import com.github.takahirom.arbiter.ArbiterScenarioDeviceFormFactor
 import com.github.takahirom.arbiter.ArbiterScenarioExecutor
 import kotlinx.coroutines.CoroutineScope
@@ -24,12 +25,12 @@ class ArbiterScenarioStateHolder(initialDevice: ArbiterDevice, private val ai: A
   val goal get() = goalState.text.toString()
   val maxRetryState: TextFieldState = TextFieldState("3")
   val maxTurnState: TextFieldState = TextFieldState("10")
-  val cleanupDataStateFlow: MutableStateFlow<ArbiterScenario.CleanupData> =
+  val cleanupDataStateFlow: MutableStateFlow<ArbiterScenarioContent.CleanupData> =
     MutableStateFlow(
-      ArbiterScenario.CleanupData.Noop
+      ArbiterScenarioContent.CleanupData.Noop
     )
-  val initializeMethodsStateFlow: MutableStateFlow<ArbiterScenario.InitializeMethods> =
-    MutableStateFlow(ArbiterScenario.InitializeMethods.Back)
+  val initializeMethodsStateFlow: MutableStateFlow<ArbiterScenarioContent.InitializeMethods> =
+    MutableStateFlow(ArbiterScenarioContent.InitializeMethods.Back)
   val deviceFormFactorStateFlow: MutableStateFlow<ArbiterScenarioDeviceFormFactor> =
     MutableStateFlow(ArbiterScenarioDeviceFormFactor.Mobile)
   val dependencyScenarioStateHolderStateFlow = MutableStateFlow<ArbiterScenarioStateHolder?>(null)
@@ -61,13 +62,13 @@ class ArbiterScenarioStateHolder(initialDevice: ArbiterDevice, private val ai: A
         initialValue = null
       )
 
-  suspend fun onExecute(arbiterExecutorScenario: ArbiterScenarioExecutor.ArbiterExecutorScenario) {
+  suspend fun onExecute(arbiterScenario: ArbiterScenario) {
     arbiterScenarioExecutorStateFlow.value?.cancel()
     val arbiterScenarioExecutor = ArbiterScenarioExecutor {
     }
     arbiterScenarioExecutorStateFlow.value = arbiterScenarioExecutor
     arbiterScenarioExecutorStateFlow.value!!.execute(
-      arbiterExecutorScenario,
+      arbiterScenario,
     )
   }
 
@@ -93,8 +94,8 @@ class ArbiterScenarioStateHolder(initialDevice: ArbiterDevice, private val ai: A
     deviceStateFlow.value = device
   }
 
-  fun createArbiterScenario(): ArbiterScenario {
-    return ArbiterScenario(
+  fun createArbiterScenarioContent(): ArbiterScenarioContent {
+    return ArbiterScenarioContent(
       goal = goal,
       dependency = dependencyScenarioStateHolderStateFlow.value?.goal?.let { "goal:$it" },
       initializeMethods = initializeMethodsStateFlow.value,

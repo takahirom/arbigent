@@ -8,17 +8,17 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 
-class ArbiterProjectTest {
+class ArbiterProjectFileContentTest {
   @OptIn(ExperimentalStdlibApi::class)
   @Test
   fun tests() = runTest {
     ArbiterCorotuinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
 
-    val projectConfig: ArbiterProjectConfig = ArbiterProjectSerializer().load(
+    val projectConfig: ArbiterProjectFileContent = ArbiterProjectSerializer().load(
       this::class.java.getResourceAsStream("/projects/nowinandroidsample.yaml")
     )
     projectConfig.scenarios.forEach { scenario ->
-      val executorScenario = projectConfig.cerateExecutorScenario(
+      val executorScenario = projectConfig.createArbiterScenario(
         scenario = scenario,
         aiFactory = { FakeAi() },
         deviceFactory = { FakeDevice() }
@@ -26,7 +26,7 @@ class ArbiterProjectTest {
       val executor = ArbiterScenarioExecutor()
       executor.execute(executorScenario)
       assertTrue {
-        executor.isArchived()
+        executor.isGoalArchived()
       }
     }
   }
@@ -37,14 +37,14 @@ class ArbiterProjectTest {
       this::class.java.getResourceAsStream("/projects/nowinandroidsample.yaml")
     )
     assertEquals(2, project.scenarios.size)
-    val firstTask = project.cerateExecutorScenario(
+    val firstTask = project.createArbiterScenario(
       scenario = project.scenarios[0],
       aiFactory = { FakeAi() },
       deviceFactory = { FakeDevice() }
     ).arbiterAgentTasks
     assertEquals(1, firstTask.size)
 
-    val secondTask = project.cerateExecutorScenario(
+    val secondTask = project.createArbiterScenario(
       scenario = project.scenarios[1],
       aiFactory = { FakeAi() },
       deviceFactory = { FakeDevice() }

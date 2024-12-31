@@ -37,7 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.github.takahirom.arbiter.ArbiterAgent
 import com.github.takahirom.arbiter.ArbiterContextHolder
-import com.github.takahirom.arbiter.ArbiterScenario
+import com.github.takahirom.arbiter.ArbiterScenarioContent
 import com.github.takahirom.arbiter.ArbiterScenarioDeviceFormFactor
 import com.github.takahirom.arbiter.ArbiterScenarioExecutor
 import com.github.takahirom.arbiter.GoalAchievedAgentCommand
@@ -186,7 +186,7 @@ fun Scenario(
     Column(Modifier.weight(1f).padding(top = 8.dp)) {
       GroupHeader("AI Agent Logs")
       if (arbiterScenarioExecutor != null) {
-        val taskToAgents: List<Pair<ArbiterScenarioExecutor.ArbiterAgentTask, ArbiterAgent>> by arbiterScenarioExecutor!!.agentTaskToAgentStateFlow.collectAsState()
+        val taskToAgents: List<Pair<ArbiterScenarioExecutor.ArbiterAgentTask, ArbiterAgent>> by arbiterScenarioExecutor!!.agentTaskToAgentsStateFlow.collectAsState()
         if (!taskToAgents.isEmpty()) {
           ContentPanel(taskToAgents)
         }
@@ -229,7 +229,8 @@ private fun ScenarioOptions(
           text = "Mobile",
           selected = inputCommandType.isMobile(),
           onClick = {
-            scenarioStateHolder.deviceFormFactorStateFlow.value = ArbiterScenarioDeviceFormFactor.Mobile
+            scenarioStateHolder.deviceFormFactorStateFlow.value =
+              ArbiterScenarioDeviceFormFactor.Mobile
           }
         )
       }
@@ -253,12 +254,14 @@ private fun ScenarioOptions(
       GroupHeader("Initialize method")
       CheckboxRow(
         text = "Cleanup app data",
-        checked = cleanupData is ArbiterScenario.CleanupData.Cleanup,
+        checked = cleanupData is ArbiterScenarioContent.CleanupData.Cleanup,
         onCheckedChange = {
           scenarioStateHolder.cleanupDataStateFlow.value = if (it) {
-            ArbiterScenario.CleanupData.Cleanup((cleanupData as? ArbiterScenario.CleanupData.Cleanup)?.packageName ?: "")
+            ArbiterScenarioContent.CleanupData.Cleanup(
+              (cleanupData as? ArbiterScenarioContent.CleanupData.Cleanup)?.packageName ?: ""
+            )
           } else {
-            ArbiterScenario.CleanupData.Noop
+            ArbiterScenarioContent.CleanupData.Noop
           }
         }
       )
@@ -266,20 +269,21 @@ private fun ScenarioOptions(
         modifier = Modifier
           .padding(4.dp),
         placeholder = { Text("Package name") },
-        enabled = cleanupData is ArbiterScenario.CleanupData.Cleanup,
-        value = (cleanupData as? ArbiterScenario.CleanupData.Cleanup)?.packageName ?: "",
+        enabled = cleanupData is ArbiterScenarioContent.CleanupData.Cleanup,
+        value = (cleanupData as? ArbiterScenarioContent.CleanupData.Cleanup)?.packageName ?: "",
         onValueChange = {
-          scenarioStateHolder.cleanupDataStateFlow.value = ArbiterScenario.CleanupData.Cleanup(it)
+          scenarioStateHolder.cleanupDataStateFlow.value = ArbiterScenarioContent.CleanupData.Cleanup(it)
         },
       )
       Row(
         verticalAlignment = Alignment.CenterVertically
       ) {
         RadioButtonRow(
-          selected = initializeMethods == ArbiterScenario.InitializeMethods.Back,
+          selected = initializeMethods == ArbiterScenarioContent.InitializeMethods.Back,
           text = "Back",
           onClick = {
-            scenarioStateHolder.initializeMethodsStateFlow.value = ArbiterScenario.InitializeMethods.Back
+            scenarioStateHolder.initializeMethodsStateFlow.value =
+              ArbiterScenarioContent.InitializeMethods.Back
           }
         )
       }
@@ -288,9 +292,10 @@ private fun ScenarioOptions(
       ) {
         RadioButtonRow(
           text = "Do nothing",
-          selected = initializeMethods is ArbiterScenario.InitializeMethods.Noop,
+          selected = initializeMethods is ArbiterScenarioContent.InitializeMethods.Noop,
           onClick = {
-            scenarioStateHolder.initializeMethodsStateFlow.value = ArbiterScenario.InitializeMethods.Noop
+            scenarioStateHolder.initializeMethodsStateFlow.value =
+              ArbiterScenarioContent.InitializeMethods.Noop
           }
         )
       }
@@ -299,14 +304,14 @@ private fun ScenarioOptions(
       ) {
         var editingText by remember(initializeMethods) {
           mutableStateOf(
-            (initializeMethods as? ArbiterScenario.InitializeMethods.OpenApp)?.packageName ?: ""
+            (initializeMethods as? ArbiterScenarioContent.InitializeMethods.OpenApp)?.packageName ?: ""
           )
         }
         RadioButtonRow(
-          selected = initializeMethods is ArbiterScenario.InitializeMethods.OpenApp,
+          selected = initializeMethods is ArbiterScenarioContent.InitializeMethods.OpenApp,
           onClick = {
             scenarioStateHolder.initializeMethodsStateFlow.value =
-              ArbiterScenario.InitializeMethods.OpenApp(editingText)
+              ArbiterScenarioContent.InitializeMethods.OpenApp(editingText)
           }
         ) {
           Column {
@@ -314,12 +319,12 @@ private fun ScenarioOptions(
             TextField(
               modifier = Modifier
                 .padding(4.dp),
-              enabled = initializeMethods is ArbiterScenario.InitializeMethods.OpenApp,
+              enabled = initializeMethods is ArbiterScenarioContent.InitializeMethods.OpenApp,
               value = editingText,
               onValueChange = {
                 editingText = it
                 scenarioStateHolder.initializeMethodsStateFlow.value =
-                  ArbiterScenario.InitializeMethods.OpenApp(it)
+                  ArbiterScenarioContent.InitializeMethods.OpenApp(it)
               },
             )
           }
@@ -383,7 +388,7 @@ private fun ContentPanel(tasksToAgent: List<Pair<ArbiterScenarioExecutor.Arbiter
   Row(Modifier) {
     val lazyColumnState = rememberLazyListState()
     LaunchedEffect(lazyColumnState.layoutInfo.totalItemsCount) {
-      lazyColumnState.animateScrollToItem(maxOf(lazyColumnState.layoutInfo.totalItemsCount - 1,0))
+      lazyColumnState.animateScrollToItem(maxOf(lazyColumnState.layoutInfo.totalItemsCount - 1, 0))
     }
     val sections: List<ScenarioSection> = buildSections(tasksToAgent)
     LazyColumn(state = lazyColumnState, modifier = Modifier.weight(1.5f)) {
@@ -436,7 +441,7 @@ private fun ContentPanel(tasksToAgent: List<Pair<ArbiterScenarioExecutor.Arbiter
         }
       }
     }
-    selectedStep?.let { turn ->
+    selectedStep?.let { step ->
       val scrollableState = rememberScrollState()
       Column(
         Modifier
@@ -444,7 +449,7 @@ private fun ContentPanel(tasksToAgent: List<Pair<ArbiterScenarioExecutor.Arbiter
           .padding(8.dp)
           .verticalScroll(scrollableState),
       ) {
-        turn.aiRequest?.let { request: String ->
+        step.aiRequest?.let { request: String ->
           GroupHeader(
             modifier = Modifier.fillMaxWidth(),
             text = "AI Request"
@@ -456,7 +461,7 @@ private fun ContentPanel(tasksToAgent: List<Pair<ArbiterScenarioExecutor.Arbiter
             text = request
           )
         }
-        turn.aiResponse?.let { response: String ->
+        step.aiResponse?.let { response: String ->
           GroupHeader(
             modifier = Modifier.fillMaxWidth(),
             text = "AI Response"
@@ -469,21 +474,19 @@ private fun ContentPanel(tasksToAgent: List<Pair<ArbiterScenarioExecutor.Arbiter
           )
         }
       }
-      turn.screenshotFileName.let { name ->
-        Column(
-          Modifier
-            .fillMaxHeight()
-            .weight(1f)
-            .padding(8.dp),
-          verticalArrangement = Arrangement.Center,
-        ) {
-          val fileName = "screenshots/$name.png"
-          Image(
-            bitmap = loadImageBitmap(FileInputStream(fileName)),
-            contentDescription = "screenshot",
-          )
-          Text("Screenshot($fileName)")
-        }
+      Column(
+        Modifier
+          .fillMaxHeight()
+          .weight(1f)
+          .padding(8.dp),
+        verticalArrangement = Arrangement.Center,
+      ) {
+        val fileName = step.screenshotFilePath
+        Image(
+          bitmap = loadImageBitmap(FileInputStream(fileName)),
+          contentDescription = "screenshot",
+        )
+        Text("Screenshot($fileName)")
       }
     }
   }

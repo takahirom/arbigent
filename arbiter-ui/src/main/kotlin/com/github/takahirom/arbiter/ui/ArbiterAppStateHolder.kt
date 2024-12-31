@@ -3,10 +3,12 @@ package com.github.takahirom.arbiter.ui
 import com.github.takahirom.arbiter.ArbiterAi
 import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
 import com.github.takahirom.arbiter.ArbiterDevice
-import com.github.takahirom.arbiter.ArbiterProjectConfig
+import com.github.takahirom.arbiter.ArbiterProjectFileContent
 import com.github.takahirom.arbiter.ArbiterProjectSerializer
-import com.github.takahirom.arbiter.ArbiterScenario
+import com.github.takahirom.arbiter.ArbiterScenarioContent
 import com.github.takahirom.arbiter.AvailableDevice
+import com.github.takahirom.arbiter.arbiterDebugLog
+import com.github.takahirom.arbiter.createArbiterScenario
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -21,7 +23,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
 
-class AppStateHolder(
+class ArbiterAppStateHolder(
   val aiFactory: () -> ArbiterAi,
   val deviceFactory: (AvailableDevice) -> ArbiterDevice = { avaiableDevice ->
     avaiableDevice.connectToDevice()
@@ -60,7 +62,7 @@ class AppStateHolder(
       }
       .map {
         val result = sortedScenarioAndDepth(it.map { it.first })
-        println("sortedScenariosAndDepthsStateFlow: ${it.map { it.first.goal }} -> ${result.map { it.first.goal }}")
+        arbiterDebugLog("sortedScenariosAndDepthsStateFlow: ${it.map { it.first.goal }} -> ${result.map { it.first.goal }}")
         result
       }
       .stateIn(
@@ -78,7 +80,7 @@ class AppStateHolder(
       ai = aiFactory()
     ).apply {
       dependencyScenarioStateHolderStateFlow.value = parent
-      initializeMethodsStateFlow.value = ArbiterScenario.InitializeMethods.Noop
+      initializeMethodsStateFlow.value = ArbiterScenarioContent.InitializeMethods.Noop
     }
     allScenarioStateHoldersStateFlow.value += scenarioStateHolder
     selectedAgentIndex.value =
@@ -121,17 +123,17 @@ class AppStateHolder(
   }
 
   private suspend fun executeWithDependencies(scenarioStateHolder: ArbiterScenarioStateHolder) {
-    val allScenarios = allScenarioStateHoldersStateFlow.value
-      .map { it.createArbiterScenario() }
-    val projectConfig = ArbiterProjectConfig(allScenarios)
-    scenarioStateHolder.onExecute(arbiterExecutorScenario = projectConfig
-      .cerateExecutorScenario(
-        scenario = scenarioStateHolder.createArbiterScenario(),
-        aiFactory = aiFactory,
-        deviceFactory = {
-          deviceFactory(devicesStateHolder.selectedDevice.value!!)
-        }
-      ))
+    val arbiterScenarioStateHolders = allScenarioStateHoldersStateFlow.value
+    val allScenarios = arbiterScenarioStateHolders
+      .map { it.createArbiterScenarioContent() }
+    val arbiterScenario = allScenarios.createArbiterScenario(
+      scenario = scenarioStateHolder.createArbiterScenarioContent(),
+      aiFactory = aiFactory,
+      deviceFactory = {
+        deviceFactory(devicesStateHolder.selectedDevice.value!!)
+      }
+    )
+    scenarioStateHolder.onExecute(arbiterScenario = arbiterScenario)
   }
 
   private fun sortedScenarioAndDepth(allScenarios: List<ArbiterScenarioStateHolder>): List<Pair<ArbiterScenarioStateHolder, Int>> {
@@ -170,7 +172,7 @@ class AppStateHolder(
       dfs(it, 0)
     }
 
-    println("Sorted scenarios and depths: $result")
+    arbiterDebugLog("Sorted scenarios and depths: $result")
     return result
   }
 
@@ -197,10 +199,12 @@ class AppStateHolder(
     }
     val sortedScenarios = sortedScenariosAndDepthsStateFlow.value.map { it.first }
     arbiterProjectSerializer.save(
-      ArbiterProjectConfig(sortedScenarios.map {
-        it.createArbiterScenario()
-      }
-      ), file)
+      projectConfig = ArbiterProjectFileContent(
+        scenarios = sortedScenarios.map {
+          it.createArbiterScenarioContent()
+        }
+      ),
+      file = file)
   }
 
   fun loadGoals(file: File?) {
