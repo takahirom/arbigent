@@ -199,7 +199,7 @@ class ArbiterAppStateHolder(
     }
     val sortedScenarios = sortedScenariosAndDepthsStateFlow.value.map { it.first }
     arbiterProjectSerializer.save(
-      projectConfig = ArbiterProjectFileContent(
+      projectFileContent = ArbiterProjectFileContent(
         scenarios = sortedScenarios.map {
           it.createArbiterScenarioContent()
         }

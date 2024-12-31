@@ -14,11 +14,11 @@ class ArbiterProjectFileContentTest {
   fun tests() = runTest {
     ArbiterCorotuinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
 
-    val projectConfig: ArbiterProjectFileContent = ArbiterProjectSerializer().load(
+    val projectFileContent: ArbiterProjectFileContent = ArbiterProjectSerializer().load(
       this::class.java.getResourceAsStream("/projects/nowinandroidsample.yaml")
     )
-    projectConfig.scenarios.forEach { scenario ->
-      val executorScenario = projectConfig.createArbiterScenario(
+    projectFileContent.scenarios.forEach { scenario ->
+      val executorScenario = projectFileContent.createArbiterScenario(
         scenario = scenario,
         aiFactory = { FakeAi() },
         deviceFactory = { FakeDevice() }

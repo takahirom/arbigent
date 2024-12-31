@@ -134,12 +134,12 @@ class ArbiterProjectSerializer(
     )
   )
 
-  fun save(projectConfig: ArbiterProjectFileContent, file: File) {
-    save(projectConfig, file.outputStream())
+  fun save(projectFileContent: ArbiterProjectFileContent, file: File) {
+    save(projectFileContent, file.outputStream())
   }
 
-  fun save(projectConfig: ArbiterProjectFileContent, outputStream: OutputStream) {
-    val jsonString = yaml.encodeToString(ArbiterProjectFileContent.serializer(), projectConfig)
+  fun save(projectFileContent: ArbiterProjectFileContent, outputStream: OutputStream) {
+    val jsonString = yaml.encodeToString(ArbiterProjectFileContent.serializer(), projectFileContent)
     fileSystem.writeText(outputStream, jsonString)
   }
 
@@ -149,7 +149,7 @@ class ArbiterProjectSerializer(
 
   fun load(inputStream: InputStream): ArbiterProjectFileContent {
     val jsonString = fileSystem.readText(inputStream)
-    val projectConfig = yaml.decodeFromString(ArbiterProjectFileContent.serializer(), jsonString)
-    return projectConfig
+    val projectFileContent = yaml.decodeFromString(ArbiterProjectFileContent.serializer(), jsonString)
+    return projectFileContent
   }
 }
