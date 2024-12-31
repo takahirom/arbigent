@@ -94,15 +94,6 @@ class ArbiterScenarioStateHolder(initialDevice: ArbiterDevice, private val ai: A
     deviceStateFlow.value = device
   }
 
-  fun createAgentConfig() = AgentConfigBuilder(
-    deviceFormFactor = deviceFormFactorStateFlow.value,
-    initializeMethods = initializeMethodsStateFlow.value,
-    cleanupData = cleanupDataStateFlow.value
-  ).apply {
-    ai(ai)
-    device(device)
-  }.build()
-
   fun createArbiterScenario(): ArbiterProjectSerializer.ArbiterScenario {
     return ArbiterProjectSerializer.ArbiterScenario(
       goal = goal,
