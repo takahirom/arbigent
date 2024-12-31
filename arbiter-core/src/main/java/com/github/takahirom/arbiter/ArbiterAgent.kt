@@ -1,6 +1,6 @@
 package com.github.takahirom.arbiter
 
-import com.github.takahirom.arbiter.Agent.*
+import com.github.takahirom.arbiter.ArbiterAgent.*
 import io.grpc.StatusRuntimeException
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -12,7 +12,7 @@ import maestro.orchestra.MaestroCommand
 import maestro.orchestra.TakeScreenshotCommand
 import kotlin.time.Duration.Companion.milliseconds
 
-class Agent(
+class ArbiterAgent(
   agentConfig: AgentConfig
 ) {
   private val ai = agentConfig.ai

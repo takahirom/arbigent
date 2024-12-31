@@ -80,9 +80,9 @@ class Test {
       addInterceptor(
         object : ArbiterStepInterceptor {
           override fun intercept(
-            stepInput: Agent.StepInput,
+            stepInput: ArbiterAgent.StepInput,
             chain: ArbiterStepInterceptor.Chain
-          ): Agent.StepResult {
+          ): ArbiterAgent.StepResult {
             println("Arbiter ArbiterStepInterceptor test intercept stepInput start")
             val result = chain.proceed(stepInput)
             println("Arbiter ArbiterStepInterceptor test intercept stepInput end")
@@ -106,9 +106,9 @@ class Test {
       addInterceptor(
         object : ArbiterExecuteCommandsInterceptor {
           override fun intercept(
-            executeCommandsInput: Agent.ExecuteCommandsInput,
+            executeCommandsInput: ArbiterAgent.ExecuteCommandsInput,
             chain: ArbiterExecuteCommandsInterceptor.Chain
-          ): Agent.ExecuteCommandsOutput {
+          ): ArbiterAgent.ExecuteCommandsOutput {
             println("    intercept executeCommandsInput: $executeCommandsInput")
             val result = chain.proceed(executeCommandsInput)
             println("    intercept executeCommandsInput result: $result")

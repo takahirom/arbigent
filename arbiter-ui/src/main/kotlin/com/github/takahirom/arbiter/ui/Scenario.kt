@@ -35,7 +35,7 @@ import androidx.compose.ui.res.loadImageBitmap
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import com.github.takahirom.arbiter.Agent
+import com.github.takahirom.arbiter.ArbiterAgent
 import com.github.takahirom.arbiter.ArbiterScenarioExecutor
 import com.github.takahirom.arbiter.ArbiterContextHolder
 import com.github.takahirom.arbiter.ArbiterProjectSerializer
@@ -186,7 +186,7 @@ fun Scenario(
     Column(Modifier.weight(1f).padding(top = 8.dp)) {
       GroupHeader("AI Agent Logs")
       if (arbiterScenarioExecutor != null) {
-        val taskToAgents: List<Pair<ArbiterScenarioExecutor.ArbiterAgentTask, Agent>> by arbiterScenarioExecutor!!.agentTaskToAgentStateFlow.collectAsState()
+        val taskToAgents: List<Pair<ArbiterScenarioExecutor.ArbiterAgentTask, ArbiterAgent>> by arbiterScenarioExecutor!!.agentTaskToAgentStateFlow.collectAsState()
         if (!taskToAgents.isEmpty()) {
           ContentPanel(taskToAgents)
         }
@@ -361,7 +361,7 @@ data class ScenarioSection(val goal: String, val isRunning: Boolean, val turns: 
 data class TurnItem(val step: ArbiterContextHolder.Step)
 
 @Composable
-fun buildSections(tasksToAgent: List<Pair<ArbiterScenarioExecutor.ArbiterAgentTask, Agent>>): List<ScenarioSection> {
+fun buildSections(tasksToAgent: List<Pair<ArbiterScenarioExecutor.ArbiterAgentTask, ArbiterAgent>>): List<ScenarioSection> {
   val sections = mutableListOf<ScenarioSection>()
   for ((tasks, agent) in tasksToAgent) {
     val latestContext: ArbiterContextHolder? by agent.latestArbiterContextStateFlow.collectAsState()
@@ -378,7 +378,7 @@ fun buildSections(tasksToAgent: List<Pair<ArbiterScenarioExecutor.ArbiterAgentTa
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ContentPanel(tasksToAgent: List<Pair<ArbiterScenarioExecutor.ArbiterAgentTask, Agent>>) {
+private fun ContentPanel(tasksToAgent: List<Pair<ArbiterScenarioExecutor.ArbiterAgentTask, ArbiterAgent>>) {
   var selectedStep: ArbiterContextHolder.Step? by remember { mutableStateOf(null) }
   Row(Modifier) {
     val lazyColumnState = rememberLazyListState()

@@ -55,8 +55,8 @@ class ArbiterScenarioExecutor {
     val deviceFormFactor: ArbiterScenarioDeviceFormFactor = ArbiterScenarioDeviceFormFactor.Mobile,
   )
 
-  private val _taskToAgentStateFlow = MutableStateFlow<List<Pair<ArbiterAgentTask, Agent>>>(listOf())
-  val agentTaskToAgentStateFlow: StateFlow<List<Pair<ArbiterAgentTask, Agent>>> = _taskToAgentStateFlow.asStateFlow()
+  private val _taskToAgentStateFlow = MutableStateFlow<List<Pair<ArbiterAgentTask, ArbiterAgent>>>(listOf())
+  val agentTaskToAgentStateFlow: StateFlow<List<Pair<ArbiterAgentTask, ArbiterAgent>>> = _taskToAgentStateFlow.asStateFlow()
   private var executeJob: Job? = null
   private val coroutineScope =
     CoroutineScope(ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob())
@@ -116,7 +116,7 @@ class ArbiterScenarioExecutor {
           it.second.cancel()
         }
         _taskToAgentStateFlow.value = arbiterExecutorScenario.arbiterAgentTasks.map { task ->
-          task to Agent(task.agentConfig)
+          task to ArbiterAgent(task.agentConfig)
         }
         for ((index, taskAgent) in agentTaskToAgentStateFlow.value.withIndex()) {
           val (task, agent) = taskAgent
