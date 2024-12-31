@@ -1,5 +1,7 @@
 package com.github.takahirom.arbiter
 
+import com.charleskorn.kaml.Yaml
+import com.charleskorn.kaml.YamlConfiguration
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.modules.SerializersModule
@@ -10,9 +12,63 @@ import java.io.File
 class ArbiterProjectSerializer {
 
   @Serializable
-  class ProjectFile(
+  class ArbiterProjectConfig(
     val scenarios: List<ArbiterScenario>
-  )
+  ) {
+    fun scenarioDependencyList(
+      scenario: ArbiterScenario,
+      aiFactory: () -> ArbiterAi,
+      deviceFactory: () -> ArbiterDevice,
+    ): ArbiterScenarioExecutor.ArbiterExecutorScenario {
+      val visited = mutableSetOf<ArbiterScenario>()
+      val result = mutableListOf<ArbiterScenarioExecutor.ArbiterAgentTask>()
+      fun dfs(nodeScenario: ArbiterScenario) {
+        if (visited.contains(nodeScenario)) {
+          return
+        }
+        visited.add(nodeScenario)
+        nodeScenario.goalDependency?.let { dependency ->
+          val dependencyScenario = scenarios.first { it.goal == dependency }
+          dfs(dependencyScenario)
+          result.add(
+            ArbiterScenarioExecutor.ArbiterAgentTask(
+              goal = dependencyScenario.goal,
+              agentConfig = agentConfigBuilder(
+                deviceFormFactor = dependencyScenario.deviceFormFactor,
+                initializeMethods = dependencyScenario.initializeMethods,
+                cleanupData = dependencyScenario.cleanupData
+              ).apply {
+                ai(aiFactory())
+                device(deviceFactory())
+              }.build(),
+            )
+          )
+        }
+        result.add(
+          ArbiterScenarioExecutor.ArbiterAgentTask(
+            goal = nodeScenario.goal,
+            agentConfig = agentConfigBuilder(
+              deviceFormFactor = nodeScenario.deviceFormFactor,
+              initializeMethods = nodeScenario.initializeMethods,
+              cleanupData = nodeScenario.cleanupData
+            ).apply {
+              ai(aiFactory())
+              device(deviceFactory())
+            }.build(),
+          )
+        )
+      }
+      dfs(scenario)
+      println("executing:$result")
+      return ArbiterScenarioExecutor.ArbiterExecutorScenario(
+        arbiterAgentTasks = result,
+        maxRetry = scenario.maxRetry,
+        maxStepCount = scenario.maxStep,
+        deviceFormFactor = scenario.deviceFormFactor
+      )
+    }
+
+  }
 
   @Serializable
   sealed interface CleanupData {
@@ -47,7 +103,7 @@ class ArbiterProjectSerializer {
     val dependency: String?,
     val initializeMethods: InitializeMethods,
     val maxRetry: Int = 3,
-    val maxTurn: Int = 10,
+    val maxStep: Int = 10,
     val deviceFormFactor: ArbiterScenarioDeviceFormFactor = ArbiterScenarioDeviceFormFactor.Mobile,
     val cleanupData: CleanupData = CleanupData.Noop
   ) {
@@ -71,21 +127,21 @@ class ArbiterProjectSerializer {
     }
   }
 
-  private val yaml = com.charleskorn.kaml.Yaml(
-    module, com.charleskorn.kaml.YamlConfiguration(
+  private val yaml = Yaml(
+    serializersModule = module,
+    configuration = YamlConfiguration(
       strictMode = false
     )
   )
 
-  fun save(scenarios: List<ArbiterScenario>, file: File) {
-    val projectFile = ProjectFile(scenarios)
-    val jsonString = yaml.encodeToString(ProjectFile.serializer(), projectFile)
+  fun save(projectConfig: ArbiterProjectConfig, file: File) {
+    val jsonString = yaml.encodeToString(ArbiterProjectConfig.serializer(), projectConfig)
     file.writeText(jsonString)
   }
 
-  fun load(file: File): List<ArbiterScenario> {
+  fun load(file: File): ArbiterProjectConfig {
     val jsonString = file.readText()
-    val projectFile = yaml.decodeFromString(ProjectFile.serializer(), jsonString)
-    return projectFile.scenarios
+    val projectConfig = yaml.decodeFromString(ArbiterProjectConfig.serializer(), jsonString)
+    return projectConfig
   }
 }

@@ -6,6 +6,8 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import maestro.MaestroException
 import maestro.orchestra.BackPressCommand
+import maestro.orchestra.ClearStateCommand
+import maestro.orchestra.LaunchAppCommand
 import maestro.orchestra.MaestroCommand
 import maestro.orchestra.TakeScreenshotCommand
 import kotlin.time.Duration.Companion.milliseconds
@@ -229,6 +231,16 @@ class AgentConfig(
       )
     }
   }
+
+  fun toBuilder(): Builder {
+    val builder = Builder()
+    interceptors.forEach {
+      builder.addInterceptor(it)
+    }
+    builder.device(device)
+    builder.ai(ai)
+    return builder
+  }
 }
 
 fun AgentConfig(block: AgentConfig.Builder.() -> Unit = {}): AgentConfig {
@@ -236,6 +248,75 @@ fun AgentConfig(block: AgentConfig.Builder.() -> Unit = {}): AgentConfig {
   builder.block()
   return builder.build()
 }
+
+
+fun agentConfigBuilder(
+  deviceFormFactor: ArbiterScenarioDeviceFormFactor,
+  initializeMethods: ArbiterProjectSerializer.InitializeMethods,
+  cleanupData: ArbiterProjectSerializer.CleanupData
+) = AgentConfig {
+  deviceFormFactor(deviceFormFactor)
+  when (val method = initializeMethods) {
+    ArbiterProjectSerializer.InitializeMethods.Back -> {
+      // default
+    }
+
+    ArbiterProjectSerializer.InitializeMethods.Noop -> {
+      addInterceptor(object : ArbiterInitializerInterceptor {
+        override fun intercept(
+          device: ArbiterDevice,
+          chain: ArbiterInitializerInterceptor.Chain
+        ) {
+          // do nothing
+        }
+      })
+    }
+
+    is ArbiterProjectSerializer.InitializeMethods.OpenApp -> {
+      addInterceptor(object : ArbiterInitializerInterceptor {
+        override fun intercept(
+          device: ArbiterDevice,
+          chain: ArbiterInitializerInterceptor.Chain
+        ) {
+          device.executeCommands(
+            listOf(
+              MaestroCommand(
+                launchAppCommand = LaunchAppCommand(
+                  appId = method.packageName
+                )
+              )
+            )
+          )
+        }
+      })
+    }
+  }
+  when (val cleanupData = cleanupData) {
+    ArbiterProjectSerializer.CleanupData.Noop -> {
+      // default
+    }
+
+    is ArbiterProjectSerializer.CleanupData.Cleanup -> {
+      addInterceptor(object : ArbiterInitializerInterceptor {
+        override fun intercept(
+          device: ArbiterDevice,
+          chain: ArbiterInitializerInterceptor.Chain
+        ) {
+          device.executeCommands(
+            listOf(
+              MaestroCommand(
+                clearStateCommand = ClearStateCommand(
+                  appId = cleanupData.packageName
+                )
+              )
+            )
+          )
+          chain.proceed(device)
+        }
+      })
+    }
+  }
+}.toBuilder()
 
 interface ArbiterInterceptor
 

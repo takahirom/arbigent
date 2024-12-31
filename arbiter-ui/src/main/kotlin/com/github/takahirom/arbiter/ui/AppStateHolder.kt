@@ -5,6 +5,8 @@ import com.github.takahirom.arbiter.ArbiterScenarioExecutor
 import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
 import com.github.takahirom.arbiter.ArbiterDevice
 import com.github.takahirom.arbiter.ArbiterProjectSerializer
+import com.github.takahirom.arbiter.AvailableDevice
+import com.github.takahirom.arbiter.agentConfigBuilder
 import com.github.takahirom.arbiter.connectToDevice
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -22,9 +24,9 @@ import java.io.File
 
 class AppStateHolder(
   val aiFactory: () -> ArbiterAi,
-  val deviceFactory: (DevicesStateHolder) -> ArbiterDevice = { devicesStateHolder ->
+  val deviceFactory: (AvailableDevice) -> ArbiterDevice = { avaiableDevice ->
     connectToDevice(
-      availableDevice = devicesStateHolder.selectedDevice.value!!
+      availableDevice = avaiableDevice
     )
   }
 ) {
@@ -47,7 +49,8 @@ class AppStateHolder(
     MutableStateFlow(DeviceConnectionState.NotConnected)
   val fileSelectionState: MutableStateFlow<FileSelectionState> =
     MutableStateFlow(FileSelectionState.NotSelected)
-  private val allScenarioStateHoldersStateFlow: MutableStateFlow<List<ArbiterScenarioStateHolder>> = MutableStateFlow(listOf())
+  private val allScenarioStateHoldersStateFlow: MutableStateFlow<List<ArbiterScenarioStateHolder>> =
+    MutableStateFlow(listOf())
   val sortedScenariosAndDepthsStateFlow: StateFlow<List<Pair<ArbiterScenarioStateHolder, Int>>> =
     allScenarioStateHoldersStateFlow
       .flatMapLatest { scenarios: List<ArbiterScenarioStateHolder> ->
@@ -120,55 +123,35 @@ class AppStateHolder(
     }
   }
 
-  suspend fun executeWithDependencies(scenario: ArbiterScenarioStateHolder) {
-    scenario.onExecute(scenarioDependencyList(scenario))
-  }
-
-  private fun scenarioDependencyList(
-    scenarioStateHolder: ArbiterScenarioStateHolder,
-  ): ArbiterScenarioExecutor.ArbiterExecutorScenario {
-    val visited = mutableSetOf<ArbiterScenarioStateHolder>()
-    val result = mutableListOf<ArbiterScenarioExecutor.ArbiterAgentTask>()
-    fun dfs(nodeScenarioStateHolder: ArbiterScenarioStateHolder) {
-      if (visited.contains(nodeScenarioStateHolder)) {
-        return
-      }
-      visited.add(nodeScenarioStateHolder)
-      nodeScenarioStateHolder.dependencyScenarioStateHolderStateFlow.value?.let { dependency ->
-        allScenarioStateHoldersStateFlow.value.find { it == dependency }?.let {
-          dfs(it)
+  private suspend fun executeWithDependencies(scenarioStateHolder: ArbiterScenarioStateHolder) {
+    val allScenarios = allScenarioStateHoldersStateFlow.value
+      .map { it.createArbiterScenario() }
+    val projectConfig = ArbiterProjectSerializer.ArbiterProjectConfig(allScenarios)
+    scenarioStateHolder.onExecute(arbiterExecutorScenario = projectConfig
+      .scenarioDependencyList(
+        scenario = scenarioStateHolder.createArbiterScenario(),
+        aiFactory = aiFactory,
+        deviceFactory = {
+          deviceFactory(devicesStateHolder.selectedDevice.value!!)
         }
-      }
-      result.add(
-        ArbiterScenarioExecutor.ArbiterAgentTask(
-          goal = nodeScenarioStateHolder.goal,
-          agentConfig = nodeScenarioStateHolder.createAgentConfig(),
-        )
-      )
-    }
-    dfs(scenarioStateHolder)
-    println("executing:" + result)
-    return ArbiterScenarioExecutor.ArbiterExecutorScenario(
-      arbiterAgentTasks = result,
-      maxRetry = scenarioStateHolder.maxRetryState.text.toString().toIntOrNull() ?: 3,
-      maxStepCount = scenarioStateHolder.maxTurnState.text.toString().toIntOrNull() ?: 10,
-      deviceFormFactor = scenarioStateHolder.deviceFormFactorStateFlow.value
-    )
+      ))
   }
 
   private fun sortedScenarioAndDepth(allScenarios: List<ArbiterScenarioStateHolder>): List<Pair<ArbiterScenarioStateHolder, Int>> {
     // Build dependency map using goals as keys
-    val dependentMap = mutableMapOf<ArbiterScenarioStateHolder, MutableList<ArbiterScenarioStateHolder>>()
+    val dependentMap =
+      mutableMapOf<ArbiterScenarioStateHolder, MutableList<ArbiterScenarioStateHolder>>()
     val rootScenarios = mutableListOf<ArbiterScenarioStateHolder>()
 
     allScenarios.forEach { scenario ->
-      allScenarios.firstOrNull { it == scenario.dependencyScenarioStateHolderStateFlow.value }?.let {
-        if (it == scenario) {
-          rootScenarios.add(scenario)
-          return@forEach
-        }
-        dependentMap.getOrPut(it) { mutableListOf() }.add(scenario)
-      } ?: run {
+      allScenarios.firstOrNull { it == scenario.dependencyScenarioStateHolderStateFlow.value }
+        ?.let {
+          if (it == scenario) {
+            rootScenarios.add(scenario)
+            return@forEach
+          }
+          dependentMap.getOrPut(it) { mutableListOf() }.add(scenario)
+        } ?: run {
         rootScenarios.add(scenario)
       }
     }
@@ -216,24 +199,19 @@ class AppStateHolder(
       return
     }
     val sortedScenarios = sortedScenariosAndDepthsStateFlow.value.map { it.first }
-    arbiterProjectSerializer.save(sortedScenarios.map {
-      ArbiterProjectSerializer.ArbiterScenario(
-        goal = it.goal,
-        dependency = it.dependencyScenarioStateHolderStateFlow.value?.goal?.let { "goal:$it" },
-        initializeMethods = it.initializeMethodsStateFlow.value,
-        maxRetry = it.maxRetryState.text.toString().toIntOrNull() ?: 3,
-        maxTurn = it.maxTurnState.text.toString().toIntOrNull() ?: 10,
-        deviceFormFactor = it.deviceFormFactorStateFlow.value,
-        cleanupData = it.cleanupDataStateFlow.value
-      )
-    }, file)
+    arbiterProjectSerializer.save(
+      ArbiterProjectSerializer.ArbiterProjectConfig(sortedScenarios.map {
+        it.createArbiterScenario()
+      }
+      ), file)
   }
 
   fun loadGoals(file: File?) {
     if (file == null) {
       return
     }
-    val scenarioContents = arbiterProjectSerializer.load(file)
+    val project = arbiterProjectSerializer.load(file)
+    val scenarioContents = project.scenarios
     val arbiterScenarioStateHolders = scenarioContents.map { scenarioContent ->
       ArbiterScenarioStateHolder(
         (deviceConnectionState.value as DeviceConnectionState.Connected).device,
@@ -245,7 +223,7 @@ class AppStateHolder(
           replace(0, length, scenarioContent.maxRetry.toString())
         }
         maxTurnState.edit {
-          replace(0, length, scenarioContent.maxTurn.toString())
+          replace(0, length, scenarioContent.maxStep.toString())
         }
         deviceFormFactorStateFlow.value = scenarioContent.deviceFormFactor
         cleanupDataStateFlow.value = scenarioContent.cleanupData
@@ -264,13 +242,13 @@ class AppStateHolder(
 
   fun onClickConnect(devicesStateHolder: DevicesStateHolder) {
     val currentConnection = deviceConnectionState.value
-    if(currentConnection is DeviceConnectionState.Connected) {
+    if (currentConnection is DeviceConnectionState.Connected) {
       currentConnection.device.close()
     }
     if (devicesStateHolder.selectedDevice.value == null) {
       devicesStateHolder.onSelectedDeviceChanged(devicesStateHolder.devices.value.firstOrNull())
     }
-    val device = deviceFactory(devicesStateHolder)
+    val device = deviceFactory(devicesStateHolder.selectedDevice.value!!)
     deviceConnectionState.value = DeviceConnectionState.Connected(device)
 
     allScenarioStateHoldersStateFlow.value.forEach {
@@ -280,6 +258,7 @@ class AppStateHolder(
 
   fun removeScenario(scenario: ArbiterScenarioStateHolder) {
     scenario.arbiterScenarioExecutorStateFlow.value?.cancel()
-    allScenarioStateHoldersStateFlow.value = allScenarioStateHoldersStateFlow.value.filter { it != scenario }
+    allScenarioStateHoldersStateFlow.value =
+      allScenarioStateHoldersStateFlow.value.filter { it != scenario }
   }
 }

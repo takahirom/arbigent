@@ -9,6 +9,7 @@ import com.github.takahirom.arbiter.ArbiterDevice
 import com.github.takahirom.arbiter.ArbiterScenarioDeviceFormFactor
 import com.github.takahirom.arbiter.AgentConfig
 import com.github.takahirom.arbiter.ArbiterProjectSerializer
+import com.github.takahirom.arbiter.agentConfigBuilder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,8 +30,10 @@ class ArbiterScenarioStateHolder(initialDevice: ArbiterDevice, private val ai: A
   val goal get() = goalState.text.toString()
   val maxRetryState: TextFieldState = TextFieldState("3")
   val maxTurnState: TextFieldState = TextFieldState("10")
-  val cleanupDataStateFlow: MutableStateFlow<ArbiterProjectSerializer.CleanupData> = MutableStateFlow(
-    ArbiterProjectSerializer.CleanupData.Noop)
+  val cleanupDataStateFlow: MutableStateFlow<ArbiterProjectSerializer.CleanupData> =
+    MutableStateFlow(
+      ArbiterProjectSerializer.CleanupData.Noop
+    )
   val initializeMethodsStateFlow: MutableStateFlow<ArbiterProjectSerializer.InitializeMethods> =
     MutableStateFlow(ArbiterProjectSerializer.InitializeMethods.Back)
   val deviceFormFactorStateFlow: MutableStateFlow<ArbiterScenarioDeviceFormFactor> =
@@ -55,13 +58,14 @@ class ArbiterScenarioStateHolder(initialDevice: ArbiterDevice, private val ai: A
       initialValue = false
     )
 
-  val runningInfo: StateFlow<ArbiterScenarioExecutor.RunningInfo?> = arbiterScenarioExecutorStateFlow
-    .flatMapLatest { it?.runningInfoStateFlow ?: flowOf() }
-    .stateIn(
-      scope = coroutineScope,
-      started = SharingStarted.WhileSubscribed(),
-      initialValue = null
-    )
+  val runningInfo: StateFlow<ArbiterScenarioExecutor.RunningInfo?> =
+    arbiterScenarioExecutorStateFlow
+      .flatMapLatest { it?.runningInfoStateFlow ?: flowOf() }
+      .stateIn(
+        scope = coroutineScope,
+        started = SharingStarted.WhileSubscribed(),
+        initialValue = null
+      )
 
   suspend fun onExecute(arbiterExecutorScenario: ArbiterScenarioExecutor.ArbiterExecutorScenario) {
     arbiterScenarioExecutorStateFlow.value?.cancel()
@@ -95,60 +99,24 @@ class ArbiterScenarioStateHolder(initialDevice: ArbiterDevice, private val ai: A
     deviceStateFlow.value = device
   }
 
-  fun createAgentConfig() = AgentConfig {
+  fun createAgentConfig() = agentConfigBuilder(
+    deviceFormFactor = deviceFormFactorStateFlow.value,
+    initializeMethods = initializeMethodsStateFlow.value,
+    cleanupData = cleanupDataStateFlow.value
+  ).apply {
     ai(ai)
     device(device)
-    deviceFormFactor(deviceFormFactorStateFlow.value)
-    when (val method = initializeMethodsStateFlow.value) {
-      ArbiterProjectSerializer.InitializeMethods.Back -> {
-        // default
-      }
+  }.build()
 
-      ArbiterProjectSerializer.InitializeMethods.Noop -> {
-        addInterceptor(object : ArbiterInitializerInterceptor {
-          override fun intercept(device: ArbiterDevice, chain: ArbiterInitializerInterceptor.Chain) {
-            // do nothing
-          }
-        })
-      }
-
-      is ArbiterProjectSerializer.InitializeMethods.OpenApp -> {
-        addInterceptor(object : ArbiterInitializerInterceptor {
-          override fun intercept(device: ArbiterDevice, chain: ArbiterInitializerInterceptor.Chain) {
-            device.executeCommands(
-              listOf(
-                MaestroCommand(
-                  launchAppCommand = LaunchAppCommand(
-                    appId = method.packageName
-                  )
-                )
-              )
-            )
-          }
-        })
-      }
-    }
-    when (val cleanupData = cleanupDataStateFlow.value) {
-      ArbiterProjectSerializer.CleanupData.Noop -> {
-        // default
-      }
-
-      is ArbiterProjectSerializer.CleanupData.Cleanup -> {
-        addInterceptor(object : ArbiterInitializerInterceptor {
-          override fun intercept(device: ArbiterDevice, chain: ArbiterInitializerInterceptor.Chain) {
-            device.executeCommands(
-              listOf(
-                MaestroCommand(
-                  clearStateCommand = ClearStateCommand(
-                    appId = cleanupData.packageName
-                  )
-                )
-              )
-            )
-            chain.proceed(device)
-          }
-        })
-      }
-    }
+  fun createArbiterScenario(): ArbiterProjectSerializer.ArbiterScenario {
+    return ArbiterProjectSerializer.ArbiterScenario(
+      goal = goal,
+      dependency = dependencyScenarioStateHolderStateFlow.value?.goal?.let { "goal:$it" },
+      initializeMethods = initializeMethodsStateFlow.value,
+      maxRetry = maxRetryState.text.toString().toIntOrNull() ?: 3,
+      maxStep = maxTurnState.text.toString().toIntOrNull() ?: 10,
+      deviceFormFactor = deviceFormFactorStateFlow.value,
+      cleanupData = cleanupDataStateFlow.value
+    )
   }
 }
