@@ -1,6 +1,5 @@
 package com.github.takahirom.arbiter
 
-import com.google.gson.annotations.SerializedName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -49,7 +48,7 @@ class ArbiterScenarioExecutor {
     val agentConfig: AgentConfig,
   )
 
-  data class Scenario(
+  data class ArbiterExecutorScenario(
     val arbiterAgentTasks: List<ArbiterAgentTask>,
     val maxRetry: Int = 0,
     val maxStepCount: Int = 10,
@@ -97,26 +96,26 @@ class ArbiterScenarioExecutor {
   }
 
   fun executeAsync(
-    scenario: Scenario,
+    arbiterExecutorScenario: ArbiterExecutorScenario,
   ) {
     executeJob?.cancel()
     executeJob = coroutineScope.launch {
-      execute(scenario)
+      execute(arbiterExecutorScenario)
     }
   }
 
-  suspend fun execute(scenario: Scenario) {
+  suspend fun execute(arbiterExecutorScenario: ArbiterExecutorScenario) {
     println("Arbiter.execute start")
 
     var finishedSuccessfully = false
-    var retryRemain = scenario.maxRetry
+    var retryRemain = arbiterExecutorScenario.maxRetry
     try {
       do {
         yield()
         _taskToAgentStateFlow.value.forEach {
           it.second.cancel()
         }
-        _taskToAgentStateFlow.value = scenario.arbiterAgentTasks.map { task ->
+        _taskToAgentStateFlow.value = arbiterExecutorScenario.arbiterAgentTasks.map { task ->
           task to Agent(task.agentConfig)
         }
         for ((index, taskAgent) in agentTaskToAgentStateFlow.value.withIndex()) {
@@ -124,13 +123,13 @@ class ArbiterScenarioExecutor {
           _runningInfoStateFlow.value = RunningInfo(
             allTasks = agentTaskToAgentStateFlow.value.size,
             runningTasks = index + 1,
-            retriedTasks = scenario.maxRetry - retryRemain,
-            maxRetry = scenario.maxRetry,
+            retriedTasks = arbiterExecutorScenario.maxRetry - retryRemain,
+            maxRetry = arbiterExecutorScenario.maxRetry,
           )
           agent.execute(
             task.goal,
-            maxStep = scenario.maxStepCount,
-            agentCommandTypes = when(scenario.deviceFormFactor) {
+            maxStep = arbiterExecutorScenario.maxStepCount,
+            agentCommandTypes = when(arbiterExecutorScenario.deviceFormFactor) {
               is ArbiterScenarioDeviceFormFactor.Mobile -> defaultAgentCommandTypes()
               is ArbiterScenarioDeviceFormFactor.Tv -> defaultAgentCommandTypesForTv()
             }

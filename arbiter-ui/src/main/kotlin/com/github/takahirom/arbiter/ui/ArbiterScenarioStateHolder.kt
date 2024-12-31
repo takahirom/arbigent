@@ -89,13 +89,13 @@ class ArbiterScenarioStateHolder(initialDevice: ArbiterDevice, private val ai: A
       initialValue = null
     )
 
-  suspend fun onExecute(scenario: ArbiterScenarioExecutor.Scenario) {
+  suspend fun onExecute(arbiterExecutorScenario: ArbiterScenarioExecutor.ArbiterExecutorScenario) {
     arbiterStateFlow.value?.cancel()
     val arbiter = ArbiterScenarioExecutor {
     }
     arbiterStateFlow.value = arbiter
     arbiterStateFlow.value!!.execute(
-      scenario,
+      arbiterExecutorScenario,
     )
   }
 

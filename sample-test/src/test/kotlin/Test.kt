@@ -119,7 +119,7 @@ class Test {
     }
     val arbiter = ArbiterScenarioExecutor {
     }
-    val scenario = ArbiterScenarioExecutor.Scenario(
+    val arbiterExecutorScenario = ArbiterScenarioExecutor.ArbiterExecutorScenario(
       listOf(
         ArbiterScenarioExecutor.ArbiterAgentTask("goal1", agentConfig),
         ArbiterScenarioExecutor.ArbiterAgentTask("goal2", agentConfig)
@@ -127,7 +127,7 @@ class Test {
       maxStepCount = 10,
     )
     arbiter.executeAsync(
-      scenario
+      arbiterExecutorScenario
     )
     advanceUntilIdle()
   }

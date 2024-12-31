@@ -125,7 +125,7 @@ class AppStateHolder(
 
   fun scenarioDependencyList(
     scenario: ArbiterScenarioStateHolder,
-  ): ArbiterScenarioExecutor.Scenario {
+  ): ArbiterScenarioExecutor.ArbiterExecutorScenario {
     val visited = mutableSetOf<ArbiterScenarioStateHolder>()
     val result = mutableListOf<ArbiterScenarioExecutor.ArbiterAgentTask>()
     fun dfs(scenario: ArbiterScenarioStateHolder) {
@@ -147,7 +147,7 @@ class AppStateHolder(
     }
     dfs(scenario)
     println("executing:" + result)
-    return ArbiterScenarioExecutor.Scenario(
+    return ArbiterScenarioExecutor.ArbiterExecutorScenario(
       arbiterAgentTasks = result,
       maxRetry = scenario.maxRetryState.text.toString().toIntOrNull() ?: 3,
       maxStepCount = scenario.maxTurnState.text.toString().toIntOrNull() ?: 10,
@@ -209,20 +209,20 @@ class AppStateHolder(
     }
   }
 
-  private val scenarioSerializer = ScenarioSerializer()
+  private val arbiterProjectSerializer = ArbiterProjectSerializer()
   fun saveGoals(file: File?) {
     if (file == null) {
       return
     }
     val sortedScenarios = sortedScenariosAndDepthsStateFlow.value.map { it.first }
-    scenarioSerializer.save(sortedScenarios, file)
+    arbiterProjectSerializer.save(sortedScenarios, file)
   }
 
   fun loadGoals(file: File?) {
     if (file == null) {
       return
     }
-    val scenarioContents = scenarioSerializer.load(file)
+    val scenarioContents = arbiterProjectSerializer.load(file)
     val arbiterScenarioStateHolders = scenarioContents.map { scenarioContent ->
       ArbiterScenarioStateHolder(
         (deviceConnectionState.value as DeviceConnectionState.Connected).device,
@@ -242,7 +242,7 @@ class AppStateHolder(
     }
     scenarioContents.forEachIndexed { index, scenarioContent ->
       arbiterScenarioStateHolders[index].dependencyScenarioStateFlow.value =
-        arbiterScenarioStateHolders.firstOrNull { it.goal == scenarioContent.dependency }
+        arbiterScenarioStateHolders.firstOrNull { it.goal == scenarioContent.goalDependency }
     }
     scenariosStateFlow.value = arbiterScenarioStateHolders
   }

@@ -9,15 +9,15 @@ import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
 import java.io.File
 
-class ScenarioSerializer {
+class ArbiterProjectSerializer {
 
   @Serializable
-  class FileContent(
-    val scenarios: List<ScenarioContent>
+  class ProjectFile(
+    val scenarios: List<ArbiterScenario>
   )
 
   @Serializable
-  class ScenarioContent(
+  class ArbiterScenario(
     val goal: String,
     val dependency: String?,
     val initializeMethods: InitializeMethods,
@@ -25,7 +25,16 @@ class ScenarioSerializer {
     val maxTurn: Int = 10,
     val deviceFormFactor: ArbiterScenarioDeviceFormFactor = ArbiterScenarioDeviceFormFactor.Mobile,
     val cleanupData: CleanupData = CleanupData.Noop
-  )
+  ) {
+    val goalDependency get() = if(dependency?.contains(":") == true) {
+      if (dependency.startsWith("goal:")) {
+        dependency.split(":")[1]
+      } else {
+      }
+    } else {
+      dependency
+    }
+  }
 
   private val module = SerializersModule {
     polymorphic(InitializeMethods::class) {
@@ -42,10 +51,10 @@ class ScenarioSerializer {
   )
 
   fun save(scenarios: List<ArbiterScenarioStateHolder>, file: File) {
-    val fileContent = FileContent(scenarios.map {
-      ScenarioContent(
+    val projectFile = ProjectFile(scenarios.map {
+      ArbiterScenario(
         goal = it.goal,
-        dependency = it.dependencyScenarioStateFlow.value?.goal,
+        dependency = it.dependencyScenarioStateFlow.value?.goal?.let { "goal:$it" },
         initializeMethods = it.initializeMethodsStateFlow.value,
         maxRetry = it.maxRetryState.text.toString().toIntOrNull() ?: 3,
         maxTurn = it.maxTurnState.text.toString().toIntOrNull() ?: 10,
@@ -53,13 +62,13 @@ class ScenarioSerializer {
         cleanupData = it.cleanupDataStateFlow.value
       )
     })
-    val jsonString = yaml.encodeToString(FileContent.serializer(), fileContent)
+    val jsonString = yaml.encodeToString(ProjectFile.serializer(), projectFile)
     file.writeText(jsonString)
   }
 
-  fun load(file: File): List<ScenarioContent> {
+  fun load(file: File): List<ArbiterScenario> {
     val jsonString = file.readText()
-    val fileContent = yaml.decodeFromString(FileContent.serializer(), jsonString)
-    return fileContent.scenarios
+    val projectFile = yaml.decodeFromString(ProjectFile.serializer(), jsonString)
+    return projectFile.scenarios
   }
 }
