@@ -48,8 +48,8 @@ class ArbiterScenarioExecutor {
     val scenarioId: String,
     val goal: String,
     val agentConfig: AgentConfig,
-    val maxStep: Int,
-    val deviceFormFactor: ArbiterScenarioDeviceFormFactor
+    val maxStep: Int = 10,
+    val deviceFormFactor: ArbiterScenarioDeviceFormFactor = ArbiterScenarioDeviceFormFactor.Mobile,
   )
 
   private val _taskToAgentsStateFlow =

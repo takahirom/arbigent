@@ -15,17 +15,6 @@ class ArbiterScenarioContentExecutorTest {
     val agentConfig = AgentConfig {
       device(FakeDevice())
       ai(FakeAi())
-      addInterceptor(
-        object : ArbiterInitializerInterceptor {
-          override fun intercept(
-            device: ArbiterDevice,
-            chain: ArbiterInitializerInterceptor.Chain
-          ) {
-            arbiterDebugLog("intercept device: $device")
-            chain.proceed(device)
-          }
-        }
-      )
     }
     val arbiterScenarioExecutor = ArbiterScenarioExecutor {
     }
