@@ -8,7 +8,6 @@ import io.grpc.StatusRuntimeException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -19,9 +18,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.yield
 import maestro.MaestroException
 import maestro.orchestra.BackPressCommand
 import maestro.orchestra.ClearStateCommand
@@ -29,14 +25,13 @@ import maestro.orchestra.LaunchAppCommand
 import maestro.orchestra.MaestroCommand
 import maestro.orchestra.TakeScreenshotCommand
 import maestro.orchestra.WaitForAnimationToEndCommand
-import kotlin.time.Duration.Companion.milliseconds
 
 class ArbiterAgent(
   agentConfig: AgentConfig
 ) {
   private val ai = agentConfig.ai
   private val device = agentConfig.device
-  private val interceptors = agentConfig.interceptors
+  private val interceptors: List<ArbiterInterceptor> = agentConfig.interceptors
   private val deviceFormFactor = agentConfig.deviceFormFactor
 
   private val decisionInterceptors: List<ArbiterDecisionInterceptor> = interceptors
@@ -95,7 +90,9 @@ class ArbiterAgent(
     arbiterContextHistoryStateFlow
       .map { it.lastOrNull() }
       .stateIn(coroutineScope, SharingStarted.WhileSubscribed(), null)
-  fun latestArbiterContext(): ArbiterContextHolder? = arbiterContextHistoryStateFlow.value.lastOrNull()
+
+  fun latestArbiterContext(): ArbiterContextHolder? =
+    arbiterContextHistoryStateFlow.value.lastOrNull()
 
   private val arbiterContextHolderStateFlow: MutableStateFlow<ArbiterContextHolder?> =
     MutableStateFlow(null)
@@ -115,29 +112,17 @@ class ArbiterAgent(
     isRunningStateFlow.first { !it }
   }
 
-  fun executeAsync(
-    goal: String,
-    maxTurn: Int = 10,
-    maxRetry: Int = 1,
-    agentCommandTypes: List<AgentCommandType> = when (deviceFormFactor) {
-      ArbiterScenarioDeviceFormFactor.Mobile -> defaultAgentCommandTypes()
-      ArbiterScenarioDeviceFormFactor.Tv -> defaultAgentCommandTypesForTv()
-    }
+  suspend fun execute(
+    agentTask: ArbiterScenarioExecutor.ArbiterAgentTask
   ) {
-    job?.cancel()
-    job = coroutineScope.launch {
-      var remainRetry = maxRetry
-      do {
-        execute(goal, maxTurn, agentCommandTypes)
-        yield()
-        try {
-          withTimeout(100.milliseconds) {
-            isArchivedStateFlow.first { it }
-          }
-        } catch (e: TimeoutCancellationException) {
-        }
-      } while (isArchivedStateFlow.value.not() && remainRetry-- > 0)
-    }
+    execute(
+      goal = agentTask.goal,
+      maxStep = agentTask.maxStep,
+      agentCommandTypes = when (agentTask.deviceFormFactor) {
+        ArbiterScenarioDeviceFormFactor.Mobile -> defaultAgentCommandTypes()
+        ArbiterScenarioDeviceFormFactor.Tv -> defaultAgentCommandTypesForTv()
+      }
+    )
   }
 
   suspend fun execute(

@@ -48,11 +48,9 @@ class ArbiterScenarioExecutor {
     val scenarioId: String,
     val goal: String,
     val agentConfig: AgentConfig,
-  ) {
-    override fun toString(): String {
-      return "ArbiterAgentTask(goal='$goal', agentConfig=$agentConfig)"
-    }
-  }
+    val maxStep: Int,
+    val deviceFormFactor: ArbiterScenarioDeviceFormFactor
+  )
 
   private val _taskToAgentsStateFlow =
     MutableStateFlow<List<Pair<ArbiterAgentTask, ArbiterAgent>>>(listOf())
@@ -133,12 +131,7 @@ class ArbiterScenarioExecutor {
             maxRetry = arbiterScenario.maxRetry,
           )
           agent.execute(
-            goal = task.goal,
-            maxStep = arbiterScenario.maxStepCount,
-            agentCommandTypes = when (arbiterScenario.deviceFormFactor) {
-              is ArbiterScenarioDeviceFormFactor.Mobile -> defaultAgentCommandTypes()
-              is ArbiterScenarioDeviceFormFactor.Tv -> defaultAgentCommandTypesForTv()
-            }
+            agentTask = task,
           )
           if (!agent.isArchivedStateFlow.value) {
             arbiterDebugLog("Arbiter.execute break because agent is not archived")

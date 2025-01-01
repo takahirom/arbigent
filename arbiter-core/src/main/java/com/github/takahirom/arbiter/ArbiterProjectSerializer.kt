@@ -49,6 +49,8 @@ fun List<ArbiterScenarioContent>.createArbiterScenario(
       ArbiterScenarioExecutor.ArbiterAgentTask(
         scenarioId = nodeScenario.id,
         goal = nodeScenario.goal,
+        maxStep = nodeScenario.maxStep,
+        deviceFormFactor = nodeScenario.deviceFormFactor,
         agentConfig = AgentConfigBuilder(
           deviceFormFactor = nodeScenario.deviceFormFactor,
           initializeMethods = nodeScenario.initializeMethods,
