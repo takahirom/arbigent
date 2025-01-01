@@ -45,9 +45,14 @@ class ArbiterScenarioExecutor {
   }
 
   data class ArbiterAgentTask(
+    val scenarioId: String,
     val goal: String,
     val agentConfig: AgentConfig,
-  )
+  ) {
+    override fun toString(): String {
+      return "ArbiterAgentTask(goal='$goal', agentConfig=$agentConfig)"
+    }
+  }
 
   private val _taskToAgentsStateFlow =
     MutableStateFlow<List<Pair<ArbiterAgentTask, ArbiterAgent>>>(listOf())
@@ -116,7 +121,7 @@ class ArbiterScenarioExecutor {
         _taskToAgentsStateFlow.value.forEach {
           it.second.cancel()
         }
-        _taskToAgentsStateFlow.value = arbiterScenario.arbiterAgentTasks.map { task ->
+        _taskToAgentsStateFlow.value = arbiterScenario.agentTasks.map { task ->
           task to ArbiterAgent(task.agentConfig)
         }
         for ((index, taskAgent) in agentTaskToAgentsStateFlow.value.withIndex()) {

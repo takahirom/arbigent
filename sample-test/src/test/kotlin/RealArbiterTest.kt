@@ -9,7 +9,7 @@ import kotlin.test.Test
 import kotlin.time.Duration.Companion.minutes
 
 
-@Ignore("Currently this test is not working on CI")
+//@Ignore("Currently this test is not working on CI")
 class RealArbiterTest {
   private val scenarioFile = File(this::class.java.getResource("/projects/nowinandroidsample.yaml").toURI())
 

@@ -1,5 +1,6 @@
 scenarios:
-- goal: "Just see Now in Android app from app list. Goal is just to see list of topics.\
+- id: "7788d7f4-7276-4cb3-8e98-7d3ad1d1cd47"
+  goal: "Just see Now in Android app from app list. Goal is just to see list of topics.\
     \ Do not interact with the app"
   dependency: null
   initializeMethods: !<OpenApp>
@@ -9,11 +10,11 @@ scenarios:
   deviceFormFactor: !<com.github.takahirom.arbiter.ArbiterScenarioDeviceFormFactor.Mobile> {}
   cleanupData: !<Cleanup>
     packageName: "com.google.samples.apps.nowinandroid"
-- goal: "Select an interesting topic in now in android. Please goal when there are\
+- id: "f0ef0129-c764-443f-897d-fc4408e5952b"
+  goal: "Select an interesting topic in now in android. Please goal when there are\
     \ articles in \"For you\" tab. Don't click an artile. If you open browser please\
     \ go back."
-  dependency: "goal:Just see Now in Android app from app list. Goal is just to see\
-    \ list of topics. Do not interact with the app"
+  dependency: "7788d7f4-7276-4cb3-8e98-7d3ad1d1cd47"
   initializeMethods: !<Noop> {}
   maxRetry: 3
   maxStep: 10

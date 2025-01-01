@@ -17,9 +17,9 @@ class ArbiterProjectFileContentTest {
     val projectFileContent: ArbiterProjectFileContent = ArbiterProjectSerializer().load(
       this::class.java.getResourceAsStream("/projects/nowinandroidsample.yaml")
     )
-    projectFileContent.scenarios.forEach { scenario ->
-      val executorScenario = projectFileContent.createArbiterScenario(
-        scenario = scenario,
+    projectFileContent.scenarioContents.forEach { scenarioContent ->
+      val executorScenario = projectFileContent.scenarioContents.createArbiterScenario(
+        scenario = scenarioContent,
         aiFactory = { FakeAi() },
         deviceFactory = { FakeDevice() }
       )
@@ -36,19 +36,19 @@ class ArbiterProjectFileContentTest {
     val project = ArbiterProjectSerializer().load(
       this::class.java.getResourceAsStream("/projects/nowinandroidsample.yaml")
     )
-    assertEquals(2, project.scenarios.size)
-    val firstTask = project.createArbiterScenario(
-      scenario = project.scenarios[0],
+    assertEquals(2, project.scenarioContents.size)
+    val firstTask = project.scenarioContents.createArbiterScenario(
+      scenario = project.scenarioContents[0],
       aiFactory = { FakeAi() },
       deviceFactory = { FakeDevice() }
-    ).arbiterAgentTasks
+    ).agentTasks
     assertEquals(1, firstTask.size)
 
-    val secondTask = project.createArbiterScenario(
-      scenario = project.scenarios[1],
+    val secondTask = project.scenarioContents.createArbiterScenario(
+      scenario = project.scenarioContents[1],
       aiFactory = { FakeAi() },
       deviceFactory = { FakeDevice() }
-    ).arbiterAgentTasks
+    ).agentTasks
     assertEquals(2, secondTask.size)
   }
 }

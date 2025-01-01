@@ -10,6 +10,8 @@ import kotlinx.serialization.modules.subclass
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 interface FileSystem {
   fun readText(inputStream: InputStream): String {
@@ -23,7 +25,8 @@ interface FileSystem {
 
 @Serializable
 class ArbiterProjectFileContent(
-  val scenarios: List<ArbiterScenarioContent>
+  @SerialName("scenarios")
+  val scenarioContents: List<ArbiterScenarioContent>
 )
 
 fun List<ArbiterScenarioContent>.createArbiterScenario(
@@ -38,12 +41,13 @@ fun List<ArbiterScenarioContent>.createArbiterScenario(
       return
     }
     visited.add(nodeScenario)
-    nodeScenario.goalDependency?.let { dependency ->
-      val dependencyScenario = first { it.goal == dependency }
+    nodeScenario.dependencyId?.let { dependency ->
+      val dependencyScenario = first { it.id == dependency }
       dfs(dependencyScenario)
     }
     result.add(
       ArbiterScenarioExecutor.ArbiterAgentTask(
+        scenarioId = nodeScenario.id,
         goal = nodeScenario.goal,
         agentConfig = AgentConfigBuilder(
           deviceFormFactor = nodeScenario.deviceFormFactor,
@@ -59,7 +63,8 @@ fun List<ArbiterScenarioContent>.createArbiterScenario(
   dfs(scenario)
   arbiterDebugLog("executing:$result")
   return ArbiterScenario(
-    arbiterAgentTasks = result,
+    id = scenario.id,
+    agentTasks = result,
     maxRetry = scenario.maxRetry,
     maxStepCount = scenario.maxStep,
     deviceFormFactor = scenario.deviceFormFactor
@@ -67,26 +72,17 @@ fun List<ArbiterScenarioContent>.createArbiterScenario(
 }
 
 @Serializable
-class ArbiterScenarioContent(
+class ArbiterScenarioContent @OptIn(ExperimentalUuidApi::class) constructor(
+  val id: String = Uuid.random().toString(),
   val goal: String,
-  private val dependency: String?,
+  @SerialName("dependency")
+  val dependencyId: String?,
   val initializeMethods: InitializeMethods,
   val maxRetry: Int = 3,
   val maxStep: Int = 10,
   val deviceFormFactor: ArbiterScenarioDeviceFormFactor = ArbiterScenarioDeviceFormFactor.Mobile,
   val cleanupData: CleanupData = CleanupData.Noop
 ) {
-  val goalDependency: String?
-    get() = if (dependency?.contains(":") == true) {
-      if (dependency.startsWith("goal:")) {
-        dependency.split(":")[1]
-      } else {
-        null
-      }
-    } else {
-      dependency
-    }
-
   @Serializable
   sealed interface CleanupData {
     @Serializable
@@ -149,7 +145,8 @@ class ArbiterProjectSerializer(
 
   fun load(inputStream: InputStream): ArbiterProjectFileContent {
     val jsonString = fileSystem.readText(inputStream)
-    val projectFileContent = yaml.decodeFromString(ArbiterProjectFileContent.serializer(), jsonString)
+    val projectFileContent =
+      yaml.decodeFromString(ArbiterProjectFileContent.serializer(), jsonString)
     return projectFileContent
   }
 }

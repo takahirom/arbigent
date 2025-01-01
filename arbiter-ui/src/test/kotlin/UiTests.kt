@@ -27,6 +27,7 @@ import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
 import com.github.takahirom.arbiter.ClickWithTextAgentCommand
 import com.github.takahirom.arbiter.ArbiterDevice
 import com.github.takahirom.arbiter.GoalAchievedAgentCommand
+import com.github.takahirom.arbiter.arbiterDebugLog
 import io.github.takahirom.roborazzi.captureRoboImage
 import io.github.takahirom.robospec.DescribedBehavior
 import io.github.takahirom.robospec.DescribedBehaviors
@@ -153,6 +154,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
                     expandOptions()
                     clickDependencyTextField()
                     typeDependencyTextField("launch the app")
+                    collapseOptions()
                     clickRunAllButton()
                   }
                   describe("when finish the scenario") {
@@ -213,7 +215,7 @@ class TestRobot(
   fun waitUntilScenarioRunning() {
     repeat(5) {
       composeUiTest.waitUntil(
-        timeoutMillis = 5000
+        timeoutMillis = 1000
       ) {
         try {
           composeUiTest.onNode(hasTestTag("scenario_running"), useUnmergedTree = true)
@@ -256,6 +258,10 @@ class TestRobot(
 
   fun expandOptions() {
     composeUiTest.onNode(hasContentDescription("Expand options")).performClick()
+  }
+
+  fun collapseOptions() {
+    composeUiTest.onNode(hasContentDescription("Collapse options")).performClick()
   }
 
   fun clickDependencyTextField() {

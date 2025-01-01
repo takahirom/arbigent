@@ -88,7 +88,7 @@ fun App(
         }
       )
     }
-    val scenarioIndex by appStateHolder.selectedAgentIndex.collectAsState()
+    val scenarioIndex by appStateHolder.selectedScenarioIndex.collectAsState()
     var scenariosWidth by remember { mutableStateOf(200.dp) }
     Row {
       val scenarioAndDepths by appStateHolder.sortedScenariosAndDepthsStateFlow.collectAsState()
@@ -105,31 +105,31 @@ fun App(
           },
         thickness = 8.dp
       )
-      val scenarioStateHolder = scenarioAndDepths.getOrNull(scenarioIndex)
-      if (scenarioStateHolder != null) {
+      val scenarioStateHolderAndDepth = scenarioAndDepths.getOrNull(scenarioIndex)
+      if (scenarioStateHolderAndDepth != null) {
         Column(Modifier.weight(3f)) {
           Scenario(
-            scenarioStateHolder = scenarioStateHolder.first,
+            scenarioStateHolder = scenarioStateHolderAndDepth.first,
             dependencyScenarioMenu = {
               selectableItem(
-                selected = scenarioStateHolder.first.dependencyScenarioStateHolderStateFlow.value == null,
+                selected = scenarioStateHolderAndDepth.first.dependencyScenarioStateHolderStateFlow.value == null,
                 onClick = {
-                  scenarioStateHolder.first.dependencyScenarioStateHolderStateFlow.value = null
+                  scenarioStateHolderAndDepth.first.dependencyScenarioStateHolderStateFlow.value = null
                 },
                 content = {
                   Text("No dependency")
                 }
               )
               appStateHolder.sortedScenariosAndDepthsStateFlow.value.map { it.first }
-                .filter { it != scenarioStateHolder.first }
-                .forEach {
+                .filter { senario -> senario != scenarioStateHolderAndDepth.first }
+                .forEach { scenarioStateHolder: ArbiterScenarioStateHolder ->
                   selectableItem(
-                    selected = scenarioStateHolder.first.dependencyScenarioStateHolderStateFlow.value == it,
+                    selected = scenarioStateHolderAndDepth.first.dependencyScenarioStateHolderStateFlow.value == scenarioStateHolder,
                     onClick = {
-                      scenarioStateHolder.first.dependencyScenarioStateHolderStateFlow.value = it
+                      scenarioStateHolderAndDepth.first.dependencyScenarioStateHolderStateFlow.value = scenarioStateHolder
                     },
                     content = {
-                      Text(it.goal)
+                      Text(scenarioStateHolder.goal)
                     }
                   )
                 }
@@ -142,7 +142,7 @@ fun App(
             },
             onCancel = {
               appStateHolder.close()
-              scenarioStateHolder.first.cancel()
+              scenarioStateHolderAndDepth.first.cancel()
             },
             onRemove = {
               appStateHolder.removeScenario(it)
@@ -204,7 +204,7 @@ private fun LeftScenariosPanel(
                 Color.White
               }
             )
-            .clickable { appStateHolder.selectedAgentIndex.value = index },
+            .clickable { appStateHolder.selectedScenarioIndex.value = index },
         ) {
           Row(
             modifier = Modifier.padding(8.dp),

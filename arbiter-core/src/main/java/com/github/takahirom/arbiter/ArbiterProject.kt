@@ -1,21 +1,50 @@
 package com.github.takahirom.arbiter
 
 import com.github.takahirom.arbiter.ArbiterScenarioExecutor.ArbiterAgentTask
+import kotlinx.coroutines.flow.MutableStateFlow
 import java.io.File
 
-class ArbiterProject(private val arbiterScenarios: List<ArbiterScenario>) {
-  suspend fun execute() {
-    arbiterScenarios.forEach { scenario ->
-      arbiterInfoLog("Start scenario: ${scenario.arbiterAgentTasks.last().goal}")
-      val executor = ArbiterScenarioExecutor()
-      executor.execute(scenario)
+class ArbiterProject(initialArbiterScenarios: List<ArbiterScenario>) {
+  val scenarioAndExecutorsStateFlow =
+    MutableStateFlow<List<Pair<ArbiterScenario, ArbiterScenarioExecutor>>>(listOf())
+  val scenarios get() = scenarioAndExecutorsStateFlow.value.map { it.first }
 
-      arbiterDebugLog(executor.statusText())
-      if (!executor.isGoalArchived()) {
+  init {
+    scenarioAndExecutorsStateFlow.value = initialArbiterScenarios.map { scenario ->
+      scenario to ArbiterScenarioExecutor()
+    }
+  }
+
+  suspend fun execute() {
+    scenarioAndExecutorsStateFlow.value.forEach { (scenario, scenarioExecutor) ->
+      arbiterInfoLog("Start scenario: $scenario")
+      scenarioExecutor.execute(scenario)
+
+      arbiterDebugLog(scenarioExecutor.statusText())
+      if (!scenarioExecutor.isGoalArchived()) {
         error(
-          "Failed to archive " + executor.statusText()
+          "Failed to archive " + scenarioExecutor.statusText()
         )
       }
+    }
+  }
+
+  suspend fun execute(scenario: ArbiterScenario) {
+    arbiterInfoLog("Start scenario: ${scenario}")
+    val scenarioExecutor =
+      scenarioAndExecutorsStateFlow.value.first { it.first.id == scenario.id }.second
+    scenarioExecutor.execute(scenario)
+    arbiterDebugLog(scenarioExecutor.statusText())
+    if (!scenarioExecutor.isGoalArchived()) {
+      error(
+        "Failed to archive " + scenarioExecutor.statusText()
+      )
+    }
+  }
+
+  fun cancel() {
+    scenarioAndExecutorsStateFlow.value.forEach { (_, scenarioExecutor) ->
+      scenarioExecutor.cancel()
     }
   }
 }
@@ -26,8 +55,8 @@ fun ArbiterProject(
   deviceFactory: () -> ArbiterDevice
 ): ArbiterProject {
   return ArbiterProject(
-    arbiterProjectFileContent.scenarios.map {
-      arbiterProjectFileContent.scenarios.createArbiterScenario(
+    arbiterProjectFileContent.scenarioContents.map {
+      arbiterProjectFileContent.scenarioContents.createArbiterScenario(
         scenario = it,
         aiFactory = aiFactory,
         deviceFactory = deviceFactory
@@ -46,7 +75,8 @@ fun ArbiterProject(
 }
 
 data class ArbiterScenario(
-  val arbiterAgentTasks: List<ArbiterAgentTask>,
+  val id: String,
+  val agentTasks: List<ArbiterAgentTask>,
   val maxRetry: Int = 0,
   val maxStepCount: Int = 10,
   val deviceFormFactor: ArbiterScenarioDeviceFormFactor = ArbiterScenarioDeviceFormFactor.Mobile,

@@ -23,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -387,10 +388,13 @@ private fun ContentPanel(tasksToAgent: List<Pair<ArbiterScenarioExecutor.Arbiter
   var selectedStep: ArbiterContextHolder.Step? by remember { mutableStateOf(null) }
   Row(Modifier) {
     val lazyColumnState = rememberLazyListState()
-    LaunchedEffect(lazyColumnState.layoutInfo.totalItemsCount) {
-      lazyColumnState.animateScrollToItem(maxOf(lazyColumnState.layoutInfo.totalItemsCount - 1, 0))
+    val totalItemsCount by derivedStateOf { lazyColumnState.layoutInfo.totalItemsCount }
+    LaunchedEffect(totalItemsCount) {
+      lazyColumnState.animateScrollToItem(maxOf(totalItemsCount - 1, 0))
     }
+    println(tasksToAgent)
     val sections: List<ScenarioSection> = buildSections(tasksToAgent)
+    println(sections)
     LazyColumn(state = lazyColumnState, modifier = Modifier.weight(1.5f)) {
       sections.forEachIndexed { index, section ->
         stickyHeader {

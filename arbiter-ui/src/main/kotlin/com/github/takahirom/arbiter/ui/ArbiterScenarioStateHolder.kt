@@ -1,10 +1,7 @@
 package com.github.takahirom.arbiter.ui
 
 import androidx.compose.foundation.text.input.TextFieldState
-import com.github.takahirom.arbiter.ArbiterAi
 import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
-import com.github.takahirom.arbiter.ArbiterDevice
-import com.github.takahirom.arbiter.ArbiterScenario
 import com.github.takahirom.arbiter.ArbiterScenarioContent
 import com.github.takahirom.arbiter.ArbiterScenarioDeviceFormFactor
 import com.github.takahirom.arbiter.ArbiterScenarioExecutor
@@ -16,9 +13,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 
 class ArbiterScenarioStateHolder {
+  @OptIn(ExperimentalUuidApi::class)
+  val idStateFlow = MutableStateFlow(Uuid.random().toString())
+  val id get() = idStateFlow.value
   val goalState = TextFieldState("")
   val goal get() = goalState.text.toString()
   val maxRetryState: TextFieldState = TextFieldState("3")
@@ -44,7 +46,7 @@ class ArbiterScenarioStateHolder {
       initialValue = false
     )
   val isRunning = arbiterScenarioExecutorStateFlow
-    .flatMapLatest { it?.isRunningStateFlow ?: flowOf() }
+    .flatMapLatest { it?.isRunningStateFlow ?: flowOf(false) }
     .stateIn(
       scope = coroutineScope,
       started = SharingStarted.WhileSubscribed(),
@@ -60,14 +62,8 @@ class ArbiterScenarioStateHolder {
         initialValue = null
       )
 
-  suspend fun onExecute(arbiterScenario: ArbiterScenario) {
-    arbiterScenarioExecutorStateFlow.value?.cancel()
-    val arbiterScenarioExecutor = ArbiterScenarioExecutor {
-    }
-    arbiterScenarioExecutorStateFlow.value = arbiterScenarioExecutor
-    arbiterScenarioExecutorStateFlow.value!!.execute(
-      arbiterScenario,
-    )
+  fun onExecute(scenarioExecutor: ArbiterScenarioExecutor) {
+    arbiterScenarioExecutorStateFlow.value = scenarioExecutor
   }
 
   suspend fun waitUntilFinished() {
@@ -90,8 +86,9 @@ class ArbiterScenarioStateHolder {
 
   fun createArbiterScenarioContent(): ArbiterScenarioContent {
     return ArbiterScenarioContent(
+      id = idStateFlow.value,
       goal = goal,
-      dependency = dependencyScenarioStateHolderStateFlow.value?.goal?.let { "goal:$it" },
+      dependencyId = dependencyScenarioStateHolderStateFlow.value?.id,
       initializeMethods = initializeMethodsStateFlow.value,
       maxRetry = maxRetryState.text.toString().toIntOrNull() ?: 3,
       maxStep = maxTurnState.text.toString().toIntOrNull() ?: 10,

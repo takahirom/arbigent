@@ -30,9 +30,10 @@ class ArbiterScenarioContentExecutorTest {
     val arbiterScenarioExecutor = ArbiterScenarioExecutor {
     }
     val arbiterScenario = ArbiterScenario(
-      listOf(
-        ArbiterScenarioExecutor.ArbiterAgentTask("goal1", agentConfig),
-        ArbiterScenarioExecutor.ArbiterAgentTask("goal2", agentConfig)
+      id = "id2",
+      agentTasks = listOf(
+        ArbiterScenarioExecutor.ArbiterAgentTask("id1", "goal1", agentConfig),
+        ArbiterScenarioExecutor.ArbiterAgentTask("id2", "goal2", agentConfig)
       ),
       maxStepCount = 10,
     )
@@ -78,9 +79,10 @@ class ArbiterScenarioContentExecutorTest {
     val arbiterScenarioExecutor = ArbiterScenarioExecutor {
     }
     val arbiterScenario = ArbiterScenario(
+      id = "id2",
       listOf(
-        ArbiterScenarioExecutor.ArbiterAgentTask("goal1", agentConfig),
-        ArbiterScenarioExecutor.ArbiterAgentTask("goal2", agentConfig)
+        ArbiterScenarioExecutor.ArbiterAgentTask("id1", "goal1", agentConfig),
+        ArbiterScenarioExecutor.ArbiterAgentTask("id2", "goal2", agentConfig)
       ),
       maxStepCount = 10,
     )
