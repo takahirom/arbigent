@@ -18,9 +18,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 
 
-class ArbiterScenarioStateHolder(initialDevice: ArbiterDevice, private val ai: ArbiterAi) {
-  private val deviceStateFlow = MutableStateFlow(initialDevice)
-  private val device get() = deviceStateFlow.value
+class ArbiterScenarioStateHolder {
   val goalState = TextFieldState("")
   val goal get() = goalState.text.toString()
   val maxRetryState: TextFieldState = TextFieldState("3")
@@ -88,10 +86,6 @@ class ArbiterScenarioStateHolder(initialDevice: ArbiterDevice, private val ai: A
     goalState.edit {
       replace(0, goalState.text.length, goal)
     }
-  }
-
-  fun onDeviceChanged(device: ArbiterDevice) {
-    deviceStateFlow.value = device
   }
 
   fun createArbiterScenarioContent(): ArbiterScenarioContent {

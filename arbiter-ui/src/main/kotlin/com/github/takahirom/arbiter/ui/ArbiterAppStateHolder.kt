@@ -75,10 +75,7 @@ class ArbiterAppStateHolder(
     CoroutineScope(ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob())
 
   fun addSubScenario(parent: ArbiterScenarioStateHolder) {
-    val scenarioStateHolder = ArbiterScenarioStateHolder(
-      initialDevice = (deviceConnectionState.value as DeviceConnectionState.Connected).device,
-      ai = aiFactory()
-    ).apply {
+    val scenarioStateHolder = ArbiterScenarioStateHolder().apply {
       dependencyScenarioStateHolderStateFlow.value = parent
       initializeMethodsStateFlow.value = ArbiterScenarioContent.InitializeMethods.Noop
     }
@@ -88,10 +85,7 @@ class ArbiterAppStateHolder(
   }
 
   fun addScenario() {
-    val scenarioStateHolder = ArbiterScenarioStateHolder(
-      initialDevice = (deviceConnectionState.value as DeviceConnectionState.Connected).device,
-      ai = aiFactory()
-    )
+    val scenarioStateHolder = ArbiterScenarioStateHolder()
     allScenarioStateHoldersStateFlow.value += scenarioStateHolder
     selectedAgentIndex.value =
       sortedScenariosAndDepthsStateFlow.value.indexOfFirst { it.first == scenarioStateHolder }
@@ -214,10 +208,7 @@ class ArbiterAppStateHolder(
     val project = arbiterProjectSerializer.load(file)
     val scenarioContents = project.scenarios
     val arbiterScenarioStateHolders = scenarioContents.map { scenarioContent ->
-      ArbiterScenarioStateHolder(
-        (deviceConnectionState.value as DeviceConnectionState.Connected).device,
-        ai = aiFactory()
-      ).apply {
+      ArbiterScenarioStateHolder().apply {
         onGoalChanged(scenarioContent.goal)
         initializeMethodsStateFlow.value = scenarioContent.initializeMethods
         maxRetryState.edit {
@@ -251,10 +242,6 @@ class ArbiterAppStateHolder(
     }
     val device = deviceFactory(devicesStateHolder.selectedDevice.value!!)
     deviceConnectionState.value = DeviceConnectionState.Connected(device)
-
-    allScenarioStateHoldersStateFlow.value.forEach {
-      it.onDeviceChanged(device)
-    }
   }
 
   fun removeScenario(scenario: ArbiterScenarioStateHolder) {
