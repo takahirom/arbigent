@@ -114,7 +114,8 @@ fun App(
               selectableItem(
                 selected = scenarioStateHolderAndDepth.first.dependencyScenarioStateHolderStateFlow.value == null,
                 onClick = {
-                  scenarioStateHolderAndDepth.first.dependencyScenarioStateHolderStateFlow.value = null
+                  scenarioStateHolderAndDepth.first.dependencyScenarioStateHolderStateFlow.value =
+                    null
                 },
                 content = {
                   Text("No dependency")
@@ -126,10 +127,14 @@ fun App(
                   selectableItem(
                     selected = scenarioStateHolderAndDepth.first.dependencyScenarioStateHolderStateFlow.value == scenarioStateHolder,
                     onClick = {
-                      scenarioStateHolderAndDepth.first.dependencyScenarioStateHolderStateFlow.value = scenarioStateHolder
+                      scenarioStateHolderAndDepth.first.dependencyScenarioStateHolderStateFlow.value =
+                        scenarioStateHolder
                     },
                     content = {
-                      Text(scenarioStateHolder.goal)
+                      Text(
+                        modifier = Modifier.testTag("dependency_scenario"),
+                        text = scenarioStateHolder.goal
+                      )
                     }
                   )
                 }

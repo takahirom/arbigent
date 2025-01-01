@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.filterToOne
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -29,6 +30,7 @@ import com.github.takahirom.arbiter.ArbiterDevice
 import com.github.takahirom.arbiter.GoalAchievedAgentCommand
 import com.github.takahirom.arbiter.arbiterDebugLog
 import io.github.takahirom.roborazzi.captureRoboImage
+import io.github.takahirom.robospec.BehaviorsTreeBuilder
 import io.github.takahirom.robospec.DescribedBehavior
 import io.github.takahirom.robospec.DescribedBehaviors
 import io.github.takahirom.robospec.describeBehaviors
@@ -129,45 +131,60 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
                   }
                 }
               }
-              describe("when add scenarios") {
-                doIt {
-                  enterGoal("launch the app")
-                  clickAddScenarioButton()
-                  enterGoal("launch the app2")
-                }
-                describe("when run all") {
-                  doIt {
-                    clickRunAllButton()
-                  }
-                  describe("should finish the scenario") {
-                    doIt {
-                      waitUntilScenarioRunning()
-                    }
-                    itShould("show goal achieved") {
-                      capture(it)
-                      assertGoalAchieved()
-                    }
-                  }
-                }
-                describe("when add dependency and run") {
-                  doIt {
-                    expandOptions()
-                    clickDependencyTextField()
-                    typeDependencyTextField("launch the app")
-                    collapseOptions()
-                    clickRunAllButton()
-                  }
-                  describe("when finish the scenario") {
-                    doIt {
-                      waitUntilScenarioRunning()
-                    }
-                    itShould("show goal achieved") {
-                      capture(it)
-                      assertTwoGoalAchieved()
-                    }
-                  }
-                }
-              }
+              describeEnterDependencyGoal(
+                firstGoal = "launch the app",
+                secondGoal = "launch the app2"
+              )
+              // Same goal
+              describeEnterDependencyGoal(
+                firstGoal = "launch the app",
+                secondGoal = "launch the app"
+              )
+            }
+          }
+        }
+      }
+    }
+
+    private fun BehaviorsTreeBuilder<TestRobot>.describeEnterDependencyGoal(
+      firstGoal: String,
+      secondGoal: String,
+    ) {
+      describe("when add scenarios") {
+        doIt {
+          enterGoal(firstGoal)
+          clickAddScenarioButton()
+          enterGoal(secondGoal)
+        }
+        describe("when run all") {
+          doIt {
+            clickRunAllButton()
+          }
+          describe("should finish the scenario") {
+            doIt {
+              waitUntilScenarioRunning()
+            }
+            itShould("show goal achieved") {
+              capture(it)
+              assertGoalAchieved()
+            }
+          }
+        }
+        describe("when add dependency and run") {
+          doIt {
+            expandOptions()
+            clickDependencyDropDown()
+            selectDependencyDropDown(firstGoal)
+            collapseOptions()
+            clickRunAllButton()
+          }
+          describe("when finish the scenario") {
+            doIt {
+              waitUntilScenarioRunning()
+            }
+            itShould("show goal achieved") {
+              capture(it)
+              assertTwoGoalAchieved()
             }
           }
         }
@@ -264,12 +281,14 @@ class TestRobot(
     composeUiTest.onNode(hasContentDescription("Collapse options")).performClick()
   }
 
-  fun clickDependencyTextField() {
+  fun clickDependencyDropDown() {
     composeUiTest.onNode(hasTestTag("dependency_dropdown")).performClick()
   }
 
-  fun typeDependencyTextField(text: String) {
-    composeUiTest.onNode(hasText(text)).performClick()
+  fun selectDependencyDropDown(text: String) {
+    composeUiTest.onAllNodes(hasText(text), useUnmergedTree = true)
+      .filterToOne(hasTestTag("dependency_scenario"))
+      .performClick()
   }
 
   fun capture(describedBehavior: DescribedBehavior<TestRobot>) {
