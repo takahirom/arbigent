@@ -17,6 +17,7 @@ import androidx.compose.ui.window.WindowExceptionHandler
 import androidx.compose.ui.window.WindowExceptionHandlerFactory
 import androidx.compose.ui.window.application
 import com.github.takahirom.arbiter.OpenAIAi
+import com.github.takahirom.arbiter.ui.AiProvider.*
 import com.github.takahirom.arbiter.ui.ArbiterAppStateHolder.FileSelectionState
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.intui.window.styling.lightWithLightHeader
@@ -30,7 +31,21 @@ import java.awt.Window
 fun main() = application {
   val appStateHolder = remember {
     ArbiterAppStateHolder(
-      aiFactory = { OpenAIAi(Preference.openAiApiKey) },
+      aiFactory = {
+        when (Preference.aiProviderEnum) {
+          OpenAi -> OpenAIAi(
+            baseUrl = "https://api.openai.com/v1/",
+            apiKey = Preference.openAiApiKey,
+            model = Preference.openAiModelName
+          )
+
+          Gemini -> OpenAIAi(
+            baseUrl = "https://generativelanguage.googleapis.com/v1beta/openai/",
+            apiKey = Preference.geminiApiKey,
+            model = Preference.geminiModelName
+          )
+        }
+      },
     )
   }
   AppWindow(

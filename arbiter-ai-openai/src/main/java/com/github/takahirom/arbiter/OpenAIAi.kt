@@ -17,9 +17,10 @@ import javax.imageio.ImageIO
 
 class OpenAIAi(
   private val apiKey: String,
+  private val baseUrl: String = "https://api.openai.com/v1/",
   private val model: String = "gpt-4o-mini",
   private val requestBuilder: (String) -> Request = { requestBodyJson ->
-    createRequest(requestBodyJson, apiKey)
+    createRequest(baseUrl, requestBodyJson, apiKey)
   }
 ) : ArbiterAi {
   override fun decideWhatToDo(decisionInput: ArbiterAi.DecisionInput): ArbiterAi.DecisionOutput {
@@ -250,11 +251,11 @@ fun File.getResizedIamgeByteArray(scale: Float): ByteArray {
   return output.readBytes()
 }
 
-private fun createRequest(requestBodyJson: String, apiKey: String): Request {
+private fun createRequest(baseUrl: String, requestBodyJson: String, apiKey: String): Request {
   val requestBody = requestBodyJson
     .toRequestBody("application/json".toMediaType())
   val request = Request.Builder()
-    .url("https://api.openai.com/v1/chat/completions")
+    .url("${baseUrl}chat/completions")
     .header("Authorization", "Bearer $apiKey")
     .post(requestBody)
     .build()

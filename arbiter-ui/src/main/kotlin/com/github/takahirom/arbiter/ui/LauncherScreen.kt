@@ -16,6 +16,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,6 +32,7 @@ import org.jetbrains.jewel.ui.component.Icon
 import org.jetbrains.jewel.ui.component.IconButton
 import org.jetbrains.jewel.ui.component.RadioButtonRow
 import org.jetbrains.jewel.ui.component.Text
+import org.jetbrains.jewel.ui.component.TextField
 import org.jetbrains.jewel.ui.component.styling.TextFieldStyle
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
@@ -93,30 +97,7 @@ fun BoxScope.LauncherScreen(
         }
       }
     }
-    val openAiApiKey = rememberTextFieldState(Preference.openAiApiKey)
-    LaunchedEffect(Unit) {
-      snapshotFlow { openAiApiKey.text }
-        .collect {
-          Preference.openAiApiKey = it.toString()
-        }
-    }
-    GroupHeader("OpenAI API Key(Saved in Keychain on Mac)")
-    BasicSecureTextField(
-      modifier = Modifier.padding(8.dp),
-      decorator = {
-        Box(
-          Modifier.background(color = TextFieldStyle.Companion.light().colors.background)
-            .padding(8.dp)
-            .clip(RoundedCornerShape(4.dp))
-        ) {
-          if(openAiApiKey.text.isEmpty()) {
-            Text("Enter OpenAI API Key")
-          }
-          it()
-        }
-      },
-      state = openAiApiKey,
-    )
+    AiProviderSetting()
     if (devices.isNotEmpty()) {
       DefaultButton(
         modifier = Modifier.align(Alignment.CenterHorizontally), onClick = {
@@ -126,4 +107,114 @@ fun BoxScope.LauncherScreen(
       }
     }
   }
+}
+
+@Composable
+private fun AiProviderSetting() {
+  var aiProvider by remember { mutableStateOf(Preference.aiProviderEnum) }
+  GroupHeader("AI Provider")
+  RadioButtonRow(
+    text = "OpenAI",
+    selected = aiProvider == AiProvider.OpenAi,
+    onClick = {
+      aiProvider = AiProvider.OpenAi
+    }
+  )
+  RadioButtonRow(
+    text = "Gemini",
+    selected = aiProvider == AiProvider.Gemini,
+    onClick = {
+      aiProvider = AiProvider.Gemini
+    }
+  )
+  when (aiProvider) {
+    AiProvider.OpenAi -> {
+      OpenAiSetting()
+    }
+
+    AiProvider.Gemini -> {
+      GeminiSetting()
+    }
+  }
+}
+
+@Composable
+private fun OpenAiSetting() {
+  val openAiApiKey = rememberTextFieldState(Preference.openAiApiKey)
+  LaunchedEffect(Unit) {
+    val collector: suspend (value: CharSequence) -> Unit = {
+      Preference.openAiApiKey = it.toString()
+    }
+    snapshotFlow { openAiApiKey.text }
+      .collect(collector)
+  }
+  val openAiModelName = rememberTextFieldState(Preference.openAiModelName)
+  LaunchedEffect(Unit) {
+    snapshotFlow { openAiModelName.text }
+      .collect {
+        Preference.openAiModelName = it.toString()
+      }
+  }
+  Text("OpenAI API Key(Saved in Keychain on Mac)")
+  BasicSecureTextField(
+    modifier = Modifier.padding(8.dp),
+    decorator = {
+      Box(
+        Modifier.background(color = TextFieldStyle.light().colors.background)
+          .padding(8.dp)
+          .clip(RoundedCornerShape(4.dp))
+      ) {
+        if (openAiApiKey.text.isEmpty()) {
+          Text("Enter OpenAI API Key")
+        }
+        it()
+      }
+    },
+    state = openAiApiKey,
+  )
+  Text("OpenAI Model Name")
+  TextField(
+    state = openAiModelName,
+    modifier = Modifier.padding(8.dp)
+  )
+}
+
+@Composable
+private fun GeminiSetting() {
+  val geminiApiKey = rememberTextFieldState(Preference.geminiApiKey)
+  LaunchedEffect(Unit) {
+    snapshotFlow { geminiApiKey.text }
+      .collect {
+        Preference.geminiApiKey = it.toString()
+      }
+  }
+  val geminiModelName = rememberTextFieldState(Preference.geminiModelName)
+  LaunchedEffect(Unit) {
+    snapshotFlow { geminiModelName.text }
+      .collect {
+        Preference.geminiModelName = it.toString()
+      }
+  }
+  Text("Gemini API Key(Saved in Keychain on Mac)")
+  BasicSecureTextField(
+    modifier = Modifier.padding(8.dp),
+    decorator = {
+      Box(
+        Modifier.background(color = TextFieldStyle.light().colors.background)
+          .padding(8.dp)
+          .clip(RoundedCornerShape(4.dp))
+      ) {
+        if (geminiApiKey.text.isEmpty()) {
+          Text("Enter Gemini API Key")
+        }
+        it()
+      }
+    },
+    state = geminiApiKey,
+  )
+  Text("Gemini Model Name")
+  TextField(
+    state = geminiModelName,
+    modifier = Modifier.padding(8.dp)
+  )
 }
