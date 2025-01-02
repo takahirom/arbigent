@@ -68,18 +68,21 @@ fun BoxScope.LauncherScreen(
     val devices by devicesStateHolder.devices.collectAsState()
     Column(Modifier) {
       Row {
-        GroupHeader("Devices", modifier = Modifier.weight(1F).align(Alignment.CenterVertically))
-        IconButton(
-          modifier = Modifier.padding(8.dp).align(Alignment.CenterVertically),
-          onClick = {
-            devicesStateHolder.fetchDevices()
-          }) {
-          Icon(
-            key = AllIconsKeys.Actions.Refresh,
-            contentDescription = "Refresh",
-            hint = Size(28)
-          )
+        GroupHeader(modifier = Modifier.weight(1F).align(Alignment.CenterVertically)) {
+          Text("Devices")
+          IconButton(
+            modifier = Modifier.align(Alignment.CenterVertically),
+            onClick = {
+              devicesStateHolder.fetchDevices()
+            }) {
+            Icon(
+              key = AllIconsKeys.Actions.Refresh,
+              contentDescription = "Refresh",
+              hint = Size(16)
+            )
+          }
         }
+
       }
       if (devices.isEmpty()) {
         Text(
@@ -100,7 +103,9 @@ fun BoxScope.LauncherScreen(
         }
       }
     }
-    AiProviderSetting()
+    AiProviderSetting(
+      modifier = Modifier.padding(8.dp)
+    )
     if (devices.isNotEmpty()) {
       DefaultButton(
         modifier = Modifier.align(Alignment.CenterHorizontally), onClick = {
@@ -133,31 +138,35 @@ class AiSettingStateHolder {
 }
 
 @Composable
-private fun AiProviderSetting() {
+private fun AiProviderSetting(modifier: Modifier) {
   val aiSettingStateHolder = remember { AiSettingStateHolder() }
   GroupHeader("AI Provider")
   val aiSetting = aiSettingStateHolder.aiSetting
-  aiSetting.aiSettings.forEach { aiProviderSetting: AiProviderSetting ->
-    RadioButtonRow(
-      text = aiProviderSetting.name,
-      selected = aiSetting.selectedId == aiProviderSetting.id,
-      onClick = {
-        aiSettingStateHolder.onSelectedAiProviderSettingChanged(aiProviderSetting)
-      }
-    )
+  Column(modifier = modifier) {
+    aiSetting.aiSettings.forEach { aiProviderSetting: AiProviderSetting ->
+      RadioButtonRow(
+        text = aiProviderSetting.name,
+        selected = aiSetting.selectedId == aiProviderSetting.id,
+        onClick = {
+          aiSettingStateHolder.onSelectedAiProviderSettingChanged(aiProviderSetting)
+        }
+      )
+    }
+    val selectedAiProviderSetting = aiSetting.aiSettings.first { it.id == aiSetting.selectedId }
+    NormalAiSetting(
+      modifier = Modifier.padding(8.dp),
+      aiProviderSetting =  selectedAiProviderSetting as AiProviderSetting.NormalAiProviderSetting,
+      onAiProviderSettingChanged = {
+        aiSettingStateHolder.onAiProviderSettingChanged(it)
+      })
   }
-  val selectedAiProviderSetting = aiSetting.aiSettings.first { it.id == aiSetting.selectedId }
-  NormalAiSetting(
-    selectedAiProviderSetting as AiProviderSetting.NormalAiProviderSetting,
-    onAiProviderSettingChanged = {
-      aiSettingStateHolder.onAiProviderSettingChanged(it)
-    })
 }
 
 @Composable
 private fun NormalAiSetting(
   aiProviderSetting: AiProviderSetting.NormalAiProviderSetting,
-  onAiProviderSettingChanged: (AiProviderSetting.NormalAiProviderSetting) -> Unit
+  onAiProviderSettingChanged: (AiProviderSetting.NormalAiProviderSetting) -> Unit,
+  modifier: Modifier = Modifier,
 ) {
   val openAiApiKey =
     rememberSaveable(saver = TextFieldState.Saver, inputs = arrayOf(aiProviderSetting.id)) {
@@ -180,26 +189,28 @@ private fun NormalAiSetting(
       }
   }
   val providerName = aiProviderSetting.name
-  Text("$providerName API Key(Saved in Keychain on Mac)")
-  BasicSecureTextField(
-    modifier = Modifier.padding(8.dp),
-    decorator = {
-      Box(
-        Modifier.background(color = TextFieldStyle.light().colors.background)
-          .padding(8.dp)
-          .clip(RoundedCornerShape(4.dp))
-      ) {
-        if (openAiApiKey.text.isEmpty()) {
-          Text("Enter $providerName API Key")
+  Column(modifier = modifier) {
+    Text("$providerName API Key(Saved in Keychain on Mac)")
+    BasicSecureTextField(
+      modifier = Modifier.padding(8.dp),
+      decorator = {
+        Box(
+          Modifier.background(color = TextFieldStyle.light().colors.background)
+            .padding(8.dp)
+            .clip(RoundedCornerShape(4.dp))
+        ) {
+          if (openAiApiKey.text.isEmpty()) {
+            Text("Enter $providerName API Key")
+          }
+          it()
         }
-        it()
-      }
-    },
-    state = openAiApiKey,
-  )
-  Text("$providerName Model Name")
-  TextField(
-    state = modelName,
-    modifier = Modifier.padding(8.dp)
-  )
+      },
+      state = openAiApiKey,
+    )
+    Text("$providerName Model Name")
+    TextField(
+      state = modelName,
+      modifier = Modifier.padding(8.dp)
+    )
+  }
 }
