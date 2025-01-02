@@ -17,7 +17,6 @@ import androidx.compose.ui.window.WindowExceptionHandler
 import androidx.compose.ui.window.WindowExceptionHandlerFactory
 import androidx.compose.ui.window.application
 import com.github.takahirom.arbiter.OpenAIAi
-import com.github.takahirom.arbiter.ui.AiProvider.*
 import com.github.takahirom.arbiter.ui.ArbiterAppStateHolder.FileSelectionState
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.intui.window.styling.lightWithLightHeader
@@ -32,18 +31,16 @@ fun main() = application {
   val appStateHolder = remember {
     ArbiterAppStateHolder(
       aiFactory = {
-        when (Preference.aiProviderEnum) {
-          OpenAi -> OpenAIAi(
-            baseUrl = "https://api.openai.com/v1/",
-            apiKey = Preference.openAiApiKey,
-            model = Preference.openAiModelName
+        val aiSetting = Preference.aiSettingValue
+        val aiProviderSetting = aiSetting.aiSettings.first { it.id == aiSetting.selectedId }
+        if (aiProviderSetting is AiProviderSetting.OpenAiBasedApiProviderSetting) {
+          OpenAIAi(
+            apiKey = aiProviderSetting.apiKey,
+            modelName = aiProviderSetting.modelName,
+            baseUrl = aiProviderSetting.baseUrl
           )
-
-          Gemini -> OpenAIAi(
-            baseUrl = "https://generativelanguage.googleapis.com/v1beta/openai/",
-            apiKey = Preference.geminiApiKey,
-            model = Preference.geminiModelName
-          )
+        } else {
+          throw IllegalArgumentException("Unsupported aiProviderSetting: $aiProviderSetting")
         }
       },
     )

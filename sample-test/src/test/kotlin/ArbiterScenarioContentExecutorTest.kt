@@ -13,7 +13,7 @@ class ArbiterScenarioContentExecutorTest {
   fun tests() = runTest {
     ArbiterCorotuinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
     val agentConfig = AgentConfig {
-      device(FakeDevice())
+      deviceFactory { FakeDevice() }
       ai(FakeAi())
     }
     val arbiterScenarioExecutor = ArbiterScenarioExecutor {
@@ -38,7 +38,7 @@ class ArbiterScenarioContentExecutorTest {
     ArbiterCorotuinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
     val order = mutableListOf<Int>()
     val agentConfig = AgentConfig {
-      device(FakeDevice())
+      deviceFactory { FakeDevice() }
       ai(FakeAi())
       addInterceptor(
         object : ArbiterInitializerInterceptor {

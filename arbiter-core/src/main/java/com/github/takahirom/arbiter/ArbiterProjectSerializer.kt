@@ -1,12 +1,11 @@
 package com.github.takahirom.arbiter
 
+import com.charleskorn.kaml.PolymorphismStyle
 import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.modules.SerializersModule
-import kotlinx.serialization.modules.polymorphic
-import kotlinx.serialization.modules.subclass
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
@@ -57,7 +56,7 @@ fun List<ArbiterScenarioContent>.createArbiterScenario(
           cleanupData = nodeScenario.cleanupData
         ).apply {
           ai(aiFactory())
-          device(deviceFactory())
+          deviceFactory(deviceFactory)
         }.build(),
       )
     )
@@ -78,11 +77,17 @@ class ArbiterScenarioContent @OptIn(ExperimentalUuidApi::class) constructor(
   val id: String = Uuid.random().toString(),
   val goal: String,
   @SerialName("dependency")
-  val dependencyId: String?,
-  val initializeMethods: InitializeMethods,
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val dependencyId: String? = null,
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val initializeMethods: InitializeMethods = InitializeMethods.Noop,
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
   val maxRetry: Int = 3,
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
   val maxStep: Int = 10,
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
   val deviceFormFactor: ArbiterScenarioDeviceFormFactor = ArbiterScenarioDeviceFormFactor.Mobile,
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
   val cleanupData: CleanupData = CleanupData.Noop
 ) {
   @Serializable
@@ -107,8 +112,8 @@ class ArbiterScenarioContent @OptIn(ExperimentalUuidApi::class) constructor(
     data object Noop : InitializeMethods
 
     @Serializable
-    @SerialName("OpenApp")
-    data class OpenApp(val packageName: String) : InitializeMethods
+    @SerialName("LaunchApp")
+    data class LaunchApp(val packageName: String) : InitializeMethods
   }
 }
 
@@ -116,19 +121,10 @@ class ArbiterScenarioContent @OptIn(ExperimentalUuidApi::class) constructor(
 class ArbiterProjectSerializer(
   private val fileSystem: FileSystem = object : FileSystem {}
 ) {
-
-  private val module = SerializersModule {
-    polymorphic(ArbiterScenarioContent.InitializeMethods::class) {
-      subclass(ArbiterScenarioContent.InitializeMethods.Back::class)
-      subclass(ArbiterScenarioContent.InitializeMethods.Noop::class)
-      subclass(ArbiterScenarioContent.InitializeMethods.OpenApp::class)
-    }
-  }
-
   private val yaml = Yaml(
-    serializersModule = module,
     configuration = YamlConfiguration(
-      strictMode = false
+      strictMode = false,
+      polymorphismStyle = PolymorphismStyle.Property
     )
   )
 

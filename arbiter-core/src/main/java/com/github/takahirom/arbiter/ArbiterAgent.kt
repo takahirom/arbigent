@@ -30,7 +30,7 @@ class ArbiterAgent(
   agentConfig: AgentConfig
 ) {
   private val ai = agentConfig.ai
-  private val device = agentConfig.device
+  val device by lazy { agentConfig.deviceFactory() }
   private val interceptors: List<ArbiterInterceptor> = agentConfig.interceptors
   private val deviceFormFactor = agentConfig.deviceFormFactor
 
@@ -208,22 +208,22 @@ class ArbiterAgent(
 class AgentConfig(
   val interceptors: List<ArbiterInterceptor>,
   val ai: ArbiterAi,
-  val device: ArbiterDevice,
+  val deviceFactory: () -> ArbiterDevice,
   val deviceFormFactor: ArbiterScenarioDeviceFormFactor
 ) {
   class Builder {
     private val interceptors = mutableListOf<ArbiterInterceptor>()
-    private var device: ArbiterDevice? = null
+    private var deviceFactory: (() -> ArbiterDevice)? = null
     private var ai: ArbiterAi? = null
-    private var deviceFormFactor: ArbiterScenarioDeviceFormFactor =
-      ArbiterScenarioDeviceFormFactor.Mobile
+    private var deviceFormFactor: ArbiterScenarioDeviceFormFactor? =
+      null
 
     fun addInterceptor(interceptor: ArbiterInterceptor) {
       interceptors.add(0, interceptor)
     }
 
-    fun device(device: ArbiterDevice) {
-      this.device = device
+    fun deviceFactory(deviceFactory: () -> ArbiterDevice) {
+      this.deviceFactory = deviceFactory
     }
 
     fun ai(ai: ArbiterAi) {
@@ -238,8 +238,8 @@ class AgentConfig(
       return AgentConfig(
         interceptors = interceptors,
         ai = ai!!,
-        device = device!!,
-        deviceFormFactor = deviceFormFactor
+        deviceFactory = deviceFactory!!,
+        deviceFormFactor = deviceFormFactor!!
       )
     }
   }
@@ -249,7 +249,7 @@ class AgentConfig(
     interceptors.forEach {
       builder.addInterceptor(it)
     }
-    builder.device(device)
+    builder.deviceFactory(deviceFactory)
     builder.ai(ai)
     return builder
   }
@@ -302,7 +302,7 @@ fun AgentConfigBuilder(
     ArbiterScenarioContent.InitializeMethods.Noop -> {
     }
 
-    is ArbiterScenarioContent.InitializeMethods.OpenApp -> {
+    is ArbiterScenarioContent.InitializeMethods.LaunchApp -> {
       addInterceptor(object : ArbiterInitializerInterceptor {
         override fun intercept(
           device: ArbiterDevice,
@@ -332,9 +332,6 @@ fun AgentConfigBuilder(
     }
   }
   when (val cleanupData = cleanupData) {
-    ArbiterScenarioContent.CleanupData.Noop -> {
-    }
-
     is ArbiterScenarioContent.CleanupData.Cleanup -> {
       addInterceptor(object : ArbiterInitializerInterceptor {
         override fun intercept(
@@ -353,6 +350,9 @@ fun AgentConfigBuilder(
           chain.proceed(device)
         }
       })
+    }
+    else -> {
+      // do nothing
     }
   }
 }

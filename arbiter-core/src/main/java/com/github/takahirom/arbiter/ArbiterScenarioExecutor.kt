@@ -1,5 +1,6 @@
 package com.github.takahirom.arbiter
 
+import com.github.takahirom.arbiter.ArbiterScenarioDeviceFormFactor.Tv
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -15,18 +16,21 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
 sealed interface ArbiterScenarioDeviceFormFactor {
-  fun isMobile(): Boolean = this is Mobile
-  fun isTv(): Boolean = this is Tv
-
   @Serializable
+  @SerialName("Mobile")
   object Mobile : ArbiterScenarioDeviceFormFactor
 
   @Serializable
+  @SerialName("Tv")
   object Tv : ArbiterScenarioDeviceFormFactor
+
+  fun isMobile(): Boolean = this == Mobile
+  fun isTv(): Boolean = this is Tv
 }
 
 class ArbiterScenarioExecutor {
@@ -49,7 +53,7 @@ class ArbiterScenarioExecutor {
     val goal: String,
     val agentConfig: AgentConfig,
     val maxStep: Int = 10,
-    val deviceFormFactor: ArbiterScenarioDeviceFormFactor = ArbiterScenarioDeviceFormFactor.Mobile,
+    val deviceFormFactor: ArbiterScenarioDeviceFormFactor,
   )
 
   private val _taskToAgentsStateFlow =

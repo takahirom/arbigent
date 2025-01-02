@@ -26,7 +26,6 @@ data class ResponseFormat(
 
 @Serializable
 data class ChatCompletionResponse(
-  val id: String,
   val `object`: String,
   val created: Long,
   val model: String,
@@ -61,7 +60,5 @@ data class ImageUrl(
 
 @Serializable
 data class Usage(
-  @SerialName("prompt_tokens") val promptTokens: Int,
   @SerialName("completion_tokens") val completionTokens: Int? = null,
-  @SerialName("total_tokens") val totalTokens: Int,
 )

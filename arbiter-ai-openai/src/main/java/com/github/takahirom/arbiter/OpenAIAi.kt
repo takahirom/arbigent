@@ -1,5 +1,7 @@
 package com.github.takahirom.arbiter
 
+import io.ktor.http.HttpStatusCode
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -11,18 +13,19 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.awt.image.BufferedImage
 import java.io.File
-import java.util.*
+import java.util.Base64
 import java.util.concurrent.TimeUnit
 import javax.imageio.ImageIO
 
 class OpenAIAi(
   private val apiKey: String,
   private val baseUrl: String = "https://api.openai.com/v1/",
-  private val model: String = "gpt-4o-mini",
+  private val modelName: String = "gpt-4o-mini",
   private val requestBuilder: (String) -> Request = { requestBodyJson ->
     createRequest(baseUrl, requestBodyJson, apiKey)
   }
 ) : ArbiterAi {
+  @OptIn(ExperimentalSerializationApi::class)
   override fun decideWhatToDo(decisionInput: ArbiterAi.DecisionInput): ArbiterAi.DecisionOutput {
     val (arbiterContext, dumpHierarchy, focusedTree, agentCommandTypes, screenshotFileName) = decisionInput
     val prompt = buildPrompt(arbiterContext, dumpHierarchy, focusedTree, agentCommandTypes)
@@ -52,12 +55,23 @@ class OpenAIAi(
         )
       )
     )
-    val responseText = chatCompletion(
-      agentCommandTypes = agentCommandTypes,
-      messages = messages,
-    )
-    val step = parseResponse(responseText, messages, screenshotFileName, agentCommandTypes)
-    return ArbiterAi.DecisionOutput(listOf(step.agentCommand!!), step)
+    val responseText = try {
+      chatCompletion(
+        agentCommandTypes = agentCommandTypes,
+        messages = messages,
+      )
+    } catch (e: AiRateLimitExceededException) {
+      arbiterInfoLog("Rate limit exceeded. Waiting for 10 seconds.")
+      Thread.sleep(10000)
+      return decideWhatToDo(decisionInput)
+    }
+    try {
+      val step = parseResponse(responseText, messages, screenshotFileName, agentCommandTypes)
+      return ArbiterAi.DecisionOutput(listOf(step.agentCommand!!), step)
+    } catch (e: kotlinx.serialization.MissingFieldException) {
+      arbiterInfoLog("Missing required field in OpenAI response: $e $responseText")
+      throw e
+    }
   }
 
   private fun buildPrompt(
@@ -163,6 +177,8 @@ $templates"""
     }
   }
 
+  class AiRateLimitExceededException : Exception("Rate limit exceeded")
+
   private fun chatCompletion(
     agentCommandTypes: List<AgentCommandType>,
     messages: List<ChatMessage>
@@ -173,7 +189,7 @@ $templates"""
     val json = Json { ignoreUnknownKeys = true }
     val requestBodyJson = json.encodeToString(
       ChatCompletionRequest(
-        model = model,
+        model = modelName,
         messages = messages,
         ResponseFormat(
           type = "json_schema",
@@ -188,6 +204,9 @@ $templates"""
       }"
     )
     val response = client.newCall(request).execute()
+    if (response.code == HttpStatusCode.TooManyRequests.value) {
+      throw AiRateLimitExceededException()
+    }
     val responseBody = response.body?.string() ?: ""
     arbiterDebugLog("OpenAI response: $responseBody")
     return responseBody

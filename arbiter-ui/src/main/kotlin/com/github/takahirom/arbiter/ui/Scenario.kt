@@ -305,14 +305,14 @@ private fun ScenarioOptions(
       ) {
         var editingText by remember(initializeMethods) {
           mutableStateOf(
-            (initializeMethods as? ArbiterScenarioContent.InitializeMethods.OpenApp)?.packageName ?: ""
+            (initializeMethods as? ArbiterScenarioContent.InitializeMethods.LaunchApp)?.packageName ?: ""
           )
         }
         RadioButtonRow(
-          selected = initializeMethods is ArbiterScenarioContent.InitializeMethods.OpenApp,
+          selected = initializeMethods is ArbiterScenarioContent.InitializeMethods.LaunchApp,
           onClick = {
             scenarioStateHolder.initializeMethodsStateFlow.value =
-              ArbiterScenarioContent.InitializeMethods.OpenApp(editingText)
+              ArbiterScenarioContent.InitializeMethods.LaunchApp(editingText)
           }
         ) {
           Column {
@@ -320,12 +320,12 @@ private fun ScenarioOptions(
             TextField(
               modifier = Modifier
                 .padding(4.dp),
-              enabled = initializeMethods is ArbiterScenarioContent.InitializeMethods.OpenApp,
+              enabled = initializeMethods is ArbiterScenarioContent.InitializeMethods.LaunchApp,
               value = editingText,
               onValueChange = {
                 editingText = it
                 scenarioStateHolder.initializeMethodsStateFlow.value =
-                  ArbiterScenarioContent.InitializeMethods.OpenApp(it)
+                  ArbiterScenarioContent.InitializeMethods.LaunchApp(it)
               },
             )
           }

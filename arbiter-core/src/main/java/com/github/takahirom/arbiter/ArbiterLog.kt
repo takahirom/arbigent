@@ -32,3 +32,9 @@ fun arbiterInfoLog(log: () -> String) {
         println("ArbiterLog: ${log()}")
     }
 }
+
+fun arbiterErrorLog(log: String) {
+    if (arbiterLogLevel <= ArbiterLogLevel.ERROR) {
+        println("ArbiterLog: $log")
+    }
+}

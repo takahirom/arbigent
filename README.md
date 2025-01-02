@@ -1,5 +1,8 @@
 # Arbiter - An AI Agent testing framework and tool
 
+> [!WARNING]
+> This project is still under development and may change in the future.
+
 ## Motivation
 
 ### Customizable for Various AI Providers, OSes, Form Factors, etc.
@@ -96,9 +99,38 @@ ArbiterScenarioExecutor *--"*" ArbiterAgent
 ArbiterScenario *--"*" ArbiterTask
 ```
 
+### Saved project file
+
+> [!WARNING]
+> The yaml format is still under development and may change in the future.
+
+The project file is saved in YAML format and contains scenarios with goals, initialization methods, and cleanup data. Dependencies between scenarios are also defined.
+You can write a project file in YAML format by hand or create it using the Arbiter UI.
+
+Auto-generated id is UUID but you can change it to any string.
+
+```yaml
+scenarios:
+- id: "7788d7f4-7276-4cb3-8e98-7d3ad1d1cd47"
+  goal: "Just see Now in Android app from app list. Goal is just to see list of topics.\
+    \ Do not interact with the app"
+  initializeMethods:
+    type: "LaunchApp"
+    packageName: "com.google.samples.apps.nowinandroid"
+  cleanupData:
+    type: "Cleanup"
+    packageName: "com.google.samples.apps.nowinandroid"
+- id: "f0ef0129-c764-443f-897d-fc4408e5952b"
+  goal: "Select an interesting topic in now in android. Please goal when there are\
+    \ articles in \"For you\" tab. Don't click an article. If you open browser please\
+    \ go back."
+  dependency: "7788d7f4-7276-4cb3-8e98-7d3ad1d1cd47"
+```
+
 ## Code Interface
 
-**WORING:** The code interface is still under development and may change in the future.
+> [!WARNING]
+> The code interface is still under development and may change in the future.
 
 Arbiter provides a code interface for executing tests programmatically. Here's an example of how to run a test:
 

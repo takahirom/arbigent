@@ -15,7 +15,7 @@ class ArbiterAgentExecutorTest {
   fun tests() = runTest {
     ArbiterCorotuinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
     val agentConfig = AgentConfig {
-      device(FakeDevice())
+      deviceFactory { FakeDevice() }
       ai(FakeAi())
     }
 

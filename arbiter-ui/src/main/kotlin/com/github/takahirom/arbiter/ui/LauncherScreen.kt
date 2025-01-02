@@ -11,18 +11,21 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicSecureTextField
-import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.arbiter.DeviceOs
 import org.jetbrains.jewel.intui.standalone.styling.light
@@ -109,53 +112,75 @@ fun BoxScope.LauncherScreen(
   }
 }
 
-@Composable
-private fun AiProviderSetting() {
-  var aiProvider by remember { mutableStateOf(Preference.aiProviderEnum) }
-  GroupHeader("AI Provider")
-  RadioButtonRow(
-    text = "OpenAI",
-    selected = aiProvider == AiProvider.OpenAi,
-    onClick = {
-      aiProvider = AiProvider.OpenAi
-    }
-  )
-  RadioButtonRow(
-    text = "Gemini",
-    selected = aiProvider == AiProvider.Gemini,
-    onClick = {
-      aiProvider = AiProvider.Gemini
-    }
-  )
-  when (aiProvider) {
-    AiProvider.OpenAi -> {
-      OpenAiSetting()
-    }
+class AiSettingStateHolder {
+  var aiSetting by mutableStateOf(Preference.aiSettingValue)
 
-    AiProvider.Gemini -> {
-      GeminiSetting()
-    }
+  fun onSelectedAiProviderSettingChanged(aiProviderSetting: AiProviderSetting) {
+    aiSetting = aiSetting.copy(selectedId = aiProviderSetting.id)
+    Preference.aiSettingValue = aiSetting
+  }
+
+  fun onAiProviderSettingChanged(aiProviderSetting: AiProviderSetting.NormalAiProviderSetting) {
+    aiSetting = aiSetting.copy(aiSettings = aiSetting.aiSettings.map {
+      if (it.id == aiProviderSetting.id) {
+        aiProviderSetting
+      } else {
+        it
+      }
+    })
+    Preference.aiSettingValue = aiSetting
   }
 }
 
 @Composable
-private fun OpenAiSetting() {
-  val openAiApiKey = rememberTextFieldState(Preference.openAiApiKey)
-  LaunchedEffect(Unit) {
-    val collector: suspend (value: CharSequence) -> Unit = {
-      Preference.openAiApiKey = it.toString()
-    }
-    snapshotFlow { openAiApiKey.text }
-      .collect(collector)
+private fun AiProviderSetting() {
+  val aiSettingStateHolder = remember { AiSettingStateHolder() }
+  GroupHeader("AI Provider")
+  val aiSetting = aiSettingStateHolder.aiSetting
+  aiSetting.aiSettings.forEach { aiProviderSetting: AiProviderSetting ->
+    RadioButtonRow(
+      text = aiProviderSetting.name,
+      selected = aiSetting.selectedId == aiProviderSetting.id,
+      onClick = {
+        aiSettingStateHolder.onSelectedAiProviderSettingChanged(aiProviderSetting)
+      }
+    )
   }
-  val openAiModelName = rememberTextFieldState(Preference.openAiModelName)
+  val selectedAiProviderSetting = aiSetting.aiSettings.first { it.id == aiSetting.selectedId }
+  NormalAiSetting(
+    selectedAiProviderSetting as AiProviderSetting.NormalAiProviderSetting,
+    onAiProviderSettingChanged = {
+      aiSettingStateHolder.onAiProviderSettingChanged(it)
+    })
+}
+
+@Composable
+private fun NormalAiSetting(
+  aiProviderSetting: AiProviderSetting.NormalAiProviderSetting,
+  onAiProviderSettingChanged: (AiProviderSetting.NormalAiProviderSetting) -> Unit
+) {
+  val openAiApiKey =
+    rememberSaveable(saver = TextFieldState.Saver, inputs = arrayOf(aiProviderSetting.id)) {
+      TextFieldState(aiProviderSetting.apiKey, TextRange(aiProviderSetting.apiKey.length))
+    }
+  val updatedOnAiProviderSettingChanged by rememberUpdatedState(onAiProviderSettingChanged)
   LaunchedEffect(Unit) {
-    snapshotFlow { openAiModelName.text }
+    snapshotFlow { openAiApiKey.text }
+      .collect({
+        updatedOnAiProviderSettingChanged(aiProviderSetting.updatedApiKey(apiKey = it.toString()))
+      })
+  }
+  val modelName = rememberSaveable(saver = TextFieldState.Saver, inputs = arrayOf(aiProviderSetting.id)) {
+    TextFieldState(aiProviderSetting.modelName, TextRange(aiProviderSetting.modelName.length))
+  }
+  LaunchedEffect(Unit) {
+    snapshotFlow { modelName.text }
       .collect {
-        Preference.openAiModelName = it.toString()
+        updatedOnAiProviderSettingChanged(aiProviderSetting.updatedModelName(modelName = it.toString()))
       }
   }
-  Text("OpenAI API Key(Saved in Keychain on Mac)")
+  val providerName = aiProviderSetting.name
+  Text("$providerName API Key(Saved in Keychain on Mac)")
   BasicSecureTextField(
     modifier = Modifier.padding(8.dp),
     decorator = {
@@ -165,56 +190,16 @@ private fun OpenAiSetting() {
           .clip(RoundedCornerShape(4.dp))
       ) {
         if (openAiApiKey.text.isEmpty()) {
-          Text("Enter OpenAI API Key")
+          Text("Enter $providerName API Key")
         }
         it()
       }
     },
     state = openAiApiKey,
   )
-  Text("OpenAI Model Name")
+  Text("$providerName Model Name")
   TextField(
-    state = openAiModelName,
-    modifier = Modifier.padding(8.dp)
-  )
-}
-
-@Composable
-private fun GeminiSetting() {
-  val geminiApiKey = rememberTextFieldState(Preference.geminiApiKey)
-  LaunchedEffect(Unit) {
-    snapshotFlow { geminiApiKey.text }
-      .collect {
-        Preference.geminiApiKey = it.toString()
-      }
-  }
-  val geminiModelName = rememberTextFieldState(Preference.geminiModelName)
-  LaunchedEffect(Unit) {
-    snapshotFlow { geminiModelName.text }
-      .collect {
-        Preference.geminiModelName = it.toString()
-      }
-  }
-  Text("Gemini API Key(Saved in Keychain on Mac)")
-  BasicSecureTextField(
-    modifier = Modifier.padding(8.dp),
-    decorator = {
-      Box(
-        Modifier.background(color = TextFieldStyle.light().colors.background)
-          .padding(8.dp)
-          .clip(RoundedCornerShape(4.dp))
-      ) {
-        if (geminiApiKey.text.isEmpty()) {
-          Text("Enter Gemini API Key")
-        }
-        it()
-      }
-    },
-    state = geminiApiKey,
-  )
-  Text("Gemini Model Name")
-  TextField(
-    state = geminiModelName,
+    state = modelName,
     modifier = Modifier.padding(8.dp)
   )
 }
