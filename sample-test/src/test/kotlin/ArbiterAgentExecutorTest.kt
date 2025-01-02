@@ -2,8 +2,8 @@ package com.github.takahirom.arbiter.sample.test
 
 import com.github.takahirom.arbiter.AgentConfig
 import com.github.takahirom.arbiter.ArbiterAgent
+import com.github.takahirom.arbiter.ArbiterAgentTask
 import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
-import com.github.takahirom.arbiter.ArbiterScenarioExecutor
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -19,7 +19,7 @@ class ArbiterAgentExecutorTest {
       ai(FakeAi())
     }
 
-    val task = ArbiterScenarioExecutor.ArbiterAgentTask("id1", "goal1", agentConfig)
+    val task = ArbiterAgentTask("id1", "goal1", agentConfig)
     ArbiterAgent(agentConfig)
       .execute(task)
 

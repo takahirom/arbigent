@@ -188,8 +188,8 @@ val arbiterScenarioExecutor = ArbiterScenarioExecutor {
 val arbiterScenario = ArbiterScenario(
   id = "id2",
   agentTasks = listOf(
-    ArbiterScenarioExecutor.ArbiterAgentTask("id1", "goal1", agentConfig),
-    ArbiterScenarioExecutor.ArbiterAgentTask("id2", "goal2", agentConfig)
+    ArbiterAgentTask("id1", "goal1", agentConfig),
+    ArbiterAgentTask("id2", "goal2", agentConfig)
   ),
   maxStepCount = 10,
 )
@@ -206,7 +206,7 @@ val agentConfig = AgentConfig {
   ai(FakeAi())
 }
 
-val task = ArbiterScenarioExecutor.ArbiterAgentTask("id1", "goal1", agentConfig)
+val task = ArbiterAgentTask("id1", "goal1", agentConfig)
 ArbiterAgent(agentConfig)
   .execute(task)
 ```

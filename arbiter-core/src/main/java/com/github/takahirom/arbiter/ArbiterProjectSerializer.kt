@@ -34,7 +34,7 @@ fun List<ArbiterScenarioContent>.createArbiterScenario(
   deviceFactory: () -> ArbiterDevice,
 ): ArbiterScenario {
   val visited = mutableSetOf<ArbiterScenarioContent>()
-  val result = mutableListOf<ArbiterScenarioExecutor.ArbiterAgentTask>()
+  val result = mutableListOf<ArbiterAgentTask>()
   fun dfs(nodeScenario: ArbiterScenarioContent) {
     if (visited.contains(nodeScenario)) {
       return
@@ -45,7 +45,7 @@ fun List<ArbiterScenarioContent>.createArbiterScenario(
       dfs(dependencyScenario)
     }
     result.add(
-      ArbiterScenarioExecutor.ArbiterAgentTask(
+      ArbiterAgentTask(
         scenarioId = nodeScenario.id,
         goal = nodeScenario.goal,
         maxStep = nodeScenario.maxStep,

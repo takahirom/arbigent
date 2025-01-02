@@ -48,13 +48,6 @@ class ArbiterScenarioExecutor {
     }
   }
 
-  data class ArbiterAgentTask(
-    val scenarioId: String,
-    val goal: String,
-    val agentConfig: AgentConfig,
-    val maxStep: Int = 10,
-    val deviceFormFactor: ArbiterScenarioDeviceFormFactor,
-  )
 
   private val _taskToAgentsStateFlow =
     MutableStateFlow<List<Pair<ArbiterAgentTask, ArbiterAgent>>>(listOf())

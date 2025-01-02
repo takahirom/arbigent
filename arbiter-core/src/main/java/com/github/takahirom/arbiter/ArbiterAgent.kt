@@ -113,7 +113,7 @@ class ArbiterAgent(
   }
 
   suspend fun execute(
-    agentTask: ArbiterScenarioExecutor.ArbiterAgentTask
+    agentTask: ArbiterAgentTask
   ) {
     execute(
       goal = agentTask.goal,
@@ -215,8 +215,8 @@ class AgentConfig(
     private val interceptors = mutableListOf<ArbiterInterceptor>()
     private var deviceFactory: (() -> ArbiterDevice)? = null
     private var ai: ArbiterAi? = null
-    private var deviceFormFactor: ArbiterScenarioDeviceFormFactor? =
-      null
+    private var deviceFormFactor: ArbiterScenarioDeviceFormFactor =
+      ArbiterScenarioDeviceFormFactor.Mobile
 
     fun addInterceptor(interceptor: ArbiterInterceptor) {
       interceptors.add(0, interceptor)
@@ -239,7 +239,7 @@ class AgentConfig(
         interceptors = interceptors,
         ai = ai!!,
         deviceFactory = deviceFactory!!,
-        deviceFormFactor = deviceFormFactor!!
+        deviceFormFactor = deviceFormFactor
       )
     }
   }
@@ -351,6 +351,7 @@ fun AgentConfigBuilder(
         }
       })
     }
+
     else -> {
       // do nothing
     }

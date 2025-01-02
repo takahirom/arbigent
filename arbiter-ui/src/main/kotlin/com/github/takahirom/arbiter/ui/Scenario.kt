@@ -41,6 +41,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.github.takahirom.arbiter.ArbiterAgent
+import com.github.takahirom.arbiter.ArbiterAgentTask
 import com.github.takahirom.arbiter.ArbiterContextHolder
 import com.github.takahirom.arbiter.ArbiterScenarioContent
 import com.github.takahirom.arbiter.ArbiterScenarioDeviceFormFactor
@@ -197,7 +198,7 @@ fun Scenario(
     Column(Modifier.weight(1f).padding(top = 8.dp)) {
       GroupHeader("AI Agent Logs")
       if (arbiterScenarioExecutor != null) {
-        val taskToAgents: List<Pair<ArbiterScenarioExecutor.ArbiterAgentTask, ArbiterAgent>> by arbiterScenarioExecutor!!.agentTaskToAgentsStateFlow.collectAsState()
+        val taskToAgents: List<Pair<ArbiterAgentTask, ArbiterAgent>> by arbiterScenarioExecutor!!.agentTaskToAgentsStateFlow.collectAsState()
         if (!taskToAgents.isEmpty()) {
           ContentPanel(taskToAgents)
         }
@@ -388,7 +389,7 @@ data class StepItem(val step: ArbiterContextHolder.Step) {
 }
 
 @Composable
-fun buildSections(tasksToAgent: List<Pair<ArbiterScenarioExecutor.ArbiterAgentTask, ArbiterAgent>>): List<ScenarioSection> {
+fun buildSections(tasksToAgent: List<Pair<ArbiterAgentTask, ArbiterAgent>>): List<ScenarioSection> {
   val sections = mutableListOf<ScenarioSection>()
   for ((tasks, agent) in tasksToAgent) {
     val latestContext: ArbiterContextHolder? by agent.latestArbiterContextStateFlow.collectAsState()
@@ -405,7 +406,7 @@ fun buildSections(tasksToAgent: List<Pair<ArbiterScenarioExecutor.ArbiterAgentTa
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ContentPanel(tasksToAgent: List<Pair<ArbiterScenarioExecutor.ArbiterAgentTask, ArbiterAgent>>) {
+private fun ContentPanel(tasksToAgent: List<Pair<ArbiterAgentTask, ArbiterAgent>>) {
   var selectedStep: ArbiterContextHolder.Step? by remember { mutableStateOf(null) }
   Row(Modifier) {
     val lazyColumnState = rememberLazyListState()
