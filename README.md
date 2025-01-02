@@ -193,7 +193,7 @@ val arbiterScenario = ArbiterScenario(
   ),
   maxStepCount = 10,
 )
-arbiterScenarioExecutor.executeAsync(
+arbiterScenarioExecutor.execute(
   arbiterScenario
 )
 ```
@@ -202,7 +202,7 @@ arbiterScenarioExecutor.executeAsync(
 
 ```kotlin
 val agentConfig = AgentConfig {
-  device(FakeDevice())
+  deviceFactory { FakeDevice() }
   ai(FakeAi())
 }
 
