@@ -3,6 +3,9 @@
 > [!WARNING]
 > This project is still under development and may change in the future.
 
+<img width="1616" alt="image" src="https://github.com/user-attachments/assets/38265777-0968-4a91-a269-f66ceed6b059" />
+
+
 ## Motivation
 
 ### Customizable for Various AI Providers, OSes, Form Factors, etc.
@@ -35,9 +38,14 @@ Furthermore, I wanted to make Arbiter accessible to QA engineers by offering a u
 
 Install the Arbiter UI binary from the [GitHub Releases page](link to your releases).
 
-### Device Connection
+### Device Connection and AI API Key Entry
 
-Connect your device to your PC. The connected device should appear in the UI, allowing you to establish a connection.
+1. Connect your device to your PC. 
+2. The connected device should appear in the UI. Select your device to establish a connection.
+3. Enter the API key for the AI. 
+
+<img width="912" alt="image" src="https://github.com/user-attachments/assets/a2b5f3c3-1487-4898-a00e-5625cbb67b5f" />
+
 
 ### Scenario Creation
 
@@ -80,23 +88,27 @@ classDiagram
   direction TB
   class ArbiterProject {
     +List~ArbiterScenario~ scenarios
+    +execute()
   }
-  class ArbiterTask {
+  class ArbiterAgentTask {
     +String goal
   }
   class ArbiterAgent {
     +ArbiterAi ai
     +ArbiterDevice device
     +List~ArbiterInterceptor~ interceptors
-    +suspend execute(arbiterTask)
+    +execute(arbiterAgentTask)
   }
   class ArbiterScenarioExecutor {
-    +suspend execute(arbiterScenario)
+    +execute(arbiterScenario)
+  }
+  class ArbiterScenario {
+    +List~ArbiterAgentTask~ agentTasks
   }
   ArbiterProject *--"*" ArbiterScenarioExecutor
-  ArbiterScenarioExecutor *-- ArbiterScenario
 ArbiterScenarioExecutor *--"*" ArbiterAgent
-ArbiterScenario *--"*" ArbiterTask
+ArbiterScenario *--"*" ArbiterAgentTask
+ArbiterProject *--"*" ArbiterScenario
 ```
 
 ### Saved project file
@@ -107,7 +119,7 @@ ArbiterScenario *--"*" ArbiterTask
 The project file is saved in YAML format and contains scenarios with goals, initialization methods, and cleanup data. Dependencies between scenarios are also defined.
 You can write a project file in YAML format by hand or create it using the Arbiter UI.
 
-Auto-generated id is UUID but you can change it to any string.
+The id is auto-generated UUID by Arbiter UI but you can change it to any string.
 
 ```yaml
 scenarios:
