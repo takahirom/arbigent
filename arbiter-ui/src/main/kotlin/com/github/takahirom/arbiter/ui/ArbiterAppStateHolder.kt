@@ -235,7 +235,7 @@ class ArbiterAppStateHolder(
         maxRetryState.edit {
           replace(0, length, scenarioContent.maxRetry.toString())
         }
-        maxTurnState.edit {
+        maxStepState.edit {
           replace(0, length, scenarioContent.maxStep.toString())
         }
         deviceFormFactorStateFlow.value = scenarioContent.deviceFormFactor

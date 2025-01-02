@@ -24,7 +24,7 @@ class ArbiterScenarioStateHolder {
   val goalState = TextFieldState("")
   val goal get() = goalState.text.toString()
   val maxRetryState: TextFieldState = TextFieldState("3")
-  val maxTurnState: TextFieldState = TextFieldState("10")
+  val maxStepState: TextFieldState = TextFieldState("10")
   val cleanupDataStateFlow: MutableStateFlow<ArbiterScenarioContent.CleanupData> =
     MutableStateFlow(
       ArbiterScenarioContent.CleanupData.Noop
@@ -91,7 +91,7 @@ class ArbiterScenarioStateHolder {
       dependencyId = dependencyScenarioStateHolderStateFlow.value?.id,
       initializeMethods = initializeMethodsStateFlow.value,
       maxRetry = maxRetryState.text.toString().toIntOrNull() ?: 3,
-      maxStep = maxTurnState.text.toString().toIntOrNull() ?: 10,
+      maxStep = maxStepState.text.toString().toIntOrNull() ?: 10,
       deviceFormFactor = deviceFormFactorStateFlow.value,
       cleanupData = cleanupDataStateFlow.value
     )

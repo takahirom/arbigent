@@ -10,6 +10,6 @@ scenarios:
     packageName: "com.google.samples.apps.nowinandroid"
 - id: "f0ef0129-c764-443f-897d-fc4408e5952b"
   goal: "Select an interesting topic in now in android. Please goal when there are\
-    \ articles in \"For you\" tab. Don't click an article. If you open browser please\
-    \ go back."
+    \ articles in \"For you\" tab after selecting topic. Don't click an article. If\
+    \ you open browser please go back."
   dependency: "7788d7f4-7276-4cb3-8e98-7d3ad1d1cd47"

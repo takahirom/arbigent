@@ -396,6 +396,7 @@ fun defaultAgentCommandTypes(): List<AgentCommandType> {
     BackPressAgentCommand,
     KeyPressAgentCommand,
     ScrollAgentCommand,
+    WaitAgentCommand,
     GoalAchievedAgentCommand
   )
 }
@@ -410,6 +411,7 @@ fun defaultAgentCommandTypesForTv(): List<AgentCommandType> {
     InputTextAgentCommand,
     BackPressAgentCommand,
     KeyPressAgentCommand,
+    WaitAgentCommand,
     GoalAchievedAgentCommand
   )
 }

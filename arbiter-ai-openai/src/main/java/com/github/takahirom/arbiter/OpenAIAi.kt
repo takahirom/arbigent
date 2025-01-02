@@ -158,7 +158,10 @@ $templates"""
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
           KeyPressAgentCommand(text)
         }
-
+        WaitAgentCommand -> {
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
+          WaitAgentCommand(text.toIntOrNull() ?: 1000)
+        }
         ScrollAgentCommand -> ScrollAgentCommand()
 
         else -> throw Exception("Unsupported action: $action")

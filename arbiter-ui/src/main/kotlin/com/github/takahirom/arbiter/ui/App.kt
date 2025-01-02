@@ -222,15 +222,8 @@ private fun LeftScenariosPanel(
             )
             val isArchived by scenarioStateHolder.isArchived.collectAsState()
             if (isArchived) {
-              Icon(
-                key = AllIconsKeys.Actions.Checked,
-                contentDescription = "Archived",
-                modifier = Modifier.padding(8.dp)
-                  .size(32.dp)
-                  .clip(
-                    CircleShape
-                  )
-                  .background(JewelTheme.colorPalette.green(8))
+              PassedMark(
+                Modifier.padding(8.dp)
               )
             }
             val isRunning by scenarioStateHolder.isRunning.collectAsState()

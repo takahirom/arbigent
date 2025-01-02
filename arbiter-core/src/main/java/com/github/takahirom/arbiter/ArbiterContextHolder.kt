@@ -16,6 +16,9 @@ class ArbiterContextHolder(
     val screenshotFileName: String
   ) {
     val screenshotFilePath = "screenshots/$screenshotFileName.png"
+    fun isFailed(): Boolean {
+      return memo.contains("Failed")
+    }
     fun text(): String {
       return """
         memo: $memo

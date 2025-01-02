@@ -428,6 +428,32 @@ data class KeyPressAgentCommand(val keyName: String) : AgentCommand {
   }
 }
 
+class WaitAgentCommand(val timeMs: Int) : AgentCommand {
+  override val actionName = "Wait"
+
+  override fun stepLogText(): String {
+    return "Wait for $timeMs ms"
+  }
+
+  override fun runOrchestraCommand(device: ArbiterDevice) {
+    Thread.sleep(timeMs.toLong())
+  }
+
+  companion object : AgentCommandType {
+    override val actionName = "Wait"
+
+    override fun templateForAI(): String {
+      return """
+        {
+            "action": "$actionName",
+            // Time in milliseconds "text": "1000"
+            "text": "..."
+        }
+        """.trimIndent()
+    }
+  }
+}
+
 class GoalAchievedAgentCommand : AgentCommand {
   override val actionName = "GoalAchieved"
 

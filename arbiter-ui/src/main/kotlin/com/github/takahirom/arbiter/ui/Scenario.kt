@@ -10,14 +10,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -30,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.loadImageBitmap
@@ -43,8 +47,11 @@ import com.github.takahirom.arbiter.ArbiterScenarioDeviceFormFactor
 import com.github.takahirom.arbiter.ArbiterScenarioExecutor
 import com.github.takahirom.arbiter.GoalAchievedAgentCommand
 import org.jetbrains.jewel.foundation.theme.JewelTheme
+import org.jetbrains.jewel.ui.Orientation
 import org.jetbrains.jewel.ui.component.CheckboxRow
+import org.jetbrains.jewel.ui.component.Chip
 import org.jetbrains.jewel.ui.component.CircularProgressIndicator
+import org.jetbrains.jewel.ui.component.Divider
 import org.jetbrains.jewel.ui.component.Dropdown
 import org.jetbrains.jewel.ui.component.GroupHeader
 import org.jetbrains.jewel.ui.component.Icon
@@ -54,8 +61,11 @@ import org.jetbrains.jewel.ui.component.OutlinedButton
 import org.jetbrains.jewel.ui.component.RadioButtonRow
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.TextField
+import org.jetbrains.jewel.ui.component.styling.GroupHeaderStyle
+import org.jetbrains.jewel.ui.component.styling.LocalGroupHeaderStyle
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
+import org.jetbrains.jewel.ui.theme.chipStyle
 import org.jetbrains.jewel.ui.theme.colorPalette
 import java.io.FileInputStream
 
@@ -273,7 +283,8 @@ private fun ScenarioOptions(
         enabled = cleanupData is ArbiterScenarioContent.CleanupData.Cleanup,
         value = (cleanupData as? ArbiterScenarioContent.CleanupData.Cleanup)?.packageName ?: "",
         onValueChange = {
-          scenarioStateHolder.cleanupDataStateFlow.value = ArbiterScenarioContent.CleanupData.Cleanup(it)
+          scenarioStateHolder.cleanupDataStateFlow.value =
+            ArbiterScenarioContent.CleanupData.Cleanup(it)
         },
       )
       Row(
@@ -305,7 +316,8 @@ private fun ScenarioOptions(
       ) {
         var editingText by remember(initializeMethods) {
           mutableStateOf(
-            (initializeMethods as? ArbiterScenarioContent.InitializeMethods.LaunchApp)?.packageName ?: ""
+            (initializeMethods as? ArbiterScenarioContent.InitializeMethods.LaunchApp)?.packageName
+              ?: ""
           )
         }
         RadioButtonRow(
@@ -355,7 +367,7 @@ private fun ScenarioOptions(
         TextField(
           modifier = Modifier
             .padding(4.dp),
-          state = scenarioStateHolder.maxTurnState,
+          state = scenarioStateHolder.maxStepState,
           keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         )
       }
@@ -363,8 +375,17 @@ private fun ScenarioOptions(
   }
 }
 
-data class ScenarioSection(val goal: String, val isRunning: Boolean, val turns: List<TurnItem>)
-data class TurnItem(val step: ArbiterContextHolder.Step)
+data class ScenarioSection(val goal: String, val isRunning: Boolean, val steps: List<StepItem>) {
+  fun isArchived(): Boolean {
+    return steps.any { it.isArchived() }
+  }
+}
+
+data class StepItem(val step: ArbiterContextHolder.Step) {
+  fun isArchived(): Boolean {
+    return step.agentCommand is GoalAchievedAgentCommand
+  }
+}
 
 @Composable
 fun buildSections(tasksToAgent: List<Pair<ArbiterScenarioExecutor.ArbiterAgentTask, ArbiterAgent>>): List<ScenarioSection> {
@@ -377,7 +398,7 @@ fun buildSections(tasksToAgent: List<Pair<ArbiterScenarioExecutor.ArbiterAgentTa
     sections += ScenarioSection(
       goal = tasks.goal,
       isRunning = isRunning,
-      turns = steps.map { TurnItem(it) })
+      steps = steps.map { StepItem(it) })
   }
   return sections
 }
@@ -403,34 +424,54 @@ private fun ContentPanel(tasksToAgent: List<Pair<ArbiterScenarioExecutor.Arbiter
           } else {
             "Dependency goal: "
           }
-          GroupHeader(
-            modifier = Modifier.background(JewelTheme.globalColors.panelBackground).padding(8.dp)
-              .fillMaxWidth(),
-            text = prefix + section.goal + "(" + (index + 1) + "/" + tasksToAgent.size + ")",
-          )
+          Row(Modifier.background(Color.White)) {
+            GroupHeader(
+              modifier = Modifier.padding(8.dp)
+                .weight(1F),
+              text = prefix + section.goal + "(" + (index + 1) + "/" + tasksToAgent.size + ")",
+            )
+            if (section.isArchived()) {
+              PassedMark(modifier = Modifier.align(Alignment.CenterVertically)
+                .padding(8.dp)
+              )
+            }
+          }
         }
-        itemsIndexed(items = section.turns) { turnIndex, item ->
-          val turn = item.step
+        itemsIndexed(items = section.steps) { stepIndex, item ->
+          val step = item.step
           Column(
             Modifier.padding(8.dp)
               .background(
-                color = if (turn.memo.contains("Failed")) {
-                  JewelTheme.colorPalette.red.get(8)
-                } else if (turn.agentCommand is GoalAchievedAgentCommand) {
-                  JewelTheme.colorPalette.green.get(8)
+                color = if (step == selectedStep) {
+                  JewelTheme.colorPalette.purple(9)
                 } else {
-                  Color.White
+                  Color.Transparent
                 },
               )
-              .clickable { selectedStep = turn },
+              .clickable { selectedStep = step },
           ) {
             GroupHeader(
               modifier = Modifier.fillMaxWidth(),
-              text = "Turn ${turnIndex + 1}",
-            )
+            ) {
+              Text(
+                text = "Step ${stepIndex + 1}",
+              )
+              if (step.isFailed()) {
+                Icon(
+                  key = AllIconsKeys.General.Error,
+                  contentDescription = "Failed",
+                  modifier = Modifier.padding(4.dp).align(Alignment.CenterVertically),
+                  hint = Size(12)
+                )
+              } else if (item.isArchived()) {
+                PassedMark(modifier = Modifier.padding(4.dp).size(12.dp)
+                  .align(Alignment.CenterVertically))
+              }
+            }
             Text(
               modifier = Modifier.padding(8.dp),
-              text = turn.text()
+
+              text = step.text()
             )
           }
         }
@@ -449,7 +490,7 @@ private fun ContentPanel(tasksToAgent: List<Pair<ArbiterScenarioExecutor.Arbiter
       val scrollableState = rememberScrollState()
       Column(
         Modifier
-          .weight(2f)
+          .weight(1.5f)
           .padding(8.dp)
           .verticalScroll(scrollableState),
       ) {
@@ -493,5 +534,38 @@ private fun ContentPanel(tasksToAgent: List<Pair<ArbiterScenarioExecutor.Arbiter
         Text("Screenshot($fileName)")
       }
     }
+  }
+}
+
+@Composable
+fun PassedMark(modifier: Modifier = Modifier) {
+  Icon(
+    key = AllIconsKeys.Actions.Checked,
+    contentDescription = "Archived",
+    modifier = modifier
+      .size(32.dp)
+      .clip(
+        CircleShape
+      )
+      .background(JewelTheme.colorPalette.green(8))
+  )
+}
+
+@Composable
+fun GroupHeader(
+  modifier: Modifier = Modifier,
+  style: GroupHeaderStyle = LocalGroupHeaderStyle.current,
+  content: @Composable RowScope.() -> Unit,
+) {
+  Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+    content()
+
+    Divider(
+      orientation = Orientation.Horizontal,
+      modifier = Modifier.fillMaxWidth(),
+      color = style.colors.divider,
+      thickness = style.metrics.dividerThickness,
+      startIndent = style.metrics.indent,
+    )
   }
 }
