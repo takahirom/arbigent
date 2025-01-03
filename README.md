@@ -180,7 +180,7 @@ class ArbiterTest {
 
 ```kotlin
 val agentConfig = AgentConfig {
-  device(FakeDevice())
+  deviceFactory { FakeDevice() }
   ai(FakeAi())
 }
 val arbiterScenarioExecutor = ArbiterScenarioExecutor {
@@ -188,8 +188,8 @@ val arbiterScenarioExecutor = ArbiterScenarioExecutor {
 val arbiterScenario = ArbiterScenario(
   id = "id2",
   agentTasks = listOf(
-    ArbiterAgentTask("id1", "goal1", agentConfig),
-    ArbiterAgentTask("id2", "goal2", agentConfig)
+    ArbiterAgentTask("id1", "Login in the app and see the home tab.", agentConfig),
+    ArbiterAgentTask("id2", "Search an episode and open detail", agentConfig)
   ),
   maxStepCount = 10,
 )
@@ -206,7 +206,7 @@ val agentConfig = AgentConfig {
   ai(FakeAi())
 }
 
-val task = ArbiterAgentTask("id1", "goal1", agentConfig)
+val task = ArbiterAgentTask("id1", "Login in the app and see the home tab.", agentConfig)
 ArbiterAgent(agentConfig)
   .execute(task)
 ```
