@@ -420,7 +420,7 @@ private fun ContentPanel(tasksToAgent: List<ArbiterTaskAssignment>) {
           val prefix = if (index + 1 == tasksToAgent.size) {
             "Goal: "
           } else {
-            "Dependency goal: "
+            "Dependency scenario goal: "
           }
           Row(Modifier.background(Color.White)) {
             GroupHeader(

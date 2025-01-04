@@ -16,7 +16,7 @@ class ArbiterProjectFileContentTest {
     ArbiterCoroutinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
 
     val projectFileContent: ArbiterProjectFileContent = ArbiterProjectSerializer().load(
-      File(this::class.java.getResource("/projects/nowinandroidsample.yaml").toURI())
+      File(this::class.java.getResource("/projects/nowinandroidsample.yaml")!!.toURI())
     )
     projectFileContent.scenarioContents.forEach { scenarioContent ->
       val executorScenario = projectFileContent.scenarioContents.createArbiterScenario(
@@ -35,7 +35,7 @@ class ArbiterProjectFileContentTest {
   @Test
   fun loadProjectTest() {
     val project = ArbiterProjectSerializer().load(
-      File(this::class.java.getResource("/projects/nowinandroidsample.yaml").toURI())
+      File(this::class.java.getResource("/projects/nowinandroidsample.yaml")!!.toURI())
     )
     assertEquals(2, project.scenarioContents.size)
     val firstTask = project.scenarioContents.createArbiterScenario(
