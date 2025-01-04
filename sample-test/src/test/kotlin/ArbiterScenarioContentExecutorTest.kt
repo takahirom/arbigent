@@ -26,7 +26,7 @@ class ArbiterScenarioContentExecutorTest {
       ),
       maxStepCount = 10,
     )
-    arbiterScenarioExecutor.executeAsync(
+    arbiterScenarioExecutor.execute(
       arbiterScenario
     )
     advanceUntilIdle()
@@ -75,7 +75,7 @@ class ArbiterScenarioContentExecutorTest {
       ),
       maxStepCount = 10,
     )
-    arbiterScenarioExecutor.executeAsync(
+    arbiterScenarioExecutor.execute(
       arbiterScenario
     )
     advanceUntilIdle()

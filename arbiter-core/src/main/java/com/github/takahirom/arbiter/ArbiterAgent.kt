@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,7 +18,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.shareIn
 import maestro.MaestroException
 import maestro.orchestra.BackPressCommand
 import maestro.orchestra.ClearStateCommand
@@ -86,10 +87,10 @@ class ArbiterAgent(
   private var job: Job? = null
   private val arbiterContextHistoryStateFlow: MutableStateFlow<List<ArbiterContextHolder>> =
     MutableStateFlow(listOf())
-  val latestArbiterContextStateFlow: StateFlow<ArbiterContextHolder?> =
+  val latestArbiterContextFlow: Flow<ArbiterContextHolder?> =
     arbiterContextHistoryStateFlow
       .map { it.lastOrNull() }
-      .stateIn(coroutineScope, SharingStarted.WhileSubscribed(), null)
+      .shareIn(coroutineScope, SharingStarted.WhileSubscribed(), 1)
 
   fun latestArbiterContext(): ArbiterContextHolder? =
     arbiterContextHistoryStateFlow.value.lastOrNull()
@@ -97,20 +98,24 @@ class ArbiterAgent(
   private val arbiterContextHolderStateFlow: MutableStateFlow<ArbiterContextHolder?> =
     MutableStateFlow(null)
   private val _isRunningStateFlow: MutableStateFlow<Boolean> = MutableStateFlow(false)
-  val isRunningStateFlow: StateFlow<Boolean> = _isRunningStateFlow.asStateFlow()
+  val isRunningFlow: StateFlow<Boolean> = _isRunningStateFlow.asStateFlow()
+  fun isRunning() = _isRunningStateFlow.value
   private val currentGoalStateFlow = MutableStateFlow<String?>(null)
-  val isArchivedStateFlow = arbiterContextHolderStateFlow
+  val isGoalArchivedFlow: Flow<Boolean> = arbiterContextHolderStateFlow
     .flatMapLatest {
       it?.steps ?: flowOf()
     }
     .map { steps: List<ArbiterContextHolder.Step> ->
       steps.any { it.agentCommand is GoalAchievedAgentCommand }
     }
-    .stateIn(coroutineScope, SharingStarted.Lazily, false)
+    .shareIn(coroutineScope, SharingStarted.WhileSubscribed(), 1)
 
-  suspend fun waitUntilFinished() {
-    isRunningStateFlow.first { !it }
-  }
+  fun isGoalArchived() = arbiterContextHolderStateFlow
+    .value
+    ?.steps
+    ?.value
+    ?.any { it.agentCommand is GoalAchievedAgentCommand }
+    ?: false
 
   suspend fun execute(
     agentTask: ArbiterAgentTask
@@ -141,7 +146,7 @@ class ArbiterAgent(
 
       initializerChain(device)
       var stepRemain = maxStep
-      while (stepRemain-- > 0 && isArchivedStateFlow.value.not()) {
+      while (stepRemain-- > 0 && isGoalArchived().not()) {
         val stepInput = StepInput(
           arbiterContextHolder = arbiterContextHolder,
           agentCommandTypes = agentCommandTypes,
@@ -154,7 +159,7 @@ class ArbiterAgent(
         when (stepChain(stepInput)) {
           StepResult.GoalAchieved -> {
             _isRunningStateFlow.value = false
-            isArchivedStateFlow.first { it }
+            isGoalArchivedFlow.first { it }
             break
           }
 

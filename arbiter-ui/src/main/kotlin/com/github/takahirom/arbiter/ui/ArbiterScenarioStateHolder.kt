@@ -5,6 +5,7 @@ import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
 import com.github.takahirom.arbiter.ArbiterScenarioContent
 import com.github.takahirom.arbiter.ArbiterScenarioDeviceFormFactor
 import com.github.takahirom.arbiter.ArbiterScenarioExecutor
+import com.github.takahirom.arbiter.ArbiterScenarioRunningInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,10 +18,13 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 
-class ArbiterScenarioStateHolder {
-  @OptIn(ExperimentalUuidApi::class)
-  val idStateFlow = MutableStateFlow(Uuid.random().toString())
-  val id get() = idStateFlow.value
+class ArbiterScenarioStateHolder
+@OptIn(ExperimentalUuidApi::class)
+constructor(
+  id: String = Uuid.random().toString()
+) {
+  private val _id = MutableStateFlow(id)
+  val id:String = _id.value
   val goalState = TextFieldState("")
   val goal get() = goalState.text.toString()
   val maxRetryState: TextFieldState = TextFieldState("3")
@@ -39,7 +43,7 @@ class ArbiterScenarioStateHolder {
     ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob()
   )
   val isArchived = arbiterScenarioExecutorStateFlow
-    .flatMapLatest { it?.isArchivedStateFlow ?: flowOf() }
+    .flatMapLatest { it?.isArchivedFlow ?: flowOf() }
     .stateIn(
       scope = coroutineScope,
       started = SharingStarted.WhileSubscribed(),
@@ -53,9 +57,9 @@ class ArbiterScenarioStateHolder {
       initialValue = false
     )
 
-  val runningInfo: StateFlow<ArbiterScenarioExecutor.RunningInfo?> =
+  val arbiterScenarioRunningInfo: StateFlow<ArbiterScenarioRunningInfo?> =
     arbiterScenarioExecutorStateFlow
-      .flatMapLatest { it?.runningInfoStateFlow ?: flowOf() }
+      .flatMapLatest { it?.arbiterScenarioRunningInfoFlow ?: flowOf() }
       .stateIn(
         scope = coroutineScope,
         started = SharingStarted.WhileSubscribed(),
@@ -71,7 +75,7 @@ class ArbiterScenarioStateHolder {
   }
 
   fun isGoalAchieved(): Boolean {
-    return arbiterScenarioExecutorStateFlow.value?.isArchivedStateFlow?.value ?: false
+    return arbiterScenarioExecutorStateFlow.value?.isArchived() ?: false
   }
 
   fun cancel() {
@@ -86,7 +90,7 @@ class ArbiterScenarioStateHolder {
 
   fun createArbiterScenarioContent(): ArbiterScenarioContent {
     return ArbiterScenarioContent(
-      id = idStateFlow.value,
+      id = id,
       goal = goal,
       dependencyId = dependencyScenarioStateHolderStateFlow.value?.id,
       initializeMethods = initializeMethodsStateFlow.value,

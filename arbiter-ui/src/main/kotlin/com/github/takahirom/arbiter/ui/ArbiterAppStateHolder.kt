@@ -85,14 +85,14 @@ class ArbiterAppStateHolder(
     }
     allScenarioStateHoldersStateFlow.value += scenarioStateHolder
     selectedScenarioIndex.value =
-      sortedScenariosAndDepths().indexOfFirst { it.first.idStateFlow.value == scenarioStateHolder.id }
+      sortedScenariosAndDepths().indexOfFirst { it.first.id == scenarioStateHolder.id }
   }
 
   fun addScenario() {
     val scenarioStateHolder = ArbiterScenarioStateHolder()
     allScenarioStateHoldersStateFlow.value += scenarioStateHolder
     selectedScenarioIndex.value =
-      sortedScenariosAndDepths().indexOfFirst { it.first.idStateFlow.value == scenarioStateHolder.id }
+      sortedScenariosAndDepths().indexOfFirst { it.first.id == scenarioStateHolder.id }
   }
 
   var job: Job? = null
@@ -104,7 +104,7 @@ class ArbiterAppStateHolder(
     job = coroutineScope.launch {
       projectStateFlow.value?.scenarios?.forEach { scenario ->
         selectedScenarioIndex.value =
-          sortedScenariosAndDepths().indexOfFirst { it.first.idStateFlow.value == scenario.id }
+          sortedScenariosAndDepths().indexOfFirst { it.first.id == scenario.id }
         projectStateFlow.value?.execute(scenario)
         delay(10)
       }
@@ -118,7 +118,7 @@ class ArbiterAppStateHolder(
     job = coroutineScope.launch {
       projectStateFlow.value?.execute(scenarioStateHolder.createScenario(allScenarioStateHoldersStateFlow.value))
       selectedScenarioIndex.value =
-        sortedScenariosAndDepths().indexOfFirst { it.first.idStateFlow.value == scenarioStateHolder.id }
+        sortedScenariosAndDepths().indexOfFirst { it.first.id == scenarioStateHolder.id }
     }
   }
 
@@ -200,7 +200,7 @@ class ArbiterAppStateHolder(
         !scenario.isGoalAchieved()
       }.forEach { scenarioStateHolder: ArbiterScenarioStateHolder ->
         selectedScenarioIndex.value =
-          sortedScenariosAndDepths().indexOfFirst { it.first.idStateFlow.value == scenarioStateHolder.id }
+          sortedScenariosAndDepths().indexOfFirst { it.first.id == scenarioStateHolder.id }
         projectStateFlow.value?.execute(scenarioStateHolder.createScenario(allScenarioStateHoldersStateFlow.value))
       }
     }
@@ -228,9 +228,8 @@ class ArbiterAppStateHolder(
     val projectFile = ArbiterProjectSerializer().load(file)
     val scenarios = projectFile.scenarioContents
     val arbiterScenarioStateHolders = scenarios.map { scenarioContent ->
-      ArbiterScenarioStateHolder().apply {
+      ArbiterScenarioStateHolder(id = scenarioContent.id).apply {
         onGoalChanged(scenarioContent.goal)
-        idStateFlow.value = scenarioContent.id
         initializeMethodsStateFlow.value = scenarioContent.initializeMethods
         maxRetryState.edit {
           replace(0, length, scenarioContent.maxRetry.toString())

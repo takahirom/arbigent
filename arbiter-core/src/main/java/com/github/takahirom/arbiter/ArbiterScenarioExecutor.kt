@@ -1,20 +1,17 @@
 package com.github.takahirom.arbiter
 
-import com.github.takahirom.arbiter.ArbiterScenarioDeviceFormFactor.Tv
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.yield
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -33,76 +30,71 @@ sealed interface ArbiterScenarioDeviceFormFactor {
   fun isTv(): Boolean = this is Tv
 }
 
-class ArbiterScenarioExecutor {
-  data class RunningInfo(
-    val allTasks: Int,
-    val runningTasks: Int,
-    val retriedTasks: Int,
-    val maxRetry: Int,
-  ) {
-    override fun toString(): String {
-      return """
+data class ArbiterScenarioRunningInfo(
+  val allTasks: Int,
+  val runningTasks: Int,
+  val retriedTasks: Int,
+  val maxRetry: Int,
+) {
+  override fun toString(): String {
+    return """
         task: $runningTasks/$allTasks
         retry: $retriedTasks/$maxRetry
     """.trimIndent()
-    }
   }
+}
 
-
-  private val _taskToAgentsStateFlow =
-    MutableStateFlow<List<Pair<ArbiterAgentTask, ArbiterAgent>>>(listOf())
-  val agentTaskToAgentsStateFlow: StateFlow<List<Pair<ArbiterAgentTask, ArbiterAgent>>> =
-    _taskToAgentsStateFlow.asStateFlow()
+class ArbiterScenarioExecutor {
+  private val _taskAssignmentsStateFlow =
+    MutableStateFlow<List<ArbiterTaskAssignment>>(listOf())
+  val taskAssignmentsFlow: Flow<List<ArbiterTaskAssignment>> =
+    _taskAssignmentsStateFlow.asSharedFlow()
+  fun taskAssignments(): List<ArbiterTaskAssignment> = _taskAssignmentsStateFlow.value
   private var executeJob: Job? = null
   private val coroutineScope =
     CoroutineScope(ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob())
-  private val _runningInfoStateFlow: MutableStateFlow<RunningInfo?> = MutableStateFlow(null)
-  val runningInfoStateFlow: StateFlow<RunningInfo?> = _runningInfoStateFlow.asStateFlow()
-  val isArchivedStateFlow = agentTaskToAgentsStateFlow.flatMapLatest { taskToAgents ->
+  private val _arbiterScenarioRunningInfoStateFlow: MutableStateFlow<ArbiterScenarioRunningInfo?> =
+    MutableStateFlow(null)
+  val arbiterScenarioRunningInfoFlow: Flow<ArbiterScenarioRunningInfo?> =
+    _arbiterScenarioRunningInfoStateFlow.asSharedFlow()
+  val isArchivedFlow: Flow<Boolean> = taskAssignmentsFlow.flatMapLatest { taskToAgents ->
     val flows: List<Flow<Boolean>> = taskToAgents.map { taskToAgent ->
-      taskToAgent.second.isArchivedStateFlow
+      taskToAgent.agent.isGoalArchivedFlow
     }
     combine(flows) { booleans ->
       booleans.all { it }
     }
   }
-    .stateIn(
+    .shareIn(
       scope = coroutineScope,
       started = SharingStarted.WhileSubscribed(),
-      initialValue = false
+      replay = 1
     )
+  fun isArchived() = taskAssignments().all { it.agent.isGoalArchived() }
 
   // isArchivedStateFlow is WhileSubscribed so we can't use it in waitUntilFinished
   fun isGoalArchived() =
-    agentTaskToAgentsStateFlow.value.all { it.second.isArchivedStateFlow.value }
+    taskAssignments().all { it.agent.isGoalArchived() }
 
-  val isRunningStateFlow = agentTaskToAgentsStateFlow.flatMapLatest { taskToAgents ->
+  val isRunningStateFlow: Flow<Boolean> = taskAssignmentsFlow.flatMapLatest { taskToAgents ->
     val flows: List<Flow<Boolean>> = taskToAgents.map { taskToAgent ->
-      taskToAgent.second.isRunningStateFlow
+      taskToAgent.agent.isRunningFlow
     }
     combine(flows) { booleans ->
       booleans.any { it as Boolean }
     }
   }
-    .stateIn(
+    .shareIn(
       scope = coroutineScope,
       started = SharingStarted.WhileSubscribed(),
-      initialValue = false
+      replay = 1
     )
+  val isRunning: Boolean = _taskAssignmentsStateFlow.value.any { it.agent.isRunning() }
 
   suspend fun waitUntilFinished() {
     arbiterDebugLog("Arbiter.waitUntilFinished start")
     isRunningStateFlow.debounce(100).first { !it }
     arbiterDebugLog("Arbiter.waitUntilFinished end")
-  }
-
-  fun executeAsync(
-    arbiterScenario: ArbiterScenario,
-  ) {
-    executeJob?.cancel()
-    executeJob = coroutineScope.launch {
-      execute(arbiterScenario)
-    }
   }
 
   suspend fun execute(arbiterScenario: ArbiterScenario) {
@@ -113,16 +105,16 @@ class ArbiterScenarioExecutor {
     try {
       do {
         yield()
-        _taskToAgentsStateFlow.value.forEach {
-          it.second.cancel()
+        _taskAssignmentsStateFlow.value.forEach {
+          it.agent.cancel()
         }
-        _taskToAgentsStateFlow.value = arbiterScenario.agentTasks.map { task ->
-          task to ArbiterAgent(task.agentConfig)
+        _taskAssignmentsStateFlow.value = arbiterScenario.agentTasks.map { task ->
+          ArbiterTaskAssignment(task, ArbiterAgent(task.agentConfig))
         }
-        for ((index, taskAgent) in agentTaskToAgentsStateFlow.value.withIndex()) {
+        for ((index, taskAgent) in taskAssignments().withIndex()) {
           val (task, agent) = taskAgent
-          _runningInfoStateFlow.value = RunningInfo(
-            allTasks = agentTaskToAgentsStateFlow.value.size,
+          _arbiterScenarioRunningInfoStateFlow.value = ArbiterScenarioRunningInfo(
+            allTasks = taskAssignments().size,
             runningTasks = index + 1,
             retriedTasks = arbiterScenario.maxRetry - retryRemain,
             maxRetry = arbiterScenario.maxRetry,
@@ -130,11 +122,11 @@ class ArbiterScenarioExecutor {
           agent.execute(
             agentTask = task,
           )
-          if (!agent.isArchivedStateFlow.value) {
+          if (!agent.isGoalArchived()) {
             arbiterDebugLog("Arbiter.execute break because agent is not archived")
             break
           }
-          if (index == agentTaskToAgentsStateFlow.value.size - 1) {
+          if (index == taskAssignments().size - 1) {
             arbiterDebugLog("Arbiter.execute all agents are archived")
             finishedSuccessfully = true
           }
@@ -142,9 +134,9 @@ class ArbiterScenarioExecutor {
         }
       } while (!finishedSuccessfully && retryRemain-- > 0)
     } finally {
-      _runningInfoStateFlow.value = null
-      _taskToAgentsStateFlow.value.forEach {
-        it.second.cancel()
+      _arbiterScenarioRunningInfoStateFlow.value = null
+      _taskAssignmentsStateFlow.value.forEach {
+        it.agent.cancel()
       }
     }
     arbiterDebugLog("Arbiter.execute end")
@@ -152,18 +144,18 @@ class ArbiterScenarioExecutor {
 
   fun cancel() {
     executeJob?.cancel()
-    _taskToAgentsStateFlow.value.forEach {
-      it.second.cancel()
+    _taskAssignmentsStateFlow.value.forEach {
+      it.agent.cancel()
     }
   }
 
   fun statusText(): String {
-    return "Goal:${agentTaskToAgentsStateFlow.value.last().first.goal}\n${
-      agentTaskToAgentsStateFlow.value.map { (task, agent) ->
+    return "Goal:${taskAssignments().last().task.goal}\n${
+      taskAssignments().map { (task, agent) ->
         buildString {
           append(task.goal)
           appendLine(":")
-          appendLine("  isArchived:" + agent.isArchivedStateFlow.value)
+          appendLine("  isArchived:" + agent.isGoalArchived())
           agent.latestArbiterContext()?.let {
             appendLine("  context:")
             it.steps.value.forEachIndexed { index, step ->

@@ -40,17 +40,15 @@ import androidx.compose.ui.res.loadImageBitmap
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import com.github.takahirom.arbiter.ArbiterAgent
-import com.github.takahirom.arbiter.ArbiterAgentTask
 import com.github.takahirom.arbiter.ArbiterContextHolder
 import com.github.takahirom.arbiter.ArbiterScenarioContent
 import com.github.takahirom.arbiter.ArbiterScenarioDeviceFormFactor
 import com.github.takahirom.arbiter.ArbiterScenarioExecutor
+import com.github.takahirom.arbiter.ArbiterTaskAssignment
 import com.github.takahirom.arbiter.GoalAchievedAgentCommand
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.Orientation
 import org.jetbrains.jewel.ui.component.CheckboxRow
-import org.jetbrains.jewel.ui.component.Chip
 import org.jetbrains.jewel.ui.component.CircularProgressIndicator
 import org.jetbrains.jewel.ui.component.Divider
 import org.jetbrains.jewel.ui.component.Dropdown
@@ -66,7 +64,6 @@ import org.jetbrains.jewel.ui.component.styling.GroupHeaderStyle
 import org.jetbrains.jewel.ui.component.styling.LocalGroupHeaderStyle
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
-import org.jetbrains.jewel.ui.theme.chipStyle
 import org.jetbrains.jewel.ui.theme.colorPalette
 import java.io.FileInputStream
 
@@ -197,9 +194,9 @@ fun Scenario(
     }
     Column(Modifier.weight(1f).padding(top = 8.dp)) {
       GroupHeader("AI Agent Logs")
-      if (arbiterScenarioExecutor != null) {
-        val taskToAgents: List<Pair<ArbiterAgentTask, ArbiterAgent>> by arbiterScenarioExecutor!!.agentTaskToAgentsStateFlow.collectAsState()
-        if (!taskToAgents.isEmpty()) {
+      arbiterScenarioExecutor?.let { arbiterScenarioExecutor ->
+        val taskToAgents: List<ArbiterTaskAssignment> by arbiterScenarioExecutor.taskAssignmentsFlow.collectAsState(arbiterScenarioExecutor.taskAssignments())
+        if (taskToAgents.isNotEmpty()) {
           ContentPanel(taskToAgents)
         }
       }
@@ -389,11 +386,11 @@ data class StepItem(val step: ArbiterContextHolder.Step) {
 }
 
 @Composable
-fun buildSections(tasksToAgent: List<Pair<ArbiterAgentTask, ArbiterAgent>>): List<ScenarioSection> {
+fun buildSections(tasksToAgent: List<ArbiterTaskAssignment>): List<ScenarioSection> {
   val sections = mutableListOf<ScenarioSection>()
   for ((tasks, agent) in tasksToAgent) {
-    val latestContext: ArbiterContextHolder? by agent.latestArbiterContextStateFlow.collectAsState()
-    val isRunning by agent.isRunningStateFlow.collectAsState()
+    val latestContext: ArbiterContextHolder? by agent.latestArbiterContextFlow.collectAsState(agent.latestArbiterContext())
+    val isRunning by agent.isRunningFlow.collectAsState()
     val nonNullContext = latestContext ?: continue
     val steps: List<ArbiterContextHolder.Step> by nonNullContext.steps.collectAsState()
     sections += ScenarioSection(
@@ -406,7 +403,7 @@ fun buildSections(tasksToAgent: List<Pair<ArbiterAgentTask, ArbiterAgent>>): Lis
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ContentPanel(tasksToAgent: List<Pair<ArbiterAgentTask, ArbiterAgent>>) {
+private fun ContentPanel(tasksToAgent: List<ArbiterTaskAssignment>) {
   var selectedStep: ArbiterContextHolder.Step? by remember { mutableStateOf(null) }
   Row(Modifier) {
     val lazyColumnState = rememberLazyListState()
