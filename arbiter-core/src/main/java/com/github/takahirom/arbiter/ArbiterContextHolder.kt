@@ -3,6 +3,7 @@ package com.github.takahirom.arbiter
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import java.io.File
 
 public class ArbiterContextHolder(
   private val goal: String,
@@ -16,7 +17,7 @@ public class ArbiterContextHolder(
     public val aiResponse: String? = null,
     public val screenshotFileName: String
   ) {
-    public val screenshotFilePath: String = "screenshots/$screenshotFileName.png"
+    public val screenshotFilePath: String =  ArbiterTempDir.screenshotsDir.absolutePath + File.separator + "$screenshotFileName.png"
     public fun isFailed(): Boolean {
       return memo.contains("Failed")
     }

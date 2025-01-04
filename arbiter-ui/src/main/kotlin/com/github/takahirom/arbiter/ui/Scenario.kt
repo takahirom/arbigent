@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.onClick
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -65,6 +66,8 @@ import org.jetbrains.jewel.ui.component.styling.LocalGroupHeaderStyle
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
 import org.jetbrains.jewel.ui.theme.colorPalette
+import java.awt.Desktop
+import java.io.File
 import java.io.FileInputStream
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -195,7 +198,9 @@ fun Scenario(
     Column(Modifier.weight(1f).padding(top = 8.dp)) {
       GroupHeader("AI Agent Logs")
       arbiterScenarioExecutor?.let { arbiterScenarioExecutor ->
-        val taskToAgents: List<ArbiterTaskAssignment> by arbiterScenarioExecutor.taskAssignmentsFlow.collectAsState(arbiterScenarioExecutor.taskAssignments())
+        val taskToAgents: List<ArbiterTaskAssignment> by arbiterScenarioExecutor.taskAssignmentsFlow.collectAsState(
+          arbiterScenarioExecutor.taskAssignments()
+        )
         if (taskToAgents.isNotEmpty()) {
           ContentPanel(taskToAgents)
         }
@@ -392,7 +397,9 @@ fun buildSections(tasksToAgent: List<ArbiterTaskAssignment>): List<ScenarioSecti
     val latestContext: ArbiterContextHolder? by agent.latestArbiterContextFlow.collectAsState(agent.latestArbiterContext())
     val isRunning by agent.isRunningFlow.collectAsState()
     val nonNullContext = latestContext ?: continue
-    val steps: List<ArbiterContextHolder.Step> by nonNullContext.stepsFlow.collectAsState(nonNullContext.steps())
+    val steps: List<ArbiterContextHolder.Step> by nonNullContext.stepsFlow.collectAsState(
+      nonNullContext.steps()
+    )
     sections += ScenarioSection(
       goal = tasks.goal,
       isRunning = isRunning,
@@ -429,8 +436,9 @@ private fun ContentPanel(tasksToAgent: List<ArbiterTaskAssignment>) {
               text = prefix + section.goal + "(" + (index + 1) + "/" + tasksToAgent.size + ")",
             )
             if (section.isArchived()) {
-              PassedMark(modifier = Modifier.align(Alignment.CenterVertically)
-                .padding(8.dp)
+              PassedMark(
+                modifier = Modifier.align(Alignment.CenterVertically)
+                  .padding(8.dp)
               )
             }
           }
@@ -462,8 +470,10 @@ private fun ContentPanel(tasksToAgent: List<ArbiterTaskAssignment>) {
                   hint = Size(12)
                 )
               } else if (item.isArchived()) {
-                PassedMark(modifier = Modifier.padding(4.dp).size(12.dp)
-                  .align(Alignment.CenterVertically))
+                PassedMark(
+                  modifier = Modifier.padding(4.dp).size(12.dp)
+                    .align(Alignment.CenterVertically)
+                )
               }
             }
             Text(
@@ -524,12 +534,17 @@ private fun ContentPanel(tasksToAgent: List<ArbiterTaskAssignment>) {
           .padding(8.dp),
         verticalArrangement = Arrangement.Center,
       ) {
-        val fileName = step.screenshotFilePath
+        val filePath = step.screenshotFilePath
         Image(
-          bitmap = loadImageBitmap(FileInputStream(fileName)),
+          bitmap = loadImageBitmap(FileInputStream(filePath)),
           contentDescription = "screenshot",
         )
-        Text("Screenshot($fileName)")
+        Text(
+          modifier = Modifier.onClick {
+            Desktop.getDesktop().open(File(filePath))
+          },
+          text = "Screenshot($filePath)"
+        )
       }
     }
   }

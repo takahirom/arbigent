@@ -32,6 +32,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.github.takahirom.arbiter.ArbiterTempDir.screenshotsDir
 import com.github.takahirom.arbiter.DeviceOs
 import com.github.takahirom.arbiter.arbiterDebugLog
 import com.github.takahirom.arbiter.ui.ArbiterAppStateHolder.DeviceConnectionState

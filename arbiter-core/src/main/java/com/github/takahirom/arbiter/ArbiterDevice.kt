@@ -19,7 +19,7 @@ public interface ArbiterDevice {
 
 public class MaestroDevice(
   private val maestro: Maestro,
-  screenshotsDir: File = File("screenshots")
+  screenshotsDir: File = ArbiterTempDir.screenshotsDir
 ) : ArbiterDevice {
   private val orchestra = Orchestra(
     maestro = maestro,
