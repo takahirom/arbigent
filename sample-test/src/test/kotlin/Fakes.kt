@@ -44,7 +44,7 @@ class FakeAi : ArbiterAi {
     )
   }
 
-  override fun decideWhatToDo(decisionInput: ArbiterAi.DecisionInput): ArbiterAi.DecisionOutput {
+  override fun decideAgentCommands(decisionInput: ArbiterAi.DecisionInput): ArbiterAi.DecisionOutput {
     arbiterDebugLog("FakeAi.decideWhatToDo")
     if (count == 0) {
       count++

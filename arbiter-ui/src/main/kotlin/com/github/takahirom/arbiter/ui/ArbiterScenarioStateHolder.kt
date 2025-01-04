@@ -1,7 +1,7 @@
 package com.github.takahirom.arbiter.ui
 
 import androidx.compose.foundation.text.input.TextFieldState
-import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
+import com.github.takahirom.arbiter.ArbiterCoroutinesDispatcher
 import com.github.takahirom.arbiter.ArbiterScenarioContent
 import com.github.takahirom.arbiter.ArbiterScenarioDeviceFormFactor
 import com.github.takahirom.arbiter.ArbiterScenarioExecutor
@@ -40,7 +40,7 @@ constructor(
   val dependencyScenarioStateHolderStateFlow = MutableStateFlow<ArbiterScenarioStateHolder?>(null)
   val arbiterScenarioExecutorStateFlow = MutableStateFlow<ArbiterScenarioExecutor?>(null)
   private val coroutineScope = CoroutineScope(
-    ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob()
+    ArbiterCoroutinesDispatcher.dispatcher + SupervisorJob()
   )
   val isArchived = arbiterScenarioExecutorStateFlow
     .flatMapLatest { it?.isArchivedFlow ?: flowOf() }

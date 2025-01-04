@@ -1,6 +1,6 @@
 package com.github.takahirom.arbiter
 
-data class ArbiterAgentTask(
+public data class ArbiterAgentTask(
   val scenarioId: String,
   val goal: String,
   val agentConfig: AgentConfig,

@@ -12,23 +12,23 @@ import java.io.OutputStream
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-interface FileSystem {
-  fun readText(inputStream: InputStream): String {
+public interface FileSystem {
+  public fun readText(inputStream: InputStream): String {
     return inputStream.readAllBytes().decodeToString()
   }
 
-  fun writeText(file: OutputStream, text: String) {
+  public fun writeText(file: OutputStream, text: String) {
     file.write(text.toByteArray())
   }
 }
 
 @Serializable
-class ArbiterProjectFileContent(
+public class ArbiterProjectFileContent(
   @SerialName("scenarios")
-  val scenarioContents: List<ArbiterScenarioContent>
+  public val scenarioContents: List<ArbiterScenarioContent>
 )
 
-fun List<ArbiterScenarioContent>.createArbiterScenario(
+public fun List<ArbiterScenarioContent>.createArbiterScenario(
   scenario: ArbiterScenarioContent,
   aiFactory: () -> ArbiterAi,
   deviceFactory: () -> ArbiterDevice,
@@ -73,52 +73,52 @@ fun List<ArbiterScenarioContent>.createArbiterScenario(
 }
 
 @Serializable
-class ArbiterScenarioContent @OptIn(ExperimentalUuidApi::class) constructor(
-  val id: String = Uuid.random().toString(),
-  val goal: String,
+public class ArbiterScenarioContent @OptIn(ExperimentalUuidApi::class) constructor(
+  public val id: String = Uuid.random().toString(),
+  public val goal: String,
   @SerialName("dependency")
   @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val dependencyId: String? = null,
+  public val dependencyId: String? = null,
   @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val initializeMethods: InitializeMethods = InitializeMethods.Noop,
+  public val initializeMethods: InitializeMethods = InitializeMethods.Noop,
   @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val maxRetry: Int = 3,
+  public val maxRetry: Int = 3,
   @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val maxStep: Int = 10,
+  public val maxStep: Int = 10,
   @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val deviceFormFactor: ArbiterScenarioDeviceFormFactor = ArbiterScenarioDeviceFormFactor.Mobile,
+  public val deviceFormFactor: ArbiterScenarioDeviceFormFactor = ArbiterScenarioDeviceFormFactor.Mobile,
   @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val cleanupData: CleanupData = CleanupData.Noop
+  public val cleanupData: CleanupData = CleanupData.Noop
 ) {
   @Serializable
-  sealed interface CleanupData {
+  public sealed interface CleanupData {
     @Serializable
     @SerialName("Noop")
-    data object Noop : CleanupData
+    public data object Noop : CleanupData
 
     @Serializable
     @SerialName("Cleanup")
-    data class Cleanup(val packageName: String) : CleanupData
+    public data class Cleanup(val packageName: String) : CleanupData
   }
 
   @Serializable
-  sealed interface InitializeMethods {
+  public sealed interface InitializeMethods {
     @Serializable
     @SerialName("Back")
-    data object Back : InitializeMethods
+    public data object Back : InitializeMethods
 
     @Serializable
     @SerialName("Noop")
-    data object Noop : InitializeMethods
+    public data object Noop : InitializeMethods
 
     @Serializable
     @SerialName("LaunchApp")
-    data class LaunchApp(val packageName: String) : InitializeMethods
+    public data class LaunchApp(val packageName: String) : InitializeMethods
   }
 }
 
 
-class ArbiterProjectSerializer(
+public class ArbiterProjectSerializer(
   private val fileSystem: FileSystem = object : FileSystem {}
 ) {
   private val yaml = Yaml(
@@ -128,20 +128,20 @@ class ArbiterProjectSerializer(
     )
   )
 
-  fun save(projectFileContent: ArbiterProjectFileContent, file: File) {
+  public fun save(projectFileContent: ArbiterProjectFileContent, file: File) {
     save(projectFileContent, file.outputStream())
   }
 
-  fun save(projectFileContent: ArbiterProjectFileContent, outputStream: OutputStream) {
+  private fun save(projectFileContent: ArbiterProjectFileContent, outputStream: OutputStream) {
     val jsonString = yaml.encodeToString(ArbiterProjectFileContent.serializer(), projectFileContent)
     fileSystem.writeText(outputStream, jsonString)
   }
 
-  fun load(file: File): ArbiterProjectFileContent {
+  public fun load(file: File): ArbiterProjectFileContent {
     return load(file.inputStream())
   }
 
-  fun load(inputStream: InputStream): ArbiterProjectFileContent {
+  private fun load(inputStream: InputStream): ArbiterProjectFileContent {
     val jsonString = fileSystem.readText(inputStream)
     val projectFileContent =
       yaml.decodeFromString(ArbiterProjectFileContent.serializer(), jsonString)

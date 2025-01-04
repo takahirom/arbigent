@@ -11,20 +11,20 @@ import xcuitest.XCTestClient
 import xcuitest.XCTestDriverClient
 import xcuitest.installer.LocalXCTestInstaller
 
-enum class DeviceOs {
+public enum class DeviceOs {
   Android,
   iOS;
 
-  fun isAndroid() = this == Android
-  fun isIOS() = this == iOS
+  public fun isAndroid(): Boolean = this == Android
+  public fun isIOS(): Boolean = this == iOS
 }
 
-sealed interface AvailableDevice {
-  val deviceOs: DeviceOs
-  val name: String
+public sealed interface AvailableDevice {
+  public val deviceOs: DeviceOs
+  public val name: String
 
   // Do not use data class because dadb return true for equals
-  class Android(val dadb: Dadb) : AvailableDevice {
+  public class Android(private val dadb: Dadb) : AvailableDevice {
     override val deviceOs: DeviceOs = DeviceOs.Android
     override val name: String = dadb.toString()
     override fun connectToDevice(): ArbiterDevice {
@@ -44,16 +44,20 @@ sealed interface AvailableDevice {
     }
   }
 
-  class IOS(val device: SimctlList.Device) : AvailableDevice {
+  public class IOS(
+    private val device: SimctlList.Device,
+    private val port: Int = 8080,
+    // local host
+    private val host: String = "[::1]",
+  ) : AvailableDevice {
     override val deviceOs: DeviceOs = DeviceOs.iOS
     override val name: String = device.name
     override fun connectToDevice(): ArbiterDevice {
-      val port = 8080
-      val host = "[::1]"
+      val port = port
+      val host = host
 
       val xcTestInstaller = LocalXCTestInstaller(
         deviceId = device.udid, // Use the device's UDID
-        // local host
         host = host,
         defaultPort = port,
         enableXCTestOutputFileLogging = true,
@@ -79,5 +83,5 @@ sealed interface AvailableDevice {
     }
   }
 
-  fun connectToDevice(): ArbiterDevice
+  public fun connectToDevice(): ArbiterDevice
 }

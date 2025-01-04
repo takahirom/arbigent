@@ -17,20 +17,20 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-sealed interface ArbiterScenarioDeviceFormFactor {
+public sealed interface ArbiterScenarioDeviceFormFactor {
   @Serializable
   @SerialName("Mobile")
-  object Mobile : ArbiterScenarioDeviceFormFactor
+  public data object Mobile : ArbiterScenarioDeviceFormFactor
 
   @Serializable
   @SerialName("Tv")
-  object Tv : ArbiterScenarioDeviceFormFactor
+  public data object Tv : ArbiterScenarioDeviceFormFactor
 
-  fun isMobile(): Boolean = this == Mobile
-  fun isTv(): Boolean = this is Tv
+  public fun isMobile(): Boolean = this == Mobile
+  public fun isTv(): Boolean = this is Tv
 }
 
-data class ArbiterScenarioRunningInfo(
+public data class ArbiterScenarioRunningInfo(
   val allTasks: Int,
   val runningTasks: Int,
   val retriedTasks: Int,
@@ -44,20 +44,20 @@ data class ArbiterScenarioRunningInfo(
   }
 }
 
-class ArbiterScenarioExecutor {
+public class ArbiterScenarioExecutor {
   private val _taskAssignmentsStateFlow =
     MutableStateFlow<List<ArbiterTaskAssignment>>(listOf())
-  val taskAssignmentsFlow: Flow<List<ArbiterTaskAssignment>> =
+  public val taskAssignmentsFlow: Flow<List<ArbiterTaskAssignment>> =
     _taskAssignmentsStateFlow.asSharedFlow()
-  fun taskAssignments(): List<ArbiterTaskAssignment> = _taskAssignmentsStateFlow.value
+  public fun taskAssignments(): List<ArbiterTaskAssignment> = _taskAssignmentsStateFlow.value
   private var executeJob: Job? = null
   private val coroutineScope =
-    CoroutineScope(ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob())
+    CoroutineScope(ArbiterCoroutinesDispatcher.dispatcher + SupervisorJob())
   private val _arbiterScenarioRunningInfoStateFlow: MutableStateFlow<ArbiterScenarioRunningInfo?> =
     MutableStateFlow(null)
-  val arbiterScenarioRunningInfoFlow: Flow<ArbiterScenarioRunningInfo?> =
+  public val arbiterScenarioRunningInfoFlow: Flow<ArbiterScenarioRunningInfo?> =
     _arbiterScenarioRunningInfoStateFlow.asSharedFlow()
-  val isArchivedFlow: Flow<Boolean> = taskAssignmentsFlow.flatMapLatest { taskToAgents ->
+  public val isArchivedFlow: Flow<Boolean> = taskAssignmentsFlow.flatMapLatest { taskToAgents ->
     val flows: List<Flow<Boolean>> = taskToAgents.map { taskToAgent ->
       taskToAgent.agent.isGoalArchivedFlow
     }
@@ -70,13 +70,13 @@ class ArbiterScenarioExecutor {
       started = SharingStarted.WhileSubscribed(),
       replay = 1
     )
-  fun isArchived() = taskAssignments().all { it.agent.isGoalArchived() }
+  public fun isArchived(): Boolean = taskAssignments().all { it.agent.isGoalArchived() }
 
   // isArchivedStateFlow is WhileSubscribed so we can't use it in waitUntilFinished
-  fun isGoalArchived() =
+  public fun isGoalArchived(): Boolean =
     taskAssignments().all { it.agent.isGoalArchived() }
 
-  val isRunningStateFlow: Flow<Boolean> = taskAssignmentsFlow.flatMapLatest { taskToAgents ->
+  public val isRunningStateFlow: Flow<Boolean> = taskAssignmentsFlow.flatMapLatest { taskToAgents ->
     val flows: List<Flow<Boolean>> = taskToAgents.map { taskToAgent ->
       taskToAgent.agent.isRunningFlow
     }
@@ -89,15 +89,15 @@ class ArbiterScenarioExecutor {
       started = SharingStarted.WhileSubscribed(),
       replay = 1
     )
-  val isRunning: Boolean = _taskAssignmentsStateFlow.value.any { it.agent.isRunning() }
+  public val isRunning: Boolean = _taskAssignmentsStateFlow.value.any { it.agent.isRunning() }
 
-  suspend fun waitUntilFinished() {
+  public suspend fun waitUntilFinished() {
     arbiterDebugLog("Arbiter.waitUntilFinished start")
     isRunningStateFlow.debounce(100).first { !it }
     arbiterDebugLog("Arbiter.waitUntilFinished end")
   }
 
-  suspend fun execute(arbiterScenario: ArbiterScenario) {
+  public suspend fun execute(arbiterScenario: ArbiterScenario) {
     arbiterDebugLog("Arbiter.execute start")
 
     var finishedSuccessfully = false
@@ -142,14 +142,14 @@ class ArbiterScenarioExecutor {
     arbiterDebugLog("Arbiter.execute end")
   }
 
-  fun cancel() {
+  public fun cancel() {
     executeJob?.cancel()
     _taskAssignmentsStateFlow.value.forEach {
       it.agent.cancel()
     }
   }
 
-  fun statusText(): String {
+  public fun statusText(): String {
     return "Goal:${taskAssignments().last().task.goal}\n${
       taskAssignments().map { (task, agent) ->
         buildString {
@@ -158,7 +158,7 @@ class ArbiterScenarioExecutor {
           appendLine("  isArchived:" + agent.isGoalArchived())
           agent.latestArbiterContext()?.let {
             appendLine("  context:")
-            it.steps.value.forEachIndexed { index, step ->
+            it.steps().forEachIndexed { index, step ->
               appendLine("    step ${index + 1}.")
               appendLine(step.text().lines().joinToString("\n") { "      $it" })
               appendLine("      screenshots:${step.screenshotFilePath}")
@@ -169,14 +169,14 @@ class ArbiterScenarioExecutor {
     }"
   }
 
-  class Builder {
-    fun build(): ArbiterScenarioExecutor {
+  public class Builder {
+    public fun build(): ArbiterScenarioExecutor {
       return ArbiterScenarioExecutor()
     }
   }
 }
 
-fun ArbiterScenarioExecutor(block: ArbiterScenarioExecutor.Builder.() -> Unit = {}): ArbiterScenarioExecutor {
+public fun ArbiterScenarioExecutor(block: ArbiterScenarioExecutor.Builder.() -> Unit = {}): ArbiterScenarioExecutor {
   val builder = ArbiterScenarioExecutor.Builder()
   builder.block()
   return builder.build()

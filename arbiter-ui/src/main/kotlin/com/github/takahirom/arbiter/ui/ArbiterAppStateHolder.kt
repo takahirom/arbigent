@@ -1,7 +1,7 @@
 package com.github.takahirom.arbiter.ui
 
 import com.github.takahirom.arbiter.ArbiterAi
-import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
+import com.github.takahirom.arbiter.ArbiterCoroutinesDispatcher
 import com.github.takahirom.arbiter.ArbiterDevice
 import com.github.takahirom.arbiter.ArbiterProject
 import com.github.takahirom.arbiter.ArbiterProjectFileContent
@@ -68,7 +68,7 @@ class ArbiterAppStateHolder(
         result
       }
       .stateIn(
-        scope = CoroutineScope(ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob()),
+        scope = CoroutineScope(ArbiterCoroutinesDispatcher.dispatcher + SupervisorJob()),
         started = SharingStarted.WhileSubscribed(),
         initialValue = emptyList()
       )
@@ -76,7 +76,7 @@ class ArbiterAppStateHolder(
   fun sortedScenariosAndDepths() = sortedScenarioAndDepth(allScenarioStateHoldersStateFlow.value)
   val selectedScenarioIndex: MutableStateFlow<Int> = MutableStateFlow(0)
   private val coroutineScope =
-    CoroutineScope(ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob())
+    CoroutineScope(ArbiterCoroutinesDispatcher.dispatcher + SupervisorJob())
 
   fun addSubScenario(parent: ArbiterScenarioStateHolder) {
     val scenarioStateHolder = ArbiterScenarioStateHolder().apply {
@@ -132,11 +132,11 @@ class ArbiterAppStateHolder(
     )
     projectStateFlow.value = arbiterProject
     allScenarioStateHoldersStateFlow.value.forEach { scenarioStateHolder ->
-      arbiterProject.scenarioAndExecutorsStateFlow.value.firstOrNull { (scenario, _) ->
+      arbiterProject.scenarioAssignments().firstOrNull { (scenario, _) ->
         scenario.id == scenarioStateHolder.id
       }
         ?.let {
-          scenarioStateHolder.onExecute(it.second)
+          scenarioStateHolder.onExecute(it.scenarioExecutor)
         }
     }
   }

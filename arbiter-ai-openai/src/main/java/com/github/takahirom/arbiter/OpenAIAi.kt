@@ -26,7 +26,7 @@ class OpenAIAi(
   }
 ) : ArbiterAi {
   @OptIn(ExperimentalSerializationApi::class)
-  override fun decideWhatToDo(decisionInput: ArbiterAi.DecisionInput): ArbiterAi.DecisionOutput {
+  override fun decideAgentCommands(decisionInput: ArbiterAi.DecisionInput): ArbiterAi.DecisionOutput {
     val (arbiterContext, dumpHierarchy, focusedTree, agentCommandTypes, screenshotFileName) = decisionInput
     val prompt = buildPrompt(arbiterContext, dumpHierarchy, focusedTree, agentCommandTypes)
     val messages: List<ChatMessage> = listOf(
@@ -63,7 +63,7 @@ class OpenAIAi(
     } catch (e: AiRateLimitExceededException) {
       arbiterInfoLog("Rate limit exceeded. Waiting for 10 seconds.")
       Thread.sleep(10000)
-      return decideWhatToDo(decisionInput)
+      return decideAgentCommands(decisionInput)
     }
     try {
       val step = parseResponse(responseText, messages, screenshotFileName, agentCommandTypes)

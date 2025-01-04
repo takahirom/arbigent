@@ -3,6 +3,7 @@ package com.github.takahirom.arbiter.sample.test
 import com.github.takahirom.arbiter.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.test.runTest
+import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -12,10 +13,10 @@ class ArbiterProjectFileContentTest {
   @OptIn(ExperimentalStdlibApi::class)
   @Test
   fun tests() = runTest {
-    ArbiterCorotuinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
+    ArbiterCoroutinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
 
     val projectFileContent: ArbiterProjectFileContent = ArbiterProjectSerializer().load(
-      this::class.java.getResourceAsStream("/projects/nowinandroidsample.yaml")
+      File(this::class.java.getResource("/projects/nowinandroidsample.yaml").toURI())
     )
     projectFileContent.scenarioContents.forEach { scenarioContent ->
       val executorScenario = projectFileContent.scenarioContents.createArbiterScenario(
@@ -34,7 +35,7 @@ class ArbiterProjectFileContentTest {
   @Test
   fun loadProjectTest() {
     val project = ArbiterProjectSerializer().load(
-      this::class.java.getResourceAsStream("/projects/nowinandroidsample.yaml")
+      File(this::class.java.getResource("/projects/nowinandroidsample.yaml").toURI())
     )
     assertEquals(2, project.scenarioContents.size)
     val firstTask = project.scenarioContents.createArbiterScenario(

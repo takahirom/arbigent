@@ -4,4 +4,4 @@ package com.github.takahirom.arbiter
   message = "This API is internal to Arbiter and should not be used from outside.",
   level = RequiresOptIn.Level.ERROR
 )
-annotation class ArbiterInternalApis
+public annotation class ArbiterInternalApis

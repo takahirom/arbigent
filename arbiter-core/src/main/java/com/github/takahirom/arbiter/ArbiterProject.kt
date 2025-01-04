@@ -1,21 +1,27 @@
 package com.github.takahirom.arbiter
 
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import java.io.File
 
-class ArbiterProject(initialArbiterScenarios: List<ArbiterScenario>) {
-  val scenarioAndExecutorsStateFlow =
-    MutableStateFlow<List<Pair<ArbiterScenario, ArbiterScenarioExecutor>>>(listOf())
-  val scenarios get() = scenarioAndExecutorsStateFlow.value.map { it.first }
+public class ArbiterProject(initialArbiterScenarios: List<ArbiterScenario>) {
+  private val _scenarioAssignmentsFlow =
+    MutableStateFlow<List<ArbiterScenarioAssignment>>(listOf())
+  public val scenarioAssignmentsFlow: Flow<List<ArbiterScenarioAssignment>> =
+    _scenarioAssignmentsFlow.asSharedFlow()
+
+  public fun scenarioAssignments(): List<ArbiterScenarioAssignment> = _scenarioAssignmentsFlow.value
+  public val scenarios: List<ArbiterScenario> get() = scenarioAssignments().map { it.scenario }
 
   init {
-    scenarioAndExecutorsStateFlow.value = initialArbiterScenarios.map { scenario ->
-      scenario to ArbiterScenarioExecutor()
+    _scenarioAssignmentsFlow.value = initialArbiterScenarios.map { scenario ->
+      ArbiterScenarioAssignment(scenario, ArbiterScenarioExecutor())
     }
   }
 
-  suspend fun execute() {
-    scenarioAndExecutorsStateFlow.value.forEach { (scenario, scenarioExecutor) ->
+  public suspend fun execute() {
+    scenarioAssignments().forEach { (scenario, scenarioExecutor) ->
       arbiterInfoLog("Start scenario: $scenario")
       scenarioExecutor.execute(scenario)
 
@@ -28,10 +34,10 @@ class ArbiterProject(initialArbiterScenarios: List<ArbiterScenario>) {
     }
   }
 
-  suspend fun execute(scenario: ArbiterScenario) {
+  public suspend fun execute(scenario: ArbiterScenario) {
     arbiterInfoLog("Start scenario: ${scenario}")
     val scenarioExecutor =
-      scenarioAndExecutorsStateFlow.value.first { it.first.id == scenario.id }.second
+      scenarioAssignments().first { it.scenario.id == scenario.id }.scenarioExecutor
     scenarioExecutor.execute(scenario)
     arbiterDebugLog(scenarioExecutor.statusText())
     if (!scenarioExecutor.isGoalArchived()) {
@@ -41,14 +47,14 @@ class ArbiterProject(initialArbiterScenarios: List<ArbiterScenario>) {
     }
   }
 
-  fun cancel() {
-    scenarioAndExecutorsStateFlow.value.forEach { (_, scenarioExecutor) ->
+  public fun cancel() {
+    scenarioAssignments().forEach { (_, scenarioExecutor) ->
       scenarioExecutor.cancel()
     }
   }
 }
 
-fun ArbiterProject(
+public fun ArbiterProject(
   arbiterProjectFileContent: ArbiterProjectFileContent,
   aiFactory: () -> ArbiterAi,
   deviceFactory: () -> ArbiterDevice
@@ -64,7 +70,7 @@ fun ArbiterProject(
   )
 }
 
-fun ArbiterProject(
+public fun ArbiterProject(
   file: File,
   aiFactory: () -> ArbiterAi,
   deviceFactory: () -> ArbiterDevice
@@ -73,7 +79,7 @@ fun ArbiterProject(
   return ArbiterProject(arbiterProjectFileContent, aiFactory, deviceFactory)
 }
 
-data class ArbiterScenario(
+public data class ArbiterScenario(
   val id: String,
   val agentTasks: List<ArbiterAgentTask>,
   val maxRetry: Int = 0,

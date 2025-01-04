@@ -1,25 +1,26 @@
 package com.github.takahirom.arbiter
 
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 
-class ArbiterContextHolder(
+public class ArbiterContextHolder(
   private val goal: String,
 ) {
-  class Step(
-    val agentCommand: AgentCommand? = null,
-    val action: String? = null,
-    val memo: String,
-    val whatYouSaw: String? = null,
-    val aiRequest: String? = null,
-    val aiResponse: String? = null,
-    val screenshotFileName: String
+  public class Step(
+    public val agentCommand: AgentCommand? = null,
+    public val action: String? = null,
+    public val memo: String,
+    public val whatYouSaw: String? = null,
+    public val aiRequest: String? = null,
+    public val aiResponse: String? = null,
+    public val screenshotFileName: String
   ) {
-    val screenshotFilePath = "screenshots/$screenshotFileName.png"
-    fun isFailed(): Boolean {
+    public val screenshotFilePath: String = "screenshots/$screenshotFileName.png"
+    public fun isFailed(): Boolean {
       return memo.contains("Failed")
     }
-    fun text(): String {
+    public fun text(): String {
       return """
         memo: $memo
         whatYouSaw: $whatYouSaw
@@ -29,17 +30,18 @@ class ArbiterContextHolder(
   }
 
   private val _steps = MutableStateFlow<List<Step>>(listOf())
-  val steps = _steps.asStateFlow()
-  fun addStep(step: Step) {
-    _steps.value = steps.value.toMutableList() + step
+  public val stepsFlow: Flow<List<Step>> = _steps.asSharedFlow()
+  public fun steps(): List<Step> = _steps.value
+  public fun addStep(step: Step) {
+    _steps.value = steps().toMutableList() + step
   }
 
-  fun prompt(): String {
+  public fun prompt(): String {
     return """
 Goal: "$goal"
 What you did so far:
 ${
-      steps.value.mapIndexed { index, turn ->
+      steps().mapIndexed { index, turn ->
         "${index + 1}. \n" +
           turn.text()
       }.joinToString("\n")

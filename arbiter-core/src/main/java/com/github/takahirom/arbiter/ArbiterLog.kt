@@ -1,39 +1,39 @@
 package com.github.takahirom.arbiter
 
-enum class ArbiterLogLevel {
+public enum class ArbiterLogLevel {
     DEBUG,
     INFO,
     WARN,
     ERROR
 }
 
-var arbiterLogLevel = ArbiterLogLevel.DEBUG
+public var arbiterLogLevel: ArbiterLogLevel = ArbiterLogLevel.DEBUG
 
-fun arbiterDebugLog(log: String) {
+public fun arbiterDebugLog(log: String) {
     if (arbiterLogLevel <= ArbiterLogLevel.DEBUG) {
         println("ArbiterLog: $log")
     }
 }
 
-fun arbiterDebugLog(log: () -> String) {
+public fun arbiterDebugLog(log: () -> String) {
     if (arbiterLogLevel <= ArbiterLogLevel.DEBUG) {
         println("ArbiterLog: ${log()}")
     }
 }
 
-fun arbiterInfoLog(log: String) {
+public fun arbiterInfoLog(log: String) {
     if (arbiterLogLevel <= ArbiterLogLevel.INFO) {
         println("ArbiterLog: $log")
     }
 }
 
-fun arbiterInfoLog(log: () -> String) {
+public fun arbiterInfoLog(log: () -> String) {
     if (arbiterLogLevel <= ArbiterLogLevel.INFO) {
         println("ArbiterLog: ${log()}")
     }
 }
 
-fun arbiterErrorLog(log: String) {
+public fun arbiterErrorLog(log: String) {
     if (arbiterLogLevel <= ArbiterLogLevel.ERROR) {
         println("ArbiterLog: $log")
     }

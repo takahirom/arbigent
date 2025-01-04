@@ -10,16 +10,16 @@ import maestro.orchestra.MaestroCommand
 import maestro.orchestra.Orchestra
 import java.io.File
 
-interface ArbiterDevice {
-  fun executeCommands(commands: List<MaestroCommand>)
-  fun viewTreeString(): String
-  fun focusedTreeString(): String
-  fun close()
+public interface ArbiterDevice {
+  public fun executeCommands(commands: List<MaestroCommand>)
+  public fun viewTreeString(): String
+  public fun focusedTreeString(): String
+  public fun close()
 }
 
-class MaestroDevice(
+public class MaestroDevice(
   private val maestro: Maestro,
-  private val screenshotsDir: File = File("screenshots")
+  screenshotsDir: File = File("screenshots")
 ) : ArbiterDevice {
   private val orchestra = Orchestra(
     maestro = maestro,
@@ -66,12 +66,12 @@ class MaestroDevice(
     return dfs(root)
   }
 
-  data class OptimizationResult(
+  public data class OptimizationResult(
     val node: TreeNode?,
     val promotedChildren: List<TreeNode>
   )
 
-  fun TreeNode.optimizeTree(
+  public fun TreeNode.optimizeTree(
     isRoot: Boolean = false,
     meaningfulAttributes: Set<String> = setOf(
       "text",
@@ -144,7 +144,7 @@ class MaestroDevice(
     }
   }
 
-  fun TreeNode.optimizedToString(depth: Int, enableDepth: Boolean = false): String {
+  public fun TreeNode.optimizedToString(depth: Int, enableDepth: Boolean = false): String {
     val blank = " ".repeat(depth)
     fun StringBuilder.appendString(str: String) {
       if (enableDepth) {
@@ -207,7 +207,7 @@ class MaestroDevice(
     }
   }
 
-  fun ViewHierarchy.toOptimizedString(
+  public fun ViewHierarchy.toOptimizedString(
     meaningfulAttributes: Set<String> = setOf("text", "content description", "hintText", "focused"),
     deviceInfo: DeviceInfo
   ): String {

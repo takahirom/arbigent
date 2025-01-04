@@ -27,11 +27,11 @@ import maestro.orchestra.MaestroCommand
 import maestro.orchestra.TakeScreenshotCommand
 import maestro.orchestra.WaitForAnimationToEndCommand
 
-class ArbiterAgent(
+public class ArbiterAgent(
   agentConfig: AgentConfig
 ) {
   private val ai = agentConfig.ai
-  val device by lazy { agentConfig.deviceFactory() }
+  public val device: ArbiterDevice by lazy { agentConfig.deviceFactory() }
   private val interceptors: List<ArbiterInterceptor> = agentConfig.interceptors
   private val deviceFormFactor = agentConfig.deviceFormFactor
 
@@ -39,7 +39,7 @@ class ArbiterAgent(
     .filterIsInstance<ArbiterDecisionInterceptor>()
   private val decisionChain: (ArbiterAi.DecisionInput) -> ArbiterAi.DecisionOutput =
     decisionInterceptors.foldRight(
-      { input: ArbiterAi.DecisionInput -> ai.decideWhatToDo(input) },
+      { input: ArbiterAi.DecisionInput -> ai.decideAgentCommands(input) },
       { interceptor, acc ->
         { input ->
           interceptor.intercept(
@@ -83,41 +83,40 @@ class ArbiterAgent(
     }
   )
   private val coroutineScope =
-    CoroutineScope(ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob())
+    CoroutineScope(ArbiterCoroutinesDispatcher.dispatcher + SupervisorJob())
   private var job: Job? = null
   private val arbiterContextHistoryStateFlow: MutableStateFlow<List<ArbiterContextHolder>> =
     MutableStateFlow(listOf())
-  val latestArbiterContextFlow: Flow<ArbiterContextHolder?> =
+  public val latestArbiterContextFlow: Flow<ArbiterContextHolder?> =
     arbiterContextHistoryStateFlow
       .map { it.lastOrNull() }
       .shareIn(coroutineScope, SharingStarted.WhileSubscribed(), 1)
 
-  fun latestArbiterContext(): ArbiterContextHolder? =
+  public fun latestArbiterContext(): ArbiterContextHolder? =
     arbiterContextHistoryStateFlow.value.lastOrNull()
 
   private val arbiterContextHolderStateFlow: MutableStateFlow<ArbiterContextHolder?> =
     MutableStateFlow(null)
   private val _isRunningStateFlow: MutableStateFlow<Boolean> = MutableStateFlow(false)
-  val isRunningFlow: StateFlow<Boolean> = _isRunningStateFlow.asStateFlow()
-  fun isRunning() = _isRunningStateFlow.value
+  public val isRunningFlow: StateFlow<Boolean> = _isRunningStateFlow.asStateFlow()
+  public fun isRunning(): Boolean = _isRunningStateFlow.value
   private val currentGoalStateFlow = MutableStateFlow<String?>(null)
-  val isGoalArchivedFlow: Flow<Boolean> = arbiterContextHolderStateFlow
+  public val isGoalArchivedFlow: Flow<Boolean> = arbiterContextHolderStateFlow
     .flatMapLatest {
-      it?.steps ?: flowOf()
+      it?.stepsFlow ?: flowOf()
     }
     .map { steps: List<ArbiterContextHolder.Step> ->
       steps.any { it.agentCommand is GoalAchievedAgentCommand }
     }
     .shareIn(coroutineScope, SharingStarted.WhileSubscribed(), 1)
 
-  fun isGoalArchived() = arbiterContextHolderStateFlow
+  public fun isGoalArchived(): Boolean = arbiterContextHolderStateFlow
     .value
-    ?.steps
-    ?.value
+    ?.steps()
     ?.any { it.agentCommand is GoalAchievedAgentCommand }
     ?: false
 
-  suspend fun execute(
+  public suspend fun execute(
     agentTask: ArbiterAgentTask
   ) {
     execute(
@@ -130,7 +129,7 @@ class ArbiterAgent(
     )
   }
 
-  suspend fun execute(
+  public suspend fun execute(
     goal: String,
     maxStep: Int = 10,
     agentCommandTypes: List<AgentCommandType> = defaultAgentCommandTypes()
@@ -179,7 +178,7 @@ class ArbiterAgent(
     }
   }
 
-  data class StepInput(
+  public data class StepInput(
     val arbiterContextHolder: ArbiterContextHolder,
     val agentCommandTypes: List<AgentCommandType>,
     val device: ArbiterDevice,
@@ -189,57 +188,57 @@ class ArbiterAgent(
     val executeCommandChain: (ExecuteCommandsInput) -> ExecuteCommandsOutput,
   )
 
-  sealed interface StepResult {
-    object GoalAchieved : StepResult
-    object Continue : StepResult
+  public sealed interface StepResult {
+    public object GoalAchieved : StepResult
+    public object Continue : StepResult
   }
 
-  data class ExecuteCommandsInput(
+  public data class ExecuteCommandsInput(
     val decisionOutput: ArbiterAi.DecisionOutput,
     val arbiterContextHolder: ArbiterContextHolder,
     val screenshotFileName: String,
     val device: ArbiterDevice,
   )
 
-  class ExecuteCommandsOutput
+  public class ExecuteCommandsOutput
 
 
-  fun cancel() {
+  public fun cancel() {
     job?.cancel()
     _isRunningStateFlow.value = false
   }
 }
 
-class AgentConfig(
-  val interceptors: List<ArbiterInterceptor>,
-  val ai: ArbiterAi,
-  val deviceFactory: () -> ArbiterDevice,
-  val deviceFormFactor: ArbiterScenarioDeviceFormFactor
+public class AgentConfig(
+  internal val interceptors: List<ArbiterInterceptor>,
+  internal val ai: ArbiterAi,
+  internal val deviceFactory: () -> ArbiterDevice,
+  internal val deviceFormFactor: ArbiterScenarioDeviceFormFactor
 ) {
-  class Builder {
+  public class Builder {
     private val interceptors = mutableListOf<ArbiterInterceptor>()
     private var deviceFactory: (() -> ArbiterDevice)? = null
     private var ai: ArbiterAi? = null
     private var deviceFormFactor: ArbiterScenarioDeviceFormFactor =
       ArbiterScenarioDeviceFormFactor.Mobile
 
-    fun addInterceptor(interceptor: ArbiterInterceptor) {
+    public fun addInterceptor(interceptor: ArbiterInterceptor) {
       interceptors.add(0, interceptor)
     }
 
-    fun deviceFactory(deviceFactory: () -> ArbiterDevice) {
+    public fun deviceFactory(deviceFactory: () -> ArbiterDevice) {
       this.deviceFactory = deviceFactory
     }
 
-    fun ai(ai: ArbiterAi) {
+    public fun ai(ai: ArbiterAi) {
       this.ai = ai
     }
 
-    fun deviceFormFactor(deviceFormFactor: ArbiterScenarioDeviceFormFactor) {
+    public fun deviceFormFactor(deviceFormFactor: ArbiterScenarioDeviceFormFactor) {
       this.deviceFormFactor = deviceFormFactor
     }
 
-    fun build(): AgentConfig {
+    public fun build(): AgentConfig {
       return AgentConfig(
         interceptors = interceptors,
         ai = ai!!,
@@ -249,7 +248,7 @@ class AgentConfig(
     }
   }
 
-  fun toBuilder(): Builder {
+  public fun toBuilder(): Builder {
     val builder = Builder()
     interceptors.forEach {
       builder.addInterceptor(it)
@@ -260,24 +259,24 @@ class AgentConfig(
   }
 }
 
-fun AgentConfig(block: AgentConfig.Builder.() -> Unit = {}): AgentConfig {
+public fun AgentConfig(block: AgentConfig.Builder.() -> Unit = {}): AgentConfig {
   val builder = AgentConfig.Builder()
   builder.block()
   return builder.build()
 }
 
-fun AgentConfigBuilder(block: AgentConfig.Builder.() -> Unit): AgentConfig.Builder {
+public fun AgentConfigBuilder(block: AgentConfig.Builder.() -> Unit): AgentConfig.Builder {
   val builder = AgentConfig.Builder()
   builder.block()
   return builder
 }
 
 
-fun AgentConfigBuilder(
+public fun AgentConfigBuilder(
   deviceFormFactor: ArbiterScenarioDeviceFormFactor,
   initializeMethods: ArbiterScenarioContent.InitializeMethods,
   cleanupData: ArbiterScenarioContent.CleanupData
-) = AgentConfigBuilder {
+): AgentConfig.Builder = AgentConfigBuilder {
   deviceFormFactor(deviceFormFactor)
   when (val method = initializeMethods) {
     ArbiterScenarioContent.InitializeMethods.Back -> {
@@ -363,38 +362,38 @@ fun AgentConfigBuilder(
   }
 }
 
-interface ArbiterInterceptor
+public interface ArbiterInterceptor
 
-interface ArbiterInitializerInterceptor : ArbiterInterceptor {
-  fun intercept(device: ArbiterDevice, chain: Chain)
-  fun interface Chain {
-    fun proceed(device: ArbiterDevice)
+public interface ArbiterInitializerInterceptor : ArbiterInterceptor {
+  public fun intercept(device: ArbiterDevice, chain: Chain)
+  public fun interface Chain {
+    public fun proceed(device: ArbiterDevice)
   }
 }
 
-interface ArbiterDecisionInterceptor : ArbiterInterceptor {
-  fun intercept(decisionInput: ArbiterAi.DecisionInput, chain: Chain): ArbiterAi.DecisionOutput
+public interface ArbiterDecisionInterceptor : ArbiterInterceptor {
+  public fun intercept(decisionInput: ArbiterAi.DecisionInput, chain: Chain): ArbiterAi.DecisionOutput
 
-  fun interface Chain {
-    fun proceed(decisionInput: ArbiterAi.DecisionInput): ArbiterAi.DecisionOutput
+  public fun interface Chain {
+    public fun proceed(decisionInput: ArbiterAi.DecisionInput): ArbiterAi.DecisionOutput
   }
 }
 
-interface ArbiterExecuteCommandsInterceptor : ArbiterInterceptor {
-  fun intercept(executeCommandsInput: ExecuteCommandsInput, chain: Chain): ExecuteCommandsOutput
-  fun interface Chain {
-    fun proceed(executeCommandsInput: ExecuteCommandsInput): ExecuteCommandsOutput
+public interface ArbiterExecuteCommandsInterceptor : ArbiterInterceptor {
+  public fun intercept(executeCommandsInput: ExecuteCommandsInput, chain: Chain): ExecuteCommandsOutput
+  public fun interface Chain {
+    public fun proceed(executeCommandsInput: ExecuteCommandsInput): ExecuteCommandsOutput
   }
 }
 
-interface ArbiterStepInterceptor : ArbiterInterceptor {
-  fun intercept(stepInput: StepInput, chain: Chain): StepResult
-  fun interface Chain {
-    fun proceed(stepInput: StepInput): StepResult
+public interface ArbiterStepInterceptor : ArbiterInterceptor {
+  public fun intercept(stepInput: StepInput, chain: Chain): StepResult
+  public fun interface Chain {
+    public fun proceed(stepInput: StepInput): StepResult
   }
 }
 
-fun defaultAgentCommandTypes(): List<AgentCommandType> {
+public fun defaultAgentCommandTypes(): List<AgentCommandType> {
   return listOf(
     ClickWithIdAgentCommand,
     ClickWithTextAgentCommand,
@@ -407,7 +406,7 @@ fun defaultAgentCommandTypes(): List<AgentCommandType> {
   )
 }
 
-fun defaultAgentCommandTypesForTv(): List<AgentCommandType> {
+public fun defaultAgentCommandTypesForTv(): List<AgentCommandType> {
   return listOf(
     DpadUpArrowAgentCommand,
     DpadDownArrowAgentCommand,

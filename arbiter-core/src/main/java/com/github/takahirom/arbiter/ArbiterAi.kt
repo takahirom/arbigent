@@ -1,7 +1,7 @@
 package com.github.takahirom.arbiter
 
-interface ArbiterAi {
-  data class DecisionInput(
+public interface ArbiterAi {
+  public data class DecisionInput(
     val arbiterContextHolder: ArbiterContextHolder,
     val dumpHierarchy: String,
     // Only true if it is TV form factor
@@ -9,11 +9,11 @@ interface ArbiterAi {
     val agentCommandTypes: List<AgentCommandType>,
     val screenshotFileName: String,
   )
-  data class DecisionOutput(
+  public data class DecisionOutput(
     val agentCommands: List<AgentCommand>,
     val step: ArbiterContextHolder.Step
   )
-  fun decideWhatToDo(
+  public fun decideAgentCommands(
     decisionInput: DecisionInput
   ): DecisionOutput
 }

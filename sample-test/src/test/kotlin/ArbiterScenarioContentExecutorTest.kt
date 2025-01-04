@@ -11,7 +11,7 @@ class ArbiterScenarioContentExecutorTest {
   @OptIn(ExperimentalStdlibApi::class)
   @Test
   fun tests() = runTest {
-    ArbiterCorotuinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
+    ArbiterCoroutinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
     val agentConfig = AgentConfig {
       deviceFactory { FakeDevice() }
       ai(FakeAi())
@@ -35,7 +35,7 @@ class ArbiterScenarioContentExecutorTest {
   @OptIn(ExperimentalStdlibApi::class)
   @Test
   fun lastInterceptorCalledFirst() = runTest {
-    ArbiterCorotuinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
+    ArbiterCoroutinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
     val order = mutableListOf<Int>()
     val agentConfig = AgentConfig {
       deviceFactory { FakeDevice() }

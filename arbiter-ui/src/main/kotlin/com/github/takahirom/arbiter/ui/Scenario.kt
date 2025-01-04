@@ -392,7 +392,7 @@ fun buildSections(tasksToAgent: List<ArbiterTaskAssignment>): List<ScenarioSecti
     val latestContext: ArbiterContextHolder? by agent.latestArbiterContextFlow.collectAsState(agent.latestArbiterContext())
     val isRunning by agent.isRunningFlow.collectAsState()
     val nonNullContext = latestContext ?: continue
-    val steps: List<ArbiterContextHolder.Step> by nonNullContext.steps.collectAsState()
+    val steps: List<ArbiterContextHolder.Step> by nonNullContext.stepsFlow.collectAsState(nonNullContext.steps())
     sections += ScenarioSection(
       goal = tasks.goal,
       isRunning = isRunning,

@@ -4,19 +4,19 @@ import maestro.KeyCode
 import maestro.MaestroException
 import maestro.orchestra.*
 
-interface AgentCommand {
-  val actionName: String
-  fun runOrchestraCommand(device: ArbiterDevice)
-  fun stepLogText(): String
+public interface AgentCommand {
+  public val actionName: String
+  public fun runOrchestraCommand(device: ArbiterDevice)
+  public fun stepLogText(): String
 
-  fun isGoal(): Boolean {
+  public fun isGoal(): Boolean {
     return actionName == GoalAchievedAgentCommand.actionName
   }
 }
 
-interface AgentCommandType {
-  val actionName: String
-  fun templateForAI(): String
+public interface AgentCommandType {
+  public val actionName: String
+  public fun templateForAI(): String
 }
 
 private fun getRegexToIndex(text: String): Pair<String, String> {
@@ -26,8 +26,8 @@ private fun getRegexToIndex(text: String): Pair<String, String> {
   return Pair(regexText, index)
 }
 
-data class ClickWithTextAgentCommand(val textRegex: String) : AgentCommand {
-  override val actionName = Companion.actionName
+public data class ClickWithTextAgentCommand(val textRegex: String) : AgentCommand {
+  override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
     return "Click on text: $textRegex"
@@ -63,8 +63,8 @@ data class ClickWithTextAgentCommand(val textRegex: String) : AgentCommand {
     }
   }
 
-  companion object : AgentCommandType {
-    override val actionName = "ClickWithText"
+  public companion object : AgentCommandType {
+    override val actionName: String = "ClickWithText"
 
     override fun templateForAI(): String {
       return """
@@ -81,8 +81,8 @@ data class ClickWithTextAgentCommand(val textRegex: String) : AgentCommand {
   }
 }
 
-data class ClickWithIdAgentCommand(val textRegex: String) : AgentCommand {
-  override val actionName = Companion.actionName
+public data class ClickWithIdAgentCommand(val textRegex: String) : AgentCommand {
+  override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
     return "Click on id: $textRegex"
@@ -103,8 +103,8 @@ data class ClickWithIdAgentCommand(val textRegex: String) : AgentCommand {
     )
   }
 
-  companion object : AgentCommandType {
-    override val actionName = "ClickWithId"
+  public companion object : AgentCommandType {
+    override val actionName: String = "ClickWithId"
 
     override fun templateForAI(): String {
       return """
@@ -121,8 +121,8 @@ data class ClickWithIdAgentCommand(val textRegex: String) : AgentCommand {
   }
 }
 
-data class DpadDownArrowAgentCommand(val count: Int) : AgentCommand {
-  override val actionName = Companion.actionName
+public data class DpadDownArrowAgentCommand(val count: Int) : AgentCommand {
+  override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
     return "Press down arrow key $count times"
@@ -140,8 +140,8 @@ data class DpadDownArrowAgentCommand(val count: Int) : AgentCommand {
     )
   }
 
-  companion object : AgentCommandType {
-    override val actionName = "DpadDownArrow"
+  public companion object : AgentCommandType {
+    override val actionName: String = "DpadDownArrow"
 
     override fun templateForAI(): String {
       return """
@@ -156,8 +156,8 @@ data class DpadDownArrowAgentCommand(val count: Int) : AgentCommand {
   }
 }
 
-data class DpadUpArrowAgentCommand(val count: Int) : AgentCommand {
-  override val actionName = Companion.actionName
+public data class DpadUpArrowAgentCommand(val count: Int) : AgentCommand {
+  override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
     return "Press up arrow key $count times"
@@ -175,8 +175,8 @@ data class DpadUpArrowAgentCommand(val count: Int) : AgentCommand {
     )
   }
 
-  companion object : AgentCommandType {
-    override val actionName = "DpadUpArrow"
+  public companion object : AgentCommandType {
+    override val actionName: String = "DpadUpArrow"
 
     override fun templateForAI(): String {
       return """
@@ -191,8 +191,8 @@ data class DpadUpArrowAgentCommand(val count: Int) : AgentCommand {
   }
 }
 
-data class DpadRightArrowAgentCommand(val count: Int) : AgentCommand {
-  override val actionName = Companion.actionName
+public data class DpadRightArrowAgentCommand(val count: Int) : AgentCommand {
+  override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
     return "Press right arrow key $count times"
@@ -210,8 +210,8 @@ data class DpadRightArrowAgentCommand(val count: Int) : AgentCommand {
     )
   }
 
-  companion object : AgentCommandType {
-    override val actionName = "DpadRightArrow"
+  public companion object : AgentCommandType {
+    override val actionName: String = "DpadRightArrow"
 
     override fun templateForAI(): String {
       return """
@@ -226,8 +226,8 @@ data class DpadRightArrowAgentCommand(val count: Int) : AgentCommand {
   }
 }
 
-data class DpadLeftArrowAgentCommand(val count: Int) : AgentCommand {
-  override val actionName = Companion.actionName
+public data class DpadLeftArrowAgentCommand(val count: Int) : AgentCommand {
+  override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
     return "Press left arrow key $count times"
@@ -245,8 +245,8 @@ data class DpadLeftArrowAgentCommand(val count: Int) : AgentCommand {
     )
   }
 
-  companion object : AgentCommandType {
-    override val actionName = "DpadLeftArrow"
+  public companion object : AgentCommandType {
+    override val actionName: String = "DpadLeftArrow"
 
     override fun templateForAI(): String {
       return """
@@ -261,8 +261,8 @@ data class DpadLeftArrowAgentCommand(val count: Int) : AgentCommand {
   }
 }
 
-data class DpadCenterAgentCommand(val count: Int) : AgentCommand {
-  override val actionName = Companion.actionName
+public data class DpadCenterAgentCommand(val count: Int) : AgentCommand {
+  override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
     return "Press center key $count times"
@@ -280,8 +280,8 @@ data class DpadCenterAgentCommand(val count: Int) : AgentCommand {
     )
   }
 
-  companion object : AgentCommandType {
-    override val actionName = "DpadCenter"
+  public companion object : AgentCommandType {
+    override val actionName: String = "DpadCenter"
 
     override fun templateForAI(): String {
       return """
@@ -296,8 +296,8 @@ data class DpadCenterAgentCommand(val count: Int) : AgentCommand {
   }
 }
 
-data class InputTextAgentCommand(val text: String) : AgentCommand {
-  override val actionName = Companion.actionName
+public data class InputTextAgentCommand(val text: String) : AgentCommand {
+  override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
     return "Input text: $text"
@@ -315,8 +315,8 @@ data class InputTextAgentCommand(val text: String) : AgentCommand {
     )
   }
 
-  companion object : AgentCommandType {
-    override val actionName = "InputText"
+  public companion object : AgentCommandType {
+    override val actionName: String = "InputText"
 
     override fun templateForAI(): String {
       return """
@@ -331,8 +331,8 @@ data class InputTextAgentCommand(val text: String) : AgentCommand {
   }
 }
 
-class BackPressAgentCommand() : AgentCommand {
-  override val actionName = Companion.actionName
+public class BackPressAgentCommand() : AgentCommand {
+  override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
     return "Press back button"
@@ -348,8 +348,8 @@ class BackPressAgentCommand() : AgentCommand {
     )
   }
 
-  companion object : AgentCommandType {
-    override val actionName = "BackPress"
+  public companion object : AgentCommandType {
+    override val actionName: String = "BackPress"
 
     override fun templateForAI(): String {
       return """
@@ -362,7 +362,7 @@ class BackPressAgentCommand() : AgentCommand {
   }
 }
 
-class ScrollAgentCommand : AgentCommand {
+public class ScrollAgentCommand : AgentCommand {
   override val actionName: String = "Scroll"
 
   override fun stepLogText(): String {
@@ -379,8 +379,8 @@ class ScrollAgentCommand : AgentCommand {
     )
   }
 
-  companion object : AgentCommandType {
-    override val actionName = "Scroll"
+  public companion object : AgentCommandType {
+    override val actionName: String = "Scroll"
 
     override fun templateForAI(): String {
       return """
@@ -393,8 +393,8 @@ class ScrollAgentCommand : AgentCommand {
   }
 }
 
-data class KeyPressAgentCommand(val keyName: String) : AgentCommand {
-  override val actionName = "KeyPress"
+public data class KeyPressAgentCommand(val keyName: String) : AgentCommand {
+  override val actionName: String = "KeyPress"
 
   override fun stepLogText(): String {
     return "Press key: $keyName"
@@ -414,8 +414,8 @@ data class KeyPressAgentCommand(val keyName: String) : AgentCommand {
     )
   }
 
-  companion object : AgentCommandType {
-    override val actionName = "KeyPress"
+  public companion object : AgentCommandType {
+    override val actionName: String = "KeyPress"
 
     override fun templateForAI(): String {
       return """
@@ -428,8 +428,8 @@ data class KeyPressAgentCommand(val keyName: String) : AgentCommand {
   }
 }
 
-class WaitAgentCommand(val timeMs: Int) : AgentCommand {
-  override val actionName = "Wait"
+public class WaitAgentCommand(public val timeMs: Int) : AgentCommand {
+  override val actionName: String = "Wait"
 
   override fun stepLogText(): String {
     return "Wait for $timeMs ms"
@@ -439,8 +439,8 @@ class WaitAgentCommand(val timeMs: Int) : AgentCommand {
     Thread.sleep(timeMs.toLong())
   }
 
-  companion object : AgentCommandType {
-    override val actionName = "Wait"
+  public companion object : AgentCommandType {
+    override val actionName: String = "Wait"
 
     override fun templateForAI(): String {
       return """
@@ -454,8 +454,8 @@ class WaitAgentCommand(val timeMs: Int) : AgentCommand {
   }
 }
 
-class GoalAchievedAgentCommand : AgentCommand {
-  override val actionName = "GoalAchieved"
+public class GoalAchievedAgentCommand : AgentCommand {
+  override val actionName: String = "GoalAchieved"
 
   override fun stepLogText(): String {
     return "Goal achieved"
@@ -464,8 +464,8 @@ class GoalAchievedAgentCommand : AgentCommand {
   override fun runOrchestraCommand(device: ArbiterDevice) {
   }
 
-  companion object : AgentCommandType {
-    override val actionName = "GoalAchieved"
+  public companion object : AgentCommandType {
+    override val actionName: String = "GoalAchieved"
 
     override fun templateForAI(): String {
       return """

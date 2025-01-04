@@ -1,7 +1,7 @@
 package com.github.takahirom.arbiter.ui
 
 
-import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
+import com.github.takahirom.arbiter.ArbiterCoroutinesDispatcher
 import com.github.takahirom.arbiter.AvailableDevice
 import com.github.takahirom.arbiter.DeviceOs
 import com.github.takahirom.arbiter.arbiterDebugLog
@@ -44,6 +44,6 @@ class DevicesStateHolder {
           }
           .map { AvailableDevice.IOS(it) }
       }
-    }.launchIn(CoroutineScope(ArbiterCorotuinesDispatcher.dispatcher + SupervisorJob()))
+    }.launchIn(CoroutineScope(ArbiterCoroutinesDispatcher.dispatcher + SupervisorJob()))
   }
 }

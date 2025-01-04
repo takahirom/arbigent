@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.github.takahirom.arbiter.AgentCommand
 import com.github.takahirom.arbiter.ArbiterAi
 import com.github.takahirom.arbiter.ArbiterContextHolder
-import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
+import com.github.takahirom.arbiter.ArbiterCoroutinesDispatcher
 import com.github.takahirom.arbiter.ClickWithTextAgentCommand
 import com.github.takahirom.arbiter.ArbiterDevice
 import com.github.takahirom.arbiter.GoalAchievedAgentCommand
@@ -50,7 +50,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
   @Test
   fun test() {
     val testDispatcher = StandardTestDispatcher()
-    ArbiterCorotuinesDispatcher.dispatcher = testDispatcher
+    ArbiterCoroutinesDispatcher.dispatcher = testDispatcher
     runComposeUiTest {
       setContent()
       runTest(testDispatcher) {
@@ -331,7 +331,7 @@ class FakeAi : ArbiterAi {
     )
   }
 
-  override fun decideWhatToDo(decisionInput: ArbiterAi.DecisionInput): ArbiterAi.DecisionOutput {
+  override fun decideAgentCommands(decisionInput: ArbiterAi.DecisionInput): ArbiterAi.DecisionOutput {
     arbiterDebugLog("FakeAi.decideWhatToDo")
     if (count == 0) {
       count++

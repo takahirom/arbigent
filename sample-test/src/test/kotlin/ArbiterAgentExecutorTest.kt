@@ -3,7 +3,7 @@ package com.github.takahirom.arbiter.sample.test
 import com.github.takahirom.arbiter.AgentConfig
 import com.github.takahirom.arbiter.ArbiterAgent
 import com.github.takahirom.arbiter.ArbiterAgentTask
-import com.github.takahirom.arbiter.ArbiterCorotuinesDispatcher
+import com.github.takahirom.arbiter.ArbiterCoroutinesDispatcher
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -13,7 +13,7 @@ class ArbiterAgentExecutorTest {
   @OptIn(ExperimentalStdlibApi::class)
   @Test
   fun tests() = runTest {
-    ArbiterCorotuinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
+    ArbiterCoroutinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
     val agentConfig = AgentConfig {
       deviceFactory { FakeDevice() }
       ai(FakeAi())
