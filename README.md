@@ -76,17 +76,19 @@ The execution flow involves the UI, Arbiter, ArbiterDevice, and ArbiterAi. The U
 ```mermaid
 sequenceDiagram
   participant UI(or Tests)
-  participant Arbiter
+  participant ArbiterAgent
   participant ArbiterDevice
   participant ArbiterAi
-  UI(or Tests)->>Arbiter: Create project
-  Arbiter->>ArbiterDevice: Fetch UI tree
-  ArbiterDevice->>Arbiter: Return UI tree
-  Arbiter->>ArbiterAi: Decide Action by goal and UI tree
-  ArbiterAi->>Arbiter: Return Action
-  Arbiter->>ArbiterDevice: Perform actions
-  ArbiterDevice->>Arbiter: Return results
-  Arbiter->>UI(or Tests): Display results
+  UI(or Tests)->>ArbiterAgent: Execute
+  loop
+    ArbiterAgent->>ArbiterDevice: Fetch UI tree
+    ArbiterDevice->>ArbiterAgent: Return UI tree
+    ArbiterAgent->>ArbiterAi: Decide Action by goal and UI tree and histories
+    ArbiterAi->>ArbiterAgent: Return Action
+    ArbiterAgent->>ArbiterDevice: Perform actions
+    ArbiterDevice->>ArbiterAgent: Return results
+  end
+  ArbiterAgent->>UI(or Tests): Display results
 ```
 
 ###  Class Diagram
