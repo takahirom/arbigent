@@ -1,6 +1,8 @@
 # Arbiter: An AI Agent Testing Framework for Modern Applications
 
-> Zero to AI agent testing in minutes. Arbiter's intuitive UI and powerful code interface make it accessible to everyone, while its scenario breakdown feature ensures scalability for even the most complex tasks.
+**Zero to AI agent testing in minutes. Arbiter's intuitive UI and powerful code interface make it accessible to everyone, while its scenario breakdown feature ensures scalability for even the most complex tasks.**
+
+
 
 > [!WARNING]
 > This project is still under development and may change in the future.
@@ -12,7 +14,7 @@
 
 ## Demo movie
 
-https://github.com/user-attachments/assets/46a29a3a-bf18-4db5-af57-2733a38b7757
+https://github.com/user-attachments/assets/46fa3034-5671-4ff1-99df-abbdaebaf197
 
 ## Motivation
 
