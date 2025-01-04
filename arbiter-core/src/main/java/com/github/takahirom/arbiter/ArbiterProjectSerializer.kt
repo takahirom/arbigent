@@ -105,7 +105,9 @@ public class ArbiterScenarioContent @OptIn(ExperimentalUuidApi::class) construct
   public sealed interface InitializeMethods {
     @Serializable
     @SerialName("Back")
-    public data object Back : InitializeMethods
+    public data class Back(
+      val times: Int = 3
+    ) : InitializeMethods
 
     @Serializable
     @SerialName("Noop")

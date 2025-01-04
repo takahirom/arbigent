@@ -35,6 +35,28 @@ public class ArbiterAgent(
   private val interceptors: List<ArbiterInterceptor> = agentConfig.interceptors
   private val deviceFormFactor = agentConfig.deviceFormFactor
 
+  private val initializerInterceptors: List<ArbiterInitializerInterceptor> = interceptors
+    .filterIsInstance<ArbiterInitializerInterceptor>()
+  private val initializerChain: (ArbiterDevice) -> Unit = initializerInterceptors.foldRight(
+    { device: ArbiterDevice ->
+      // do nothing
+    },
+    { interceptor, acc ->
+      { device ->
+        interceptor.intercept(device) { device -> acc(device) }
+      }
+    }
+  )
+  private val stepInterceptors: List<ArbiterStepInterceptor> = interceptors
+    .filterIsInstance<ArbiterStepInterceptor>()
+  private val stepChain: (StepInput) -> StepResult = stepInterceptors.foldRight(
+    { input: StepInput -> step(input) },
+    { interceptor, acc ->
+      { input ->
+        interceptor.intercept(input) { stepInput -> acc(stepInput) }
+      }
+    }
+  )
   private val decisionInterceptors: List<ArbiterDecisionInterceptor> = interceptors
     .filterIsInstance<ArbiterDecisionInterceptor>()
   private val decisionChain: (ArbiterAi.DecisionInput) -> ArbiterAi.DecisionOutput =
@@ -60,28 +82,6 @@ public class ArbiterAgent(
         }
       }
     )
-  private val initializerInterceptors: List<ArbiterInitializerInterceptor> = interceptors
-    .filterIsInstance<ArbiterInitializerInterceptor>()
-  private val initializerChain: (ArbiterDevice) -> Unit = initializerInterceptors.foldRight(
-    { device: ArbiterDevice ->
-      // do nothing
-    },
-    { interceptor, acc ->
-      { device ->
-        interceptor.intercept(device) { device -> acc(device) }
-      }
-    }
-  )
-  private val stepInterceptors: List<ArbiterStepInterceptor> = interceptors
-    .filterIsInstance<ArbiterStepInterceptor>()
-  private val stepChain: (StepInput) -> StepResult = stepInterceptors.foldRight(
-    { input: StepInput -> step(input) },
-    { interceptor, acc ->
-      { input ->
-        interceptor.intercept(input) { stepInput -> acc(stepInput) }
-      }
-    }
-  )
   private val coroutineScope =
     CoroutineScope(ArbiterCoroutinesDispatcher.dispatcher + SupervisorJob())
   private var job: Job? = null
@@ -171,7 +171,7 @@ public class ArbiterAgent(
       _isRunningStateFlow.value = false
     } catch (e: Exception) {
       arbiterDebugLog("Failed to run agent: $e")
-      e.printStackTrace()
+      errorHandler(e)
       _isRunningStateFlow.value = false
     } finally {
       arbiterDebugLog("Arbiter.execute agent.execute end $goal")
@@ -279,13 +279,13 @@ public fun AgentConfigBuilder(
 ): AgentConfig.Builder = AgentConfigBuilder {
   deviceFormFactor(deviceFormFactor)
   when (val method = initializeMethods) {
-    ArbiterScenarioContent.InitializeMethods.Back -> {
+    is ArbiterScenarioContent.InitializeMethods.Back -> {
       addInterceptor(object : ArbiterInitializerInterceptor {
         override fun intercept(
           device: ArbiterDevice,
           chain: ArbiterInitializerInterceptor.Chain
         ) {
-          repeat(10) {
+          repeat(method.times) {
             try {
               device.executeCommands(
                 commands = listOf(

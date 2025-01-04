@@ -133,6 +133,8 @@ public class ArbiterScenarioExecutor {
           yield()
         }
       } while (!finishedSuccessfully && retryRemain-- > 0)
+    } catch (e: Exception) {
+      errorHandler(e)
     } finally {
       _arbiterScenarioRunningInfoStateFlow.value = null
       _taskAssignmentsStateFlow.value.forEach {

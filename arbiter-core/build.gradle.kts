@@ -8,6 +8,11 @@ kotlin {
   java.toolchain {
     languageVersion.set(JavaLanguageVersion.of(17))
   }
+  sourceSets {
+    all {
+      languageSettings.optIn("com.github.takahirom.arbiter.ArbiterInternalApi")
+    }
+  }
 }
 
 dependencies {

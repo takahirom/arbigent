@@ -21,6 +21,7 @@ class OpenAIAi(
   private val apiKey: String,
   private val baseUrl: String = "https://api.openai.com/v1/",
   private val modelName: String = "gpt-4o-mini",
+  private val systemPrompt: String = ArbiterPrompts.systemPrompt,
   private val requestBuilder: (String) -> Request = { requestBodyJson ->
     createRequest(baseUrl, requestBodyJson, apiKey)
   }
@@ -35,7 +36,7 @@ class OpenAIAi(
         content = listOf(
           Content(
             type = "text",
-            text = "You are an agent that achieve the user's goal automatically. Please be careful not to repeat the same action."
+            text = systemPrompt
           )
         )
       ),
@@ -158,10 +159,12 @@ $templates"""
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
           KeyPressAgentCommand(text)
         }
+
         WaitAgentCommand -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
           WaitAgentCommand(text.toIntOrNull() ?: 1000)
         }
+
         ScrollAgentCommand -> ScrollAgentCommand()
 
         else -> throw Exception("Unsupported action: $action")
@@ -209,6 +212,8 @@ $templates"""
     val response = client.newCall(request).execute()
     if (response.code == HttpStatusCode.TooManyRequests.value) {
       throw AiRateLimitExceededException()
+    } else if (!response.isSuccessful && !response.isRedirect) {
+      throw Exception("Failed to call API: ${response.code} ${response.body?.string()}")
     }
     val responseBody = response.body?.string() ?: ""
     arbiterDebugLog("OpenAI response: $responseBody")

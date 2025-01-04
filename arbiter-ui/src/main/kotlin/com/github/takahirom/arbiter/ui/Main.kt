@@ -27,32 +27,36 @@ import org.jetbrains.jewel.window.styling.TitleBarStyle
 import java.awt.Window
 
 
-fun main() = application {
-  val appStateHolder = remember {
-    ArbiterAppStateHolder(
-      aiFactory = {
-        val aiSetting = Preference.aiSettingValue
-        val aiProviderSetting = aiSetting.aiSettings.first { it.id == aiSetting.selectedId }
-        if (aiProviderSetting is AiProviderSetting.OpenAiBasedApiProviderSetting) {
-          OpenAIAi(
-            apiKey = aiProviderSetting.apiKey,
-            modelName = aiProviderSetting.modelName,
-            baseUrl = aiProviderSetting.baseUrl
-          )
-        } else {
-          throw IllegalArgumentException("Unsupported aiProviderSetting: $aiProviderSetting")
-        }
-      },
+fun main() {
+  plantErrorDialog()
+  application {
+    val appStateHolder = remember {
+      ArbiterAppStateHolder(
+        aiFactory = {
+          val aiSetting = Preference.aiSettingValue
+          val aiProviderSetting = aiSetting.aiSettings.first { it.id == aiSetting.selectedId }
+          if (aiProviderSetting is AiProviderSetting.OpenAiBasedApiProviderSetting) {
+            OpenAIAi(
+              apiKey = aiProviderSetting.apiKey,
+              modelName = aiProviderSetting.modelName,
+              baseUrl = aiProviderSetting.baseUrl
+            )
+          } else {
+            throw IllegalArgumentException("Unsupported aiProviderSetting: $aiProviderSetting")
+          }
+        },
+      )
+    }
+    AppWindow(
+      appStateHolder = appStateHolder,
+      onExit = {
+        appStateHolder.close()
+        exitApplication()
+      }
     )
   }
-  AppWindow(
-    appStateHolder = appStateHolder,
-    onExit = {
-      appStateHolder.close()
-      exitApplication()
-    }
-  )
 }
+
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable

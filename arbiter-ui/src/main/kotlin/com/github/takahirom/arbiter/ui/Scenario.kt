@@ -293,14 +293,35 @@ private fun ScenarioOptions(
       Row(
         verticalAlignment = Alignment.CenterVertically
       ) {
+        var editingText by remember(initializeMethods) {
+          mutableStateOf(
+            (initializeMethods as? ArbiterScenarioContent.InitializeMethods.Back)?.times.toString()
+          )
+        }
         RadioButtonRow(
-          selected = initializeMethods == ArbiterScenarioContent.InitializeMethods.Back,
-          text = "Back",
+          selected = initializeMethods is ArbiterScenarioContent.InitializeMethods.Back,
           onClick = {
             scenarioStateHolder.initializeMethodsStateFlow.value =
-              ArbiterScenarioContent.InitializeMethods.Back
+              ArbiterScenarioContent.InitializeMethods.Back()
           }
-        )
+        ) {
+          Column {
+            Text(modifier = Modifier.padding(top = 4.dp), text = "Back")
+            TextField(
+              modifier = Modifier
+                .padding(4.dp),
+              enabled = initializeMethods is ArbiterScenarioContent.InitializeMethods.Back,
+              value = editingText,
+              placeholder = { Text("Times") },
+              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+              onValueChange = {
+                editingText = it
+                scenarioStateHolder.initializeMethodsStateFlow.value =
+                  ArbiterScenarioContent.InitializeMethods.Back(it.toInt())
+              },
+            )
+          }
+        }
       }
       Row(
         verticalAlignment = Alignment.CenterVertically

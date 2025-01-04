@@ -34,7 +34,7 @@ constructor(
       ArbiterScenarioContent.CleanupData.Noop
     )
   val initializeMethodsStateFlow: MutableStateFlow<ArbiterScenarioContent.InitializeMethods> =
-    MutableStateFlow(ArbiterScenarioContent.InitializeMethods.Back)
+    MutableStateFlow(ArbiterScenarioContent.InitializeMethods.Back())
   val deviceFormFactorStateFlow: MutableStateFlow<ArbiterScenarioDeviceFormFactor> =
     MutableStateFlow(ArbiterScenarioDeviceFormFactor.Mobile)
   val dependencyScenarioStateHolderStateFlow = MutableStateFlow<ArbiterScenarioStateHolder?>(null)
