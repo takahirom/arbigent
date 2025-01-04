@@ -213,7 +213,7 @@ $templates"""
     if (response.code == HttpStatusCode.TooManyRequests.value) {
       throw AiRateLimitExceededException()
     } else if (!response.isSuccessful && !response.isRedirect) {
-      throw Exception("Failed to call API: ${response.code} ${response.body?.string()}")
+      throw IllegalStateException("Failed to call API: ${response.code} ${response.body?.string()}")
     }
     val responseBody = response.body?.string() ?: ""
     arbiterDebugLog("OpenAI response: $responseBody")
