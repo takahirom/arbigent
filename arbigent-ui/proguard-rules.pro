@@ -8,6 +8,7 @@
 -keep class kotlinx.coroutines.** { *; }
 -keep class androidx.compose.runtime.** { *; }
 -keep class okio.** { *; }
+-keep class org.jetbrains.jewel.** { *; }
 
 -dontwarn androidx.compose.desktop.DesktopTheme_jvmKt
 -dontwarn androidx.compose.desktop.DesktopTheme_jvmKt$DesktopMaterialTheme$2
