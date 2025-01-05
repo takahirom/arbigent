@@ -11,12 +11,17 @@
 
  <img width="1616" alt="image" src="https://github.com/user-attachments/assets/38265777-0968-4a91-a269-f66ceed6b059" /> 
 
-
 ## Demo movie
 
 https://github.com/user-attachments/assets/46fa3034-5671-4ff1-99df-abbdaebaf197
 
 ## Motivation
+
+### Testing AI Agents in Modern Applications
+
+Testing UI with traditional testing frameworks is challenging because they easily break when the UI changes, such as during tutorial updates or when dialogs are displayed.  
+AI agents emerged as a solution, but testing with AI agents also presents challenges. AI agents often don't work as intended, for example, they might open other apps or click on the wrong button due to the complexity of the task.  
+To address these challenges, I created Arbiter, an AI agent testing framework that can break down complex tasks into smaller, dependent scenarios. This approach enables more predictable and scalable testing of AI agents in modern applications.
 
 ### Customizable for Various AI Providers, OSes, Form Factors, etc.
 
@@ -83,7 +88,7 @@ You can add AI providers by implementing the `ArbiterAi` interface.
 | iOS         | Yes       |
 | Web(Chrome) | Yes       |
 
-You can add OSes by implementing the ArbiterDevice interface. Thanks to the excellent [maestro](https://github.com/mobile-dev-inc/maestro) library, we are able to support multiple OSes.
+You can add OSes by implementing the `ArbiterDevice` interface. Thanks to the excellent [maestro](https://github.com/mobile-dev-inc/maestro) library, we are able to support multiple OSes.
 
 | Form Factor    | Supported |
 |----------------|-----------|
