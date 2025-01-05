@@ -68,3 +68,32 @@ compose.desktop {
   }
 }
 
+tasks.withType(org.jetbrains.compose.desktop.application.tasks.AbstractProguardTask::class.java) {
+  val proguardFile = File.createTempFile("tmp", ".pro", temporaryDir)
+  proguardFile.deleteOnExit()
+
+  compose.desktop.application.buildTypes.release.proguard {
+    configurationFiles.from(proguardFile)
+  }
+
+  doFirst {
+    proguardFile.bufferedWriter().use { proguardFileWriter ->
+      sourceSets.main.get().runtimeClasspath
+        .filter { it.extension == "jar" }
+        .forEach { jar ->
+          val zip = zipTree(jar)
+          zip.matching { include("META-INF/**/proguard/*.pro") }.forEach {
+            proguardFileWriter.appendLine("########   ${jar.name} ${it.name}")
+            proguardFileWriter.appendLine(it.readText())
+          }
+          zip.matching { include("META-INF/services/*") }.forEach {
+            it.readLines().filter { !it.startsWith("#") && it.isNotBlank() }.forEach { cls ->
+              val rule = "-keep class $cls"
+              proguardFileWriter.appendLine(rule)
+            }
+          }
+        }
+    }
+  }
+}
+
