@@ -20,6 +20,8 @@ public class ArbigentProject(initialArbigentScenarios: List<ArbigentScenario>) {
     }
   }
 
+  public class FailedToArchiveException(message: String) : RuntimeException(message)
+
   public suspend fun execute() {
     scenarioAssignments().forEach { (scenario, scenarioExecutor) ->
       arbigentInfoLog("Start scenario: $scenario")
@@ -27,8 +29,8 @@ public class ArbigentProject(initialArbigentScenarios: List<ArbigentScenario>) {
 
       arbigentDebugLog(scenarioExecutor.statusText())
       if (!scenarioExecutor.isGoalArchived()) {
-        error(
-          "Failed to archive " + scenarioExecutor.statusText()
+        throw FailedToArchiveException(
+          "Failed to archive scenario:" + scenarioExecutor.statusText()
         )
       }
     }
@@ -41,8 +43,8 @@ public class ArbigentProject(initialArbigentScenarios: List<ArbigentScenario>) {
     scenarioExecutor.execute(scenario)
     arbigentDebugLog(scenarioExecutor.statusText())
     if (!scenarioExecutor.isGoalArchived()) {
-      error(
-        "Failed to archive " + scenarioExecutor.statusText()
+      throw FailedToArchiveException(
+        "Failed to archive scenario:" + scenarioExecutor.statusText()
       )
     }
   }
