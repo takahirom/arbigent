@@ -11,7 +11,7 @@ plugins {
 
 kotlin {
   java.toolchain {
-    languageVersion.set(JavaLanguageVersion.of(17))
+    languageVersion.set(JavaLanguageVersion.of(21))
   }
 }
 
@@ -45,6 +45,7 @@ dependencies {
 compose.desktop {
   application {
     buildTypes.release.proguard{
+      version.set("7.5.0")
       configurationFiles.from(file("proguard-rules.pro"))
       obfuscate = false
     }
@@ -66,3 +67,4 @@ compose.desktop {
     }
   }
 }
+
