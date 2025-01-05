@@ -65,6 +65,31 @@ Use the intuitive UI to define scenarios. Simply specify the desired goal for th
 
 Run tests either directly through the UI or programmatically via the code interface.
 
+
+## Supported AI Providers
+
+| AI Provider | Supported |
+|-------------|-----------|
+| OpenAI      | Yes       |
+| Gemini      | Yes       |
+
+You can add AI providers by implementing the `ArbiterAi` interface.
+
+## Supported OSes / Form Factors
+
+| OS          | Supported |
+|-------------|-----------|
+| Android     | Yes       |
+| iOS         | Yes       |
+| Web(Chrome) | Yes       |
+
+You can add OSes by implementing the ArbiterDevice interface. Thanks to the excellent [maestro](https://github.com/mobile-dev-inc/maestro) library, we are able to support multiple OSes.
+
+| Form Factor    | Supported |
+|----------------|-----------|
+| Phone / Tablet | Yes       |
+| TV(D-Pad)      | Yes       |
+
 # Learn More
 
 ## Basic Structure

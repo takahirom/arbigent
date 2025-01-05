@@ -280,25 +280,33 @@ fun ScenarioControls(appStateHolder: ArbiterAppStateHolder) {
   val coroutineScope = rememberCoroutineScope()
   FlowRow {
     val devicesStateHolder = appStateHolder.devicesStateHolder
-    ListComboBox(
-      items = DeviceOs.entries.map { it.name },
+    val deviceOs by devicesStateHolder.selectedDeviceOs.collectAsState()
+    ComboBox(
       modifier = Modifier.width(100.dp).padding(end = 2.dp),
-      isEditable = false,
+      labelText = deviceOs.name,
       maxPopupHeight = 150.dp,
-      onSelectedItemChange = { itemText ->
-        devicesStateHolder.selectedDeviceOs.value = DeviceOs.valueOf(itemText)
-        devicesStateHolder.fetchDevices()
-        devicesStateHolder.onSelectedDeviceChanged(null)
-      },
-    ) { itemText, isSelected, isActive, isItemHovered, isPreviewSelection ->
-      SimpleListItem(
-        text = itemText,
-        state = ListItemState(isSelected, isItemHovered, isPreviewSelection),
-        modifier = Modifier,
-        style = JewelTheme.simpleListItemStyle,
-        contentDescription = itemText,
-      )
+    ) {
+      Column {
+        DeviceOs.values().forEach { item ->
+          val isSelected = item == deviceOs
+          val isItemHovered = false
+          val isPreviewSelection = false
+          SimpleListItem(
+            text = item.name,
+            state = ListItemState(isSelected, isItemHovered, isPreviewSelection),
+            modifier = Modifier
+              .clickable {
+                devicesStateHolder.selectedDeviceOs.value = item
+                devicesStateHolder.fetchDevices()
+                devicesStateHolder.onSelectedDeviceChanged(null)
+              },
+            style = JewelTheme.simpleListItemStyle,
+            contentDescription = item.name,
+          )
+        }
+      }
     }
+
     val selectedDevice by devicesStateHolder.selectedDevice.collectAsState()
     val items = devicesStateHolder.devices.collectAsState().value.map { it.name }
     arbiterDebugLog("selectedDevice: $selectedDevice")

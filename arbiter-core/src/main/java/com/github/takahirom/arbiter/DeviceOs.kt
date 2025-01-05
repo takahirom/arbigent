@@ -13,10 +13,12 @@ import xcuitest.installer.LocalXCTestInstaller
 
 public enum class DeviceOs {
   Android,
-  iOS;
+  iOS,
+  Web;
 
   public fun isAndroid(): Boolean = this == Android
   public fun isIOS(): Boolean = this == iOS
+  public fun isWeb(): Boolean = this == Web
 }
 
 public sealed interface AvailableDevice {
@@ -79,6 +81,16 @@ public sealed interface AvailableDevice {
             xcTestDevice
           )
         )
+      )
+    }
+  }
+
+  public class Web : AvailableDevice {
+    override val deviceOs: DeviceOs = DeviceOs.Web
+    override val name: String = "Chrome"
+    public override fun connectToDevice(): ArbiterDevice {
+      return MaestroDevice(
+        Maestro.web(false)
       )
     }
   }

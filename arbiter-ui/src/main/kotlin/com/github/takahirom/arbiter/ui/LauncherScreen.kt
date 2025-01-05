@@ -64,6 +64,11 @@ fun BoxScope.LauncherScreen(
         selected = deviceOs.isIOS(),
         onClick = { devicesStateHolder.selectedDeviceOs.value = DeviceOs.iOS }
       )
+      RadioButtonRow(
+        text = "Web(Experimental)",
+        selected = deviceOs.isWeb(),
+        onClick = { devicesStateHolder.selectedDeviceOs.value = DeviceOs.Web }
+      )
     }
     val devices by devicesStateHolder.devices.collectAsState()
     Column(Modifier) {

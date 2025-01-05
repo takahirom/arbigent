@@ -35,7 +35,7 @@ class DevicesStateHolder {
     selectedDeviceOs.onEach { deviceType ->
       devices.value = if (deviceType == DeviceOs.Android) {
         Dadb.list().map { AvailableDevice.Android(it) }
-      } else {
+      } else if (deviceType == DeviceOs.iOS) {
         LocalSimulatorUtils.list()
           .devices
           .flatMap { runtime ->
@@ -43,6 +43,8 @@ class DevicesStateHolder {
               .filter { it.isAvailable && it.state == "Booted" }
           }
           .map { AvailableDevice.IOS(it) }
+      } else {
+        listOf(AvailableDevice.Web())
       }
     }.launchIn(CoroutineScope(ArbiterCoroutinesDispatcher.dispatcher + SupervisorJob()))
   }
