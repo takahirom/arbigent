@@ -1,5 +1,8 @@
 -dontwarn **
 
+-keep class io.netty.** { *; }
+-dontwarn io.netty.**
+
 -keep class kotlin.reflect.jvm.internal.** { *; }
 -keep class kotlin.jvm.internal.** { *; }
 -keep class kotlinx.coroutines.internal.** { *; }
