@@ -30,7 +30,7 @@ I believe many AI Agent testing frameworks will emerge in the future. However, w
 *   **Slow OS Adoption:** Support for different operating systems (like iOS and Android) could lag.
 *   **Delayed Form Factor Support:** Expanding to form factors beyond phones, such as Android TV, might take considerable time.
 
-To address these issues, I aimed to create a framework that empowers users with extensive customization capabilities. Inspired by OkHttp's interceptor pattern, Arbiter provides interfaces for flexible customization, allowing users to adapt the framework to their specific needs, such as those listed above.
+To address these issues, I aimed to create a framework that empowers users with extensive customization capabilities. Inspired by [OkHttp's interceptor](https://square.github.io/okhttp/features/interceptors/) pattern, Arbiter provides interfaces for flexible customization, allowing users to adapt the framework to their specific needs, such as those listed above.
 
 ### Easy Integration into Development Workflows
 
