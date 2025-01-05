@@ -46,7 +46,6 @@ compose.desktop {
   application {
     buildTypes.release.proguard{
       version.set("7.6.1")
-      configurationFiles.from(file("proguard-rules.pro"))
       // It seems that Jewel does not work with Proguard
       isEnabled = false
     }
