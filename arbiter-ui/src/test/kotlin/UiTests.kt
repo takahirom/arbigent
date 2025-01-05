@@ -98,16 +98,16 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
         }
         describe("when opens the app") {
           itShould("have a Connect to device") {
-            assertConnectToDeviceButtonExists()
             capture(it)
+            assertConnectToDeviceButtonExists()
           }
           describe("when clicks the Connect to device") {
             doIt {
               clickConnectToDeviceButton()
             }
             itShould("show the Add scenario") {
-              assertAddScenarioButtonExists()
               capture(it)
+              assertAddScenarioButtonExists()
             }
             describe("when clicks the Add scenario") {
               doIt {
