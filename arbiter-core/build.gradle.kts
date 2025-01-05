@@ -10,7 +10,7 @@ kotlin {
   }
   sourceSets {
     all {
-      languageSettings.optIn("com.github.takahirom.arbiter.ArbiterInternalApi")
+      languageSettings.optIn("io.github.takahirom.arbiter.ArbiterInternalApi")
     }
   }
 }

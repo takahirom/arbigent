@@ -1,4 +1,4 @@
-package com.github.takahirom.arbiter.ui
+package io.github.takahirom.arbiter.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,14 +21,14 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
-import com.github.takahirom.arbiter.AgentCommand
-import com.github.takahirom.arbiter.ArbiterAi
-import com.github.takahirom.arbiter.ArbiterContextHolder
-import com.github.takahirom.arbiter.ArbiterCoroutinesDispatcher
-import com.github.takahirom.arbiter.ClickWithTextAgentCommand
-import com.github.takahirom.arbiter.ArbiterDevice
-import com.github.takahirom.arbiter.GoalAchievedAgentCommand
-import com.github.takahirom.arbiter.arbiterDebugLog
+import io.github.takahirom.arbiter.AgentCommand
+import io.github.takahirom.arbiter.ArbiterAi
+import io.github.takahirom.arbiter.ArbiterContextHolder
+import io.github.takahirom.arbiter.ArbiterCoroutinesDispatcher
+import io.github.takahirom.arbiter.ClickWithTextAgentCommand
+import io.github.takahirom.arbiter.ArbiterDevice
+import io.github.takahirom.arbiter.GoalAchievedAgentCommand
+import io.github.takahirom.arbiter.arbiterDebugLog
 import io.github.takahirom.roborazzi.captureRoboImage
 import io.github.takahirom.robospec.BehaviorsTreeBuilder
 import io.github.takahirom.robospec.DescribedBehavior

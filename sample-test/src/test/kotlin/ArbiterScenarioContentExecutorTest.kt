@@ -1,6 +1,6 @@
-package com.github.takahirom.arbiter.sample.test
+package io.github.takahirom.arbiter.sample.test
 
-import com.github.takahirom.arbiter.*
+import io.github.takahirom.arbiter.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest

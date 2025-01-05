@@ -1,12 +1,12 @@
-package com.github.takahirom.arbiter.sample.test
+package io.github.takahirom.arbiter.sample.test
 
-import com.github.takahirom.arbiter.AgentCommand
-import com.github.takahirom.arbiter.ArbiterAi
-import com.github.takahirom.arbiter.ArbiterContextHolder
-import com.github.takahirom.arbiter.ArbiterDevice
-import com.github.takahirom.arbiter.ClickWithTextAgentCommand
-import com.github.takahirom.arbiter.GoalAchievedAgentCommand
-import com.github.takahirom.arbiter.arbiterDebugLog
+import io.github.takahirom.arbiter.AgentCommand
+import io.github.takahirom.arbiter.ArbiterAi
+import io.github.takahirom.arbiter.ArbiterContextHolder
+import io.github.takahirom.arbiter.ArbiterDevice
+import io.github.takahirom.arbiter.ClickWithTextAgentCommand
+import io.github.takahirom.arbiter.GoalAchievedAgentCommand
+import io.github.takahirom.arbiter.arbiterDebugLog
 import maestro.orchestra.MaestroCommand
 
 class FakeDevice : ArbiterDevice {

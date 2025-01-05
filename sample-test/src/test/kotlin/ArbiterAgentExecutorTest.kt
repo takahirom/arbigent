@@ -1,9 +1,9 @@
-package com.github.takahirom.arbiter.sample.test
+package io.github.takahirom.arbiter.sample.test
 
-import com.github.takahirom.arbiter.AgentConfig
-import com.github.takahirom.arbiter.ArbiterAgent
-import com.github.takahirom.arbiter.ArbiterAgentTask
-import com.github.takahirom.arbiter.ArbiterCoroutinesDispatcher
+import io.github.takahirom.arbiter.AgentConfig
+import io.github.takahirom.arbiter.ArbiterAgent
+import io.github.takahirom.arbiter.ArbiterAgentTask
+import io.github.takahirom.arbiter.ArbiterCoroutinesDispatcher
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest

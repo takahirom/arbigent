@@ -44,7 +44,7 @@ dependencies {
 
 compose.desktop {
   application {
-    mainClass = "com.github.takahirom.arbiter.ui.MainKt"
+    mainClass = "io.github.takahirom.arbiter.ui.MainKt"
 
     nativeDistributions {
       targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)

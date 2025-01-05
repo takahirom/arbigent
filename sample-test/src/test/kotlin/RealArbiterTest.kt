@@ -1,6 +1,6 @@
-package com.github.takahirom.arbiter.sample.test
+package io.github.takahirom.arbiter.sample.test
 
-import com.github.takahirom.arbiter.*
+import io.github.takahirom.arbiter.*
 import dadb.Dadb
 import kotlinx.coroutines.test.runTest
 import java.io.File
