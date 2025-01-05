@@ -1,42 +1,42 @@
-package io.github.takahirom.arbiter.sample.test
+package io.github.takahirom.arbigent.sample.test
 
-import io.github.takahirom.arbiter.AgentCommand
-import io.github.takahirom.arbiter.ArbiterAi
-import io.github.takahirom.arbiter.ArbiterContextHolder
-import io.github.takahirom.arbiter.ArbiterDevice
-import io.github.takahirom.arbiter.ClickWithTextAgentCommand
-import io.github.takahirom.arbiter.GoalAchievedAgentCommand
-import io.github.takahirom.arbiter.arbiterDebugLog
+import io.github.takahirom.arbigent.AgentCommand
+import io.github.takahirom.arbigent.ArbigentAi
+import io.github.takahirom.arbigent.ArbigentContextHolder
+import io.github.takahirom.arbigent.ArbigentDevice
+import io.github.takahirom.arbigent.ClickWithTextAgentCommand
+import io.github.takahirom.arbigent.GoalAchievedAgentCommand
+import io.github.takahirom.arbigent.arbigentDebugLog
 import maestro.orchestra.MaestroCommand
 
-class FakeDevice : ArbiterDevice {
+class FakeDevice : ArbigentDevice {
   override fun executeCommands(commands: List<MaestroCommand>) {
-    arbiterDebugLog("FakeDevice.executeCommands: $commands")
+    arbigentDebugLog("FakeDevice.executeCommands: $commands")
   }
 
   override fun focusedTreeString(): String {
-    arbiterDebugLog("FakeDevice.focusedTreeString")
+    arbigentDebugLog("FakeDevice.focusedTreeString")
     return "focusedTreeString"
   }
 
   override fun close() {
-    arbiterDebugLog("FakeDevice.close")
+    arbigentDebugLog("FakeDevice.close")
   }
 
   override fun viewTreeString(): String {
-    arbiterDebugLog("FakeDevice.viewTreeString")
+    arbigentDebugLog("FakeDevice.viewTreeString")
     return "viewTreeString"
   }
 }
 
-class FakeAi : ArbiterAi {
+class FakeAi : ArbigentAi {
   var count = 0
   fun createDecisionOutput(
     agentCommand: AgentCommand = ClickWithTextAgentCommand("text")
-  ): ArbiterAi.DecisionOutput {
-    return ArbiterAi.DecisionOutput(
+  ): ArbigentAi.DecisionOutput {
+    return ArbigentAi.DecisionOutput(
       listOf(agentCommand),
-      ArbiterContextHolder.Step(
+      ArbigentContextHolder.Step(
         agentCommand = agentCommand,
         memo = "memo",
         screenshotFileName = "screenshotFileName"
@@ -44,8 +44,8 @@ class FakeAi : ArbiterAi {
     )
   }
 
-  override fun decideAgentCommands(decisionInput: ArbiterAi.DecisionInput): ArbiterAi.DecisionOutput {
-    arbiterDebugLog("FakeAi.decideWhatToDo")
+  override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
+    arbigentDebugLog("FakeAi.decideWhatToDo")
     if (count == 0) {
       count++
       return createDecisionOutput()

@@ -29,9 +29,9 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "arbiter"
-include(":arbiter-core")
-include(":arbiter-device-maestro")
-include(":arbiter-ai-openai")
-include(":arbiter-ui")
+rootProject.name = "arbigent"
+include(":arbigent-core")
+include(":arbigent-device-maestro")
+include(":arbigent-ai-openai")
+include(":arbigent-ui")
 include(":sample-test")

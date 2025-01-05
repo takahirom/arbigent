@@ -14,8 +14,8 @@ tasks.withType<Test> {
 }
 
 dependencies {
-    implementation(project(":arbiter-core"))
-    implementation(project(":arbiter-ai-openai"))
+    implementation(project(":arbigent-core"))
+    implementation(project(":arbigent-ai-openai"))
     testImplementation(kotlin("test"))
     // coroutine test
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.5.2")

@@ -1,6 +1,6 @@
-# Arbiter: An AI Agent Testing Framework for Modern Applications
+# Arbigent(Arbiter-Agent): An AI Agent Testing Framework for Modern Applications
 
-**Zero to AI agent testing in minutes. Arbiter's intuitive UI and powerful code interface make it accessible to everyone, while its scenario breakdown feature ensures scalability for even the most complex tasks.**
+**Zero to AI agent testing in minutes. Arbigent's intuitive UI and powerful code interface make it accessible to everyone, while its scenario breakdown feature ensures scalability for even the most complex tasks.**
 
 
 > [!WARNING]
@@ -8,7 +8,7 @@
 
 ## Screenshot
 
-<img src="https://github.com/user-attachments/assets/6dd8f581-b002-4475-92b2-f880745ca8e0" alt="arbiter-screenshot" width="650" />
+<img src="https://github.com/user-attachments/assets/6dd8f581-b002-4475-92b2-f880745ca8e0" alt="arbigent-screenshot" width="650" />
 
 
 ## Demo movie
@@ -21,7 +21,7 @@ https://github.com/user-attachments/assets/46fa3034-5671-4ff1-99df-abbdaebaf197
 
 Traditional UI testing frameworks often struggle with modern applications because they are brittle and break easily when the UI changes. For instance, updates to tutorials or the appearance of unexpected dialogs can cause tests to fail.  
 AI agents emerged as a solution, but testing with AI agents also presents challenges. AI agents often don't work as intended; for example, the agents might open other apps or click on the wrong button due to the complexity of the task.  
-To address these challenges, I created Arbiter, an AI agent testing framework that can break down complex tasks into smaller, dependent scenarios. By decomposing tasks, Arbiter enables more predictable and scalable testing of AI agents in modern applications.
+To address these challenges, I created Arbigent, an AI agent testing framework that can break down complex tasks into smaller, dependent scenarios. By decomposing tasks, Arbigent enables more predictable and scalable testing of AI agents in modern applications.
 
 ### Customizable for Various AI Providers, OSes, Form Factors, etc.
 
@@ -31,33 +31,33 @@ I believe many AI Agent testing frameworks will emerge in the future. However, w
 *   **Slow OS Adoption:** Support for different operating systems (like iOS and Android) could lag.
 *   **Delayed Form Factor Support:** Expanding to form factors beyond phones, such as Android TV, might take considerable time.
 
-To address these issues, I aimed to create a framework that empowers users with extensive customization capabilities. Inspired by [OkHttp's interceptor](https://square.github.io/okhttp/features/interceptors/) pattern, Arbiter provides interfaces for flexible customization, allowing users to adapt the framework to their specific needs, such as those listed above.
+To address these issues, I aimed to create a framework that empowers users with extensive customization capabilities. Inspired by [OkHttp's interceptor](https://square.github.io/okhttp/features/interceptors/) pattern, Arbigent provides interfaces for flexible customization, allowing users to adapt the framework to their specific needs, such as those listed above.
 
 ### Easy Integration into Development Workflows
 
-Furthermore, I wanted to make Arbiter accessible to QA engineers by offering a user-friendly UI. This allows for scenario creation within the UI and seamless test execution via the code interface.
+Furthermore, I wanted to make Arbigent accessible to QA engineers by offering a user-friendly UI. This allows for scenario creation within the UI and seamless test execution via the code interface.
 
 ## Features
 
-*   **Achieve Complex Goals Through Scenario Dependencies:** AI agents often struggle with complex tasks. Arbiter addresses this by allowing you to break down goals into smaller, dependent scenarios. For example, you can create a scenario to log in, followed by a dependent scenario to perform a search. The name "Arbiter" was chosen to reflect the framework's role as a mediator, orchestrating the actions of AI agents across multiple scenarios.
+*   **Achieve Complex Goals Through Scenario Dependencies:** AI agents often struggle with complex tasks. Arbigent addresses this by allowing you to break down goals into smaller, dependent scenarios. For example, you can create a scenario to log in, followed by a dependent scenario to perform a search. The name "Arbigent" was chosen to reflect the framework's role as a mediator, orchestrating the actions of AI agents across multiple scenarios.
 *   **UI-Based Scenario Creation, Code-Based Execution:**  Create scenarios visually in the UI and execute them programmatically using a saved project yaml file, allowing to create scenarios by QA engineer and execute by Software engineer.
-*   **Support for Multiple Form Factors:**  Arbiter supports testing on iOS, Android, and even TV interfaces using D-pad navigation.
-*   **Optimized for AI:**  Through experimentation, I discovered that LLMs perform poorly when presented with the entire UI tree. Arbiter optimizes the UI tree by removing unnecessary information, enhancing the AI's ability to understand and interact with the UI.
-*   **Cost-Effective:**  Beyond being open source, Arbiter can utilize models like `GPT-4o mini` to execute tests, significantly reducing costs.
-*   **Flexible Code Interface:**  For advanced customization, Arbiter offers a code interface for test execution like adding custom initialization and cleanup methods for scenarios.
-*   **Open Source:** Arbiter is free to use, modify, and distribute. Contributions to the project are welcome!
+*   **Support for Multiple Form Factors:**  Arbigent supports testing on iOS, Android, and even TV interfaces using D-pad navigation.
+*   **Optimized for AI:**  Through experimentation, I discovered that LLMs perform poorly when presented with the entire UI tree. Arbigent optimizes the UI tree by removing unnecessary information, enhancing the AI's ability to understand and interact with the UI.
+*   **Cost-Effective:**  Beyond being open source, Arbigent can utilize models like `GPT-4o mini` to execute tests, significantly reducing costs.
+*   **Flexible Code Interface:**  For advanced customization, Arbigent offers a code interface for test execution like adding custom initialization and cleanup methods for scenarios.
+*   **Open Source:** Arbigent is free to use, modify, and distribute. Contributions to the project are welcome!
 
 ## How to Use
 
 ### Installation
 
-Install the Arbiter UI binary from the [GitHub Actions workflow page](https://github.com/takahirom/arbiter/actions/workflows/build-ui.yaml).
+Install the Arbigent UI binary from the [GitHub Actions workflow page](https://github.com/takahirom/arbigent/actions/workflows/build-ui.yaml).
 
 ### Device Connection and AI API Key Entry
 
 1. Connect your device to your PC.
-2. In the Arbiter UI, select your connected device from the list of available devices. This will establish a connection.
-3. Enter your AI provider's API key in the designated field within the Arbiter UI.
+2. In the Arbigent UI, select your connected device from the list of available devices. This will establish a connection.
+3. Enter your AI provider's API key in the designated field within the Arbigent UI.
 
 <img src="https://github.com/user-attachments/assets/77a002f5-8ab3-4cb1-94f6-6c15a223900c" width="450" alt="Device Connection and AI API Key Entry" />
 
@@ -77,7 +77,7 @@ Run tests either directly through the UI or programmatically via the code interf
 | OpenAI      | Yes       |
 | Gemini      | Yes       |
 
-You can add AI providers by implementing the `ArbiterAi` interface.
+You can add AI providers by implementing the `ArbigentAi` interface.
 
 ## Supported OSes / Form Factors
 
@@ -87,7 +87,7 @@ You can add AI providers by implementing the `ArbiterAi` interface.
 | iOS         | Yes       |
 | Web(Chrome) | Yes       |
 
-You can add OSes by implementing the `ArbiterDevice` interface. Thanks to the excellent [Maestro](https://github.com/mobile-dev-inc/maestro) library, we are able to support multiple OSes.
+You can add OSes by implementing the `ArbigentDevice` interface. Thanks to the excellent [Maestro](https://github.com/mobile-dev-inc/maestro) library, we are able to support multiple OSes.
 
 | Form Factor    | Supported |
 |----------------|-----------|
@@ -100,56 +100,56 @@ You can add OSes by implementing the `ArbiterDevice` interface. Thanks to the ex
 
 ### Execution Flow
 
-The execution flow involves the UI, Arbiter, ArbiterDevice, and ArbiterAi. The UI sends a project creation request to Arbiter, which fetches the UI tree from ArbiterDevice. ArbiterAi then decides on an action based on the goal and UI tree. The action is performed by ArbiterDevice, and the results are returned to the UI for display.
+The execution flow involves the UI, Arbigent, ArbigentDevice, and ArbigentAi. The UI sends a project creation request to Arbigent, which fetches the UI tree from ArbigentDevice. ArbigentAi then decides on an action based on the goal and UI tree. The action is performed by ArbigentDevice, and the results are returned to the UI for display.
 
 ```mermaid
 sequenceDiagram
   participant UI(or Tests)
-  participant ArbiterAgent
-  participant ArbiterDevice
-  participant ArbiterAi
-  UI(or Tests)->>ArbiterAgent: Execute
+  participant ArbigentAgent
+  participant ArbigentDevice
+  participant ArbigentAi
+  UI(or Tests)->>ArbigentAgent: Execute
   loop
-    ArbiterAgent->>ArbiterDevice: Fetch UI tree
-    ArbiterDevice->>ArbiterAgent: Return UI tree
-    ArbiterAgent->>ArbiterAi: Decide Action by goal and UI tree and histories
-    ArbiterAi->>ArbiterAgent: Return Action
-    ArbiterAgent->>ArbiterDevice: Perform actions
-    ArbiterDevice->>ArbiterAgent: Return results
+    ArbigentAgent->>ArbigentDevice: Fetch UI tree
+    ArbigentDevice->>ArbigentAgent: Return UI tree
+    ArbigentAgent->>ArbigentAi: Decide Action by goal and UI tree and histories
+    ArbigentAi->>ArbigentAgent: Return Action
+    ArbigentAgent->>ArbigentDevice: Perform actions
+    ArbigentDevice->>ArbigentAgent: Return results
   end
-  ArbiterAgent->>UI(or Tests): Display results
+  ArbigentAgent->>UI(or Tests): Display results
 ```
 
 ###  Class Diagram
 
-The class diagram illustrates the relationships between ArbiterProject, ArbiterScenario, ArbiterTask, ArbiterAgent, ArbiterScenarioExecutor, ArbiterAi, ArbiterDevice, and ArbiterInterceptor.
+The class diagram illustrates the relationships between ArbigentProject, ArbigentScenario, ArbigentTask, ArbigentAgent, ArbigentScenarioExecutor, ArbigentAi, ArbigentDevice, and ArbigentInterceptor.
 
 ```mermaid
 classDiagram
   direction TB
-  class ArbiterProject {
-    +List~ArbiterScenario~ scenarios
+  class ArbigentProject {
+    +List~ArbigentScenario~ scenarios
     +execute()
   }
-  class ArbiterAgentTask {
+  class ArbigentAgentTask {
     +String goal
   }
-  class ArbiterAgent {
-    +ArbiterAi ai
-    +ArbiterDevice device
-    +List~ArbiterInterceptor~ interceptors
-    +execute(arbiterAgentTask)
+  class ArbigentAgent {
+    +ArbigentAi ai
+    +ArbigentDevice device
+    +List~ArbigentInterceptor~ interceptors
+    +execute(arbigentAgentTask)
   }
-  class ArbiterScenarioExecutor {
-    +execute(arbiterScenario)
+  class ArbigentScenarioExecutor {
+    +execute(arbigentScenario)
   }
-  class ArbiterScenario {
-    +List~ArbiterAgentTask~ agentTasks
+  class ArbigentScenario {
+    +List~ArbigentAgentTask~ agentTasks
   }
-  ArbiterProject o--"*" ArbiterScenarioExecutor
-ArbiterScenarioExecutor o--"*" ArbiterAgent
-ArbiterScenario o--"*" ArbiterAgentTask
-ArbiterProject o--"*" ArbiterScenario
+  ArbigentProject o--"*" ArbigentScenarioExecutor
+ArbigentScenarioExecutor o--"*" ArbigentAgent
+ArbigentScenario o--"*" ArbigentAgentTask
+ArbigentProject o--"*" ArbigentScenario
 ```
 
 ### Saved project file
@@ -158,9 +158,9 @@ ArbiterProject o--"*" ArbiterScenario
 > The yaml format is still under development and may change in the future.
 
 The project file is saved in YAML format and contains scenarios with goals, initialization methods, and cleanup data. Dependencies between scenarios are also defined.
-You can write a project file in YAML format by hand or create it using the Arbiter UI.
+You can write a project file in YAML format by hand or create it using the Arbigent UI.
 
-The id is auto-generated UUID by Arbiter UI but you can change it to any string.
+The id is auto-generated UUID by Arbigent UI but you can change it to any string.
 
 ```yaml
 scenarios:
@@ -185,26 +185,26 @@ scenarios:
 > [!WARNING]
 > The code interface is still under development and may change in the future.
 
-Arbiter provides a code interface for executing tests programmatically. Here's an example of how to run a test:
+Arbigent provides a code interface for executing tests programmatically. Here's an example of how to run a test:
 
 
 ### Dependency
 
-Stay tuned for the release of Arbiter on Maven Central.
+Stay tuned for the release of Arbigent on Maven Central.
 
 ### Running saved project yaml file
 
 You can load a project yaml file and execute it using the following code:
 
 ```kotlin
-class ArbiterTest {
+class ArbigentTest {
   private val scenarioFile = File(this::class.java.getResource("/projects/nowinandroidsample.yaml").toURI())
 
   @Test
   fun tests() = runTest(
     timeout = 10.minutes
   ) {
-    val arbiterProject = ArbiterProject(
+    val arbigentProject = ArbigentProject(
       file = scenarioFile,
       aiFactory = {
         OpenAIAi(
@@ -217,7 +217,7 @@ class ArbiterTest {
         ).connectToDevice()
       }
     )
-    arbiterProject.execute()
+    arbigentProject.execute()
   }
 }
 ```
@@ -229,18 +229,18 @@ val agentConfig = AgentConfig {
   deviceFactory { FakeDevice() }
   ai(FakeAi())
 }
-val arbiterScenarioExecutor = ArbiterScenarioExecutor {
+val arbigentScenarioExecutor = ArbigentScenarioExecutor {
 }
-val arbiterScenario = ArbiterScenario(
+val arbigentScenario = ArbigentScenario(
   id = "id2",
   agentTasks = listOf(
-    ArbiterAgentTask("id1", "Login in the app and see the home tab.", agentConfig),
-    ArbiterAgentTask("id2", "Search an episode and open detail", agentConfig)
+    ArbigentAgentTask("id1", "Login in the app and see the home tab.", agentConfig),
+    ArbigentAgentTask("id2", "Search an episode and open detail", agentConfig)
   ),
   maxStepCount = 10,
 )
-arbiterScenarioExecutor.execute(
-  arbiterScenario
+arbigentScenarioExecutor.execute(
+  arbigentScenario
 )
 ```
 
@@ -252,7 +252,7 @@ val agentConfig = AgentConfig {
   ai(FakeAi())
 }
 
-val task = ArbiterAgentTask("id1", "Login in the app and see the home tab.", agentConfig)
-ArbiterAgent(agentConfig)
+val task = ArbigentAgentTask("id1", "Login in the app and see the home tab.", agentConfig)
+ArbigentAgent(agentConfig)
   .execute(task)
 ```
