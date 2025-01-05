@@ -51,7 +51,7 @@ Furthermore, I wanted to make Arbigent accessible to QA engineers by offering a 
 
 ### Installation
 
-Install the Arbigent UI binary from the [GitHub Actions workflow page](https://github.com/takahirom/arbigent/actions/workflows/build-ui.yaml).
+Install the Arbigent UI binary from the [GitHub Actions workflow page](https://github.com/takahirom/arbigent/actions/workflows/build-ui.yaml?query=branch%3Amain). Please open the latest successful build and download the artifact.
 
 ### Device Connection and AI API Key Entry
 
