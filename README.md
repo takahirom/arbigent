@@ -8,7 +8,7 @@
 
 ## Screenshot
 
-![arbiter-screenshot](https://github.com/user-attachments/assets/6dd8f581-b002-4475-92b2-f880745ca8e0)
+<img src="https://github.com/user-attachments/assets/6dd8f581-b002-4475-92b2-f880745ca8e0" alt="arbiter-screenshot" width="650" />
 
 
 ## Demo movie
@@ -59,8 +59,7 @@ Install the Arbiter UI binary from the [GitHub Releases page](link to your relea
 2. The connected device should appear in the UI. Select your device to establish a connection.
 3. Enter the API key for the AI. 
 
-<img width="912" alt="image" src="https://github.com/user-attachments/assets/a2b5f3c3-1487-4898-a00e-5625cbb67b5f" />
-
+<img src="https://github.com/user-attachments/assets/77a002f5-8ab3-4cb1-94f6-6c15a223900c" width="450" alt="Device Connection and AI API Key Entry" />
 
 ### Scenario Creation
 
