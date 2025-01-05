@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.onEach
 import util.LocalSimulatorUtils
 
 
-class DevicesStateHolder {
+class DevicesStateHolder(val availableDeviceListFactory: (DeviceOs) -> List<AvailableDevice>) {
   val selectedDeviceOs: MutableStateFlow<DeviceOs> = MutableStateFlow(DeviceOs.Android)
   val devices: MutableStateFlow<List<AvailableDevice>> = MutableStateFlow(listOf())
   private val _selectedDevice: MutableStateFlow<AvailableDevice?> = MutableStateFlow(null)
@@ -32,20 +32,30 @@ class DevicesStateHolder {
   }
 
   fun fetchDevices() {
-    selectedDeviceOs.onEach { deviceType ->
-      devices.value = if (deviceType == DeviceOs.Android) {
-        Dadb.list().map { AvailableDevice.Android(it) }
-      } else if (deviceType == DeviceOs.iOS) {
-        LocalSimulatorUtils.list()
-          .devices
-          .flatMap { runtime ->
-            runtime.value
-              .filter { it.isAvailable && it.state == "Booted" }
-          }
-          .map { AvailableDevice.IOS(it) }
-      } else {
-        listOf(AvailableDevice.Web())
-      }
+    selectedDeviceOs.onEach { os ->
+      devices.value = availableDeviceListFactory(os)
     }.launchIn(CoroutineScope(ArbiterCoroutinesDispatcher.dispatcher + SupervisorJob()))
+  }
+}
+
+internal fun fetchAvailableDevicesByOs(deviceType: DeviceOs): List<AvailableDevice> {
+  return when (deviceType) {
+    DeviceOs.Android -> {
+      Dadb.list().map { AvailableDevice.Android(it) }
+    }
+
+    DeviceOs.iOS -> {
+      LocalSimulatorUtils.list()
+        .devices
+        .flatMap { runtime ->
+          runtime.value
+            .filter { it.isAvailable && it.state == "Booted" }
+        }
+        .map { AvailableDevice.IOS(it) }
+    }
+
+    else -> {
+      listOf(AvailableDevice.Web())
+    }
   }
 }

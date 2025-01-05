@@ -27,6 +27,7 @@ import io.github.takahirom.arbiter.ArbiterContextHolder
 import io.github.takahirom.arbiter.ArbiterCoroutinesDispatcher
 import io.github.takahirom.arbiter.ClickWithTextAgentCommand
 import io.github.takahirom.arbiter.ArbiterDevice
+import io.github.takahirom.arbiter.AvailableDevice
 import io.github.takahirom.arbiter.GoalAchievedAgentCommand
 import io.github.takahirom.arbiter.arbiterDebugLog
 import io.github.takahirom.roborazzi.captureRoboImage
@@ -65,6 +66,9 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
     val appStateHolder = ArbiterAppStateHolder(
       aiFactory = { FakeAi() },
       deviceFactory = { FakeDevice() },
+      availableDeviceListFactory = {
+        listOf(AvailableDevice.Fake())
+      },
     )
     setContent {
       AppTheme {
@@ -317,7 +321,7 @@ class FakeDevice : ArbiterDevice {
   }
 }
 
-class FakeKeyStore: KeyStore {
+class FakeKeyStore : KeyStore {
   private val keys = mutableMapOf<String, String>()
   override fun getPassword(domain: String, account: String): String {
     return keys["$domain:$account"] ?: ""

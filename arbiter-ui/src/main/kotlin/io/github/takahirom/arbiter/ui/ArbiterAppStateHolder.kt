@@ -8,6 +8,7 @@ import io.github.takahirom.arbiter.ArbiterProjectFileContent
 import io.github.takahirom.arbiter.ArbiterProjectSerializer
 import io.github.takahirom.arbiter.ArbiterScenarioContent
 import io.github.takahirom.arbiter.AvailableDevice
+import io.github.takahirom.arbiter.DeviceOs
 import io.github.takahirom.arbiter.arbiterDebugLog
 import io.github.takahirom.arbiter.createArbiterScenario
 import kotlinx.coroutines.CoroutineScope
@@ -28,9 +29,12 @@ class ArbiterAppStateHolder(
   val aiFactory: () -> ArbiterAi,
   val deviceFactory: (AvailableDevice) -> ArbiterDevice = { avaiableDevice ->
     avaiableDevice.connectToDevice()
+  },
+  val availableDeviceListFactory : (DeviceOs) -> List<AvailableDevice> = { os ->
+    fetchAvailableDevicesByOs(os)
   }
 ) {
-  val devicesStateHolder = DevicesStateHolder()
+  val devicesStateHolder = DevicesStateHolder(availableDeviceListFactory)
 
   sealed interface DeviceConnectionState {
     data object NotConnected : DeviceConnectionState

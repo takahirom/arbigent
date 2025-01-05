@@ -95,5 +95,14 @@ public sealed interface AvailableDevice {
     }
   }
 
+  public class Fake : AvailableDevice {
+    override val deviceOs: DeviceOs = DeviceOs.Android
+    override val name: String = "Fake"
+    public override fun connectToDevice(): ArbiterDevice {
+      // This is not called
+      throw UnsupportedOperationException("Fake device is not supported")
+    }
+  }
+
   public fun connectToDevice(): ArbiterDevice
 }
