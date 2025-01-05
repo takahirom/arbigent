@@ -87,7 +87,7 @@ You can add AI providers by implementing the `ArbiterAi` interface.
 | iOS         | Yes       |
 | Web(Chrome) | Yes       |
 
-You can add OSes by implementing the `ArbiterDevice` interface. Thanks to the excellent [maestro](https://github.com/mobile-dev-inc/maestro) library, we are able to support multiple OSes.
+You can add OSes by implementing the `ArbiterDevice` interface. Thanks to the excellent [Maestro](https://github.com/mobile-dev-inc/maestro) library, we are able to support multiple OSes.
 
 | Form Factor    | Supported |
 |----------------|-----------|
