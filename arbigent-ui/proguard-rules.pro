@@ -5,7 +5,7 @@
 
 -keep class kotlin.reflect.jvm.internal.** { *; }
 -keep class kotlin.jvm.internal.** { *; }
--keep class kotlinx.coroutines.internal.** { *; }
+-keep class kotlinx.coroutines.** { *; }
 -keep class androidx.compose.runtime.** { *; }
 -keep class okio.** { *; }
 
