@@ -7,6 +7,7 @@
 -keep class kotlin.jvm.internal.** { *; }
 -keep class kotlinx.coroutines.internal.** { *; }
 -keep class androidx.compose.runtime.** { *; }
+-keep class okio.** { *; }
 
 -dontwarn androidx.compose.desktop.DesktopTheme_jvmKt
 -dontwarn androidx.compose.desktop.DesktopTheme_jvmKt$DesktopMaterialTheme$2
