@@ -163,7 +163,7 @@ private class KeychainDelegate(
 
   operator fun setValue(thisRef: Any?, property: KProperty<*>, value: String?) {
     if (value != null) {
-      Keyring.create().setPassword(domain, getAccount(property), value.toString())
+      keyStoreFactory().setPassword(domain, getAccount(property), value)
     } else {
       keyStoreFactory().deletePassword(domain, getAccount(property))
     }
