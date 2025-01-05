@@ -51,7 +51,7 @@ Furthermore, I wanted to make Arbiter accessible to QA engineers by offering a u
 
 ### Installation
 
-Install the Arbiter UI binary from the [GitHub Releases page](link to your releases).
+Install the Arbiter UI binary from the [GitHub Actions workflow page](https://github.com/takahirom/arbiter/actions/workflows/build-ui.yaml).
 
 ### Device Connection and AI API Key Entry
 
