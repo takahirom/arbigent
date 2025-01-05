@@ -187,6 +187,11 @@ scenarios:
 
 Arbiter provides a code interface for executing tests programmatically. Here's an example of how to run a test:
 
+
+### Dependency
+
+Stay tuned for the release of Arbiter on Maven Central.
+
 ### Running saved project yaml file
 
 You can load a project yaml file and execute it using the following code:
