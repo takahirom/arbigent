@@ -1,0 +1,53 @@
+name: publish-ui
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+env:
+  GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx6g -Dorg.gradle.daemon=false -Dkotlin.incremental=false"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/setup-java@0ab4596768b603586c0de567f2430c30f5b0d2b0 # v3.13.0
+        with:
+          distribution: 'zulu'
+          java-version: 19
+
+      - name: Gradle cache
+        uses: gradle/gradle-build-action@a8f75513eafdebd8141bd1cd4e30fcd194af8dfa # v2
+
+      - name: build
+        id: test
+        run: |
+          ./gradlew arbiter-ui:package --stacktrace
+
+      - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
+        if: ${{ always() }}
+        with:
+          name: dmg
+          path: |
+            **/build/compose/**/*.dmg
+          retention-days: 120
+
+      - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
+        if: ${{ always() }}
+        with:
+          name: msi
+          path: |
+            **/build/compose/**/*.msi
+          retention-days: 120
+
+      - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
+        if: ${{ always() }}
+        with:
+          name: dbi
+          path: |
+            **/build/compose/**/*.dbi
+          retention-days: 120
