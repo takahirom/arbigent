@@ -44,6 +44,11 @@ dependencies {
 
 compose.desktop {
   application {
+    buildTypes.release.proguard{
+      version.set("7.6.1")
+      // It seems that Jewel does not work with Proguard
+      isEnabled = false
+    }
     mainClass = "io.github.takahirom.arbigent.ui.MainKt"
 
     nativeDistributions {
