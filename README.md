@@ -8,7 +8,8 @@
 
 ## Screenshot
 
- <img width="1616" alt="image" src="https://github.com/user-attachments/assets/38265777-0968-4a91-a269-f66ceed6b059" /> 
+![arbiter-screenshot](https://github.com/user-attachments/assets/6dd8f581-b002-4475-92b2-f880745ca8e0)
+
 
 ## Demo movie
 
