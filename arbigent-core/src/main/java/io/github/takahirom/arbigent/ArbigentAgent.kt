@@ -5,6 +5,7 @@ import io.github.takahirom.arbigent.ArbigentAgent.ExecuteCommandsOutput
 import io.github.takahirom.arbigent.ArbigentAgent.StepInput
 import io.github.takahirom.arbigent.ArbigentAgent.StepResult
 import io.grpc.StatusRuntimeException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -169,6 +170,7 @@ public class ArbigentAgent(
         }
       }
       _isRunningStateFlow.value = false
+    } catch (e: CancellationException) {
     } catch (e: Exception) {
       arbigentDebugLog("Failed to run agent: $e")
       errorHandler(e)
