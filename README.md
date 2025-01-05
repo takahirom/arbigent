@@ -19,9 +19,9 @@ https://github.com/user-attachments/assets/46fa3034-5671-4ff1-99df-abbdaebaf197
 
 ### Make AI Agent Testing Practical for Modern Applications
 
-Testing UI with traditional testing frameworks is challenging because they easily break when the UI changes, such as during tutorial updates or when dialogs are displayed.  
-AI agents emerged as a solution, but testing with AI agents also presents challenges. AI agents often don't work as intended; for example, they might open other apps or click on the wrong button due to the complexity of the task.  
-To address these challenges, I created Arbiter, an AI agent testing framework that can break down complex tasks into smaller, dependent scenarios. This approach enables more predictable and scalable testing of AI agents in modern applications.
+Traditional UI testing frameworks often struggle with modern applications because they are brittle and break easily when the UI changes. For instance, updates to tutorials or the appearance of unexpected dialogs can cause tests to fail.  
+AI agents emerged as a solution, but testing with AI agents also presents challenges. AI agents often don't work as intended; for example, the agents might open other apps or click on the wrong button due to the complexity of the task.  
+To address these challenges, I created Arbiter, an AI agent testing framework that can break down complex tasks into smaller, dependent scenarios. By decomposing tasks, Arbiter enables more predictable and scalable testing of AI agents in modern applications.
 
 ### Customizable for Various AI Providers, OSes, Form Factors, etc.
 
@@ -39,7 +39,7 @@ Furthermore, I wanted to make Arbiter accessible to QA engineers by offering a u
 
 ## Features
 
-*   **Achieve Complex Goals Through Scenario Dependencies:** Recognizing that AI agents often struggle with complex tasks, Arbiter allows breaking down goals into smaller, dependent scenarios. For example, you can create a scenario to log in and then have a dependent scenario to perform a search. The name "Arbiter" reflects the library's role in managing AI agents and scenarios.
+*   **Achieve Complex Goals Through Scenario Dependencies:** AI agents often struggle with complex tasks. Arbiter addresses this by allowing you to break down goals into smaller, dependent scenarios. For example, you can create a scenario to log in, followed by a dependent scenario to perform a search. The name "Arbiter" was chosen to reflect the framework's role as a mediator, orchestrating the actions of AI agents across multiple scenarios.
 *   **UI-Based Scenario Creation, Code-Based Execution:**  Create scenarios visually in the UI and execute them programmatically using a saved project yaml file, allowing to create scenarios by QA engineer and execute by Software engineer.
 *   **Support for Multiple Form Factors:**  Arbiter supports testing on iOS, Android, and even TV interfaces using D-pad navigation.
 *   **Optimized for AI:**  Through experimentation, I discovered that LLMs perform poorly when presented with the entire UI tree. Arbiter optimizes the UI tree by removing unnecessary information, enhancing the AI's ability to understand and interact with the UI.
@@ -55,9 +55,9 @@ Install the Arbiter UI binary from the [GitHub Releases page](link to your relea
 
 ### Device Connection and AI API Key Entry
 
-1. Connect your device to your PC. 
-2. The connected device should appear in the UI. Select your device to establish a connection.
-3. Enter the API key for the AI. 
+1. Connect your device to your PC.
+2. In the Arbiter UI, select your connected device from the list of available devices. This will establish a connection.
+3. Enter your AI provider's API key in the designated field within the Arbiter UI.
 
 <img src="https://github.com/user-attachments/assets/77a002f5-8ab3-4cb1-94f6-6c15a223900c" width="450" alt="Device Connection and AI API Key Entry" />
 
