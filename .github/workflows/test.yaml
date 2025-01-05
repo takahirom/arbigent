@@ -15,10 +15,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
-      - name: Install packages on linux for keyring
-        run: >
-          sudo apt-get -qq install -y --no-install-recommends dbus-x11 gnome-keyring dbus libdbus-glib-1-dev libsecret-tools
-        shell: bash
       - uses: actions/setup-java@0ab4596768b603586c0de567f2430c30f5b0d2b0 # v3.13.0
         with:
           distribution: 'zulu'

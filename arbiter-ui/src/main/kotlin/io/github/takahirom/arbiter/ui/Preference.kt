@@ -21,13 +21,14 @@ sealed interface AiProviderSetting {
   val id: String
   val name: String
 
-  interface NormalAiProviderSetting: AiProviderSetting {
+  interface NormalAiProviderSetting : AiProviderSetting {
     val apiKey: String
     val modelName: String
     fun updatedApiKey(apiKey: String): NormalAiProviderSetting
     fun updatedModelName(modelName: String): NormalAiProviderSetting
   }
-  interface OpenAiBasedApiProviderSetting: NormalAiProviderSetting {
+
+  interface OpenAiBasedApiProviderSetting : NormalAiProviderSetting {
     val baseUrl: String
   }
 
@@ -37,12 +38,14 @@ sealed interface AiProviderSetting {
     override val id: String,
     override val apiKey: String,
     override val modelName: String
-  ): AiProviderSetting, OpenAiBasedApiProviderSetting {
+  ) : AiProviderSetting, OpenAiBasedApiProviderSetting {
     override val name: String
       get() = "Gemini"
+
     override fun updatedApiKey(apiKey: String): NormalAiProviderSetting {
       return copy(apiKey = apiKey)
     }
+
     override fun updatedModelName(modelName: String): NormalAiProviderSetting {
       return copy(modelName = modelName)
     }
@@ -56,12 +59,14 @@ sealed interface AiProviderSetting {
     override val id: String,
     override val apiKey: String,
     override val modelName: String
-  ): AiProviderSetting, OpenAiBasedApiProviderSetting {
+  ) : AiProviderSetting, OpenAiBasedApiProviderSetting {
     override val name: String
       get() = "OpenAi"
+
     override fun updatedApiKey(apiKey: String): NormalAiProviderSetting {
       return copy(apiKey = apiKey)
     }
+
     override fun updatedModelName(modelName: String): NormalAiProviderSetting {
       return copy(modelName = modelName)
     }
@@ -109,16 +114,46 @@ internal object Preference {
     }
 }
 
+internal var globalKeyStoreFactory: () -> KeyStore = {
+  object : KeyStore {
+    override fun getPassword(domain: String, account: String): String {
+      val keying = Keyring.create()
+      return keying.use {
+        it.getPassword(domain, account)
+      }
+    }
+
+    override fun setPassword(domain: String, account: String, password: String) {
+      val keying = Keyring.create()
+      keying.use {
+        it.setPassword(domain, account, password)
+      }
+    }
+
+    override fun deletePassword(domain: String, account: String) {
+      val keying = Keyring.create()
+      keying.use {
+        it.deletePassword(domain, account)
+      }
+    }
+  }
+}
+
+internal interface KeyStore {
+  fun getPassword(domain: String, account: String): String
+  fun setPassword(domain: String, account: String, password: String)
+  fun deletePassword(domain: String, account: String)
+}
+
 private class KeychainDelegate(
   private val domain: String = "io.github.takahirom.arbiter",
   private val accountPrefix: String = System.getProperty("user.name"),
+  private val keyStoreFactory: () -> KeyStore = globalKeyStoreFactory,
   private val default: () -> String = { "" }
 ) {
   operator fun getValue(thisRef: Any?, property: KProperty<*>): String {
     return try {
-      Keyring.create().use { keyring ->
-        keyring.getPassword(domain, getAccount(property)).ifBlank { default() }
-      }
+      keyStoreFactory().getPassword(domain, getAccount(property)).ifBlank { default() }
     } catch (ex: PasswordAccessException) {
       default()
     }
@@ -127,12 +162,10 @@ private class KeychainDelegate(
   private fun getAccount(property: KProperty<*>) = accountPrefix + "-" + property.name
 
   operator fun setValue(thisRef: Any?, property: KProperty<*>, value: String?) {
-    Keyring.create().use { keyring ->
-      if (value != null) {
-        keyring.setPassword(domain, getAccount(property), value.toString())
-      } else {
-        keyring.deletePassword(domain, getAccount(property))
-      }
+    if (value != null) {
+      Keyring.create().setPassword(domain, getAccount(property), value.toString())
+    } else {
+      keyStoreFactory().deletePassword(domain, getAccount(property))
     }
   }
 }

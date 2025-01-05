@@ -51,6 +51,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
   fun test() {
     val testDispatcher = StandardTestDispatcher()
     ArbiterCoroutinesDispatcher.dispatcher = testDispatcher
+    globalKeyStoreFactory = TestKeyStoreFactory()
     runComposeUiTest {
       setContent()
       runTest(testDispatcher) {
@@ -313,6 +314,27 @@ class FakeDevice : ArbiterDevice {
 
   override fun close() {
     arbiterDebugLog("FakeDevice.close")
+  }
+}
+
+class FakeKeyStore: KeyStore {
+  private val keys = mutableMapOf<String, String>()
+  override fun getPassword(domain: String, account: String): String {
+    return keys["$domain:$account"] ?: ""
+  }
+
+  override fun setPassword(domain: String, account: String, password: String) {
+    keys["$domain:$account"] = password
+  }
+
+  override fun deletePassword(domain: String, account: String) {
+    keys.remove("$domain:$account")
+  }
+}
+
+internal class TestKeyStoreFactory : () -> KeyStore {
+  override fun invoke(): KeyStore {
+    return FakeKeyStore()
   }
 }
 
