@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.yield
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlin.coroutines.cancellation.CancellationException
 
 @Serializable
 public sealed interface ArbigentScenarioDeviceFormFactor {
@@ -133,6 +134,7 @@ public class ArbigentScenarioExecutor {
           yield()
         }
       } while (!finishedSuccessfully && retryRemain-- > 0)
+    } catch (e: CancellationException) {
     } catch (e: Exception) {
       errorHandler(e)
     } finally {
