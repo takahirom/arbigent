@@ -13,3 +13,5 @@
 -dontwarn androidx.compose.desktop.DesktopTheme_jvmKt
 -dontwarn androidx.compose.desktop.DesktopTheme_jvmKt$DesktopMaterialTheme$2
 -dontwarn org.graalvm.nativeimage.Platform$MACOS
+
+-keepattributes *Annotation*,InnerClasses,Signature,Exceptions,LineNumberTable,LocalVariable*
