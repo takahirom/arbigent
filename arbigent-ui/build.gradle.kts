@@ -44,6 +44,10 @@ dependencies {
 
 compose.desktop {
   application {
+    buildTypes.release.proguard{
+      configurationFiles.from(file("proguard-rules.pro"))
+      obfuscate = false
+    }
     mainClass = "io.github.takahirom.arbigent.ui.MainKt"
 
     nativeDistributions {
