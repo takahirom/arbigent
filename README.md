@@ -16,7 +16,7 @@ https://github.com/user-attachments/assets/46fa3034-5671-4ff1-99df-abbdaebaf197
 
 ## Motivation
 
-### AI Agent Testing in Modern Applications
+### Make AI Agent Testing Practical for Modern Applications
 
 Testing UI with traditional testing frameworks is challenging because they easily break when the UI changes, such as during tutorial updates or when dialogs are displayed.  
 AI agents emerged as a solution, but testing with AI agents also presents challenges. AI agents often don't work as intended; for example, they might open other apps or click on the wrong button due to the complexity of the task.  
