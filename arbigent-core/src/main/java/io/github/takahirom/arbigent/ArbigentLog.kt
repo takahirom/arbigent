@@ -15,9 +15,23 @@ public fun arbigentDebugLog(log: String) {
     }
 }
 
-public fun arbigentDebugLog(log: () -> String) {
+public fun Any?.arbigentDebugLog(log: String) {
     if (arbigentLogLevel <= ArbigentLogLevel.DEBUG) {
-        println("ArbigentLog: ${log()}")
+        if (this == null) {
+            println("ArbigentLog: $log")
+        } else {
+            println("ArbigentLog(${this::class.simpleName}): $log")
+        }
+    }
+}
+
+public fun Any?.arbigentDebugLog(log: () -> String) {
+    if (arbigentLogLevel <= ArbigentLogLevel.DEBUG) {
+        if (this == null) {
+            println("ArbigentLog: ${log()}")
+        } else {
+            println("ArbigentLog(${this::class.simpleName}): ${log()}")
+        }
     }
 }
 
