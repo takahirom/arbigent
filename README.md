@@ -8,7 +8,8 @@
 
 ## Screenshot
 
-<img width="650" alt="arbigent-screenshot" src="https://github.com/user-attachments/assets/06a41770-70d0-4b3c-8fdc-c50c1fc070fa" />
+<img width="650" alt="image" src="https://github.com/user-attachments/assets/c12fd2df-1a4f-484d-9273-794ead2f0b76" />
+
 
 ## Demo movie
 
