@@ -61,6 +61,6 @@ jobs:
         with:
           download-url: https://github.com/takahirom/arbigent/releases/download/${{ steps.extract-version.outputs.tag-name }}/arbigent-${{ steps.extract-version.outputs.tag-name }}.tar.gz
           formula-name: arbigent
-          homebrew-tap: takahirom/homebrew-tap
+          homebrew-tap: takahirom/homebrew-repo
         env:
           COMMITTER_TOKEN: ${{ secrets.COMMITTER_TOKEN }}
