@@ -77,13 +77,12 @@ brew tap takahirom/homebrew-repo
 brew install takahirom/repo/arbigent
 ```
 
-```bash
-arbigent -h
+```
 Usage: arbigent [<options>]
 
 Options:
-  --ai-type=(openai|gemini)  Type of AI to use (openai or gemini)
-  --os=<(android)>           Target operating system (android)
+  --ai-type=(openai|gemini)  Type of AI to use
+  --os=(android|ios|web)     Target operating system
   --scenario-file=<text>     Path to the scenario YAML file
   -h, --help                 Show this message and exit
 ```
