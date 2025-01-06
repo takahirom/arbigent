@@ -182,20 +182,22 @@ The id is auto-generated UUID by Arbigent UI but you can change it to any string
 
 ```yaml
 scenarios:
-- id: "7788d7f4-7276-4cb3-8e98-7d3ad1d1cd47"
-  goal: "Just see Now in Android app from app list. Goal is just to see list of topics.\
-    \ Do not interact with the app"
-  initializeMethods:
-    type: "LaunchApp"
-    packageName: "com.google.samples.apps.nowinandroid"
-  cleanupData:
-    type: "Cleanup"
-    packageName: "com.google.samples.apps.nowinandroid"
-- id: "f0ef0129-c764-443f-897d-fc4408e5952b"
-  goal: "Select an interesting topic in now in android. Please goal when there are\
-    \ articles in \"For you\" tab. Don't click an article. If you open browser please\
-    \ go back."
-  dependency: "7788d7f4-7276-4cb3-8e98-7d3ad1d1cd47"
+  - id: "7788d7f4-7276-4cb3-8e98-7d3ad1d1cd47"
+    goal: "Open the Now in Android app from the app list. The goal is to view the list\
+    \ of topics.  Do not interact with the app beyond this."
+    initializeMethods:
+      type: "LaunchApp"
+      packageName: "com.google.samples.apps.nowinandroid"
+    cleanupData:
+      type: "Cleanup"
+      packageName: "com.google.samples.apps.nowinandroid"
+  - id: "f0ef0129-c764-443f-897d-fc4408e5952b"
+    goal: "In the Now in Android app, select an tech topic and complete the form in\
+    \ the \"For you\" tab. The goal is reached when articles are displayed.  Do not\
+    \ click on any articles. If the browser opens, return to the app."
+    dependency: "7788d7f4-7276-4cb3-8e98-7d3ad1d1cd47"
+    imageAssertions:
+      - assertionPrompt: "Articles should be visible on the screen"
 ```
 
 ## Code Interface

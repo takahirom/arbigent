@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.yield
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.coroutines.cancellation.CancellationException
@@ -48,6 +49,7 @@ public data class ArbigentScenarioRunningInfo(
 @Serializable
 public class ArbiterImageAssertion(
   public val assertionPrompt: String,
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
   public val requiredFulfillmentPercent: Int = 80,
 )
 
