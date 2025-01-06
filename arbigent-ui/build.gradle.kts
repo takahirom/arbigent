@@ -7,7 +7,11 @@ plugins {
   id("org.jetbrains.kotlin.plugin.compose")
   id("io.github.takahirom.roborazzi") version "1.39.0"
   id("org.jetbrains.kotlin.plugin.serialization")
+  id("com.palantir.git-version") version "0.15.0"
 }
+
+val gitVersion: groovy.lang.Closure<String> by extra
+version = gitVersion()
 
 kotlin {
   java.toolchain {
