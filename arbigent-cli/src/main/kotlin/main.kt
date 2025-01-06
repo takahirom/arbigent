@@ -18,12 +18,12 @@ import java.io.File
 
 class ArbigentCli : CliktCommand() {
 
-  val aiType by option(help = "Type of AI to use (openai or gemini)")
+  val aiType by option(help = "Type of AI to use")
     .choice("openai", "gemini")
     .default("openai")
 
-  val os by option(help = "Target operating system (android)")
-    .choice("android")
+  val os by option(help = "Target operating system")
+    .choice("android", "ios", "web")
     .default("android")
 
   val scenarioFile by option(help = "Path to the scenario YAML file")
