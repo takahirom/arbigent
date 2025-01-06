@@ -587,7 +587,7 @@ private fun step(
     arbigentContextHolder.addStep(decisionOutput.step)
   }
   if (arbigentContextHolder.steps().last().agentCommand is GoalAchievedAgentCommand) {
-    arbigentDebugLog("Goal achieved")
+    arbigentDebugLog("Goal achieved: ${decisionInput.arbigentContextHolder.goal}")
     return StepResult.GoalAchieved
   }
   executeCommandChain(

@@ -37,25 +37,3 @@ class DevicesStateHolder(val arbigentAvailableDeviceListFactory: (DeviceOs) -> L
     }.launchIn(CoroutineScope(ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob()))
   }
 }
-
-internal fun fetchAvailableDevicesByOs(deviceType: DeviceOs): List<ArbigentAvailableDevice> {
-  return when (deviceType) {
-    DeviceOs.Android -> {
-      Dadb.list().map { ArbigentAvailableDevice.Android(it) }
-    }
-
-    DeviceOs.iOS -> {
-      LocalSimulatorUtils.list()
-        .devices
-        .flatMap { runtime ->
-          runtime.value
-            .filter { it.isAvailable && it.state == "Booted" }
-        }
-        .map { ArbigentAvailableDevice.IOS(it) }
-    }
-
-    else -> {
-      listOf(ArbigentAvailableDevice.Web())
-    }
-  }
-}
