@@ -210,7 +210,7 @@ fun Scenario(
   }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 private fun ScenarioOptions(
   scenarioStateHolder: ArbigentScenarioStateHolder,
@@ -401,7 +401,19 @@ private fun ScenarioOptions(
     Column(
       modifier = Modifier.padding(8.dp).width(200.dp)
     ) {
-      GroupHeader("Image assertion")
+      GroupHeader {
+        Text("Image assertion")
+        IconActionButton(
+          key = AllIconsKeys.General.Information,
+          onClick = {},
+          contentDescription = "Image assertion",
+          hint = Size(16),
+        ) {
+          Text(
+            text = "The AI checks the screenshot when the goal is achieved. If the screenshot doesn't match the assertion, the goal is considered not achieved, and the agent will try other actions.",
+          )
+        }
+      }
       val imageAssertions by scenarioStateHolder.imageAssertionsStateFlow.collectAsState()
       // We don't support multiple image assertions yet.
       val imageAssertion = imageAssertions.firstOrNull()

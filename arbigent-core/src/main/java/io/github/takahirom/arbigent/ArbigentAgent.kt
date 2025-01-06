@@ -559,7 +559,7 @@ private fun step(
     imageAssertionOutput.results.forEach {
       arbigentContextHolder.addStep(
         ArbigentContextHolder.Step(
-          memo = "Image assertion ${if(it.isPassed) "passed" else "failed"} prompt:${it.assertionPrompt}. explanation:${it.explanation}",
+          memo = "Image assertion ${if(it.isPassed) "passed" else "failed"}. \nfulfillmentPercent:${it.fulfillmentPercent} \nprompt:${it.assertionPrompt} \nexplanation:${it.explanation}",
           screenshotFilePath = screenshotFilePath,
           aiRequest = decisionOutput.step.aiRequest,
           aiResponse = decisionOutput.step.aiResponse
