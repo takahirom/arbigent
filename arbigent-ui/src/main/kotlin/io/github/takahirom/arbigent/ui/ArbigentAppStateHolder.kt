@@ -9,9 +9,11 @@ import io.github.takahirom.arbigent.ArbigentProjectSerializer
 import io.github.takahirom.arbigent.ArbigentScenario
 import io.github.takahirom.arbigent.ArbigentScenarioContent
 import io.github.takahirom.arbigent.ArbigentAvailableDevice
+import io.github.takahirom.arbigent.ArbigentInternalApi
 import io.github.takahirom.arbigent.DeviceOs
 import io.github.takahirom.arbigent.arbigentDebugLog
 import io.github.takahirom.arbigent.createArbigentScenario
+import io.github.takahirom.arbigent.fetchAvailableDevicesByOs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -26,6 +28,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
 
+@OptIn(ArbigentInternalApi::class)
 class ArbigentAppStateHolder(
   val aiFactory: () -> ArbigentAi,
   val deviceFactory: (ArbigentAvailableDevice) -> ArbigentDevice = { avaiableDevice ->

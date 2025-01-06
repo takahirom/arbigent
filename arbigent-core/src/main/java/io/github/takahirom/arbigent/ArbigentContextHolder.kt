@@ -3,10 +3,9 @@ package io.github.takahirom.arbigent
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import java.io.File
 
 public class ArbigentContextHolder(
-  private val goal: String,
+  public val goal: String,
 ) {
   public class Step(
     public val agentCommand: AgentCommand? = null,
