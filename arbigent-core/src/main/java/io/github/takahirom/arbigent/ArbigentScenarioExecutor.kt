@@ -45,6 +45,12 @@ public data class ArbigentScenarioRunningInfo(
   }
 }
 
+@Serializable
+public class ArbiterImageAssertion(
+  public val assertionPrompt: String,
+  public val requiredFulfillmentPercent: Int = 80,
+)
+
 public class ArbigentScenarioExecutor {
   private val _taskAssignmentsStateFlow =
     MutableStateFlow<List<ArbigentTaskAssignment>>(listOf())

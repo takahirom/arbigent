@@ -6,6 +6,7 @@ import io.github.takahirom.arbigent.ArbigentScenarioContent
 import io.github.takahirom.arbigent.ArbigentScenarioDeviceFormFactor
 import io.github.takahirom.arbigent.ArbigentScenarioExecutor
 import io.github.takahirom.arbigent.ArbigentScenarioRunningInfo
+import io.github.takahirom.arbigent.ArbiterImageAssertion
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,6 +34,8 @@ constructor(
     MutableStateFlow(
       ArbigentScenarioContent.CleanupData.Noop
     )
+  val imageAssertionsStateFlow: MutableStateFlow<List<ArbiterImageAssertion>> =
+    MutableStateFlow(emptyList())
   val initializeMethodsStateFlow: MutableStateFlow<ArbigentScenarioContent.InitializeMethods> =
     MutableStateFlow(ArbigentScenarioContent.InitializeMethods.Back())
   val deviceFormFactorStateFlow: MutableStateFlow<ArbigentScenarioDeviceFormFactor> =
@@ -97,7 +100,8 @@ constructor(
       maxRetry = maxRetryState.text.toString().toIntOrNull() ?: 3,
       maxStep = maxStepState.text.toString().toIntOrNull() ?: 10,
       deviceFormFactor = deviceFormFactorStateFlow.value,
-      cleanupData = cleanupDataStateFlow.value
+      cleanupData = cleanupDataStateFlow.value,
+      imageAssertions = imageAssertionsStateFlow.value
     )
   }
 }

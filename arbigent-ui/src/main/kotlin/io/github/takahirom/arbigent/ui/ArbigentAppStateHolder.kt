@@ -257,6 +257,7 @@ class ArbigentAppStateHolder(
         }
         deviceFormFactorStateFlow.value = scenarioContent.deviceFormFactor
         cleanupDataStateFlow.value = scenarioContent.cleanupData
+        imageAssertionsStateFlow.value = scenarioContent.imageAssertions
       }
     }
     scenarios.forEachIndexed { index, scenario ->

@@ -39,7 +39,7 @@ class FakeAi : ArbigentAi {
       ArbigentContextHolder.Step(
         agentCommand = agentCommand,
         memo = "memo",
-        screenshotFileName = "screenshotFileName"
+        screenshotFilePath = "screenshotFileName"
       )
     )
   }
@@ -57,5 +57,19 @@ class FakeAi : ArbigentAi {
         agentCommand = GoalAchievedAgentCommand()
       )
     }
+  }
+
+  override fun assertImage(imageAssertionInput: ArbigentAi.ImageAssertionInput): ArbigentAi.ImageAssertionOutput {
+    arbigentDebugLog("FakeAi.assertImage")
+    return ArbigentAi.ImageAssertionOutput(
+      listOf(
+        ArbigentAi.ImageAssertionResult(
+          assertionPrompt = "assertionPrompt",
+          isPassed = true,
+          fulfillmentPercent = 100,
+          explanation = "explanation"
+        )
+      )
+    )
   }
 }

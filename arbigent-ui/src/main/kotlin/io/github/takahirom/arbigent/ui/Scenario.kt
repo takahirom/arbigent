@@ -46,6 +46,7 @@ import io.github.takahirom.arbigent.ArbigentScenarioContent
 import io.github.takahirom.arbigent.ArbigentScenarioDeviceFormFactor
 import io.github.takahirom.arbigent.ArbigentScenarioExecutor
 import io.github.takahirom.arbigent.ArbigentTaskAssignment
+import io.github.takahirom.arbigent.ArbiterImageAssertion
 import io.github.takahirom.arbigent.GoalAchievedAgentCommand
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.Orientation
@@ -209,7 +210,7 @@ fun Scenario(
   }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 private fun ScenarioOptions(
   scenarioStateHolder: ArbigentScenarioStateHolder,
@@ -255,7 +256,8 @@ private fun ScenarioOptions(
           text = "TV",
           selected = inputCommandType.isTv(),
           onClick = {
-            scenarioStateHolder.deviceFormFactorStateFlow.value = ArbigentScenarioDeviceFormFactor.Tv
+            scenarioStateHolder.deviceFormFactorStateFlow.value =
+              ArbigentScenarioDeviceFormFactor.Tv
           }
         )
       }
@@ -396,6 +398,48 @@ private fun ScenarioOptions(
         )
       }
     }
+    Column(
+      modifier = Modifier.padding(8.dp).width(200.dp)
+    ) {
+      GroupHeader {
+        Text("Image assertion")
+        IconActionButton(
+          key = AllIconsKeys.General.Information,
+          onClick = {},
+          contentDescription = "Image assertion",
+          hint = Size(16),
+        ) {
+          Text(
+            text = "The AI checks the screenshot when the goal is achieved. If the screenshot doesn't match the assertion, the goal is considered not achieved, and the agent will try other actions.",
+          )
+        }
+      }
+      val imageAssertions by scenarioStateHolder.imageAssertionsStateFlow.collectAsState()
+      // We don't support multiple image assertions yet.
+      val imageAssertion = imageAssertions.firstOrNull()
+      Row(
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        TextField(
+          modifier = Modifier
+            .padding(4.dp)
+            .testTag("image_assertion"),
+          placeholder = { Text("The register button should exist") },
+          value = imageAssertion?.assertionPrompt ?: "",
+          onValueChange = {
+            if (it.isBlank()) {
+              scenarioStateHolder.imageAssertionsStateFlow.value = emptyList()
+            } else {
+              scenarioStateHolder.imageAssertionsStateFlow.value = listOf(
+                ArbiterImageAssertion(
+                  assertionPrompt = it,
+                )
+              )
+            }
+          },
+        )
+      }
+    }
   }
 }
 
@@ -415,7 +459,9 @@ data class StepItem(val step: ArbigentContextHolder.Step) {
 fun buildSections(tasksToAgent: List<ArbigentTaskAssignment>): List<ScenarioSection> {
   val sections = mutableListOf<ScenarioSection>()
   for ((tasks, agent) in tasksToAgent) {
-    val latestContext: ArbigentContextHolder? by agent.latestArbigentContextFlow.collectAsState(agent.latestArbigentContext())
+    val latestContext: ArbigentContextHolder? by agent.latestArbigentContextFlow.collectAsState(
+      agent.latestArbigentContext()
+    )
     val isRunning by agent.isRunningFlow.collectAsState()
     val nonNullContext = latestContext ?: continue
     val steps: List<ArbigentContextHolder.Step> by nonNullContext.stepsFlow.collectAsState(

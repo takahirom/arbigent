@@ -7,7 +7,7 @@ public interface ArbigentAi {
     // Only true if it is TV form factor
     val focusedTreeString: String?,
     val agentCommandTypes: List<AgentCommandType>,
-    val screenshotFileName: String,
+    val screenshotFilePath: String,
   )
   public data class DecisionOutput(
     val agentCommands: List<AgentCommand>,
@@ -16,4 +16,24 @@ public interface ArbigentAi {
   public fun decideAgentCommands(
     decisionInput: DecisionInput
   ): DecisionOutput
+
+  public data class ImageAssertionInput(
+    val ai: ArbigentAi,
+    val arbigentContextHolder: ArbigentContextHolder,
+    val screenshotFilePath: String,
+    val assertions: List<ArbiterImageAssertion>,
+  )
+  public data class ImageAssertionOutput(
+    val results: List<ImageAssertionResult>
+  )
+
+  public class ImageAssertionResult(
+    public val assertionPrompt: String,
+    public val isPassed: Boolean,
+    public val fulfillmentPercent: Int,
+    public val explanation: String?,
+  )
+  public fun assertImage(
+    imageAssertionInput: ImageAssertionInput
+  ): ImageAssertionOutput
 }
