@@ -1,20 +1,39 @@
 package io.github.takahirom.arbigent
 
+import com.github.takahirom.roborazzi.AiAssertionOptions
+import com.github.takahirom.roborazzi.AnySerializer
+import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
+import com.github.takahirom.roborazzi.OpenAiAiAssertionModel
+import io.ktor.client.HttpClient
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.HttpTimeout.Plugin.INFINITE_TIMEOUT_MS
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.logging.LogLevel
+import io.ktor.client.plugins.logging.Logger
+import io.ktor.client.plugins.logging.Logging
+import io.ktor.client.plugins.logging.SIMPLE
+import io.ktor.client.request.HttpRequestBuilder
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.encodeToString
+import kotlinx.serialization.MissingFieldException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
+import kotlinx.serialization.modules.SerializersModule
 import java.awt.image.BufferedImage
 import java.io.File
+import java.nio.charset.Charset
 import java.util.Base64
-import java.util.concurrent.TimeUnit
 import javax.imageio.ImageIO
 
 class OpenAIAi(
@@ -22,13 +41,57 @@ class OpenAIAi(
   private val baseUrl: String = "https://api.openai.com/v1/",
   private val modelName: String = "gpt-4o-mini",
   private val systemPrompt: String = ArbigentPrompts.systemPrompt,
-  private val requestBuilder: (String) -> Request = { requestBodyJson ->
-    createRequest(baseUrl, requestBodyJson, apiKey)
-  }
+  private val requestBuilderModifier: HttpRequestBuilder.() -> Unit = {
+    header("Authorization", "Bearer $apiKey")
+  },
+  loggingEnabled: Boolean = true,
+  private val openAiImageAssertionModel: OpenAiAiAssertionModel = OpenAiAiAssertionModel(
+    apiKey = apiKey,
+    baseUrl = baseUrl,
+    modelName = modelName,
+    loggingEnabled = loggingEnabled,
+    requestBuilderModifier = requestBuilderModifier
+  ),
+  private val httpClient: HttpClient = HttpClient {
+    install(ContentNegotiation) {
+      json(
+        json = Json {
+          isLenient = true
+          encodeDefaults = true
+          ignoreUnknownKeys = true
+          classDiscriminator = "#class"
+          explicitNulls = false
+          serializersModule = SerializersModule {
+            contextual(Any::class, AnySerializer)
+          }
+        }
+      )
+    }
+    install(HttpTimeout) {
+      requestTimeoutMillis =
+        INFINITE_TIMEOUT_MS
+      socketTimeoutMillis = 80_000
+    }
+    if (loggingEnabled) {
+      install(Logging) {
+        logger = object : Logger {
+          override fun log(message: String) {
+            Logger.SIMPLE.log(
+              message.replace(
+                apiKey,
+                "****"
+              )
+            )
+          }
+        }
+        level = LogLevel.ALL
+      }
+    }
+  },
 ) : ArbigentAi {
   @OptIn(ExperimentalSerializationApi::class)
   override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
-    val (arbigentContext, dumpHierarchy, focusedTree, agentCommandTypes, screenshotFileName) = decisionInput
+    val (arbigentContext, dumpHierarchy, focusedTree, agentCommandTypes, screenshotFilePath) = decisionInput
     val prompt = buildPrompt(arbigentContext, dumpHierarchy, focusedTree, agentCommandTypes)
     val messages: List<ChatMessage> = listOf(
       ChatMessage(
@@ -67,9 +130,9 @@ class OpenAIAi(
       return decideAgentCommands(decisionInput)
     }
     try {
-      val step = parseResponse(responseText, messages, screenshotFileName, agentCommandTypes)
+      val step = parseResponse(responseText, messages, screenshotFilePath, agentCommandTypes)
       return ArbigentAi.DecisionOutput(listOf(step.agentCommand!!), step)
-    } catch (e: kotlinx.serialization.MissingFieldException) {
+    } catch (e: MissingFieldException) {
       arbigentInfoLog("Missing required field in OpenAI response: $e $responseText")
       throw e
     }
@@ -98,13 +161,12 @@ $templates"""
   private fun parseResponse(
     response: String,
     message: List<ChatMessage>,
-    screenshotFileName: String,
+    screenshotFilePath: String,
     agentCommandList: List<AgentCommandType>
   ): ArbigentContextHolder.Step {
     val json = Json { ignoreUnknownKeys = true }
     val responseObj = json.decodeFromString<ChatCompletionResponse>(response)
     val content = responseObj.choices.firstOrNull()?.message?.content ?: ""
-    arbigentDebugLog("OpenAI content: $content")
     return try {
       val jsonElement = json.parseToJsonElement(content)
       val jsonObject = jsonElement.jsonObject
@@ -176,7 +238,7 @@ $templates"""
         whatYouSaw = jsonObject["summary-of-what-you-saw"]?.jsonPrimitive?.content ?: "",
         aiRequest = message.toString(),
         aiResponse = content,
-        screenshotFileName = screenshotFileName
+        screenshotFilePath = screenshotFilePath
       )
     } catch (e: Exception) {
       throw Exception("Failed to parse OpenAI response: $e")
@@ -189,35 +251,36 @@ $templates"""
     agentCommandTypes: List<AgentCommandType>,
     messages: List<ChatMessage>
   ): String {
-    val client = OkHttpClient.Builder()
-      .readTimeout(60, TimeUnit.SECONDS)
-      .build()
-    val json = Json { ignoreUnknownKeys = true }
-    val requestBodyJson = json.encodeToString(
-      ChatCompletionRequest(
-        model = modelName,
-        messages = messages,
-        ResponseFormat(
-          type = "json_schema",
-          jsonSchema = buildActionSchema(agentCommandTypes = agentCommandTypes),
-        ),
-      )
-    )
-    val request = requestBuilder(requestBodyJson)
-    arbigentDebugLog(
-      "OpenAI request: ${
-        messages.flatMap { it.content }.filter { it.type == "text" }.joinToString("\n")
-      }"
-    )
-    val response = client.newCall(request).execute()
-    if (response.code == HttpStatusCode.TooManyRequests.value) {
-      throw AiRateLimitExceededException()
-    } else if (!response.isSuccessful && !response.isRedirect) {
-      throw IllegalStateException("Failed to call API: ${response.code} ${response.body?.string()}")
+    return runBlocking {
+      val response: HttpResponse =
+        httpClient.post(baseUrl + "chat/completions") {
+          requestBuilderModifier()
+          contentType(ContentType.Application.Json)
+          setBody(
+            ChatCompletionRequest(
+              model = modelName,
+              messages = messages,
+              ResponseFormat(
+                type = "json_schema",
+                jsonSchema = buildActionSchema(agentCommandTypes = agentCommandTypes),
+              ),
+            )
+          )
+        }
+      if (response.status == HttpStatusCode.TooManyRequests) {
+        throw AiRateLimitExceededException()
+      } else if (400 <= response.status.value) {
+        throw IllegalStateException(
+          "Failed to call API: ${response.status} ${
+            response.bodyAsText(
+              Charset.defaultCharset()
+            )
+          }"
+        )
+      }
+      val responseBody = response.bodyAsText() ?: ""
+      return@runBlocking responseBody
     }
-    val responseBody = response.body?.string() ?: ""
-    arbigentDebugLog("OpenAI response: $responseBody")
-    return responseBody
   }
 
   private fun buildActionSchema(agentCommandTypes: List<AgentCommandType>): JsonObject {
@@ -258,6 +321,35 @@ $templates"""
     val bytes = file.readBytes()
     return Base64.getEncoder().encodeToString(bytes)
   }
+
+  @OptIn(ExperimentalRoborazziApi::class)
+  override fun assertImage(imageAssertionInput: ArbigentAi.ImageAssertionInput): ArbigentAi.ImageAssertionOutput {
+    val result = openAiImageAssertionModel.assert(
+      referenceImageFilePath = imageAssertionInput.screenshotFilePath,
+      comparisonImageFilePath = imageAssertionInput.screenshotFilePath,
+      actualImageFilePath = imageAssertionInput.screenshotFilePath,
+      aiAssertionOptions = AiAssertionOptions(
+        openAiImageAssertionModel,
+        aiAssertions = imageAssertionInput.assertions.map { assertion ->
+          AiAssertionOptions.AiAssertion(
+            assertionPrompt = assertion.assertionPrompt,
+            requiredFulfillmentPercent = assertion.requiredFulfillmentPercent
+          )
+        },
+        systemPrompt = ArbigentPrompts.imageAssertionSystemPrompt
+      )
+    )
+    return ArbigentAi.ImageAssertionOutput(
+      results = result.aiAssertionResults.map { aiAssertionResult ->
+        ArbigentAi.ImageAssertionResult(
+          assertionPrompt = aiAssertionResult.assertionPrompt,
+          isPassed = aiAssertionResult.fulfillmentPercent >= aiAssertionResult.requiredFulfillmentPercent!!,
+          fulfillmentPercent = aiAssertionResult.fulfillmentPercent,
+          explanation = aiAssertionResult.explanation
+        )
+      }
+    )
+  }
 }
 
 fun File.getResizedIamgeByteArray(scale: Float): ByteArray {
@@ -278,13 +370,3 @@ fun File.getResizedIamgeByteArray(scale: Float): ByteArray {
   return output.readBytes()
 }
 
-private fun createRequest(baseUrl: String, requestBodyJson: String, apiKey: String): Request {
-  val requestBody = requestBodyJson
-    .toRequestBody("application/json".toMediaType())
-  val request = Request.Builder()
-    .url("${baseUrl}chat/completions")
-    .header("Authorization", "Bearer $apiKey")
-    .post(requestBody)
-    .build()
-  return request
-}

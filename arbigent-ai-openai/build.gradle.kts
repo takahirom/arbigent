@@ -14,6 +14,9 @@ dependencies {
 
   // To expose requestBuilderModifier
   api(libs.ktor.client.core)
+  // For Image Assertion
+  api("io.github.takahirom.roborazzi:roborazzi-ai-openai:1.38.0")
+  api("io.github.takahirom.roborazzi:roborazzi-core:1.38.0")
   implementation(libs.kotlinx.coroutines.core)
   implementation(libs.ktor.serialization.json)
   implementation(libs.ktor.client.cio)

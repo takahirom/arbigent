@@ -53,7 +53,8 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
         agentConfig = AgentConfigBuilder(
           deviceFormFactor = nodeScenario.deviceFormFactor,
           initializeMethods = nodeScenario.initializeMethods,
-          cleanupData = nodeScenario.cleanupData
+          cleanupData = nodeScenario.cleanupData,
+          imageAssertions = nodeScenario.imageAssertions
         ).apply {
           ai(aiFactory())
           deviceFactory(deviceFactory)
@@ -88,7 +89,9 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   public val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Mobile,
   @EncodeDefault(EncodeDefault.Mode.NEVER)
-  public val cleanupData: CleanupData = CleanupData.Noop
+  public val cleanupData: CleanupData = CleanupData.Noop,
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  public val imageAssertions: List<ArbiterImageAssertion> = emptyList()
 ) {
   @Serializable
   public sealed interface CleanupData {

@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertAll
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.filterToOne
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
@@ -54,40 +56,10 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
     ArbigentCoroutinesDispatcher.dispatcher = testDispatcher
     globalKeyStoreFactory = TestKeyStoreFactory()
     runComposeUiTest {
-      setContent()
       runTest(testDispatcher) {
-        behavior.execute(TestRobot(this, this@runComposeUiTest))
-      }
-    }
-  }
-
-  @OptIn(ExperimentalTestApi::class)
-  private fun ComposeUiTest.setContent() {
-    val appStateHolder = ArbigentAppStateHolder(
-      aiFactory = { FakeAi() },
-      deviceFactory = { FakeDevice() },
-      availableDeviceListFactory = {
-        listOf(ArbigentAvailableDevice.Fake())
-      },
-    )
-    setContent {
-      AppTheme {
-        Column {
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-          ) {
-            Box(Modifier.padding(8.dp)) {
-              ScenarioFileControls(appStateHolder)
-            }
-            Box(Modifier.padding(8.dp)) {
-              ScenarioControls(appStateHolder)
-            }
-          }
-          App(
-            appStateHolder = appStateHolder,
-          )
-        }
+        val robot = TestRobot(this, this@runComposeUiTest)
+        robot.setContent()
+        behavior.execute(robot)
       }
     }
   }
@@ -120,6 +92,40 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
               itShould("show goal input") {
                 capture(it)
                 assertGoalInputExists()
+              }
+              describe("when enter goals and image assertion") {
+                doIt {
+                  enterGoal("launch the app")
+                  expandOptions()
+                  enterImageAssertion("The screen should show the app")
+                }
+                describe("when run") {
+                  describe("should finish the scenario") {
+                    doIt {
+                      clickRunButton()
+                      waitUntilScenarioRunning()
+                    }
+                    itShould("show goal achieved") {
+                      capture(it)
+                      assertGoalAchieved()
+                    }
+                  }
+                }
+                describe("when ai fail with image and run") {
+                  doIt {
+                    setupAiStatus(FakeAi.AiStatus.ImageAssertionFailed())
+                    clickRunButton()
+                  }
+                  describe("should finish the scenario") {
+                    doIt {
+                      waitUntilScenarioRunning()
+                    }
+                    itShould("show goal not achieved") {
+                      capture(it)
+                      assertGoalNotAchievedByImageAssertion()
+                    }
+                  }
+                }
               }
               describe("when enter goals and run") {
                 doIt {
@@ -207,6 +213,12 @@ class TestRobot(
   val testScope: TestScope,
   val composeUiTest: ComposeUiTest,
 ) {
+  private val fakeAi = FakeAi()
+  private val fakeDevice = FakeDevice()
+
+  fun setupAiStatus(aiStatus: FakeAi.AiStatus) {
+    fakeAi.status = aiStatus
+  }
 
   fun clickConnectToDeviceButton() {
     waitALittle()
@@ -221,6 +233,11 @@ class TestRobot(
 
   fun enterGoal(goal: String) {
     composeUiTest.onNode(hasTestTag("goal")).performTextInput(goal)
+    waitALittle()
+  }
+
+  fun enterImageAssertion(assertion: String) {
+    composeUiTest.onNode(hasTestTag("image_assertion")).performTextInput(assertion)
     waitALittle()
   }
 
@@ -258,6 +275,12 @@ class TestRobot(
   fun assertGoalAchieved() {
     composeUiTest.onNode(hasTestTag("scenario_running")).assertDoesNotExist()
     composeUiTest.onNode(hasText("Goal achieved", true), useUnmergedTree = true).assertExists()
+  }
+
+  fun assertGoalNotAchievedByImageAssertion() {
+    composeUiTest.onNode(hasTestTag("scenario_running")).assertDoesNotExist()
+    composeUiTest.onAllNodes(hasText("Failed to reach the goal", true), useUnmergedTree = true)
+      .onLast().assertIsDisplayed()
   }
 
   fun assertTwoGoalAchieved() {
@@ -298,6 +321,41 @@ class TestRobot(
 
   fun capture(describedBehavior: DescribedBehavior<TestRobot>) {
     composeUiTest.onAllNodes(isRoot()).onLast().captureRoboImage("$describedBehavior.png")
+  }
+
+  fun setContent() {
+    composeUiTest.setContent()
+  }
+
+  @OptIn(ExperimentalTestApi::class)
+  private fun ComposeUiTest.setContent() {
+    val appStateHolder = ArbigentAppStateHolder(
+      aiFactory = { fakeAi },
+      deviceFactory = { fakeDevice },
+      availableDeviceListFactory = {
+        listOf(ArbigentAvailableDevice.Fake())
+      },
+    )
+    setContent {
+      AppTheme {
+        Column {
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+          ) {
+            Box(Modifier.padding(8.dp)) {
+              ScenarioFileControls(appStateHolder)
+            }
+            Box(Modifier.padding(8.dp)) {
+              ScenarioControls(appStateHolder)
+            }
+          }
+          App(
+            appStateHolder = appStateHolder,
+          )
+        }
+      }
+    }
   }
 }
 
@@ -343,32 +401,84 @@ internal class TestKeyStoreFactory : () -> KeyStore {
 }
 
 class FakeAi : ArbigentAi {
-  var count = 0
-  fun createDecisionOutput(
-    agentCommand: AgentCommand = ClickWithTextAgentCommand("text")
-  ): ArbigentAi.DecisionOutput {
-    return ArbigentAi.DecisionOutput(
-      listOf(agentCommand),
-      ArbigentContextHolder.Step(
-        agentCommand = agentCommand,
-        memo = "memo",
-        screenshotFileName = "screenshotFileName"
-      )
-    )
+  sealed interface AiStatus : ArbigentAi {
+    class Normal() : AiStatus {
+      var count = 0
+      fun createDecisionOutput(
+        agentCommand: AgentCommand = ClickWithTextAgentCommand("text")
+      ): ArbigentAi.DecisionOutput {
+        return ArbigentAi.DecisionOutput(
+          listOf(agentCommand),
+          ArbigentContextHolder.Step(
+            agentCommand = agentCommand,
+            memo = "memo",
+            screenshotFilePath = "screenshotFileName"
+          )
+        )
+      }
+
+      override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
+        arbigentDebugLog("FakeAi.decideWhatToDo")
+        if (count == 0) {
+          count++
+          return createDecisionOutput()
+        } else if (count == 1) {
+          count++
+          return createDecisionOutput()
+        } else {
+          return createDecisionOutput(
+            agentCommand = GoalAchievedAgentCommand()
+          )
+        }
+      }
+
+      override fun assertImage(imageAssertionInput: ArbigentAi.ImageAssertionInput): ArbigentAi.ImageAssertionOutput {
+        arbigentDebugLog("FakeAi.assertImage")
+        return ArbigentAi.ImageAssertionOutput(
+          listOf(
+            ArbigentAi.ImageAssertionResult(
+              assertionPrompt = "assertionPrompt",
+              isPassed = true,
+              fulfillmentPercent = 100,
+              explanation = "explanation"
+            )
+          )
+        )
+      }
+    }
+    class ImageAssertionFailed(): AiStatus {
+      override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
+        return ArbigentAi.DecisionOutput(
+          listOf(GoalAchievedAgentCommand()),
+          ArbigentContextHolder.Step(
+            agentCommand = GoalAchievedAgentCommand(),
+            memo = "memo",
+            screenshotFilePath = "screenshotFileName"
+          )
+        )
+      }
+
+      override fun assertImage(imageAssertionInput: ArbigentAi.ImageAssertionInput): ArbigentAi.ImageAssertionOutput {
+        return ArbigentAi.ImageAssertionOutput(
+          listOf(
+            ArbigentAi.ImageAssertionResult(
+              assertionPrompt = "assertionPrompt",
+              isPassed = false,
+              fulfillmentPercent = 0,
+              explanation = "explanation"
+            )
+          )
+        )
+      }
+    }
   }
 
+  var status: AiStatus = AiStatus.Normal()
   override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
-    arbigentDebugLog("FakeAi.decideWhatToDo")
-    if (count == 0) {
-      count++
-      return createDecisionOutput()
-    } else if (count == 1) {
-      count++
-      return createDecisionOutput()
-    } else {
-      return createDecisionOutput(
-        agentCommand = GoalAchievedAgentCommand()
-      )
-    }
+    return status.decideAgentCommands(decisionInput)
+  }
+
+  override fun assertImage(imageAssertionInput: ArbigentAi.ImageAssertionInput): ArbigentAi.ImageAssertionOutput {
+    return status.assertImage(imageAssertionInput)
   }
 }

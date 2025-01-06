@@ -27,6 +27,7 @@ import maestro.orchestra.LaunchAppCommand
 import maestro.orchestra.MaestroCommand
 import maestro.orchestra.TakeScreenshotCommand
 import maestro.orchestra.WaitForAnimationToEndCommand
+import java.io.File
 
 public class ArbigentAgent(
   agentConfig: AgentConfig
@@ -68,6 +69,22 @@ public class ArbigentAgent(
           interceptor.intercept(
             decisionInput = input,
             chain = { decisionInput -> acc(decisionInput) }
+          )
+        }
+      }
+    )
+  private val imageAssertionInterceptors: List<ArbiterImageAssertionInterceptor> = interceptors
+    .filterIsInstance<ArbiterImageAssertionInterceptor>()
+  private val imageAssertionChain: (ArbigentAi.ImageAssertionInput) -> ArbigentAi.ImageAssertionOutput =
+    imageAssertionInterceptors.foldRight(
+      { input: ArbigentAi.ImageAssertionInput ->
+        input.ai.assertImage(input)
+      },
+      { interceptor, acc ->
+        { input ->
+          interceptor.intercept(
+            imageAssertionInput = input,
+            chain = { imageAssertionInput -> acc(imageAssertionInput) }
           )
         }
       }
@@ -154,6 +171,7 @@ public class ArbigentAgent(
           deviceFormFactor = deviceFormFactor,
           ai = ai,
           decisionChain = decisionChain,
+          imageAssertionChain = imageAssertionChain,
           executeCommandChain = executeCommandChain
         )
         when (stepChain(stepInput)) {
@@ -187,6 +205,7 @@ public class ArbigentAgent(
     val deviceFormFactor: ArbigentScenarioDeviceFormFactor,
     val ai: ArbigentAi,
     val decisionChain: (ArbigentAi.DecisionInput) -> ArbigentAi.DecisionOutput,
+    val imageAssertionChain: (ArbigentAi.ImageAssertionInput) -> ArbigentAi.ImageAssertionOutput,
     val executeCommandChain: (ExecuteCommandsInput) -> ExecuteCommandsOutput,
   )
 
@@ -198,7 +217,7 @@ public class ArbigentAgent(
   public data class ExecuteCommandsInput(
     val decisionOutput: ArbigentAi.DecisionOutput,
     val arbigentContextHolder: ArbigentContextHolder,
-    val screenshotFileName: String,
+    val screenshotFilePath: String,
     val device: ArbigentDevice,
   )
 
@@ -277,7 +296,8 @@ public fun AgentConfigBuilder(block: AgentConfig.Builder.() -> Unit): AgentConfi
 public fun AgentConfigBuilder(
   deviceFormFactor: ArbigentScenarioDeviceFormFactor,
   initializeMethods: ArbigentScenarioContent.InitializeMethods,
-  cleanupData: ArbigentScenarioContent.CleanupData
+  cleanupData: ArbigentScenarioContent.CleanupData,
+  imageAssertions: List<ArbiterImageAssertion>
 ): AgentConfig.Builder = AgentConfigBuilder {
   deviceFormFactor(deviceFormFactor)
   when (val method = initializeMethods) {
@@ -362,6 +382,21 @@ public fun AgentConfigBuilder(
       // do nothing
     }
   }
+  if (imageAssertions.isNotEmpty()) {
+    addInterceptor(object : ArbiterImageAssertionInterceptor {
+      override fun intercept(
+        imageAssertionInput: ArbigentAi.ImageAssertionInput,
+        chain: ArbiterImageAssertionInterceptor.Chain
+      ): ArbigentAi.ImageAssertionOutput {
+        val output = chain.proceed(
+          imageAssertionInput.copy(
+            assertions = imageAssertionInput.assertions + imageAssertions
+          )
+        )
+        return output
+      }
+    })
+  }
 }
 
 public interface ArbigentInterceptor
@@ -374,15 +409,33 @@ public interface ArbigentInitializerInterceptor : ArbigentInterceptor {
 }
 
 public interface ArbigentDecisionInterceptor : ArbigentInterceptor {
-  public fun intercept(decisionInput: ArbigentAi.DecisionInput, chain: Chain): ArbigentAi.DecisionOutput
+  public fun intercept(
+    decisionInput: ArbigentAi.DecisionInput,
+    chain: Chain
+  ): ArbigentAi.DecisionOutput
 
   public fun interface Chain {
     public fun proceed(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput
   }
 }
 
+public interface ArbiterImageAssertionInterceptor : ArbigentInterceptor {
+  public fun intercept(
+    imageAssertionInput: ArbigentAi.ImageAssertionInput,
+    chain: Chain
+  ): ArbigentAi.ImageAssertionOutput
+
+  public fun interface Chain {
+    public fun proceed(imageAssertionInput: ArbigentAi.ImageAssertionInput): ArbigentAi.ImageAssertionOutput
+  }
+}
+
 public interface ArbigentExecuteCommandsInterceptor : ArbigentInterceptor {
-  public fun intercept(executeCommandsInput: ExecuteCommandsInput, chain: Chain): ExecuteCommandsOutput
+  public fun intercept(
+    executeCommandsInput: ExecuteCommandsInput,
+    chain: Chain
+  ): ExecuteCommandsOutput
+
   public fun interface Chain {
     public fun proceed(executeCommandsInput: ExecuteCommandsInput): ExecuteCommandsOutput
   }
@@ -426,7 +479,7 @@ public fun defaultAgentCommandTypesForTv(): List<AgentCommandType> {
 private fun executeCommands(
   executeCommandsInput: ExecuteCommandsInput,
 ): ExecuteCommandsOutput {
-  val (decisionOutput, arbigentContextHolder, screenshotFileName, device) = executeCommandsInput
+  val (decisionOutput, arbigentContextHolder, screenshotFilePath, device) = executeCommandsInput
   decisionOutput.agentCommands.forEach { agentCommand ->
     try {
       agentCommand.runOrchestraCommand(device)
@@ -435,7 +488,7 @@ private fun executeCommands(
       arbigentContextHolder.addStep(
         ArbigentContextHolder.Step(
           memo = "Failed to perform action: ${e.message}. Please try other actions.",
-          screenshotFileName = screenshotFileName
+          screenshotFilePath = screenshotFilePath
         )
       )
     } catch (e: StatusRuntimeException) {
@@ -443,7 +496,7 @@ private fun executeCommands(
       arbigentContextHolder.addStep(
         ArbigentContextHolder.Step(
           memo = "Failed to perform action: ${e.message}. Please try other actions.",
-          screenshotFileName = screenshotFileName
+          screenshotFilePath = screenshotFilePath
         )
       )
     } catch (e: IllegalStateException) {
@@ -451,7 +504,7 @@ private fun executeCommands(
       arbigentContextHolder.addStep(
         ArbigentContextHolder.Step(
           memo = "Failed to perform action: ${e.message}. Please try other actions.",
-          screenshotFileName = screenshotFileName
+          screenshotFilePath = screenshotFilePath
         )
       )
     }
@@ -462,14 +515,14 @@ private fun executeCommands(
 private fun step(
   stepInput: StepInput
 ): StepResult {
-  val (arbigentContextHolder, agentCommandTypes, device, deviceFormFactor, ai, decisionChain, executeCommandChain) = stepInput
-  val screenshotFileName = System.currentTimeMillis().toString()
+  val (arbigentContextHolder, agentCommandTypes, device, deviceFormFactor, ai, decisionChain, imageAssertionChain, executeCommandChain) = stepInput
+  val screenshotFileID = System.currentTimeMillis().toString()
   try {
     device.executeCommands(
       commands = listOf(
         MaestroCommand(
           takeScreenshotCommand = TakeScreenshotCommand(
-            screenshotFileName
+            screenshotFileID
           )
         ),
       ),
@@ -478,6 +531,8 @@ private fun step(
     arbigentDebugLog("Failed to take screenshot: $e")
   }
   arbigentDebugLog("Arbigent step(): ${arbigentContextHolder.prompt()}")
+  val screenshotFilePath =
+    ArbigentTempDir.screenshotsDir.absolutePath + File.separator + "$screenshotFileID.png"
   val decisionInput = ArbigentAi.DecisionInput(
     arbigentContextHolder = arbigentContextHolder,
     dumpHierarchy = device.viewTreeString(),
@@ -488,11 +543,50 @@ private fun step(
       null
     },
     agentCommandTypes = agentCommandTypes,
-    screenshotFileName = screenshotFileName
+    screenshotFilePath = screenshotFilePath
   )
   val decisionOutput = decisionChain(decisionInput)
-  arbigentContextHolder.addStep(decisionOutput.step)
-  if (decisionOutput.agentCommands.size == 1 && decisionOutput.agentCommands.first() is GoalAchievedAgentCommand) {
+  if (decisionOutput.agentCommands.any { it is GoalAchievedAgentCommand }) {
+    val imageAssertionOutput = imageAssertionChain(
+      ArbigentAi.ImageAssertionInput(
+        ai = ai,
+        arbigentContextHolder = arbigentContextHolder,
+        screenshotFilePath = screenshotFilePath,
+        // Added by interceptors
+        assertions = listOf()
+      )
+    )
+    imageAssertionOutput.results.forEach {
+      arbigentContextHolder.addStep(
+        ArbigentContextHolder.Step(
+          memo = "Image assertion ${if(it.isPassed) "passed" else "failed"} prompt:${it.assertionPrompt}. explanation:${it.explanation}",
+          screenshotFilePath = screenshotFilePath,
+          aiRequest = decisionOutput.step.aiRequest,
+          aiResponse = decisionOutput.step.aiResponse
+        )
+      )
+    }
+    if (imageAssertionOutput.results.all {
+        it.isPassed
+      }) {
+      // All assertions are passed
+      arbigentContextHolder.addStep(decisionOutput.step)
+    } else {
+      imageAssertionOutput.results.filter { it.isPassed.not() }.forEach {
+        arbigentContextHolder.addStep(
+          ArbigentContextHolder.Step(
+            memo = "Failed to reach the goal by image assertion. Image assertion prompt:${it.assertionPrompt}. explanation:${it.explanation}",
+            screenshotFilePath = screenshotFilePath,
+            aiRequest = decisionOutput.step.aiRequest,
+            aiResponse = decisionOutput.step.aiResponse
+          )
+        )
+      }
+    }
+  } else {
+    arbigentContextHolder.addStep(decisionOutput.step)
+  }
+  if (arbigentContextHolder.steps().last().agentCommand is GoalAchievedAgentCommand) {
     arbigentDebugLog("Goal achieved")
     return StepResult.GoalAchieved
   }
@@ -500,7 +594,7 @@ private fun step(
     ExecuteCommandsInput(
       decisionOutput = decisionOutput,
       arbigentContextHolder = arbigentContextHolder,
-      screenshotFileName = screenshotFileName,
+      screenshotFilePath = screenshotFilePath,
       device = device
     )
   )

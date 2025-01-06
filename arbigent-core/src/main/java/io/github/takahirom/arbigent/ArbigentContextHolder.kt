@@ -15,18 +15,17 @@ public class ArbigentContextHolder(
     public val whatYouSaw: String? = null,
     public val aiRequest: String? = null,
     public val aiResponse: String? = null,
-    public val screenshotFileName: String
+    public val screenshotFilePath: String
   ) {
-    public val screenshotFilePath: String =  ArbigentTempDir.screenshotsDir.absolutePath + File.separator + "$screenshotFileName.png"
     public fun isFailed(): Boolean {
       return memo.contains("Failed")
     }
     public fun text(): String {
-      return """
-        memo: $memo
-        whatYouSaw: $whatYouSaw
-        action done: ${agentCommand?.stepLogText()}
-      """.trimIndent()
+      return buildString {
+        append("memo: $memo\n")
+        whatYouSaw?.let { append("whatYouSaw: $it\n") }
+        agentCommand?.let { append("action done: ${it.stepLogText()}\n") }
+      }
     }
   }
 
