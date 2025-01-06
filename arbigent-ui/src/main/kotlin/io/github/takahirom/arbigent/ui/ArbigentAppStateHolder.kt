@@ -8,7 +8,7 @@ import io.github.takahirom.arbigent.ArbigentProjectFileContent
 import io.github.takahirom.arbigent.ArbigentProjectSerializer
 import io.github.takahirom.arbigent.ArbigentScenario
 import io.github.takahirom.arbigent.ArbigentScenarioContent
-import io.github.takahirom.arbigent.AvailableDevice
+import io.github.takahirom.arbigent.ArbigentAvailableDevice
 import io.github.takahirom.arbigent.DeviceOs
 import io.github.takahirom.arbigent.arbigentDebugLog
 import io.github.takahirom.arbigent.createArbigentScenario
@@ -28,10 +28,10 @@ import java.io.File
 
 class ArbigentAppStateHolder(
   val aiFactory: () -> ArbigentAi,
-  val deviceFactory: (AvailableDevice) -> ArbigentDevice = { avaiableDevice ->
+  val deviceFactory: (ArbigentAvailableDevice) -> ArbigentDevice = { avaiableDevice ->
     avaiableDevice.connectToDevice()
   },
-  val availableDeviceListFactory : (DeviceOs) -> List<AvailableDevice> = { os ->
+  val availableDeviceListFactory : (DeviceOs) -> List<ArbigentAvailableDevice> = { os ->
     fetchAvailableDevicesByOs(os)
   }
 ) {
@@ -146,7 +146,7 @@ class ArbigentAppStateHolder(
     }
   }
 
-  private val deviceCache = mutableMapOf<AvailableDevice, ArbigentDevice>()
+  private val deviceCache = mutableMapOf<ArbigentAvailableDevice, ArbigentDevice>()
 
   private fun ArbigentScenarioStateHolder.createScenario(allScenarioStateHolder: List<ArbigentScenarioStateHolder>) =
     allScenarioStateHolder.map { it.createArbigentScenarioContent() }
