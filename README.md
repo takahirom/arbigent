@@ -66,8 +66,27 @@ Use the intuitive UI to define scenarios. Simply specify the desired goal for th
 
 ### Test Execution
 
-Run tests either directly through the UI or programmatically via the code interface.
+Run tests either directly through the UI or programmatically via the code interface or CLI.
 
+### CLI
+
+You can install the CLI via Homebrew and run a saved YAML file.
+
+```
+brew tap takahirom/homebrew-repo
+brew install takahirom/repo/arbigent
+```
+
+```
+arbigent -h
+Usage: arbigent-cli [<options>]
+
+Options:
+  --ai-type=(openai|gemini)  Type of AI to use (openai or gemini)
+  --os=<(android)>           Target operating system (android)
+  --scenario-file=<text>     Path to the scenario YAML file
+  -h, --help                 Show this message and exit
+```
 
 ## Supported AI Providers
 
