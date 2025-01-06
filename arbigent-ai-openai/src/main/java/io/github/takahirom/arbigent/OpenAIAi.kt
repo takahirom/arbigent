@@ -50,7 +50,8 @@ class OpenAIAi(
     baseUrl = baseUrl,
     modelName = modelName,
     loggingEnabled = loggingEnabled,
-    requestBuilderModifier = requestBuilderModifier
+    requestBuilderModifier = requestBuilderModifier,
+    seed = null
   ),
   private val httpClient: HttpClient = HttpClient {
     install(ContentNegotiation) {
