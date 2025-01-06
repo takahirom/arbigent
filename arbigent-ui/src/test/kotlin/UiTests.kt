@@ -27,7 +27,7 @@ import io.github.takahirom.arbigent.ArbigentContextHolder
 import io.github.takahirom.arbigent.ArbigentCoroutinesDispatcher
 import io.github.takahirom.arbigent.ClickWithTextAgentCommand
 import io.github.takahirom.arbigent.ArbigentDevice
-import io.github.takahirom.arbigent.AvailableDevice
+import io.github.takahirom.arbigent.ArbigentAvailableDevice
 import io.github.takahirom.arbigent.GoalAchievedAgentCommand
 import io.github.takahirom.arbigent.arbigentDebugLog
 import io.github.takahirom.roborazzi.captureRoboImage
@@ -67,7 +67,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
       aiFactory = { FakeAi() },
       deviceFactory = { FakeDevice() },
       availableDeviceListFactory = {
-        listOf(AvailableDevice.Fake())
+        listOf(ArbigentAvailableDevice.Fake())
       },
     )
     setContent {

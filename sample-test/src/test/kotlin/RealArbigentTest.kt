@@ -25,7 +25,7 @@ class RealArbigentTest {
         )
       },
       deviceFactory = {
-        AvailableDevice.Android(
+        ArbigentAvailableDevice.Android(
           dadb = Dadb.discover()!!
         ).connectToDevice()
       }

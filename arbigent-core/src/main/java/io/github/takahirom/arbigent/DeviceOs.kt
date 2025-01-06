@@ -21,12 +21,12 @@ public enum class DeviceOs {
   public fun isWeb(): Boolean = this == Web
 }
 
-public sealed interface AvailableDevice {
+public sealed interface ArbigentAvailableDevice {
   public val deviceOs: DeviceOs
   public val name: String
 
   // Do not use data class because dadb return true for equals
-  public class Android(private val dadb: Dadb) : AvailableDevice {
+  public class Android(private val dadb: Dadb) : ArbigentAvailableDevice {
     override val deviceOs: DeviceOs = DeviceOs.Android
     override val name: String = dadb.toString()
     override fun connectToDevice(): ArbigentDevice {
@@ -51,7 +51,7 @@ public sealed interface AvailableDevice {
     private val port: Int = 8080,
     // local host
     private val host: String = "[::1]",
-  ) : AvailableDevice {
+  ) : ArbigentAvailableDevice {
     override val deviceOs: DeviceOs = DeviceOs.iOS
     override val name: String = device.name
     override fun connectToDevice(): ArbigentDevice {
@@ -85,7 +85,7 @@ public sealed interface AvailableDevice {
     }
   }
 
-  public class Web : AvailableDevice {
+  public class Web : ArbigentAvailableDevice {
     override val deviceOs: DeviceOs = DeviceOs.Web
     override val name: String = "Chrome"
     public override fun connectToDevice(): ArbigentDevice {
@@ -95,7 +95,7 @@ public sealed interface AvailableDevice {
     }
   }
 
-  public class Fake : AvailableDevice {
+  public class Fake : ArbigentAvailableDevice {
     override val deviceOs: DeviceOs = DeviceOs.Android
     override val name: String = "Fake"
     public override fun connectToDevice(): ArbigentDevice {
