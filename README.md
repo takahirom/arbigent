@@ -72,14 +72,14 @@ Run tests either directly through the UI or programmatically via the code interf
 
 You can install the CLI via Homebrew and run a saved YAML file.
 
-```
+```bash
 brew tap takahirom/homebrew-repo
 brew install takahirom/repo/arbigent
 ```
 
-```
+```bash
 arbigent -h
-Usage: arbigent-cli [<options>]
+Usage: arbigent [<options>]
 
 Options:
   --ai-type=(openai|gemini)  Type of AI to use (openai or gemini)
