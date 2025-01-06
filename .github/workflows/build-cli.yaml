@@ -1,4 +1,4 @@
-name: publish-ui
+name: publish-cli
 
 on:
   push:
