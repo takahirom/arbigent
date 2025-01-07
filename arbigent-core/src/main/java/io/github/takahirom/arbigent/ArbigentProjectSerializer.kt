@@ -25,7 +25,7 @@ public interface FileSystem {
 @Serializable
 public class ArbigentProjectFileContent(
   @SerialName("scenarios")
-  public val scenarioContents: List<ArbigentScenarioContent>
+  public val scenarioContents: List<ArbigentScenarioContent>,
 )
 
 public fun List<ArbigentScenarioContent>.createArbigentScenario(
@@ -69,7 +69,8 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
     agentTasks = result,
     maxRetry = scenario.maxRetry,
     maxStepCount = scenario.maxStep,
-    deviceFormFactor = scenario.deviceFormFactor
+    deviceFormFactor = scenario.deviceFormFactor,
+    isLeaf = this.none { it.dependencyId == scenario.id }
   )
 }
 
