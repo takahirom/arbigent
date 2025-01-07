@@ -72,7 +72,7 @@ Run tests either directly through the UI or programmatically via the code interf
 
 You can install the CLI via Homebrew and run a saved YAML file.
 
-<img width="345" alt="image" src="https://github.com/user-attachments/assets/f20fdac8-ae46-4dc7-aa2b-6fc0b5bd4a9d" />
+<img width="600" alt="image" src="https://github.com/user-attachments/assets/f20fdac8-ae46-4dc7-aa2b-6fc0b5bd4a9d" />
 
 ```bash
 brew tap takahirom/homebrew-repo
