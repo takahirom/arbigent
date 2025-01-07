@@ -5,7 +5,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import java.io.File
 
-public class ArbigentProject(initialArbigentScenarios: List<ArbigentScenario>) {
+public class FailedToArchiveException(message: String) : RuntimeException(message)
+
+public class ArbigentProject(
+  initialScenarios: List<ArbigentScenario>,
+) {
   private val _scenarioAssignmentsFlow =
     MutableStateFlow<List<ArbigentScenarioAssignment>>(listOf())
   public val scenarioAssignmentsFlow: Flow<List<ArbigentScenarioAssignment>> =
@@ -17,23 +21,24 @@ public class ArbigentProject(initialArbigentScenarios: List<ArbigentScenario>) {
   public val scenarios: List<ArbigentScenario> get() = scenarioAssignments().map { it.scenario }
 
   init {
-    _scenarioAssignmentsFlow.value = initialArbigentScenarios.map { scenario ->
+    _scenarioAssignmentsFlow.value = initialScenarios.map { scenario ->
       ArbigentScenarioAssignment(scenario, ArbigentScenarioExecutor())
     }
   }
 
-  public class FailedToArchiveException(message: String) : RuntimeException(message)
 
   public suspend fun execute() {
-    scenarioAssignments().forEach { (scenario, scenarioExecutor) ->
-      arbigentInfoLog("Start scenario: $scenario")
-      try {
-        scenarioExecutor.execute(scenario)
-      } catch (e: FailedToArchiveException) {
-        arbigentErrorLog("Failed to archive: $scenario" + e.stackTraceToString())
+    scenarioAssignments()
+      .filter { it.scenario.isLeaf }
+      .forEach { (scenario, scenarioExecutor) ->
+        arbigentInfoLog("Start scenario: $scenario")
+        try {
+          scenarioExecutor.execute(scenario)
+        } catch (e: FailedToArchiveException) {
+          arbigentErrorLog("Failed to archive: $scenario" + e.stackTraceToString())
+        }
+        arbigentDebugLog(scenarioExecutor.statusText())
       }
-      arbigentDebugLog(scenarioExecutor.statusText())
-    }
   }
 
   public suspend fun execute(scenario: ArbigentScenario) {
@@ -56,18 +61,18 @@ public class ArbigentProject(initialArbigentScenarios: List<ArbigentScenario>) {
 }
 
 public fun ArbigentProject(
-  arbigentProjectFileContent: ArbigentProjectFileContent,
+  projectFileContent: ArbigentProjectFileContent,
   aiFactory: () -> ArbigentAi,
   deviceFactory: () -> ArbigentDevice
 ): ArbigentProject {
   return ArbigentProject(
-    arbigentProjectFileContent.scenarioContents.map {
-      arbigentProjectFileContent.scenarioContents.createArbigentScenario(
+    projectFileContent.scenarioContents.map {
+      projectFileContent.scenarioContents.createArbigentScenario(
         scenario = it,
         aiFactory = aiFactory,
         deviceFactory = deviceFactory
       )
-    }
+    },
   )
 }
 
@@ -86,4 +91,5 @@ public data class ArbigentScenario(
   val maxRetry: Int = 0,
   val maxStepCount: Int = 10,
   val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Mobile,
+  val isLeaf: Boolean,
 )

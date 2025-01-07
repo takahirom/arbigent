@@ -1,16 +1,17 @@
 package io.github.takahirom.arbigent.ui
 
 import io.github.takahirom.arbigent.ArbigentAi
+import io.github.takahirom.arbigent.ArbigentAvailableDevice
 import io.github.takahirom.arbigent.ArbigentCoroutinesDispatcher
 import io.github.takahirom.arbigent.ArbigentDevice
+import io.github.takahirom.arbigent.ArbigentInternalApi
 import io.github.takahirom.arbigent.ArbigentProject
 import io.github.takahirom.arbigent.ArbigentProjectFileContent
 import io.github.takahirom.arbigent.ArbigentProjectSerializer
 import io.github.takahirom.arbigent.ArbigentScenario
 import io.github.takahirom.arbigent.ArbigentScenarioContent
-import io.github.takahirom.arbigent.ArbigentAvailableDevice
-import io.github.takahirom.arbigent.ArbigentInternalApi
 import io.github.takahirom.arbigent.DeviceOs
+import io.github.takahirom.arbigent.FailedToArchiveException
 import io.github.takahirom.arbigent.arbigentDebugLog
 import io.github.takahirom.arbigent.createArbigentScenario
 import io.github.takahirom.arbigent.fetchAvailableDevicesByOs
@@ -34,7 +35,7 @@ class ArbigentAppStateHolder(
   val deviceFactory: (ArbigentAvailableDevice) -> ArbigentDevice = { avaiableDevice ->
     avaiableDevice.connectToDevice()
   },
-  val availableDeviceListFactory : (DeviceOs) -> List<ArbigentAvailableDevice> = { os ->
+  val availableDeviceListFactory: (DeviceOs) -> List<ArbigentAvailableDevice> = { os ->
     fetchAvailableDevicesByOs(os)
   }
 ) {
@@ -82,6 +83,7 @@ class ArbigentAppStateHolder(
       )
 
   fun sortedScenariosAndDepths() = sortedScenarioAndDepth(allScenarioStateHoldersStateFlow.value)
+
   val selectedScenarioIndex: MutableStateFlow<Int> = MutableStateFlow(0)
   private val coroutineScope =
     CoroutineScope(ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob())
@@ -111,12 +113,14 @@ class ArbigentAppStateHolder(
     allScenarioStateHoldersStateFlow.value.forEach { it.cancel() }
     recreateProject()
     job = coroutineScope.launch {
-      projectStateFlow.value?.scenarios?.forEach { scenario ->
-        selectedScenarioIndex.value =
-          sortedScenariosAndDepths().indexOfFirst { it.first.id == scenario.id }
-        executeScenario(scenario)
-        delay(10)
-      }
+      projectStateFlow.value?.scenarios
+        ?.filter { it.isLeaf }
+        ?.forEach { scenario ->
+          selectedScenarioIndex.value =
+            sortedScenariosAndDepths().indexOfFirst { it.first.id == scenario.id }
+          executeScenario(scenario)
+          delay(10)
+        }
     }
   }
 
@@ -135,9 +139,9 @@ class ArbigentAppStateHolder(
   private fun recreateProject() {
     projectStateFlow.value?.cancel()
     val arbigentProject = ArbigentProject(
-      initialArbigentScenarios = allScenarioStateHoldersStateFlow.value.map { scenario ->
+      initialScenarios = allScenarioStateHoldersStateFlow.value.map { scenario ->
         scenario.createScenario(allScenarioStateHoldersStateFlow.value)
-      }
+      },
     )
     projectStateFlow.value = arbigentProject
     allScenarioStateHoldersStateFlow.value.forEach { scenarioStateHolder ->
@@ -212,10 +216,15 @@ class ArbigentAppStateHolder(
     job = coroutineScope.launch {
       sortedScenariosAndDepthsStateFlow.value.map { it.first }.filter { scenario ->
         !scenario.isGoalAchieved()
-      }.forEach { scenarioStateHolder: ArbigentScenarioStateHolder ->
+      }
+        .map{ scenarioStateHolder ->
+          scenarioStateHolder.createScenario(allScenarioStateHoldersStateFlow.value)
+        }
+        .filter { it.isLeaf }
+        .forEach{ scenario ->
         selectedScenarioIndex.value =
-          sortedScenariosAndDepths().indexOfFirst { it.first.id == scenarioStateHolder.id }
-        executeScenario(scenarioStateHolder.createScenario(allScenarioStateHoldersStateFlow.value))
+          sortedScenariosAndDepths().indexOfFirst { it.first.id == scenario.id }
+          executeScenario(scenario)
       }
     }
   }
@@ -223,7 +232,7 @@ class ArbigentAppStateHolder(
   private suspend fun executeScenario(scenario: ArbigentScenario) {
     try {
       projectStateFlow.value?.execute(scenario)
-    } catch (e: ArbigentProject.FailedToArchiveException) {
+    } catch (e: FailedToArchiveException) {
       arbigentDebugLog("Failed to archive scenario: ${e.message}")
     }
   }
@@ -238,9 +247,10 @@ class ArbigentAppStateHolder(
       projectFileContent = ArbigentProjectFileContent(
         scenarioContents = sortedScenarios.map {
           it.createArbigentScenarioContent()
-        }
+        },
       ),
-      file = file)
+      file = file
+    )
   }
 
   fun loadGoals(file: File?) {
@@ -271,7 +281,11 @@ class ArbigentAppStateHolder(
         }
     }
     projectStateFlow.value = ArbigentProject(
-      initialArbigentScenarios = arbigentScenarioStateHolders.map { it.createScenario(arbigentScenarioStateHolders) }
+      initialScenarios = arbigentScenarioStateHolders.map {
+        it.createScenario(
+          arbigentScenarioStateHolders
+        )
+      },
     )
     allScenarioStateHoldersStateFlow.value = arbigentScenarioStateHolders
   }

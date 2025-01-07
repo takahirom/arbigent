@@ -1,6 +1,5 @@
 package io.github.takahirom.arbigent
 
-import io.github.takahirom.arbigent.ArbigentProject.FailedToArchiveException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
