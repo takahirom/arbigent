@@ -1,17 +1,20 @@
 package io.github.takahirom.arbigent
 
+import io.github.takahirom.arbigent.ArbigentProject.FailedToArchiveException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.shareIn
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.yield
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
@@ -53,6 +56,19 @@ public class ArbiterImageAssertion(
   public val requiredFulfillmentPercent: Int = 80,
 )
 
+public sealed interface ArbigentScenarioExecutorState {
+  public object Idle : ArbigentScenarioExecutorState
+  public object Running : ArbigentScenarioExecutorState
+  public object Success : ArbigentScenarioExecutorState
+  public object Failed : ArbigentScenarioExecutorState
+
+  public fun name(): String = when (this) {
+    Idle -> "Idle"
+    Running -> "Running"
+    Success -> "Success"
+    Failed -> "Failed"
+  }
+}
 public class ArbigentScenarioExecutor {
   private val _taskAssignmentsStateFlow =
     MutableStateFlow<List<ArbigentTaskAssignment>>(listOf())
@@ -64,9 +80,10 @@ public class ArbigentScenarioExecutor {
     CoroutineScope(ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob())
   private val _arbigentScenarioRunningInfoStateFlow: MutableStateFlow<ArbigentScenarioRunningInfo?> =
     MutableStateFlow(null)
-  public val arbigentScenarioRunningInfoFlow: Flow<ArbigentScenarioRunningInfo?> =
+  public val runningInfoFlow: Flow<ArbigentScenarioRunningInfo?> =
     _arbigentScenarioRunningInfoStateFlow.asSharedFlow()
-  public val isArchivedFlow: Flow<Boolean> = taskAssignmentsFlow.flatMapLatest { taskToAgents ->
+  public fun runningInfo(): ArbigentScenarioRunningInfo? = _arbigentScenarioRunningInfoStateFlow.value
+  public val isSuccessFlow: Flow<Boolean> = taskAssignmentsFlow.flatMapLatest { taskToAgents ->
     val flows: List<Flow<Boolean>> = taskToAgents.map { taskToAgent ->
       taskToAgent.agent.isGoalArchivedFlow
     }
@@ -79,13 +96,26 @@ public class ArbigentScenarioExecutor {
       started = SharingStarted.WhileSubscribed(),
       replay = 1
     )
-  public fun isArchived(): Boolean = taskAssignments().all { it.agent.isGoalArchived() }
+  public fun isSuccess(): Boolean {
+    if (taskAssignments().isEmpty()) {
+      return false
+    }
+    return taskAssignments().all { it.agent.isGoalArchived() }
+  }
+
+  private val _isFailedToArchiveFlow = MutableStateFlow(false)
+  public val isFailedToArchiveFlow: Flow<Boolean> = _isFailedToArchiveFlow.asSharedFlow()
+  public fun isFailedToArchive(): Boolean = _isFailedToArchiveFlow.value
 
   // isArchivedStateFlow is WhileSubscribed so we can't use it in waitUntilFinished
-  public fun isGoalArchived(): Boolean =
-    taskAssignments().all { it.agent.isGoalArchived() }
+  public fun isGoalArchived(): Boolean {
+    if (taskAssignments().isEmpty()) {
+      return false
+    }
+    return taskAssignments().all { it.agent.isGoalArchived() }
+  }
 
-  public val isRunningStateFlow: Flow<Boolean> = taskAssignmentsFlow.flatMapLatest { taskToAgents ->
+  public val isRunningFlow: Flow<Boolean> = taskAssignmentsFlow.flatMapLatest { taskToAgents ->
     val flows: List<Flow<Boolean>> = taskToAgents.map { taskToAgent ->
       taskToAgent.agent.isRunningFlow
     }
@@ -98,15 +128,46 @@ public class ArbigentScenarioExecutor {
       started = SharingStarted.WhileSubscribed(),
       replay = 1
     )
-  public val isRunning: Boolean = _taskAssignmentsStateFlow.value.any { it.agent.isRunning() }
+  public fun isRunning(): Boolean = _taskAssignmentsStateFlow.value.any { it.agent.isRunning() }
+
+  private val _stateFlow: StateFlow<ArbigentScenarioExecutorState> = combine(
+    isRunningFlow,
+    isSuccessFlow,
+    isFailedToArchiveFlow,
+  ) { isRunning, success, isFailedToArchive ->
+    when {
+      isFailedToArchive -> ArbigentScenarioExecutorState.Failed
+      isRunning -> ArbigentScenarioExecutorState.Running
+      success -> ArbigentScenarioExecutorState.Success
+      else -> ArbigentScenarioExecutorState.Idle
+    }
+  }
+    .stateIn(
+      scope = coroutineScope,
+      started = SharingStarted.WhileSubscribed(),
+      initialValue = ArbigentScenarioExecutorState.Idle
+    )
+  public val scenarioStateFlow: Flow<ArbigentScenarioExecutorState> = _stateFlow
+  public fun scenarioState(): ArbigentScenarioExecutorState {
+    val isRunning = isRunning()
+    val isArchived = isSuccess()
+    val isFailedToArchive = isFailedToArchive()
+    return when {
+      isFailedToArchive -> ArbigentScenarioExecutorState.Failed
+      isRunning -> ArbigentScenarioExecutorState.Running
+      isArchived -> ArbigentScenarioExecutorState.Success
+      else -> ArbigentScenarioExecutorState.Idle
+    }
+  }
 
   public suspend fun waitUntilFinished() {
     arbigentDebugLog("Arbigent.waitUntilFinished start")
-    isRunningStateFlow.debounce(100).first { !it }
+    isRunningFlow.debounce(100).first { !it }
     arbigentDebugLog("Arbigent.waitUntilFinished end")
   }
 
   public suspend fun execute(arbigentScenario: ArbigentScenario) {
+    _isFailedToArchiveFlow.value = false
     arbigentDebugLog("Arbigent.execute start")
 
     var finishedSuccessfully = false
@@ -151,6 +212,12 @@ public class ArbigentScenarioExecutor {
         it.agent.cancel()
       }
     }
+    if (!isGoalArchived()) {
+      _isFailedToArchiveFlow.value = true
+      throw FailedToArchiveException(
+        "Failed to archive scenario:" + statusText()
+      )
+    }
     arbigentDebugLog("Arbigent.execute end")
   }
 
@@ -162,7 +229,7 @@ public class ArbigentScenarioExecutor {
   }
 
   public fun statusText(): String {
-    return "Goal:${taskAssignments().last().task.goal}\n${
+    return "Goal:${taskAssignments().lastOrNull()?.task?.goal}\n${
       taskAssignments().map { (task, agent) ->
         buildString {
           append(task.goal)
