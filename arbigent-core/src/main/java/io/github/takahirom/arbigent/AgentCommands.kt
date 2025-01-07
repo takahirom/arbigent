@@ -477,3 +477,29 @@ public class GoalAchievedAgentCommand : ArbigentAgentCommand {
 
   }
 }
+
+public class FailedAgentCommand : ArbigentAgentCommand {
+  override val actionName: String = "Failed"
+
+  override fun stepLogText(): String {
+    return "Failed"
+  }
+
+  override fun runOrchestraCommand(device: ArbigentDevice) {
+  }
+
+  public companion object : AgentCommandType {
+    override val actionName: String = "GoalAchieved"
+
+    override fun templateForAI(): String {
+      return """
+        {
+            "action": "$actionName"
+            // Please write the reason why it failed
+            "text": "..."
+        }
+        """.trimIndent()
+    }
+
+  }
+}

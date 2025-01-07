@@ -176,8 +176,11 @@ public class ArbigentAgent(
         )
         when (stepChain(stepInput)) {
           StepResult.GoalAchieved -> {
-            _isRunningStateFlow.value = false
             isGoalArchivedFlow.first { it }
+            break
+          }
+
+          StepResult.Failed -> {
             break
           }
 
@@ -211,6 +214,7 @@ public class ArbigentAgent(
 
   public sealed interface StepResult {
     public object GoalAchieved : StepResult
+    public object Failed : StepResult
     public object Continue : StepResult
   }
 
@@ -457,7 +461,8 @@ public fun defaultAgentCommandTypes(): List<AgentCommandType> {
     KeyPressAgentCommand,
     ScrollAgentCommand,
     WaitAgentCommand,
-    GoalAchievedAgentCommand
+    GoalAchievedAgentCommand,
+    FailedAgentCommand
   )
 }
 
@@ -472,7 +477,8 @@ public fun defaultAgentCommandTypesForTv(): List<AgentCommandType> {
     BackPressAgentCommand,
     KeyPressAgentCommand,
     WaitAgentCommand,
-    GoalAchievedAgentCommand
+    GoalAchievedAgentCommand,
+    FailedAgentCommand
   )
 }
 
@@ -560,7 +566,7 @@ private fun step(
     imageAssertionOutput.results.forEach {
       arbigentContextHolder.addStep(
         ArbigentContextHolder.Step(
-          memo = "Image assertion ${if(it.isPassed) "passed" else "failed"}. \nfulfillmentPercent:${it.fulfillmentPercent} \nprompt:${it.assertionPrompt} \nexplanation:${it.explanation}",
+          memo = "Image assertion ${if (it.isPassed) "passed" else "failed"}. \nfulfillmentPercent:${it.fulfillmentPercent} \nprompt:${it.assertionPrompt} \nexplanation:${it.explanation}",
           screenshotFilePath = screenshotFilePath,
           aiRequest = decisionOutput.step.aiRequest,
           aiResponse = decisionOutput.step.aiResponse
@@ -590,6 +596,10 @@ private fun step(
   if (arbigentContextHolder.steps().last().agentCommand is GoalAchievedAgentCommand) {
     arbigentDebugLog("Goal achieved: ${decisionInput.arbigentContextHolder.goal}")
     return StepResult.GoalAchieved
+  }
+  if (arbigentContextHolder.steps().last().agentCommand is FailedAgentCommand) {
+    arbigentDebugLog("Failed to achieve the goal: ${decisionInput.arbigentContextHolder.goal}")
+    return StepResult.Failed
   }
   executeCommandChain(
     ExecuteCommandsInput(
