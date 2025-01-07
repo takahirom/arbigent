@@ -32,7 +32,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import io.github.takahirom.arbigent.DeviceOs
+import io.github.takahirom.arbigent.ArbigentDeviceOs
 import io.github.takahirom.arbigent.arbigentDebugLog
 import io.github.takahirom.arbigent.ui.ArbigentAppStateHolder.DeviceConnectionState
 import io.github.takahirom.arbigent.ui.ArbigentAppStateHolder.FileSelectionState
@@ -285,7 +285,7 @@ fun ScenarioControls(appStateHolder: ArbigentAppStateHolder) {
       maxPopupHeight = 150.dp,
     ) {
       Column {
-        DeviceOs.values().forEach { item ->
+        ArbigentDeviceOs.values().forEach { item ->
           val isSelected = item == deviceOs
           val isItemHovered = false
           val isPreviewSelection = false

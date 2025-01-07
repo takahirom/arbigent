@@ -11,7 +11,7 @@ import xcuitest.XCTestClient
 import xcuitest.XCTestDriverClient
 import xcuitest.installer.LocalXCTestInstaller
 
-public enum class DeviceOs {
+public enum class ArbigentDeviceOs {
   Android,
   iOS,
   Web;
@@ -22,12 +22,12 @@ public enum class DeviceOs {
 }
 
 public sealed interface ArbigentAvailableDevice {
-  public val deviceOs: DeviceOs
+  public val deviceOs: ArbigentDeviceOs
   public val name: String
 
   // Do not use data class because dadb return true for equals
   public class Android(private val dadb: Dadb) : ArbigentAvailableDevice {
-    override val deviceOs: DeviceOs = DeviceOs.Android
+    override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Android
     override val name: String = dadb.toString()
     override fun connectToDevice(): ArbigentDevice {
       val driver = AndroidDriver(
@@ -52,7 +52,7 @@ public sealed interface ArbigentAvailableDevice {
     // local host
     private val host: String = "[::1]",
   ) : ArbigentAvailableDevice {
-    override val deviceOs: DeviceOs = DeviceOs.iOS
+    override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.iOS
     override val name: String = device.name
     override fun connectToDevice(): ArbigentDevice {
       val port = port
@@ -86,7 +86,7 @@ public sealed interface ArbigentAvailableDevice {
   }
 
   public class Web : ArbigentAvailableDevice {
-    override val deviceOs: DeviceOs = DeviceOs.Web
+    override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Web
     override val name: String = "Chrome"
     public override fun connectToDevice(): ArbigentDevice {
       return MaestroDevice(
@@ -96,7 +96,7 @@ public sealed interface ArbigentAvailableDevice {
   }
 
   public class Fake : ArbigentAvailableDevice {
-    override val deviceOs: DeviceOs = DeviceOs.Android
+    override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Android
     override val name: String = "Fake"
     public override fun connectToDevice(): ArbigentDevice {
       // This is not called

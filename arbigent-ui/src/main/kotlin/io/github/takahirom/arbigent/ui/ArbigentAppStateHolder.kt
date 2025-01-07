@@ -10,7 +10,7 @@ import io.github.takahirom.arbigent.ArbigentProjectFileContent
 import io.github.takahirom.arbigent.ArbigentProjectSerializer
 import io.github.takahirom.arbigent.ArbigentScenario
 import io.github.takahirom.arbigent.ArbigentScenarioContent
-import io.github.takahirom.arbigent.DeviceOs
+import io.github.takahirom.arbigent.ArbigentDeviceOs
 import io.github.takahirom.arbigent.FailedToArchiveException
 import io.github.takahirom.arbigent.arbigentDebugLog
 import io.github.takahirom.arbigent.createArbigentScenario
@@ -35,7 +35,7 @@ class ArbigentAppStateHolder(
   val deviceFactory: (ArbigentAvailableDevice) -> ArbigentDevice = { avaiableDevice ->
     avaiableDevice.connectToDevice()
   },
-  val availableDeviceListFactory: (DeviceOs) -> List<ArbigentAvailableDevice> = { os ->
+  val availableDeviceListFactory: (ArbigentDeviceOs) -> List<ArbigentAvailableDevice> = { os ->
     fetchAvailableDevicesByOs(os)
   }
 ) {
