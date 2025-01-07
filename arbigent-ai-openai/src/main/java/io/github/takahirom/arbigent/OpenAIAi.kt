@@ -41,6 +41,7 @@ class OpenAIAi(
   private val baseUrl: String = "https://api.openai.com/v1/",
   private val modelName: String = "gpt-4o-mini",
   private val systemPrompt: String = ArbigentPrompts.systemPrompt,
+  private val systemPromptForTv: String = ArbigentPrompts.systemPrompt,
   private val requestBuilderModifier: HttpRequestBuilder.() -> Unit = {
     header("Authorization", "Bearer $apiKey")
   },
@@ -92,7 +93,7 @@ class OpenAIAi(
 ) : ArbigentAi {
   @OptIn(ExperimentalSerializationApi::class)
   override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
-    val (arbigentContext, dumpHierarchy, focusedTree, agentCommandTypes, screenshotFilePath) = decisionInput
+    val (arbigentContext, formFactor, dumpHierarchy, focusedTree, agentCommandTypes, screenshotFilePath) = decisionInput
     val prompt = buildPrompt(arbigentContext, dumpHierarchy, focusedTree, agentCommandTypes)
     val messages: List<ChatMessage> = listOf(
       ChatMessage(
@@ -100,7 +101,10 @@ class OpenAIAi(
         content = listOf(
           Content(
             type = "text",
-            text = systemPrompt
+            text = when (formFactor) {
+              ArbigentScenarioDeviceFormFactor.Tv -> systemPromptForTv
+              else -> systemPrompt
+            }
           )
         )
       ),
