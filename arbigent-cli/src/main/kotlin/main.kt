@@ -1,5 +1,9 @@
 package io.github.takahirom.arbigent.cli
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.parameters.groups.OptionGroup
@@ -9,17 +13,35 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.prompt
 import com.github.ajalt.clikt.parameters.types.choice
+import com.jakewharton.mosaic.layout.background
+import com.jakewharton.mosaic.layout.padding
+import com.jakewharton.mosaic.modifier.Modifier
+import com.jakewharton.mosaic.runMosaicBlocking
+import com.jakewharton.mosaic.ui.Color.*
+import com.jakewharton.mosaic.ui.Color.Companion.Black
+import com.jakewharton.mosaic.ui.Color.Companion.Green
+import com.jakewharton.mosaic.ui.Color.Companion.Red
+import com.jakewharton.mosaic.ui.Color.Companion.White
+import com.jakewharton.mosaic.ui.Color.Companion.Yellow
+import com.jakewharton.mosaic.ui.Column
+import com.jakewharton.mosaic.ui.Row
+import com.jakewharton.mosaic.ui.Text
 import io.github.takahirom.arbigent.ArbigentAi
 import io.github.takahirom.arbigent.ArbigentInternalApi
+import io.github.takahirom.arbigent.ArbigentLogLevel
 import io.github.takahirom.arbigent.ArbigentProject
+import io.github.takahirom.arbigent.ArbigentScenario
+import io.github.takahirom.arbigent.ArbigentScenarioExecutor
+import io.github.takahirom.arbigent.ArbigentScenarioExecutorState
 import io.github.takahirom.arbigent.DeviceOs
 import io.github.takahirom.arbigent.OpenAIAi
+import io.github.takahirom.arbigent.arbigentLogLevel
 import io.github.takahirom.arbigent.fetchAvailableDevicesByOs
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.util.toLowerCasePreservingASCIIRules
-import kotlinx.coroutines.runBlocking
 import java.io.File
+import kotlin.system.exitProcess
 
 sealed class AiConfig(name: String) : OptionGroup(name)
 
@@ -101,17 +123,62 @@ class ArbigentCli : CliktCommand() {
           DeviceOs.values().joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
         }")
     val device = fetchAvailableDevicesByOs(os).first().connectToDevice()
+    arbigentLogLevel = ArbigentLogLevel.ERROR
 
-    runBlocking {
-      val arbigentProject = ArbigentProject(
-        file = File(scenarioFile),
-        aiFactory = { ai },
-        deviceFactory = { device }
-      )
-      arbigentProject.execute()
+    val arbigentProject = ArbigentProject(
+      file = File(scenarioFile),
+      aiFactory = { ai },
+      deviceFactory = { device }
+    )
+    runMosaicBlocking {
+      LaunchedEffect(Unit) {
+        arbigentProject.execute()
+        arbigentProject.isSuccess()
+        exitProcess(0)
+      }
+      Column {
+        val assignments by arbigentProject.scenarioAssignmentsFlow.collectAsState(arbigentProject.scenarioAssignments())
+        assignments.forEach { (scenario, scenarioExecutor) ->
+          ScenarioRow(scenario, scenarioExecutor)
+        }
+      }
     }
   }
 
+}
+
+@Composable
+fun ScenarioRow(scenario: ArbigentScenario, scenarioExecutor: ArbigentScenarioExecutor) {
+  val runningInfo by scenarioExecutor.runningInfoFlow.collectAsState(scenarioExecutor.runningInfo())
+  val scenarioState by scenarioExecutor.scenarioStateFlow.collectAsState(scenarioExecutor.scenarioState())
+  Row {
+    val bg = when (scenarioState) {
+      ArbigentScenarioExecutorState.Running -> Yellow
+      ArbigentScenarioExecutorState.Success -> Green
+      ArbigentScenarioExecutorState.Failed -> Red
+      ArbigentScenarioExecutorState.Idle -> White
+    }
+    Text(
+      scenarioState.name(),
+      modifier = Modifier
+        .background(bg)
+        .padding(horizontal = 1),
+      color = Black,
+    )
+    if (runningInfo != null) {
+      Text(
+        runningInfo.toString().lines()
+          .joinToString(" "),
+        modifier = Modifier.padding(horizontal = 1).background(Companion.Magenta),
+        color = White,
+      )
+    }
+    Text(
+      "Goal:" + scenario.agentTasks.lastOrNull()?.goal?.take(80) + "...",
+      modifier = Modifier.padding(horizontal = 1),
+      color = Black,
+    )
+  }
 }
 
 fun main(args: Array<String>) = ArbigentCli().main(args)

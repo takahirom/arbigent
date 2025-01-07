@@ -11,7 +11,9 @@ public class ArbigentProject(initialArbigentScenarios: List<ArbigentScenario>) {
   public val scenarioAssignmentsFlow: Flow<List<ArbigentScenarioAssignment>> =
     _scenarioAssignmentsFlow.asSharedFlow()
 
-  public fun scenarioAssignments(): List<ArbigentScenarioAssignment> = _scenarioAssignmentsFlow.value
+  public fun scenarioAssignments(): List<ArbigentScenarioAssignment> =
+    _scenarioAssignmentsFlow.value
+
   public val scenarios: List<ArbigentScenario> get() = scenarioAssignments().map { it.scenario }
 
   init {
@@ -25,14 +27,12 @@ public class ArbigentProject(initialArbigentScenarios: List<ArbigentScenario>) {
   public suspend fun execute() {
     scenarioAssignments().forEach { (scenario, scenarioExecutor) ->
       arbigentInfoLog("Start scenario: $scenario")
-      scenarioExecutor.execute(scenario)
-
-      arbigentDebugLog(scenarioExecutor.statusText())
-      if (!scenarioExecutor.isGoalArchived()) {
-        throw FailedToArchiveException(
-          "Failed to archive scenario:" + scenarioExecutor.statusText()
-        )
+      try {
+        scenarioExecutor.execute(scenario)
+      } catch (e: FailedToArchiveException) {
+        arbigentErrorLog("Failed to archive: $scenario" + e.stackTraceToString())
       }
+      arbigentDebugLog(scenarioExecutor.statusText())
     }
   }
 
@@ -42,17 +42,16 @@ public class ArbigentProject(initialArbigentScenarios: List<ArbigentScenario>) {
       scenarioAssignments().first { it.scenario.id == scenario.id }.scenarioExecutor
     scenarioExecutor.execute(scenario)
     arbigentDebugLog(scenarioExecutor.statusText())
-    if (!scenarioExecutor.isGoalArchived()) {
-      throw FailedToArchiveException(
-        "Failed to archive scenario:" + scenarioExecutor.statusText()
-      )
-    }
   }
 
   public fun cancel() {
     scenarioAssignments().forEach { (_, scenarioExecutor) ->
       scenarioExecutor.cancel()
     }
+  }
+
+  public fun isSuccess(): Boolean {
+    return scenarioAssignments().all { it.scenarioExecutor.isSuccess() }
   }
 }
 

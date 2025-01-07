@@ -46,14 +46,14 @@ constructor(
     ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob()
   )
   val isArchived = arbigentScenarioExecutorStateFlow
-    .flatMapLatest { it?.isArchivedFlow ?: flowOf() }
+    .flatMapLatest { it?.isSuccessFlow ?: flowOf() }
     .stateIn(
       scope = coroutineScope,
       started = SharingStarted.WhileSubscribed(),
       initialValue = false
     )
   val isRunning = arbigentScenarioExecutorStateFlow
-    .flatMapLatest { it?.isRunningStateFlow ?: flowOf(false) }
+    .flatMapLatest { it?.isRunningFlow ?: flowOf(false) }
     .stateIn(
       scope = coroutineScope,
       started = SharingStarted.WhileSubscribed(),
@@ -62,7 +62,7 @@ constructor(
 
   val arbigentScenarioRunningInfo: StateFlow<ArbigentScenarioRunningInfo?> =
     arbigentScenarioExecutorStateFlow
-      .flatMapLatest { it?.arbigentScenarioRunningInfoFlow ?: flowOf() }
+      .flatMapLatest { it?.runningInfoFlow ?: flowOf() }
       .stateIn(
         scope = coroutineScope,
         started = SharingStarted.WhileSubscribed(),
@@ -78,7 +78,7 @@ constructor(
   }
 
   fun isGoalAchieved(): Boolean {
-    return arbigentScenarioExecutorStateFlow.value?.isArchived() ?: false
+    return arbigentScenarioExecutorStateFlow.value?.isSuccess() ?: false
   }
 
   fun cancel() {

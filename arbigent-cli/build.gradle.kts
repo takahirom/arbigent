@@ -3,6 +3,8 @@ import java.util.Properties
 plugins {
     id("org.jetbrains.kotlin.jvm") version "2.0.21"
     application
+    id("org.jetbrains.compose")
+    id("org.jetbrains.kotlin.plugin.compose")
     id("com.palantir.git-version") version "0.15.0"
 }
 
@@ -28,6 +30,7 @@ tasks.distTar {
 
 dependencies {
     implementation("com.github.ajalt.clikt:clikt:5.0.2")
+    implementation("com.jakewharton.mosaic:mosaic-runtime:0.14.0")
     implementation(project(":arbigent-core"))
     implementation(project(":arbigent-ai-openai"))
     testImplementation(kotlin("test"))
