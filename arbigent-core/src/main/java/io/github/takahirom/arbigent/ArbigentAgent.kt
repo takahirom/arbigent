@@ -535,6 +535,7 @@ private fun step(
     ArbigentTempDir.screenshotsDir.absolutePath + File.separator + "$screenshotFileID.png"
   val decisionInput = ArbigentAi.DecisionInput(
     arbigentContextHolder = arbigentContextHolder,
+    formFactor = deviceFormFactor,
     dumpHierarchy = device.viewTreeString(),
     focusedTreeString = if (deviceFormFactor.isTv()) {
       // It is important to get focused tree string for TV form factor

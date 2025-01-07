@@ -3,6 +3,7 @@ package io.github.takahirom.arbigent
 public interface ArbigentAi {
   public data class DecisionInput(
     val arbigentContextHolder: ArbigentContextHolder,
+    val formFactor: ArbigentScenarioDeviceFormFactor,
     val dumpHierarchy: String,
     // Only true if it is TV form factor
     val focusedTreeString: String?,
