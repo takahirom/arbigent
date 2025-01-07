@@ -90,6 +90,7 @@ class ArbigentAppStateHolder(
     val scenarioStateHolder = ArbigentScenarioStateHolder().apply {
       dependencyScenarioStateHolderStateFlow.value = parent
       initializeMethodsStateFlow.value = ArbigentScenarioContent.InitializeMethods.Noop
+      deviceFormFactorStateFlow.value = parent.deviceFormFactor()
     }
     allScenarioStateHoldersStateFlow.value += scenarioStateHolder
     selectedScenarioIndex.value =

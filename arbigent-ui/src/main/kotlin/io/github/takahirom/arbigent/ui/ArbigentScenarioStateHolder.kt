@@ -40,6 +40,7 @@ constructor(
     MutableStateFlow(ArbigentScenarioContent.InitializeMethods.Back())
   val deviceFormFactorStateFlow: MutableStateFlow<ArbigentScenarioDeviceFormFactor> =
     MutableStateFlow(ArbigentScenarioDeviceFormFactor.Mobile)
+  fun deviceFormFactor() = deviceFormFactorStateFlow.value
   val dependencyScenarioStateHolderStateFlow = MutableStateFlow<ArbigentScenarioStateHolder?>(null)
   val arbigentScenarioExecutorStateFlow = MutableStateFlow<ArbigentScenarioExecutor?>(null)
   private val coroutineScope = CoroutineScope(
