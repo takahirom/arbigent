@@ -18,6 +18,8 @@ import androidx.compose.ui.window.WindowExceptionHandlerFactory
 import androidx.compose.ui.window.application
 import io.github.takahirom.arbigent.OpenAIAi
 import io.github.takahirom.arbigent.ui.ArbigentAppStateHolder.FileSelectionState
+import io.ktor.client.request.header
+import io.ktor.client.request.parameter
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.intui.window.styling.lightWithLightHeader
 import org.jetbrains.jewel.ui.theme.colorPalette
@@ -40,6 +42,16 @@ fun main() {
               apiKey = aiProviderSetting.apiKey,
               modelName = aiProviderSetting.modelName,
               baseUrl = aiProviderSetting.baseUrl
+            )
+          } else if (aiProviderSetting is AiProviderSetting.AzureOpenAi) {
+            OpenAIAi(
+              apiKey = aiProviderSetting.apiKey,
+              modelName = aiProviderSetting.modelName,
+              baseUrl = aiProviderSetting.endpoint,
+              requestBuilderModifier = {
+                parameter("api-version", aiProviderSetting.apiVersion)
+                header("api-key", aiProviderSetting.apiKey)
+              }
             )
           } else {
             throw IllegalArgumentException("Unsupported aiProviderSetting: $aiProviderSetting")

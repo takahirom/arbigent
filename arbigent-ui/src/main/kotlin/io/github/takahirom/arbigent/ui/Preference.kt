@@ -10,71 +10,6 @@ import kotlinx.serialization.Serializable
 import kotlin.reflect.KProperty
 
 
-@Serializable
-data class AiSetting(
-  val selectedId: String,
-  val aiSettings: List<AiProviderSetting>
-)
-
-@Serializable
-sealed interface AiProviderSetting {
-  val id: String
-  val name: String
-
-  interface NormalAiProviderSetting : AiProviderSetting {
-    val apiKey: String
-    val modelName: String
-    fun updatedApiKey(apiKey: String): NormalAiProviderSetting
-    fun updatedModelName(modelName: String): NormalAiProviderSetting
-  }
-
-  interface OpenAiBasedApiProviderSetting : NormalAiProviderSetting {
-    val baseUrl: String
-  }
-
-  @Serializable
-  @SerialName("Gemini")
-  data class Gemini(
-    override val id: String,
-    override val apiKey: String,
-    override val modelName: String
-  ) : AiProviderSetting, OpenAiBasedApiProviderSetting {
-    override val name: String
-      get() = "Gemini"
-
-    override fun updatedApiKey(apiKey: String): NormalAiProviderSetting {
-      return copy(apiKey = apiKey)
-    }
-
-    override fun updatedModelName(modelName: String): NormalAiProviderSetting {
-      return copy(modelName = modelName)
-    }
-
-    override val baseUrl: String = "https://generativelanguage.googleapis.com/v1beta/openai/"
-  }
-
-  @Serializable
-  @SerialName("OpenAi")
-  data class OpenAi(
-    override val id: String,
-    override val apiKey: String,
-    override val modelName: String
-  ) : AiProviderSetting, OpenAiBasedApiProviderSetting {
-    override val name: String
-      get() = "OpenAi"
-
-    override fun updatedApiKey(apiKey: String): NormalAiProviderSetting {
-      return copy(apiKey = apiKey)
-    }
-
-    override fun updatedModelName(modelName: String): NormalAiProviderSetting {
-      return copy(modelName = modelName)
-    }
-
-    override val baseUrl: String = "https://api.openai.com/v1/"
-  }
-}
-
 val aiSettingYaml = Yaml(
   configuration = YamlConfiguration(
     strictMode = false,
@@ -90,18 +25,7 @@ internal object Preference {
           serializer = AiSetting.serializer(),
           value = AiSetting(
             selectedId = "defaultOpenAi",
-            aiSettings = listOf(
-              AiProviderSetting.OpenAi(
-                id = "defaultOpenAi",
-                apiKey = "",
-                modelName = "gpt-4o-mini"
-              ),
-              AiProviderSetting.Gemini(
-                id = "defaultGemini",
-                apiKey = "",
-                modelName = "gemini-1.5-flash"
-              )
-            )
+            aiSettings = defaultAiProviderSettings()
           ),
         )
     }
@@ -109,10 +33,39 @@ internal object Preference {
 
   var aiSettingValue: AiSetting
     get() = aiSettingYaml.decodeFromString(AiSetting.serializer(), aiSetting)
+      .let { savedAiSetting: AiSetting ->
+        savedAiSetting.copy(
+          aiSettings = savedAiSetting.aiSettings + defaultAiProviderSettings()
+            .filter { defaultAiProviderSetting ->
+              savedAiSetting.aiSettings.none { it.id == defaultAiProviderSetting.id }
+            }
+        )
+      }
     set(value) {
       aiSetting = aiSettingYaml.encodeToString(AiSetting.serializer(), value)
     }
 }
+
+private fun defaultAiProviderSettings() = listOf(
+  AiProviderSetting.OpenAi(
+    id = "defaultOpenAi",
+    apiKey = "",
+    modelName = "gpt-4o-mini"
+  ),
+  AiProviderSetting.Gemini(
+    id = "defaultGemini",
+    apiKey = "",
+    modelName = "gemini-1.5-flash"
+  ),
+  AiProviderSetting.AzureOpenAi(
+    id = "defaultAzureOpenAi",
+    apiKey = "",
+    modelName = "gpt-4o-mini",
+    endpoint = "https://YOUR_RESOURCE_NAME.openai.azure.com/openai/deployments/YOUR_DEPLOYMENT_NAME/",
+    apiVersion = "2024-10-21"
+  )
+)
+
 
 internal var globalKeyStoreFactory: () -> KeyStore = {
   object : KeyStore {
