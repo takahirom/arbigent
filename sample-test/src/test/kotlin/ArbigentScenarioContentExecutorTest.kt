@@ -25,6 +25,7 @@ class ArbigentScenarioContentExecutorTest {
         ArbigentAgentTask("id2", "goal2", agentConfig)
       ),
       maxStepCount = 10,
+      isLeaf = true,
     )
     arbigentScenarioExecutor.execute(
       arbigentScenario
@@ -74,6 +75,7 @@ class ArbigentScenarioContentExecutorTest {
         ArbigentAgentTask("id2", "goal2", agentConfig)
       ),
       maxStepCount = 10,
+      isLeaf = true
     )
     arbigentScenarioExecutor.execute(
       arbigentScenario
