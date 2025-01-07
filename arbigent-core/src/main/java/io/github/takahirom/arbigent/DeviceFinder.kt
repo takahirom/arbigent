@@ -4,13 +4,13 @@ import dadb.Dadb
 import util.LocalSimulatorUtils
 
 @ArbigentInternalApi
-public fun fetchAvailableDevicesByOs(deviceType: DeviceOs): List<ArbigentAvailableDevice> {
+public fun fetchAvailableDevicesByOs(deviceType: ArbigentDeviceOs): List<ArbigentAvailableDevice> {
   return when (deviceType) {
-    DeviceOs.Android -> {
+    ArbigentDeviceOs.Android -> {
       Dadb.list().map { ArbigentAvailableDevice.Android(it) }
     }
 
-    DeviceOs.iOS -> {
+    ArbigentDeviceOs.iOS -> {
       LocalSimulatorUtils.list()
         .devices
         .flatMap { runtime ->

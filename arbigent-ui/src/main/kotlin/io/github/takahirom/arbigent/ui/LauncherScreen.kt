@@ -27,7 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
-import io.github.takahirom.arbigent.DeviceOs
+import io.github.takahirom.arbigent.ArbigentDeviceOs
 import org.jetbrains.jewel.intui.standalone.styling.light
 import org.jetbrains.jewel.ui.component.DefaultButton
 import org.jetbrains.jewel.ui.component.GroupHeader
@@ -57,17 +57,17 @@ fun BoxScope.LauncherScreen(
       RadioButtonRow(
         text = "Android",
         selected = deviceOs.isAndroid(),
-        onClick = { devicesStateHolder.selectedDeviceOs.value = DeviceOs.Android }
+        onClick = { devicesStateHolder.selectedDeviceOs.value = ArbigentDeviceOs.Android }
       )
       RadioButtonRow(
         text = "iOS",
         selected = deviceOs.isIOS(),
-        onClick = { devicesStateHolder.selectedDeviceOs.value = DeviceOs.iOS }
+        onClick = { devicesStateHolder.selectedDeviceOs.value = ArbigentDeviceOs.iOS }
       )
       RadioButtonRow(
         text = "Web(Experimental)",
         selected = deviceOs.isWeb(),
-        onClick = { devicesStateHolder.selectedDeviceOs.value = DeviceOs.Web }
+        onClick = { devicesStateHolder.selectedDeviceOs.value = ArbigentDeviceOs.Web }
       )
     }
     val devices by devicesStateHolder.devices.collectAsState()

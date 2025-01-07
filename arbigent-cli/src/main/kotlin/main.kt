@@ -33,7 +33,7 @@ import io.github.takahirom.arbigent.ArbigentProject
 import io.github.takahirom.arbigent.ArbigentScenario
 import io.github.takahirom.arbigent.ArbigentScenarioExecutor
 import io.github.takahirom.arbigent.ArbigentScenarioExecutorState
-import io.github.takahirom.arbigent.DeviceOs
+import io.github.takahirom.arbigent.ArbigentDeviceOs
 import io.github.takahirom.arbigent.OpenAIAi
 import io.github.takahirom.arbigent.arbigentLogLevel
 import io.github.takahirom.arbigent.fetchAvailableDevicesByOs
@@ -118,9 +118,9 @@ class ArbigentCli : CliktCommand() {
     }
 
     val os =
-      DeviceOs.entries.find { it.name.toLowerCasePreservingASCIIRules() == os.toLowerCasePreservingASCIIRules() }
+      ArbigentDeviceOs.entries.find { it.name.toLowerCasePreservingASCIIRules() == os.toLowerCasePreservingASCIIRules() }
         ?: throw IllegalArgumentException("Invalid OS. The OS should be one of ${
-          DeviceOs.values().joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
+          ArbigentDeviceOs.values().joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
         }")
     val device = fetchAvailableDevicesByOs(os).first().connectToDevice()
     arbigentLogLevel = ArbigentLogLevel.ERROR
