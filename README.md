@@ -81,11 +81,26 @@ brew install takahirom/repo/arbigent
 ```
 Usage: arbigent [<options>]
 
+Options for OpenAI API AI:
+  --open-ai-endpoint=<text>    Endpoint URL (default:
+                               https://api.openai.com/v1/)
+  --open-ai-model-name=<text>  Model name (default: gpt-4o-mini)
+
+Options for Gemini API AI:
+  --gemini-endpoint=<text>    Endpoint URL (default:
+                              https://generativelanguage.googleapis.com/v1beta/openai/)
+  --gemini-model-name=<text>  Model name (default: gemini-1.5-flash)
+
+Options for Azure OpenAI:
+  --azure-open-aiendpoint=<text>     Endpoint URL
+  --azure-open-aiapi-version=<text>  API version
+  --azure-open-aimodel-name=<text>   Model name (default: gpt-4o-mini)
+
 Options:
-  --ai-type=(openai|gemini)  Type of AI to use
-  --os=(android|ios|web)     Target operating system
-  --scenario-file=<text>     Path to the scenario YAML file
-  -h, --help                 Show this message and exit
+  --ai-type=(openai|gemini|azureopenai)  Type of AI to use
+  --os=(android|ios|web)                 Target operating system
+  --scenario-file=<text>                 Path to the scenario YAML file
+  -h, --help                             Show this message and exit
 ```
 
 ## Supported AI Providers
