@@ -40,6 +40,7 @@ import io.github.takahirom.arbigent.fetchAvailableDevicesByOs
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.util.toLowerCasePreservingASCIIRules
+import kotlinx.coroutines.delay
 import java.io.File
 import kotlin.system.exitProcess
 
@@ -133,8 +134,13 @@ class ArbigentCli : CliktCommand() {
     runMosaicBlocking {
       LaunchedEffect(Unit) {
         arbigentProject.execute()
-        arbigentProject.isSuccess()
-        exitProcess(0)
+        // Show the result
+        delay(100)
+        if (!arbigentProject.isSuccess()) {
+          exitProcess(0)
+        } else {
+          exitProcess(1)
+        }
       }
       Column {
         val assignments by arbigentProject.scenarioAssignmentsFlow.collectAsState(arbigentProject.scenarioAssignments())
@@ -176,7 +182,6 @@ fun ScenarioRow(scenario: ArbigentScenario, scenarioExecutor: ArbigentScenarioEx
     Text(
       "Goal:" + scenario.agentTasks.lastOrNull()?.goal?.take(80) + "...",
       modifier = Modifier.padding(horizontal = 1),
-      color = Black,
     )
   }
 }
