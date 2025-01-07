@@ -319,7 +319,7 @@ private fun ScenarioOptions(
               onValueChange = {
                 editingText = it
                 scenarioStateHolder.initializeMethodsStateFlow.value =
-                  ArbigentScenarioContent.InitializeMethods.Back(it.toInt())
+                  ArbigentScenarioContent.InitializeMethods.Back(it.toIntOrNull() ?: 1)
               },
             )
           }
