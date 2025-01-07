@@ -310,5 +310,11 @@ class ArbigentAppStateHolder(
     scenario.arbigentScenarioExecutorStateFlow.value?.cancel()
     allScenarioStateHoldersStateFlow.value =
       allScenarioStateHoldersStateFlow.value.filter { it != scenario }
+    val removedScenarioDependency = scenario.dependencyScenarioStateHolderStateFlow.value
+    allScenarioStateHoldersStateFlow.value.forEach {
+      if (it.dependencyScenarioStateHolderStateFlow.value == scenario) {
+        it.dependencyScenarioStateHolderStateFlow.value = removedScenarioDependency
+      }
+    }
   }
 }
