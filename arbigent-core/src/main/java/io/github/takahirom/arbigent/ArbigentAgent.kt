@@ -73,8 +73,8 @@ public class ArbigentAgent(
         }
       }
     )
-  private val imageAssertionInterceptors: List<ArbiterImageAssertionInterceptor> = interceptors
-    .filterIsInstance<ArbiterImageAssertionInterceptor>()
+  private val imageAssertionInterceptors: List<ArbigentImageAssertionInterceptor> = interceptors
+    .filterIsInstance<ArbigentImageAssertionInterceptor>()
   private val imageAssertionChain: (ArbigentAi.ImageAssertionInput) -> ArbigentAi.ImageAssertionOutput =
     imageAssertionInterceptors.foldRight(
       { input: ArbigentAi.ImageAssertionInput ->
@@ -297,7 +297,7 @@ public fun AgentConfigBuilder(
   deviceFormFactor: ArbigentScenarioDeviceFormFactor,
   initializeMethods: ArbigentScenarioContent.InitializeMethods,
   cleanupData: ArbigentScenarioContent.CleanupData,
-  imageAssertions: List<ArbiterImageAssertion>
+  imageAssertions: List<ArbigentImageAssertion>
 ): AgentConfig.Builder = AgentConfigBuilder {
   deviceFormFactor(deviceFormFactor)
   when (val method = initializeMethods) {
@@ -383,10 +383,10 @@ public fun AgentConfigBuilder(
     }
   }
   if (imageAssertions.isNotEmpty()) {
-    addInterceptor(object : ArbiterImageAssertionInterceptor {
+    addInterceptor(object : ArbigentImageAssertionInterceptor {
       override fun intercept(
         imageAssertionInput: ArbigentAi.ImageAssertionInput,
-        chain: ArbiterImageAssertionInterceptor.Chain
+        chain: ArbigentImageAssertionInterceptor.Chain
       ): ArbigentAi.ImageAssertionOutput {
         val output = chain.proceed(
           imageAssertionInput.copy(
@@ -419,7 +419,7 @@ public interface ArbigentDecisionInterceptor : ArbigentInterceptor {
   }
 }
 
-public interface ArbiterImageAssertionInterceptor : ArbigentInterceptor {
+public interface ArbigentImageAssertionInterceptor : ArbigentInterceptor {
   public fun intercept(
     imageAssertionInput: ArbigentAi.ImageAssertionInput,
     chain: Chain

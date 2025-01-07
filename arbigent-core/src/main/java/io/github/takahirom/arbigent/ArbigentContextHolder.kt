@@ -8,7 +8,7 @@ public class ArbigentContextHolder(
   public val goal: String,
 ) {
   public class Step(
-    public val agentCommand: AgentCommand? = null,
+    public val agentCommand: ArbigentAgentCommand? = null,
     public val action: String? = null,
     public val memo: String,
     public val whatYouSaw: String? = null,

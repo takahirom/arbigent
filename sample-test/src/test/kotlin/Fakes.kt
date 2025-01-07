@@ -1,6 +1,6 @@
 package io.github.takahirom.arbigent.sample.test
 
-import io.github.takahirom.arbigent.AgentCommand
+import io.github.takahirom.arbigent.ArbigentAgentCommand
 import io.github.takahirom.arbigent.ArbigentAi
 import io.github.takahirom.arbigent.ArbigentContextHolder
 import io.github.takahirom.arbigent.ArbigentDevice
@@ -32,7 +32,7 @@ class FakeDevice : ArbigentDevice {
 class FakeAi : ArbigentAi {
   var count = 0
   fun createDecisionOutput(
-    agentCommand: AgentCommand = ClickWithTextAgentCommand("text")
+    agentCommand: ArbigentAgentCommand = ClickWithTextAgentCommand("text")
   ): ArbigentAi.DecisionOutput {
     return ArbigentAi.DecisionOutput(
       listOf(agentCommand),

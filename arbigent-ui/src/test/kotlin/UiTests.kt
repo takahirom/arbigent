@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertAll
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.filterToOne
@@ -23,7 +22,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
-import io.github.takahirom.arbigent.AgentCommand
+import io.github.takahirom.arbigent.ArbigentAgentCommand
 import io.github.takahirom.arbigent.ArbigentAi
 import io.github.takahirom.arbigent.ArbigentContextHolder
 import io.github.takahirom.arbigent.ArbigentCoroutinesDispatcher
@@ -405,7 +404,7 @@ class FakeAi : ArbigentAi {
     class Normal() : AiStatus {
       var count = 0
       fun createDecisionOutput(
-        agentCommand: AgentCommand = ClickWithTextAgentCommand("text")
+        agentCommand: ArbigentAgentCommand = ClickWithTextAgentCommand("text")
       ): ArbigentAi.DecisionOutput {
         return ArbigentAi.DecisionOutput(
           listOf(agentCommand),

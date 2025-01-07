@@ -4,7 +4,7 @@ import maestro.KeyCode
 import maestro.MaestroException
 import maestro.orchestra.*
 
-public interface AgentCommand {
+public interface ArbigentAgentCommand {
   public val actionName: String
   public fun runOrchestraCommand(device: ArbigentDevice)
   public fun stepLogText(): String
@@ -26,7 +26,7 @@ private fun getRegexToIndex(text: String): Pair<String, String> {
   return Pair(regexText, index)
 }
 
-public data class ClickWithTextAgentCommand(val textRegex: String) : AgentCommand {
+public data class ClickWithTextAgentCommand(val textRegex: String) : ArbigentAgentCommand {
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
@@ -81,7 +81,7 @@ public data class ClickWithTextAgentCommand(val textRegex: String) : AgentComman
   }
 }
 
-public data class ClickWithIdAgentCommand(val textRegex: String) : AgentCommand {
+public data class ClickWithIdAgentCommand(val textRegex: String) : ArbigentAgentCommand {
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
@@ -121,7 +121,7 @@ public data class ClickWithIdAgentCommand(val textRegex: String) : AgentCommand 
   }
 }
 
-public data class DpadDownArrowAgentCommand(val count: Int) : AgentCommand {
+public data class DpadDownArrowAgentCommand(val count: Int) : ArbigentAgentCommand {
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
@@ -156,7 +156,7 @@ public data class DpadDownArrowAgentCommand(val count: Int) : AgentCommand {
   }
 }
 
-public data class DpadUpArrowAgentCommand(val count: Int) : AgentCommand {
+public data class DpadUpArrowAgentCommand(val count: Int) : ArbigentAgentCommand {
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
@@ -191,7 +191,7 @@ public data class DpadUpArrowAgentCommand(val count: Int) : AgentCommand {
   }
 }
 
-public data class DpadRightArrowAgentCommand(val count: Int) : AgentCommand {
+public data class DpadRightArrowAgentCommand(val count: Int) : ArbigentAgentCommand {
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
@@ -226,7 +226,7 @@ public data class DpadRightArrowAgentCommand(val count: Int) : AgentCommand {
   }
 }
 
-public data class DpadLeftArrowAgentCommand(val count: Int) : AgentCommand {
+public data class DpadLeftArrowAgentCommand(val count: Int) : ArbigentAgentCommand {
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
@@ -261,7 +261,7 @@ public data class DpadLeftArrowAgentCommand(val count: Int) : AgentCommand {
   }
 }
 
-public data class DpadCenterAgentCommand(val count: Int) : AgentCommand {
+public data class DpadCenterAgentCommand(val count: Int) : ArbigentAgentCommand {
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
@@ -296,7 +296,7 @@ public data class DpadCenterAgentCommand(val count: Int) : AgentCommand {
   }
 }
 
-public data class InputTextAgentCommand(val text: String) : AgentCommand {
+public data class InputTextAgentCommand(val text: String) : ArbigentAgentCommand {
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
@@ -331,7 +331,7 @@ public data class InputTextAgentCommand(val text: String) : AgentCommand {
   }
 }
 
-public class BackPressAgentCommand() : AgentCommand {
+public class BackPressAgentCommand() : ArbigentAgentCommand {
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
@@ -362,7 +362,7 @@ public class BackPressAgentCommand() : AgentCommand {
   }
 }
 
-public class ScrollAgentCommand : AgentCommand {
+public class ScrollAgentCommand : ArbigentAgentCommand {
   override val actionName: String = "Scroll"
 
   override fun stepLogText(): String {
@@ -393,7 +393,7 @@ public class ScrollAgentCommand : AgentCommand {
   }
 }
 
-public data class KeyPressAgentCommand(val keyName: String) : AgentCommand {
+public data class KeyPressAgentCommand(val keyName: String) : ArbigentAgentCommand {
   override val actionName: String = "KeyPress"
 
   override fun stepLogText(): String {
@@ -428,7 +428,7 @@ public data class KeyPressAgentCommand(val keyName: String) : AgentCommand {
   }
 }
 
-public class WaitAgentCommand(public val timeMs: Int) : AgentCommand {
+public class WaitAgentCommand(public val timeMs: Int) : ArbigentAgentCommand {
   override val actionName: String = "Wait"
 
   override fun stepLogText(): String {
@@ -454,7 +454,7 @@ public class WaitAgentCommand(public val timeMs: Int) : AgentCommand {
   }
 }
 
-public class GoalAchievedAgentCommand : AgentCommand {
+public class GoalAchievedAgentCommand : ArbigentAgentCommand {
   override val actionName: String = "GoalAchieved"
 
   override fun stepLogText(): String {

@@ -49,7 +49,7 @@ public data class ArbigentScenarioRunningInfo(
 }
 
 @Serializable
-public class ArbiterImageAssertion(
+public class ArbigentImageAssertion(
   public val assertionPrompt: String,
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   public val requiredFulfillmentPercent: Int = 80,

@@ -6,7 +6,7 @@ import io.github.takahirom.arbigent.ArbigentScenarioContent
 import io.github.takahirom.arbigent.ArbigentScenarioDeviceFormFactor
 import io.github.takahirom.arbigent.ArbigentScenarioExecutor
 import io.github.takahirom.arbigent.ArbigentScenarioRunningInfo
-import io.github.takahirom.arbigent.ArbiterImageAssertion
+import io.github.takahirom.arbigent.ArbigentImageAssertion
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,7 +34,7 @@ constructor(
     MutableStateFlow(
       ArbigentScenarioContent.CleanupData.Noop
     )
-  val imageAssertionsStateFlow: MutableStateFlow<List<ArbiterImageAssertion>> =
+  val imageAssertionsStateFlow: MutableStateFlow<List<ArbigentImageAssertion>> =
     MutableStateFlow(emptyList())
   val initializeMethodsStateFlow: MutableStateFlow<ArbigentScenarioContent.InitializeMethods> =
     MutableStateFlow(ArbigentScenarioContent.InitializeMethods.Back())

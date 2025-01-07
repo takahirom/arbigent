@@ -46,7 +46,7 @@ import io.github.takahirom.arbigent.ArbigentScenarioContent
 import io.github.takahirom.arbigent.ArbigentScenarioDeviceFormFactor
 import io.github.takahirom.arbigent.ArbigentScenarioExecutor
 import io.github.takahirom.arbigent.ArbigentTaskAssignment
-import io.github.takahirom.arbigent.ArbiterImageAssertion
+import io.github.takahirom.arbigent.ArbigentImageAssertion
 import io.github.takahirom.arbigent.GoalAchievedAgentCommand
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.Orientation
@@ -431,7 +431,7 @@ private fun ScenarioOptions(
               scenarioStateHolder.imageAssertionsStateFlow.value = emptyList()
             } else {
               scenarioStateHolder.imageAssertionsStateFlow.value = listOf(
-                ArbiterImageAssertion(
+                ArbigentImageAssertion(
                   assertionPrompt = it,
                 )
               )
