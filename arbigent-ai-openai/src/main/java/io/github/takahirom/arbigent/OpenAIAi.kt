@@ -179,7 +179,7 @@ $templates"""
         jsonObject["action"]?.jsonPrimitive?.content ?: throw Exception("Action not found")
       val agentCommandMap = agentCommandList.associateBy { it.actionName }
       val commandPrototype = agentCommandMap[action] ?: throw Exception("Unknown action: $action")
-      val agentCommand: AgentCommand = when (commandPrototype) {
+      val agentCommand: ArbigentAgentCommand = when (commandPrototype) {
         GoalAchievedAgentCommand -> GoalAchievedAgentCommand()
         ClickWithTextAgentCommand -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")

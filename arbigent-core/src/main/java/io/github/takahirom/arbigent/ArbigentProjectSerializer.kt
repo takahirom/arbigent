@@ -92,7 +92,7 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   public val cleanupData: CleanupData = CleanupData.Noop,
   @EncodeDefault(EncodeDefault.Mode.NEVER)
-  public val imageAssertions: List<ArbiterImageAssertion> = emptyList()
+  public val imageAssertions: List<ArbigentImageAssertion> = emptyList()
 ) {
   @Serializable
   public sealed interface CleanupData {

@@ -11,7 +11,7 @@ public interface ArbigentAi {
     val screenshotFilePath: String,
   )
   public data class DecisionOutput(
-    val agentCommands: List<AgentCommand>,
+    val agentCommands: List<ArbigentAgentCommand>,
     val step: ArbigentContextHolder.Step
   )
   public fun decideAgentCommands(
@@ -22,7 +22,7 @@ public interface ArbigentAi {
     val ai: ArbigentAi,
     val arbigentContextHolder: ArbigentContextHolder,
     val screenshotFilePath: String,
-    val assertions: List<ArbiterImageAssertion>,
+    val assertions: List<ArbigentImageAssertion>,
   )
   public data class ImageAssertionOutput(
     val results: List<ImageAssertionResult>
