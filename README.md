@@ -12,7 +12,7 @@
 
 ## Demo movie
 
-https://github.com/user-attachments/assets/46fa3034-5671-4ff1-99df-abbdaebaf197
+https://github.com/user-attachments/assets/ada9012b-2d95-451d-92c5-3db3436fd2a9
 
 ## Motivation
 

@@ -1,6 +1,5 @@
 package io.github.takahirom.arbigent
 
-import com.android.identity.util.toBase64Url
 import com.github.takahirom.roborazzi.AiAssertionOptions
 import com.github.takahirom.roborazzi.AnySerializer
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
@@ -32,11 +31,10 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.modules.SerializersModule
-import java.awt.image.BufferedImage
+import java.awt.image.BufferedImage.TYPE_INT_ARGB
 import java.io.File
 import java.nio.charset.Charset
 import java.util.Base64
-import javax.imageio.ImageIO
 
 class OpenAIAi(
   private val apiKey: String,
@@ -96,7 +94,11 @@ class OpenAIAi(
   @OptIn(ExperimentalSerializationApi::class)
   override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
     val (arbigentContext, formFactor, dumpHierarchy, focusedTree, agentCommandTypes, screenshotFilePath, elements) = decisionInput
-    val imageBase64 = File(screenshotFilePath).getResizedIamgeByteArray(1.0F)
+    val canvas = ArbigentCanvas.load(File(screenshotFilePath), TYPE_INT_ARGB)
+    canvas.draw(elements)
+    canvas.save(screenshotFilePath)
+
+    val imageBase64 = File(screenshotFilePath).getResizedIamgeBase64(1.0F)
     val prompt = buildPrompt(arbigentContext, dumpHierarchy, focusedTree, agentCommandTypes, elements)
     val messages: List<ChatMessage> = listOf(
       ChatMessage(
@@ -386,7 +388,7 @@ $templates"""
   }
 }
 
-fun File.getResizedIamgeByteArray(scale: Float): String {
+fun File.getResizedIamgeBase64(scale: Float): String {
 //  val image = ImageIO.read(this)
 //  val scaledImage = image.getScaledInstance(
 //    (image.width * scale).toInt(),

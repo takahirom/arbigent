@@ -544,9 +544,6 @@ private fun step(
   arbigentDebugLog("Arbigent step(): ${arbigentContextHolder.prompt()}")
   val screenshotFilePath =
     ArbigentTempDir.screenshotsDir.absolutePath + File.separator + "$screenshotFileID.png"
-  val canvas = ArbigentCanvas.load(File(screenshotFilePath), TYPE_INT_ARGB)
-  canvas.draw(device.elements())
-  canvas.save(screenshotFilePath)
   val decisionInput = ArbigentAi.DecisionInput(
     arbigentContextHolder = arbigentContextHolder,
     formFactor = deviceFormFactor,
