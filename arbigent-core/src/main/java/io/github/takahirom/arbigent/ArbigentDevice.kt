@@ -270,52 +270,66 @@ public class MaestroDevice(
 
 
   override fun moveFocusToElement(selector: ArbigentTvCompatDevice.Selector) {
-    val target: UiElement = when (selector) {
-      is ArbigentTvCompatDevice.Selector.ById -> {
-        try {
-          val element: FindElementResult = maestro.findElementWithTimeout(
-            timeoutMs = 100,
-            filter = Filters.compose(
-              Filters.idMatches(selector.id.toRegex()),
-              Filters.index(selector.index)
-            ),
-          ) ?: throw MaestroException.ElementNotFound("Element not found", maestro.viewHierarchy().root)
-          val uiElement: UiElement = element.element
-          uiElement
-        } catch (e: MaestroException.ElementNotFound) {
-          val element: FindElementResult = maestro.findElementWithTimeout(
-            timeoutMs = 100,
-            filter = Filters.compose(
-              Filters.idMatches((".*" + selector.id + ".*").toRegex()),
-              Filters.index(selector.index)
+    val fetchTarget: () -> UiElement = {
+      when (selector) {
+        is ArbigentTvCompatDevice.Selector.ById -> {
+          try {
+            val element: FindElementResult = maestro.findElementWithTimeout(
+              timeoutMs = 100,
+              filter = Filters.compose(
+                Filters.idMatches(selector.id.toRegex()),
+                Filters.index(selector.index)
+              ),
+            ) ?: throw MaestroException.ElementNotFound(
+              "Element not found",
+              maestro.viewHierarchy().root
             )
-          ) ?: throw MaestroException.ElementNotFound("Element not found", maestro.viewHierarchy().root)
-          val uiElement: UiElement = element.element
-          uiElement
+            val uiElement: UiElement = element.element
+            uiElement
+          } catch (e: MaestroException.ElementNotFound) {
+            val element: FindElementResult = maestro.findElementWithTimeout(
+              timeoutMs = 100,
+              filter = Filters.compose(
+                Filters.idMatches((".*" + selector.id + ".*").toRegex()),
+                Filters.index(selector.index)
+              )
+            ) ?: throw MaestroException.ElementNotFound(
+              "Element not found",
+              maestro.viewHierarchy().root
+            )
+            val uiElement: UiElement = element.element
+            uiElement
+          }
         }
-      }
 
-      is ArbigentTvCompatDevice.Selector.ByText -> {
-        try {
-          val element: FindElementResult = maestro.findElementWithTimeout(
-            timeoutMs = 100,
-            filter = Filters.compose(
-              Filters.textMatches(selector.text.toRegex()),
-              Filters.index(selector.index)
-            ),
-          ) ?: throw MaestroException.ElementNotFound("Element not found", maestro.viewHierarchy().root)
-          val uiElement: UiElement = element.element
-          uiElement
-        } catch (e: MaestroException.ElementNotFound) {
-          val element: FindElementResult = maestro.findElementWithTimeout(
-            timeoutMs = 100,
-            filter = Filters.compose(
-              Filters.textMatches((".*" + selector.text + ".*").toRegex()),
-              Filters.index(selector.index)
+        is ArbigentTvCompatDevice.Selector.ByText -> {
+          try {
+            val element: FindElementResult = maestro.findElementWithTimeout(
+              timeoutMs = 100,
+              filter = Filters.compose(
+                Filters.textMatches(selector.text.toRegex()),
+                Filters.index(selector.index)
+              ),
+            ) ?: throw MaestroException.ElementNotFound(
+              "Element not found",
+              maestro.viewHierarchy().root
             )
-          ) ?: throw MaestroException.ElementNotFound("Element not found", maestro.viewHierarchy().root)
-          val uiElement: UiElement = element.element
-          uiElement
+            val uiElement: UiElement = element.element
+            uiElement
+          } catch (e: MaestroException.ElementNotFound) {
+            val element: FindElementResult = maestro.findElementWithTimeout(
+              timeoutMs = 100,
+              filter = Filters.compose(
+                Filters.textMatches((".*" + selector.text + ".*").toRegex()),
+                Filters.index(selector.index)
+              )
+            ) ?: throw MaestroException.ElementNotFound(
+              "Element not found",
+              maestro.viewHierarchy().root
+            )
+            val uiElement: UiElement = element.element
+            uiElement
+          }
         }
       }
     }
@@ -323,7 +337,7 @@ public class MaestroDevice(
     while (remainCount-- > 0) {
       val currentFocus = findCurrentFocus()
       val currentBounds = currentFocus.toUiElement().bounds
-      val targetBounds = target.bounds
+      val targetBounds = fetchTarget().bounds
 
       // Helper functions to calculate the center X and Y of a Bounds object.
       fun Bounds.centerY(): Int {
