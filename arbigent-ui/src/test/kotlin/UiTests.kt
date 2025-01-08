@@ -29,6 +29,7 @@ import io.github.takahirom.arbigent.ArbigentCoroutinesDispatcher
 import io.github.takahirom.arbigent.ClickWithTextAgentCommand
 import io.github.takahirom.arbigent.ArbigentDevice
 import io.github.takahirom.arbigent.ArbigentAvailableDevice
+import io.github.takahirom.arbigent.ArbigentElementList
 import io.github.takahirom.arbigent.GoalAchievedAgentCommand
 import io.github.takahirom.arbigent.arbigentDebugLog
 import io.github.takahirom.roborazzi.captureRoboImage
@@ -371,6 +372,11 @@ class FakeDevice : ArbigentDevice {
   override fun viewTreeString(): String {
     arbigentDebugLog("FakeDevice.viewTreeString")
     return "viewTreeString"
+  }
+
+  override fun elements(meaningfulAttributes: Set<String>): ArbigentElementList {
+    arbigentDebugLog("FakeDevice.elements")
+    return ArbigentElementList(emptyList())
   }
 
   override fun close() {
