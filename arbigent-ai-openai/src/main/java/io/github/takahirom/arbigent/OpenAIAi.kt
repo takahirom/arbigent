@@ -389,6 +389,7 @@ $templates"""
 }
 
 fun File.getResizedIamgeBase64(scale: Float): String {
+//  val scale = 0.1F
 //  val image = ImageIO.read(this)
 //  val scaledImage = image.getScaledInstance(
 //    (image.width * scale).toInt(),
@@ -403,6 +404,7 @@ fun File.getResizedIamgeBase64(scale: Float): String {
 //  bufferedImage.graphics.drawImage(scaledImage, 0, 0, null)
 //  val output = File.createTempFile("scaled", ".png")
 //  ImageIO.write(bufferedImage, "png", output)
+//  return output.readBytes().encodeBase64()
   return this.readBytes().encodeBase64()
 }
 

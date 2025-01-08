@@ -17,6 +17,7 @@ sealed interface AiProviderSetting {
   interface NormalAiProviderSetting : AiProviderSetting {
     val apiKey: String
     val modelName: String
+    val isApiKeyRequired: Boolean get() = true
     fun updatedApiKey(apiKey: String): NormalAiProviderSetting
     fun updatedModelName(modelName: String): NormalAiProviderSetting
   }
@@ -65,6 +66,30 @@ sealed interface AiProviderSetting {
     }
 
     override val baseUrl: String = "https://api.openai.com/v1/"
+  }
+
+  @Serializable
+  @SerialName("CustomOpenAiApiBasedAi")
+  data class CustomOpenAiApiBasedAi(
+    override val id: String,
+    val apiKey: String,
+    val modelName: String,
+    val baseUrl: String,
+  ) : AiProviderSetting {
+    override val name: String
+      get() = "OpenAI API based AI"
+
+    fun updatedApiKey(apiKey: String): CustomOpenAiApiBasedAi {
+      return copy(apiKey = apiKey)
+    }
+
+    fun updatedModelName(modelName: String): CustomOpenAiApiBasedAi {
+      return copy(modelName = modelName)
+    }
+
+    fun updatedBaseUrl(baseUrl: String): CustomOpenAiApiBasedAi {
+      return copy(baseUrl = baseUrl)
+    }
   }
 
   // https://learn.microsoft.com/en-us/azure/ai-services/openai/reference#chat-completions
