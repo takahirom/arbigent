@@ -26,6 +26,41 @@ private fun getRegexToIndex(text: String): Pair<String, String> {
   return Pair(regexText, index)
 }
 
+public data class ClickWithIndex(val index: Int, val elements: ArbigentElementList): ArbigentAgentCommand {
+  override val actionName: String = Companion.actionName
+
+  override fun stepLogText(): String {
+    return "Click on index: $index"
+  }
+
+  override fun runOrchestraCommand(device: ArbigentDevice) {
+    device.executeCommands(
+      commands = listOf(
+        MaestroCommand(
+          tapOnPointV2Command = TapOnPointV2Command(
+            point = "${elements.elements[index].rect.centerX()},${elements.elements[index].rect.centerY()}"
+          )
+        )
+      ),
+    )
+  }
+
+  public companion object : AgentCommandType {
+    override val actionName: String = "ClickWithIndex"
+
+    override fun templateForAI(): String {
+      return """
+        {
+            "action": "$actionName",
+            // Index like 1 or 2
+            "text": "..."
+        }
+        """.trimIndent()
+    }
+
+  }
+}
+
 public data class ClickWithTextAgentCommand(val textRegex: String) : ArbigentAgentCommand {
   override val actionName: String = Companion.actionName
 
@@ -348,6 +383,33 @@ public data class DpadAutoFocusWithTextAgentCommand(val text: String) : Arbigent
             // You can use Regex
             // If you want to click second button, you can use text[index] e.g.: "text[0]". Try different index if the first one doesn't work.
             "text": "...[index]"
+        }
+        """.trimIndent()
+    }
+  }
+}
+
+public data class DpadAutoFocusWithIndexAgentCommand(val index: Int, val elements: ArbigentElementList): ArbigentAgentCommand {
+  override val actionName: String = Companion.actionName
+
+  public override fun stepLogText(): String {
+    return "Focus on index: $index"
+  }
+
+  public override fun runOrchestraCommand(device: ArbigentDevice) {
+    val device = (device as? ArbigentTvCompatDevice)?: throw NotImplementedError(message = "This command is only available for TV device")
+    device.moveFocusToElement(elements.elements[index])
+  }
+
+  public companion object : AgentCommandType {
+    override val actionName: String = "DpadAutoFocusWithIndex"
+
+    override fun templateForAI(): String {
+      return """
+        {
+            "action": "$actionName",
+            // Index like 1 or 2
+            "text": "..."
         }
         """.trimIndent()
     }
