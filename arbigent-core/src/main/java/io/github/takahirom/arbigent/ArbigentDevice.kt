@@ -1,5 +1,6 @@
 package io.github.takahirom.arbigent
 
+import io.github.takahirom.arbigent.MaestroDevice.OptimizationResult
 import maestro.Bounds
 import maestro.DeviceInfo
 import maestro.Filters
@@ -49,6 +50,7 @@ public interface ArbigentTvCompatDevice {
   }
 
   public fun moveFocusToElement(selector: Selector)
+  public fun moveFocusToElement(element: Element)
 }
 
 public interface ArbigentDevice {
@@ -56,6 +58,116 @@ public interface ArbigentDevice {
   public fun viewTreeString(): String
   public fun focusedTreeString(): String
   public fun close()
+  public fun elements(
+    meaningfulAttributes: Set<String> = setOf(
+      "text",
+      "accessibilityText",
+      "content description",
+      "hintText"
+    ),
+  ): ArbigentElementList
+}
+
+public data class Element(
+  val index: Int,
+  val textForAI: String,
+  val rawText: String,
+  val treeNode: TreeNode,
+  val x: Int,
+  val y: Int,
+  val width: Int,
+  val height: Int,
+  val isVisible: Boolean,
+) {
+  public class Rect(
+    public val left: Int,
+    public val top: Int,
+    public val right: Int,
+    public val bottom: Int
+  ) {
+    public fun width(): Int = right - left
+    public fun height(): Int = bottom - top
+    public fun centerX(): Int = (left + right) / 2
+    public fun centerY(): Int = (top + bottom) / 2
+  }
+
+  val rect: Rect
+    get() = Rect(x, y, x + width, y + height)
+}
+
+public data class ArbigentElementList(
+  val elements: List<Element>
+) {
+
+  public fun getAiTexts(): String {
+    return elements.joinToString("\n") { "" + it.index + ":" + it.textForAI }
+  }
+
+  public companion object {
+    public fun from(
+      viewHierarchy: ViewHierarchy,
+      deviceInfo: DeviceInfo
+    ): ArbigentElementList {
+      var index = 0
+      val deviceInfo = deviceInfo
+      val root = viewHierarchy.root
+      arbigentDebugLog("root:$root")
+      val result = root.filterOutOfBounds(
+        width = deviceInfo.widthPixels,
+        height = deviceInfo.heightPixels
+      )!!.optimizeTree(
+        isRoot = true,
+        viewHierarchy = viewHierarchy,
+        meaningfulAttributes = setOf(
+          "text",
+          "accessibilityText",
+          "content description",
+          "hintText"
+        )
+      )
+      val optimizedTree = result.node ?: result.promotedChildren.firstOrNull()
+      val elements = mutableListOf<Element>()
+      fun TreeNode.toElement(): Element {
+        val bounds = toUiElementOrNull()?.bounds
+        return Element(
+          index = index++,
+          textForAI = buildString {
+            val className = attributes["class"]?.substringAfterLast('.') ?: "Node"
+            append(className)
+            append("(")
+            appendUiElementContents(this@toElement)
+            append(")")
+          },
+          rawText = attributes.toString(),
+          treeNode = this,
+          x = bounds?.x ?: 0,
+          y = bounds?.y ?: 0,
+          width = bounds?.width ?: 0,
+          height = bounds?.height ?: 0,
+          isVisible = bounds?.let {
+            it.width > 0 && it.height > 0
+          } ?: false
+        )
+      }
+
+      fun TreeNode.toElementList(): List<Element> {
+        val elements = mutableListOf<Element>()
+        if (clickable == true || focused == true
+          || attributes["clickable"] == "true"
+          || attributes["focused"] == "true"
+          || attributes["focusable"] == "true") {
+          elements.add(toElement())
+        }
+        children
+          .forEach {
+            elements.addAll(it.toElementList())
+          }
+        return elements
+      }
+      elements.addAll(optimizedTree?.toElementList() ?: emptyList())
+      return ArbigentElementList(elements)
+    }
+  }
 }
 
 public class MaestroDevice(
@@ -77,6 +189,14 @@ public class MaestroDevice(
       true
     }
     orchestra.executeCommands(commands, shouldReinitJsEngine = shouldJsReinit)
+  }
+
+  override fun elements(
+    meaningfulAttributes: Set<String>,
+  ): ArbigentElementList {
+    val viewHierarchy = maestro.viewHierarchy(false)
+    val deviceInfo = maestro.cachedDeviceInfo
+    return ArbigentElementList.from(viewHierarchy, deviceInfo)
   }
 
   override fun viewTreeString(): String {
@@ -112,78 +232,6 @@ public class MaestroDevice(
     val promotedChildren: List<TreeNode>
   )
 
-  public fun TreeNode.optimizeTree(
-    isRoot: Boolean = false,
-    meaningfulAttributes: Set<String> = setOf(
-      "text",
-      "accessibilityText",
-      "content description",
-      "hintText"
-    ),
-    viewHierarchy: ViewHierarchy
-  ): OptimizationResult {
-    // Optimize children
-    val childResults = children
-      .filter {
-        it.attributes["resource-id"]?.contains("status_bar_container").let {
-          if (it != null) !it
-          else true
-        } &&
-          (it.toUiElementOrNull()?.bounds?.let {
-            it.width > 0 && it.height > 0
-          }) ?: true
-      }
-      .map { it.optimizeTree(false, meaningfulAttributes, viewHierarchy) }
-    val optimizedChildren = childResults.flatMap {
-      it.node?.let { node -> listOf(node) } ?: it.promotedChildren
-    }
-    val hasContent =
-      children.isNotEmpty()
-        || (attributes.keys.any { it in meaningfulAttributes })
-    if (!hasContent) {
-      arbigentDebugLog(
-        "Node has no content: $this viewHierarchy.isVisible(this):${
-          viewHierarchy.isVisible(
-            this
-          )
-        }"
-      )
-    }
-    val singleChild = optimizedChildren.singleOrNull()
-
-    return when {
-      (hasContent) || isRoot -> {
-        // Keep the node with optimized children
-        OptimizationResult(
-          node = this.copy(children = optimizedChildren),
-          promotedChildren = emptyList()
-        )
-      }
-
-      optimizedChildren.isEmpty() -> {
-        // Remove the node
-        OptimizationResult(
-          node = null,
-          promotedChildren = emptyList()
-        )
-      }
-      // If the node has only one child, promote it
-      singleChild != null -> {
-        OptimizationResult(
-          node = singleChild,
-          promotedChildren = emptyList()
-        )
-      }
-
-      else -> {
-        // Promote children
-        OptimizationResult(
-          node = null,
-          promotedChildren = optimizedChildren
-        )
-      }
-    }
-  }
 
   public fun TreeNode.optimizedToString(depth: Int, enableDepth: Boolean = false): String {
     val blank = " ".repeat(depth)
@@ -199,41 +247,7 @@ public class MaestroDevice(
       val className = attributes["class"]?.substringAfterLast('.') ?: "Node"
       appendString("$className(")
 //    appendString("attributes=$attributes, ")
-      if (attributes.isNotEmpty()) {
-//      appendString("attr={")
-        attributes.forEach { (key, value) ->
-          if (key == "class") {
-            // Skip class name
-          } else if (key == "resource-id" && value.isNotBlank()) {
-            appendString("id=${value.substringAfterLast('/')}, ")
-          } else if (key == "clickable") {
-            // Skip clickable
-          } else if (key == "enabled") {
-            if (value == "false") {
-              appendString("enabled=$value, ")
-            }
-          } else if (value.isNotBlank() && value != "null" && value != "false") {
-            appendString("$key=$value, ")
-          }
-        }
-//      appendString("}, ")
-      }
-      val clickable = clickable ?: attributes["clickable"]
-      if (clickable != null) {
-        appendString("clickable=$clickable, ")
-      }
-      if (enabled != null && !enabled!!) {
-        appendString("enabled=$enabled, ")
-      }
-      if (focused != null && focused!!) {
-        appendString("focused=$focused, ")
-      }
-      if (checked != null && checked!!) {
-        appendString("checked=$checked, ")
-      }
-      if (selected != null && selected!!) {
-        appendString("selected=$selected, ")
-      }
+      this.appendUiElementContents(this@optimizedToString)
       if (children.isNotEmpty()) {
         appendString("children(${children.size})=[")
         children.forEachIndexed { index, child ->
@@ -247,6 +261,7 @@ public class MaestroDevice(
       appendString(")")
     }
   }
+
 
   public fun ViewHierarchy.toOptimizedString(
     meaningfulAttributes: Set<String> = setOf("text", "content description", "hintText", "focused"),
@@ -268,81 +283,38 @@ public class MaestroDevice(
     return optimizedToString ?: ""
   }
 
+  override fun moveFocusToElement(
+    selector: ArbigentTvCompatDevice.Selector,
+  ) {
+    moveFocusToElement(
+      fetchTarget = { fetchTargetBounds(selector) }
+    )
+  }
 
-  override fun moveFocusToElement(selector: ArbigentTvCompatDevice.Selector) {
-    val fetchTarget: () -> UiElement = {
-      when (selector) {
-        is ArbigentTvCompatDevice.Selector.ById -> {
-          try {
-            val element: FindElementResult = maestro.findElementWithTimeout(
-              timeoutMs = 100,
-              filter = Filters.compose(
-                Filters.idMatches(selector.id.toRegex()),
-                Filters.index(selector.index)
-              ),
-            ) ?: throw MaestroException.ElementNotFound(
-              "Element not found",
-              maestro.viewHierarchy().root
-            )
-            val uiElement: UiElement = element.element
-            uiElement
-          } catch (e: MaestroException.ElementNotFound) {
-            val element: FindElementResult = maestro.findElementWithTimeout(
-              timeoutMs = 100,
-              filter = Filters.compose(
-                Filters.idMatches((".*" + selector.id + ".*").toRegex()),
-                Filters.index(selector.index)
-              )
-            ) ?: throw MaestroException.ElementNotFound(
-              "Element not found",
-              maestro.viewHierarchy().root
-            )
-            val uiElement: UiElement = element.element
-            uiElement
-          }
-        }
-
-        is ArbigentTvCompatDevice.Selector.ByText -> {
-          try {
-            val element: FindElementResult = maestro.findElementWithTimeout(
-              timeoutMs = 100,
-              filter = Filters.compose(
-                Filters.textMatches(selector.text.toRegex()),
-                Filters.index(selector.index)
-              ),
-            ) ?: throw MaestroException.ElementNotFound(
-              "Element not found",
-              maestro.viewHierarchy().root
-            )
-            val uiElement: UiElement = element.element
-            uiElement
-          } catch (e: MaestroException.ElementNotFound) {
-            val element: FindElementResult = maestro.findElementWithTimeout(
-              timeoutMs = 100,
-              filter = Filters.compose(
-                Filters.textMatches((".*" + selector.text + ".*").toRegex()),
-                Filters.index(selector.index)
-              )
-            ) ?: throw MaestroException.ElementNotFound(
-              "Element not found",
-              maestro.viewHierarchy().root
-            )
-            val uiElement: UiElement = element.element
-            uiElement
-          }
-        }
+  override fun moveFocusToElement(element: Element) {
+    moveFocusToElement(
+      fetchTarget = {
+        val newElement = maestro.viewHierarchy().refreshElement(element.treeNode)
+        newElement?.toUiElement()?.bounds ?: element.treeNode.toUiElement().bounds
       }
-    }
-    var remainCount = 10
+    )
+  }
+
+
+  private fun moveFocusToElement(
+    fetchTarget: () -> Bounds
+  ) {
+    var remainCount = 3
     while (remainCount-- > 0) {
       val currentFocus = findCurrentFocus()
       val currentBounds = currentFocus.toUiElement().bounds
-      val targetBounds = fetchTarget().bounds
+      val targetBounds = fetchTarget()
 
       // Helper functions to calculate the center X and Y of a Bounds object.
       fun Bounds.centerY(): Int {
         return center().y
       }
+
       fun Bounds.centerX(): Int {
         return center().x
       }
@@ -366,7 +338,13 @@ public class MaestroDevice(
       val directionCandidates = mutableListOf<KeyCode>()
 
       // Check if X ranges overlap, prioritize vertical movement
-      if (isOverlapping(currentBounds.x, currentBounds.right(), targetBounds.x, targetBounds.right())) {
+      if (isOverlapping(
+          currentBounds.x,
+          currentBounds.right(),
+          targetBounds.x,
+          targetBounds.right()
+        )
+      ) {
         arbigentDebugLog("X Overlap detected")
         if (currentBounds.centerY() > targetBounds.centerY()) {
           directionCandidates.add(KeyCode.REMOTE_UP)
@@ -376,7 +354,13 @@ public class MaestroDevice(
       }
 
       // Check if Y ranges overlap, prioritize horizontal movement
-      if (isOverlapping(currentBounds.y, currentBounds.bottom(), targetBounds.y, targetBounds.bottom())) {
+      if (isOverlapping(
+          currentBounds.y,
+          currentBounds.bottom(),
+          targetBounds.y,
+          targetBounds.bottom()
+        )
+      ) {
         arbigentDebugLog("Y Overlap detected")
         if (currentBounds.centerX() > targetBounds.centerX()) {
           directionCandidates.add(KeyCode.REMOTE_LEFT)
@@ -428,6 +412,70 @@ public class MaestroDevice(
     }
   }
 
+  private fun fetchTargetBounds(selector: ArbigentTvCompatDevice.Selector): Bounds {
+    return when (selector) {
+      is ArbigentTvCompatDevice.Selector.ById -> {
+        try {
+          val element: FindElementResult = maestro.findElementWithTimeout(
+            timeoutMs = 100,
+            filter = Filters.compose(
+              Filters.idMatches(selector.id.toRegex()),
+              Filters.index(selector.index)
+            ),
+          ) ?: throw MaestroException.ElementNotFound(
+            "Element not found",
+            maestro.viewHierarchy().root
+          )
+          val uiElement: UiElement = element.element
+          uiElement
+        } catch (e: MaestroException.ElementNotFound) {
+          val element: FindElementResult = maestro.findElementWithTimeout(
+            timeoutMs = 100,
+            filter = Filters.compose(
+              Filters.idMatches((".*" + selector.id + ".*").toRegex()),
+              Filters.index(selector.index)
+            )
+          ) ?: throw MaestroException.ElementNotFound(
+            "Element not found",
+            maestro.viewHierarchy().root
+          )
+          val uiElement: UiElement = element.element
+          uiElement
+        }
+      }
+
+      is ArbigentTvCompatDevice.Selector.ByText -> {
+        try {
+          val element: FindElementResult = maestro.findElementWithTimeout(
+            timeoutMs = 100,
+            filter = Filters.compose(
+              Filters.textMatches(selector.text.toRegex()),
+              Filters.index(selector.index)
+            ),
+          ) ?: throw MaestroException.ElementNotFound(
+            "Element not found",
+            maestro.viewHierarchy().root
+          )
+          val uiElement: UiElement = element.element
+          uiElement
+        } catch (e: MaestroException.ElementNotFound) {
+          val element: FindElementResult = maestro.findElementWithTimeout(
+            timeoutMs = 100,
+            filter = Filters.compose(
+              Filters.textMatches((".*" + selector.text + ".*").toRegex()),
+              Filters.index(selector.index)
+            )
+          ) ?: throw MaestroException.ElementNotFound(
+            "Element not found",
+            maestro.viewHierarchy().root
+          )
+          val uiElement: UiElement = element.element
+          uiElement
+        }
+      }
+    }.bounds
+  }
+
   private fun findCurrentFocus(): TreeNode {
     return maestro.viewHierarchy(false)
       .getFocusedNode()
@@ -439,3 +487,114 @@ public class MaestroDevice(
   }
 }
 
+private fun StringBuilder.appendUiElementContents(treeNode: TreeNode) {
+  if (treeNode.attributes.isNotEmpty()) {
+    //      appendString("attr={")
+    treeNode.attributes.forEach { (key, value) ->
+      if (key == "class") {
+        // Skip class name
+      } else if (key == "resource-id" && value.isNotBlank()) {
+        append("id=${value.substringAfterLast('/')}, ")
+      } else if (key == "clickable") {
+        // Skip clickable
+      } else if (key == "enabled") {
+        if (value == "false") {
+          append("enabled=$value, ")
+        }
+      } else if (value.isNotBlank() && value != "null" && value != "false") {
+        append("$key=$value, ")
+      }
+    }
+    //      append("}, ")
+  }
+  val clickable = treeNode.clickable ?: treeNode.attributes["clickable"]
+  if (clickable != null) {
+    append("clickable=$clickable, ")
+  }
+  if (treeNode.enabled != null && !treeNode.enabled!!) {
+    append("enabled=${treeNode.enabled}, ")
+  }
+  if (treeNode.focused != null && treeNode.focused!!) {
+    append("focused=${treeNode.focused}, ")
+  }
+  if (treeNode.checked != null && treeNode.checked!!) {
+    append("checked=${treeNode.checked}, ")
+  }
+  if (treeNode.selected != null && treeNode.selected!!) {
+    append("selected=${treeNode.selected}, ")
+  }
+}
+
+
+public fun TreeNode.optimizeTree(
+  isRoot: Boolean = false,
+  meaningfulAttributes: Set<String> = setOf(
+    "text",
+    "accessibilityText",
+    "content description",
+    "hintText"
+  ),
+  viewHierarchy: ViewHierarchy
+): OptimizationResult {
+  // Optimize children
+  val childResults = children
+    .filter {
+      it.attributes["resource-id"]?.contains("status_bar_container").let {
+        if (it != null) !it
+        else true
+      } &&
+        (it.toUiElementOrNull()?.bounds?.let {
+          it.width > 0 && it.height > 0
+        }) ?: true
+    }
+    .map { it.optimizeTree(false, meaningfulAttributes, viewHierarchy) }
+  val optimizedChildren = childResults.flatMap {
+    it.node?.let { node -> listOf(node) } ?: it.promotedChildren
+  }
+  val hasContent =
+    children.isNotEmpty()
+      || (attributes.keys.any { it in meaningfulAttributes })
+  if (!hasContent) {
+    arbigentDebugLog(
+      "Node has no content: $this viewHierarchy.isVisible(this):${
+        viewHierarchy.isVisible(
+          this
+        )
+      }"
+    )
+  }
+  val singleChild = optimizedChildren.singleOrNull()
+
+  return when {
+    (hasContent) || isRoot -> {
+      // Keep the node with optimized children
+      OptimizationResult(
+        node = this.copy(children = optimizedChildren),
+        promotedChildren = emptyList()
+      )
+    }
+
+    optimizedChildren.isEmpty() -> {
+      // Remove the node
+      OptimizationResult(
+        node = null,
+        promotedChildren = emptyList()
+      )
+    }
+    // If the node has only one child, promote it
+    singleChild != null -> {
+      OptimizationResult(
+        node = singleChild,
+        promotedChildren = emptyList()
+      )
+    }
+
+    else -> {
+      // Promote children
+      OptimizationResult(
+        node = null,
+        promotedChildren = optimizedChildren
+      )
+    }
+  }
+}

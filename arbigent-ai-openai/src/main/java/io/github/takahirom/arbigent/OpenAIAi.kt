@@ -1,5 +1,6 @@
 package io.github.takahirom.arbigent
 
+import com.android.identity.util.toBase64Url
 import com.github.takahirom.roborazzi.AiAssertionOptions
 import com.github.takahirom.roborazzi.AnySerializer
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
@@ -22,6 +23,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
+import io.ktor.util.encodeBase64
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.MissingFieldException
@@ -93,8 +95,9 @@ class OpenAIAi(
 ) : ArbigentAi {
   @OptIn(ExperimentalSerializationApi::class)
   override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
-    val (arbigentContext, formFactor, dumpHierarchy, focusedTree, agentCommandTypes, screenshotFilePath) = decisionInput
-    val prompt = buildPrompt(arbigentContext, dumpHierarchy, focusedTree, agentCommandTypes)
+    val (arbigentContext, formFactor, dumpHierarchy, focusedTree, agentCommandTypes, screenshotFilePath, elements) = decisionInput
+    val imageBase64 = File(screenshotFilePath).getResizedIamgeByteArray(1.0F)
+    val prompt = buildPrompt(arbigentContext, dumpHierarchy, focusedTree, agentCommandTypes, elements)
     val messages: List<ChatMessage> = listOf(
       ChatMessage(
         role = "system",
@@ -111,12 +114,12 @@ class OpenAIAi(
       ChatMessage(
         role = "user",
         content = listOf(
-//          Content(
-//            type = "image_url",
-//            imageUrl = ImageUrl(
-//              url = "data:image/png;base64,$imageBase64"
-//            )
-//          ),
+          Content(
+            type = "image_url",
+            imageUrl = ImageUrl(
+              url = "data:image/png;base64,$imageBase64"
+            )
+          ),
           Content(
             type = "text",
             text = prompt
@@ -135,7 +138,7 @@ class OpenAIAi(
       return decideAgentCommands(decisionInput)
     }
     try {
-      val step = parseResponse(responseText, messages, screenshotFilePath, agentCommandTypes)
+      val step = parseResponse(responseText, messages, screenshotFilePath, elements, agentCommandTypes)
       return ArbigentAi.DecisionOutput(listOf(step.agentCommand!!), step)
     } catch (e: MissingFieldException) {
       arbigentInfoLog("Missing required field in OpenAI response: $e $responseText")
@@ -147,7 +150,8 @@ class OpenAIAi(
     arbigentContextHolder: ArbigentContextHolder,
     dumpHierarchy: String,
     focusedTree: String?,
-    agentCommandTypes: List<AgentCommandType>
+    agentCommandTypes: List<AgentCommandType>,
+    elements: ArbigentElementList
   ): String {
     val contextPrompt = arbigentContextHolder.prompt()
     val templates = agentCommandTypes.joinToString("\nor\n") { it.templateForAI() }
@@ -155,8 +159,8 @@ class OpenAIAi(
     val prompt = """
 
 
-New UI Hierarchy:
-$dumpHierarchy
+UI Index to Element Map:
+${elements.getAiTexts()}
 $focusedTreeText
 Based on the above, decide on the next action to achieve the goal. Please ensure not to repeat the same action. The action must be one of the following:
 $templates"""
@@ -167,6 +171,7 @@ $templates"""
     response: String,
     message: List<ChatMessage>,
     screenshotFilePath: String,
+    elements: ArbigentElementList,
     agentCommandList: List<AgentCommandType>
   ): ArbigentContextHolder.Step {
     val json = Json { ignoreUnknownKeys = true }
@@ -227,12 +232,25 @@ $templates"""
           DpadAutoFocusWithTextAgentCommand(text)
         }
 
+        DpadAutoFocusWithIndexAgentCommand -> {
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
+          DpadAutoFocusWithIndexAgentCommand(text.toIntOrNull() ?: throw IllegalArgumentException("Index not found"), elements)
+        }
+
         InputTextAgentCommand -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
           InputTextAgentCommand(text)
         }
+        ClickWithIndex -> {
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
+          ClickWithIndex(
+            index = text.toIntOrNull() ?: 0,
+            elements = elements
+          )
+        }
 
         BackPressAgentCommand -> BackPressAgentCommand()
+
         KeyPressAgentCommand -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
           KeyPressAgentCommand(text)
@@ -252,7 +270,7 @@ $templates"""
         action = action,
         memo = jsonObject["memo"]?.jsonPrimitive?.content ?: "",
         whatYouSaw = jsonObject["summary-of-what-you-saw"]?.jsonPrimitive?.content ?: "",
-        aiRequest = message.toString(),
+        aiRequest = message.map { it.copy(content = it.content.map { it.copy(imageUrl = null) }) }.toString(),
         aiResponse = content,
         screenshotFilePath = screenshotFilePath
       )
@@ -368,21 +386,21 @@ $templates"""
   }
 }
 
-fun File.getResizedIamgeByteArray(scale: Float): ByteArray {
-  val image = ImageIO.read(this)
-  val scaledImage = image.getScaledInstance(
-    (image.width * scale).toInt(),
-    (image.height * scale).toInt(),
-    BufferedImage.SCALE_SMOOTH
-  )
-  val bufferedImage = BufferedImage(
-    scaledImage.getWidth(null),
-    scaledImage.getHeight(null),
-    BufferedImage.TYPE_INT_RGB
-  )
-  bufferedImage.graphics.drawImage(scaledImage, 0, 0, null)
-  val output = File.createTempFile("scaled", ".png")
-  ImageIO.write(bufferedImage, "png", output)
-  return output.readBytes()
+fun File.getResizedIamgeByteArray(scale: Float): String {
+//  val image = ImageIO.read(this)
+//  val scaledImage = image.getScaledInstance(
+//    (image.width * scale).toInt(),
+//    (image.height * scale).toInt(),
+//    BufferedImage.SCALE_SMOOTH
+//  )
+//  val bufferedImage = BufferedImage(
+//    scaledImage.getWidth(null),
+//    scaledImage.getHeight(null),
+//    BufferedImage.TYPE_INT_RGB
+//  )
+//  bufferedImage.graphics.drawImage(scaledImage, 0, 0, null)
+//  val output = File.createTempFile("scaled", ".png")
+//  ImageIO.write(bufferedImage, "png", output)
+  return this.readBytes().encodeBase64()
 }
 

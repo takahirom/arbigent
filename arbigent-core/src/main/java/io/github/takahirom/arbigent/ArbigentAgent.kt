@@ -27,6 +27,7 @@ import maestro.orchestra.LaunchAppCommand
 import maestro.orchestra.MaestroCommand
 import maestro.orchestra.TakeScreenshotCommand
 import maestro.orchestra.WaitForAnimationToEndCommand
+import java.awt.image.BufferedImage.TYPE_INT_ARGB
 import java.io.File
 
 public class ArbigentAgent(
@@ -141,8 +142,8 @@ public class ArbigentAgent(
       goal = agentTask.goal,
       maxStep = agentTask.maxStep,
       agentCommandTypes = when (agentTask.deviceFormFactor) {
-        ArbigentScenarioDeviceFormFactor.Mobile -> defaultAgentCommandTypes()
-        ArbigentScenarioDeviceFormFactor.Tv -> defaultAgentCommandTypesForTv()
+        ArbigentScenarioDeviceFormFactor.Mobile -> defaultAgentCommandTypesForVisualMode()
+        ArbigentScenarioDeviceFormFactor.Tv -> defaultAgentCommandTypesForTvForVisualMode()
       }
     )
   }
@@ -150,7 +151,7 @@ public class ArbigentAgent(
   public suspend fun execute(
     goal: String,
     maxStep: Int = 10,
-    agentCommandTypes: List<AgentCommandType> = defaultAgentCommandTypes()
+    agentCommandTypes: List<AgentCommandType> = defaultAgentCommandTypesForVisualMode()
   ) {
     arbigentDebugLog("Arbigent.execute agent.execute start $goal")
     try {
@@ -452,10 +453,11 @@ public interface ArbigentStepInterceptor : ArbigentInterceptor {
   }
 }
 
-public fun defaultAgentCommandTypes(): List<AgentCommandType> {
+public fun defaultAgentCommandTypesForVisualMode(): List<AgentCommandType> {
   return listOf(
-    ClickWithIdAgentCommand,
-    ClickWithTextAgentCommand,
+//    ClickWithIdAgentCommand,
+//    ClickWithTextAgentCommand,
+    ClickWithIndex,
     InputTextAgentCommand,
     BackPressAgentCommand,
     KeyPressAgentCommand,
@@ -466,15 +468,16 @@ public fun defaultAgentCommandTypes(): List<AgentCommandType> {
   )
 }
 
-public fun defaultAgentCommandTypesForTv(): List<AgentCommandType> {
+public fun defaultAgentCommandTypesForTvForVisualMode(): List<AgentCommandType> {
   return listOf(
-    DpadUpArrowAgentCommand,
-    DpadDownArrowAgentCommand,
-    DpadLeftArrowAgentCommand,
-    DpadRightArrowAgentCommand,
+//    DpadUpArrowAgentCommand,
+//    DpadDownArrowAgentCommand,
+//    DpadLeftArrowAgentCommand,
+//    DpadRightArrowAgentCommand,
     DpadCenterAgentCommand,
-    DpadAutoFocusWithIdAgentCommand,
-    DpadAutoFocusWithTextAgentCommand,
+//    DpadAutoFocusWithIdAgentCommand,
+//    DpadAutoFocusWithTextAgentCommand,
+    DpadAutoFocusWithIndexAgentCommand,
     InputTextAgentCommand,
     BackPressAgentCommand,
     KeyPressAgentCommand,
@@ -541,9 +544,13 @@ private fun step(
   arbigentDebugLog("Arbigent step(): ${arbigentContextHolder.prompt()}")
   val screenshotFilePath =
     ArbigentTempDir.screenshotsDir.absolutePath + File.separator + "$screenshotFileID.png"
+  val canvas = ArbigentCanvas.load(File(screenshotFilePath), TYPE_INT_ARGB)
+  canvas.draw(device.elements())
+  canvas.save(screenshotFilePath)
   val decisionInput = ArbigentAi.DecisionInput(
     arbigentContextHolder = arbigentContextHolder,
     formFactor = deviceFormFactor,
+    elements = device.elements(),
     dumpHierarchy = device.viewTreeString(),
     focusedTreeString = if (deviceFormFactor.isTv()) {
       // It is important to get focused tree string for TV form factor

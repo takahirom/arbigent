@@ -9,6 +9,7 @@ public interface ArbigentAi {
     val focusedTreeString: String?,
     val agentCommandTypes: List<AgentCommandType>,
     val screenshotFilePath: String,
+    val elements: ArbigentElementList,
   )
   public data class DecisionOutput(
     val agentCommands: List<ArbigentAgentCommand>,
