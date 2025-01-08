@@ -296,6 +296,64 @@ public data class DpadCenterAgentCommand(val count: Int) : ArbigentAgentCommand 
   }
 }
 
+public data class DpadAutoFocusWithIdAgentCommand(val id: String) : ArbigentAgentCommand {
+  override val actionName: String = Companion.actionName
+
+  override fun stepLogText(): String {
+    return "Focus on id: $id"
+  }
+
+  override fun runOrchestraCommand(device: ArbigentDevice) {
+    val device = (device as? ArbigentTvCompatDevice)?: throw NotImplementedError(message = "This command is only available for TV device")
+    device.moveFocusToElement(ArbigentTvCompatDevice.Selector.ById.fromId(id))
+  }
+
+  public companion object : AgentCommandType {
+    override val actionName: String = "DpadAutoFocusWithId"
+
+    override fun templateForAI(): String {
+      return """
+        {
+            "action": "$actionName",
+            // the text should be id, should be in UI hierarchy
+            // You can use Regex
+            // If you want to click second button, you can use text[index] e.g.: "text[0]". Try different index if the first one doesn't work.
+            "text": "...[index]"
+        }
+        """.trimIndent()
+    }
+  }
+}
+
+public data class DpadAutoFocusWithTextAgentCommand(val text: String) : ArbigentAgentCommand {
+  override val actionName: String = Companion.actionName
+
+  override fun stepLogText(): String {
+    return "Focus on text: $text"
+  }
+
+  override fun runOrchestraCommand(device: ArbigentDevice) {
+    val device = (device as? ArbigentTvCompatDevice)?: throw NotImplementedError(message = "This command is only available for TV device")
+    device.moveFocusToElement(ArbigentTvCompatDevice.Selector.ByText.fromText(text))
+  }
+
+  public companion object : AgentCommandType {
+    override val actionName: String = "DpadAutoFocusWithText"
+
+    override fun templateForAI(): String {
+      return """
+        {
+            "action": "$actionName",
+            // the text should be clickable text, or content description. should be in UI hierarchy. should not resource id
+            // You can use Regex
+            // If you want to click second button, you can use text[index] e.g.: "text[0]". Try different index if the first one doesn't work.
+            "text": "...[index]"
+        }
+        """.trimIndent()
+    }
+  }
+}
+
 public data class InputTextAgentCommand(val text: String) : ArbigentAgentCommand {
   override val actionName: String = Companion.actionName
 
@@ -455,7 +513,7 @@ public class WaitAgentCommand(public val timeMs: Int) : ArbigentAgentCommand {
 }
 
 public class GoalAchievedAgentCommand : ArbigentAgentCommand {
-  override val actionName: String = "GoalAchieved"
+  override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
     return "Goal achieved"
@@ -479,7 +537,7 @@ public class GoalAchievedAgentCommand : ArbigentAgentCommand {
 }
 
 public class FailedAgentCommand : ArbigentAgentCommand {
-  override val actionName: String = "Failed"
+  override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
     return "Failed"
@@ -489,7 +547,7 @@ public class FailedAgentCommand : ArbigentAgentCommand {
   }
 
   public companion object : AgentCommandType {
-    override val actionName: String = "GoalAchieved"
+    override val actionName: String = "Failed"
 
     override fun templateForAI(): String {
       return """

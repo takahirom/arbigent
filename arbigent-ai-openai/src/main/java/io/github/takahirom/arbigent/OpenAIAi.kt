@@ -41,7 +41,7 @@ class OpenAIAi(
   private val baseUrl: String = "https://api.openai.com/v1/",
   private val modelName: String = "gpt-4o-mini",
   private val systemPrompt: String = ArbigentPrompts.systemPrompt,
-  private val systemPromptForTv: String = ArbigentPrompts.systemPrompt,
+  private val systemPromptForTv: String = ArbigentPrompts.systemPromptForTv,
   private val requestBuilderModifier: HttpRequestBuilder.() -> Unit = {
     header("Authorization", "Bearer $apiKey")
   },
@@ -181,6 +181,7 @@ $templates"""
       val commandPrototype = agentCommandMap[action] ?: throw Exception("Unknown action: $action")
       val agentCommand: ArbigentAgentCommand = when (commandPrototype) {
         GoalAchievedAgentCommand -> GoalAchievedAgentCommand()
+        FailedAgentCommand -> FailedAgentCommand()
         ClickWithTextAgentCommand -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
           ClickWithTextAgentCommand(text)
@@ -214,6 +215,16 @@ $templates"""
         DpadCenterAgentCommand -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
           DpadCenterAgentCommand(text.toIntOrNull() ?: 1)
+        }
+
+        DpadAutoFocusWithIdAgentCommand -> {
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
+          DpadAutoFocusWithIdAgentCommand(text)
+        }
+
+        DpadAutoFocusWithTextAgentCommand -> {
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
+          DpadAutoFocusWithTextAgentCommand(text)
         }
 
         InputTextAgentCommand -> {
