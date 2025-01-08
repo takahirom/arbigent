@@ -12,6 +12,7 @@ public class ArbigentContextHolder(
     public val action: String? = null,
     public val memo: String,
     public val whatYouSaw: String? = null,
+    public val uiTreeStrings: ArbigentUiTreeStrings? = null,
     public val aiRequest: String? = null,
     public val aiResponse: String? = null,
     public val screenshotFilePath: String
@@ -19,6 +20,7 @@ public class ArbigentContextHolder(
     public fun isFailed(): Boolean {
       return memo.contains("Failed")
     }
+
     public fun text(): String {
       return buildString {
         append("memo: $memo\n")

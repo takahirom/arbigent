@@ -173,27 +173,7 @@ fun Scenario(
       }
     }
 
-    var isOptionExpanded by remember { mutableStateOf(false) }
-    Row(
-      verticalAlignment = Alignment.CenterVertically,
-      modifier = Modifier.clickable { isOptionExpanded = !isOptionExpanded }
-    ) {
-      if (isOptionExpanded) {
-        Icon(
-          key = AllIconsKeys.General.ArrowDown,
-          contentDescription = "Collapse options",
-          hint = Size(28)
-        )
-      } else {
-        Icon(
-          key = AllIconsKeys.General.ArrowRight,
-          contentDescription = "Expand options",
-          hint = Size(28)
-        )
-      }
-      GroupHeader("Options")
-    }
-    AnimatedVisibility(visible = isOptionExpanded) {
+    ExpandableSection("Options") {
       ScenarioOptions(scenarioStateHolder, dependencyScenarioMenu)
     }
     Column(Modifier.weight(1f).padding(top = 8.dp)) {
@@ -569,6 +549,24 @@ private fun ContentPanel(tasksToAgent: List<ArbigentTaskAssignment>) {
           .padding(8.dp)
           .verticalScroll(scrollableState),
       ) {
+        step.uiTreeStrings?.let {
+          ExpandableSection("All UI Tree") {
+            Text(
+              modifier = Modifier
+                .padding(8.dp)
+                .background(JewelTheme.globalColors.panelBackground),
+              text = it.allTreeString
+            )
+          }
+          ExpandableSection("Optimized UI Tree") {
+            Text(
+              modifier = Modifier
+                .padding(8.dp)
+                .background(JewelTheme.globalColors.panelBackground),
+              text = it.optimizedTreeString
+            )
+          }
+        }
         step.aiRequest?.let { request: String ->
           GroupHeader(
             modifier = Modifier.fillMaxWidth(),
@@ -647,5 +645,37 @@ fun GroupHeader(
       thickness = style.metrics.dividerThickness,
       startIndent = style.metrics.indent,
     )
+  }
+}
+
+@Composable
+fun ExpandableSection(
+  title: String,
+  content: @Composable () -> Unit,
+) {
+  var expanded by remember { mutableStateOf(false) }
+  Column {
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      modifier = Modifier.clickable { expanded = !expanded }
+    ) {
+      if (expanded) {
+        Icon(
+          key = AllIconsKeys.General.ArrowDown,
+          contentDescription = "Collapse",
+          hint = Size(28)
+        )
+      } else {
+        Icon(
+          key = AllIconsKeys.General.ArrowRight,
+          contentDescription = "Expand",
+          hint = Size(28)
+        )
+      }
+      Text(title)
+    }
+    AnimatedVisibility(visible = expanded) {
+      content()
+    }
   }
 }

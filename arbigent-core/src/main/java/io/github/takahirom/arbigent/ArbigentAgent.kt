@@ -27,7 +27,6 @@ import maestro.orchestra.LaunchAppCommand
 import maestro.orchestra.MaestroCommand
 import maestro.orchestra.TakeScreenshotCommand
 import maestro.orchestra.WaitForAnimationToEndCommand
-import java.awt.image.BufferedImage.TYPE_INT_ARGB
 import java.io.File
 
 public class ArbigentAgent(
@@ -548,7 +547,7 @@ private fun step(
     arbigentContextHolder = arbigentContextHolder,
     formFactor = deviceFormFactor,
     elements = device.elements(),
-    dumpHierarchy = device.viewTreeString(),
+    uiTreeStrings = device.viewTreeString(),
     focusedTreeString = if (deviceFormFactor.isTv()) {
       // It is important to get focused tree string for TV form factor
       device.focusedTreeString()

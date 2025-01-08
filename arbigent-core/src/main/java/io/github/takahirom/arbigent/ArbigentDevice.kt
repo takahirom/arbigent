@@ -53,9 +53,14 @@ public interface ArbigentTvCompatDevice {
   public fun moveFocusToElement(element: ArbigentElement)
 }
 
+public data class ArbigentUiTreeStrings(
+  val allTreeString: String,
+  val optimizedTreeString: String,
+)
+
 public interface ArbigentDevice {
   public fun executeCommands(commands: List<MaestroCommand>)
-  public fun viewTreeString(): String
+  public fun viewTreeString(): ArbigentUiTreeStrings
   public fun focusedTreeString(): String
   public fun close()
   public fun elements(
@@ -199,9 +204,14 @@ public class MaestroDevice(
     return ArbigentElementList.from(viewHierarchy, deviceInfo)
   }
 
-  override fun viewTreeString(): String {
-    return maestro.viewHierarchy(false).toOptimizedString(
-      deviceInfo = maestro.cachedDeviceInfo
+
+  override fun viewTreeString(): ArbigentUiTreeStrings {
+    val viewHierarchy = maestro.viewHierarchy(false)
+    return ArbigentUiTreeStrings(
+      allTreeString = viewHierarchy.toString(),
+      optimizedTreeString = viewHierarchy.toOptimizedString(
+        deviceInfo = maestro.cachedDeviceInfo
+      )
     )
   }
 

@@ -4,7 +4,7 @@ public interface ArbigentAi {
   public data class DecisionInput(
     val arbigentContextHolder: ArbigentContextHolder,
     val formFactor: ArbigentScenarioDeviceFormFactor,
-    val dumpHierarchy: String,
+    val uiTreeStrings: ArbigentUiTreeStrings,
     // Only true if it is TV form factor
     val focusedTreeString: String?,
     val agentCommandTypes: List<AgentCommandType>,
