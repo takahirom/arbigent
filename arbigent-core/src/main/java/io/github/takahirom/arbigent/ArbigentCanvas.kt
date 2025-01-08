@@ -61,7 +61,7 @@ public class ArbigentCanvas(width: Int, height: Int, bufferedImageType: Int) {
         val textPadding = 5
         val boxWidth = rawBoxWidth + textPadding * 2
         val boxHeight = rawBoxHeight + textPadding * 2
-        val topTextRect = Element.Rect(
+        val topTextRect = ArbigentElement.Rect(
           element.rect.left,
           element.rect.top - boxHeight,
           element.rect.left + boxWidth,
@@ -96,7 +96,7 @@ public class ArbigentCanvas(width: Int, height: Int, bufferedImageType: Int) {
     }
   }
 
-  public fun drawRect(r: Element.Rect, color: Color) {
+  public fun drawRect(r: ArbigentElement.Rect, color: Color) {
     bufferedImage.graphics { graphics2D ->
       graphics2D.color = color
       graphics2D.fillRect(
@@ -127,7 +127,7 @@ public class ArbigentCanvas(width: Int, height: Int, bufferedImageType: Int) {
     }
   }
 
-  private fun drawRectOutline(r: Element.Rect, color: Color) {
+  private fun drawRectOutline(r: ArbigentElement.Rect, color: Color) {
     bufferedImage.graphics { graphics2D ->
       graphics2D.color = color
       val stroke = BasicStroke(minOf(r.width().toFloat(), r.height().toFloat()) / 20)

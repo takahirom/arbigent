@@ -1,12 +1,7 @@
 package io.github.takahirom.arbigent.sample.test
 
-import io.github.takahirom.arbigent.ArbigentAgentCommand
-import io.github.takahirom.arbigent.ArbigentAi
-import io.github.takahirom.arbigent.ArbigentContextHolder
-import io.github.takahirom.arbigent.ArbigentDevice
-import io.github.takahirom.arbigent.ClickWithTextAgentCommand
-import io.github.takahirom.arbigent.GoalAchievedAgentCommand
-import io.github.takahirom.arbigent.arbigentDebugLog
+import io.github.takahirom.arbigent.*
+import maestro.TreeNode
 import maestro.orchestra.MaestroCommand
 
 class FakeDevice : ArbigentDevice {
@@ -21,6 +16,49 @@ class FakeDevice : ArbigentDevice {
 
   override fun close() {
     arbigentDebugLog("FakeDevice.close")
+  }
+
+  override fun elements(meaningfulAttributes: Set<String>): ArbigentElementList {
+    return ArbigentElementList(
+      (0..10).map {
+        ArbigentElement(
+          index = it,
+          textForAI = "textForAI",
+          rawText = "rawText",
+          treeNode = TreeNode(
+            attributes = mutableMapOf(
+              "text" to "text",
+              "resource-id" to "resource-id",
+              "content-desc" to "content-desc",
+              "class" to "class",
+              "package" to "package",
+              "checkable" to "true",
+              "checked" to "true",
+              "clickable" to "clickable",
+              "enabled" to "enabled",
+              "focusable" to "true",
+              "focused" to "true",
+              "scrollable" to "scrollable",
+              "long-clickable" to "long-clickable",
+              "password" to "password",
+              "selected" to "selected",
+              "bounds" to "[0,0][100,100]"
+            ),
+            children = emptyList(),
+            clickable = true,
+            enabled = true,
+            focused = true,
+            checked = true,
+            selected = true
+          ),
+          x = 0,
+          y = 0,
+          width = 100,
+          height = 100,
+          isVisible = true
+        )
+      }
+    )
   }
 
   override fun viewTreeString(): String {

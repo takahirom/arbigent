@@ -50,7 +50,7 @@ public interface ArbigentTvCompatDevice {
   }
 
   public fun moveFocusToElement(selector: Selector)
-  public fun moveFocusToElement(element: Element)
+  public fun moveFocusToElement(element: ArbigentElement)
 }
 
 public interface ArbigentDevice {
@@ -68,7 +68,7 @@ public interface ArbigentDevice {
   ): ArbigentElementList
 }
 
-public data class Element(
+public data class ArbigentElement(
   val index: Int,
   val textForAI: String,
   val rawText: String,
@@ -96,7 +96,7 @@ public data class Element(
 }
 
 public data class ArbigentElementList(
-  val elements: List<Element>
+  val elements: List<ArbigentElement>
 ) {
 
   public fun getAiTexts(): String {
@@ -126,10 +126,10 @@ public data class ArbigentElementList(
         )
       )
       val optimizedTree = result.node ?: result.promotedChildren.firstOrNull()
-      val elements = mutableListOf<Element>()
-      fun TreeNode.toElement(): Element {
+      val elements = mutableListOf<ArbigentElement>()
+      fun TreeNode.toElement(): ArbigentElement {
         val bounds = toUiElementOrNull()?.bounds
-        return Element(
+        return ArbigentElement(
           index = index++,
           textForAI = buildString {
             val className = attributes["class"]?.substringAfterLast('.') ?: "Node"
@@ -150,8 +150,8 @@ public data class ArbigentElementList(
         )
       }
 
-      fun TreeNode.toElementList(): List<Element> {
-        val elements = mutableListOf<Element>()
+      fun TreeNode.toElementList(): List<ArbigentElement> {
+        val elements = mutableListOf<ArbigentElement>()
         if (clickable == true || focused == true
           || attributes["clickable"] == "true"
           || attributes["focused"] == "true"
@@ -291,7 +291,7 @@ public class MaestroDevice(
     )
   }
 
-  override fun moveFocusToElement(element: Element) {
+  override fun moveFocusToElement(element: ArbigentElement) {
     moveFocusToElement(
       fetchTarget = {
         val newElement = maestro.viewHierarchy().refreshElement(element.treeNode)

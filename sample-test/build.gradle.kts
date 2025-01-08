@@ -17,6 +17,8 @@ dependencies {
     implementation(project(":arbigent-core"))
     implementation(project(":arbigent-ai-openai"))
     testImplementation(kotlin("test"))
+    // maestro client
+    api("dev.mobile:maestro-client:1.39.1")
     // coroutine test
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.5.2")
 }
