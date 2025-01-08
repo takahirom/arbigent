@@ -25,4 +25,6 @@ dependencies {
   implementation(libs.kotlinx.io.core)
   implementation(libs.kotlinx.serialization.json)
   implementation(libs.identity.jvm)
+
+  testImplementation(libs.junit)
 }

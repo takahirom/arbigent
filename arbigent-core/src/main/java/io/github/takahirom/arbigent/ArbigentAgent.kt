@@ -473,6 +473,8 @@ public fun defaultAgentCommandTypesForTv(): List<AgentCommandType> {
     DpadLeftArrowAgentCommand,
     DpadRightArrowAgentCommand,
     DpadCenterAgentCommand,
+    DpadAutoFocusWithIdAgentCommand,
+    DpadAutoFocusWithTextAgentCommand,
     InputTextAgentCommand,
     BackPressAgentCommand,
     KeyPressAgentCommand,

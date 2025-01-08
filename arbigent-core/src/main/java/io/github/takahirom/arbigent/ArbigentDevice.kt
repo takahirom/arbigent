@@ -1,14 +1,55 @@
 package io.github.takahirom.arbigent
 
+import maestro.Bounds
 import maestro.DeviceInfo
+import maestro.Filters
+import maestro.FindElementResult
+import maestro.KeyCode
 import maestro.Maestro
+import maestro.MaestroException
 import maestro.TreeNode
+import maestro.UiElement
+import maestro.UiElement.Companion.toUiElement
 import maestro.UiElement.Companion.toUiElementOrNull
 import maestro.ViewHierarchy
 import maestro.filterOutOfBounds
 import maestro.orchestra.MaestroCommand
 import maestro.orchestra.Orchestra
 import java.io.File
+
+@ArbigentInternalApi
+public fun getIndexSelector(text: String): Pair<Int, String> {
+  val matchResult = "(.*)\\[(\\d)\\]".toRegex().find(text)
+  if (matchResult != null) {
+    val (selector, index) = matchResult.destructured
+    return index.toInt() to selector
+  }
+  return 0 to text
+}
+
+public interface ArbigentTvCompatDevice {
+  public sealed interface Selector {
+    public data class ByText(val text: String, val index: Int) : Selector {
+      public companion object {
+        public fun fromText(text: String): Selector {
+          val (index, selector) = getIndexSelector(text)
+          return ByText(selector, index)
+        }
+      }
+    }
+
+    public data class ById(val id: String, val index: Int) : Selector {
+      public companion object {
+        public fun fromId(id: String): Selector {
+          val (index, selector) = getIndexSelector(id)
+          return ById(selector, index)
+        }
+      }
+    }
+  }
+
+  public fun moveFocusToElement(selector: Selector)
+}
 
 public interface ArbigentDevice {
   public fun executeCommands(commands: List<MaestroCommand>)
@@ -20,7 +61,7 @@ public interface ArbigentDevice {
 public class MaestroDevice(
   private val maestro: Maestro,
   screenshotsDir: File = ArbigentTempDir.screenshotsDir
-) : ArbigentDevice {
+) : ArbigentDevice, ArbigentTvCompatDevice {
   private val orchestra = Orchestra(
     maestro = maestro,
     screenshotsDir = screenshotsDir
@@ -225,6 +266,158 @@ public class MaestroDevice(
     val optimizedToString = optimizedTree?.optimizedToString(depth = 0)
     arbigentDebugLog("After optimization (length): ${optimizedToString?.length}")
     return optimizedToString ?: ""
+  }
+
+
+  override fun moveFocusToElement(selector: ArbigentTvCompatDevice.Selector) {
+    val target: UiElement = when (selector) {
+      is ArbigentTvCompatDevice.Selector.ById -> {
+        try {
+          val element: FindElementResult = maestro.findElementWithTimeout(
+            timeoutMs = 100,
+            filter = Filters.compose(
+              Filters.idMatches(selector.id.toRegex()),
+              Filters.index(selector.index)
+            ),
+          ) ?: throw MaestroException.ElementNotFound("Element not found", maestro.viewHierarchy().root)
+          val uiElement: UiElement = element.element
+          uiElement
+        } catch (e: MaestroException.ElementNotFound) {
+          val element: FindElementResult = maestro.findElementWithTimeout(
+            timeoutMs = 100,
+            filter = Filters.compose(
+              Filters.idMatches((".*" + selector.id + ".*").toRegex()),
+              Filters.index(selector.index)
+            )
+          ) ?: throw MaestroException.ElementNotFound("Element not found", maestro.viewHierarchy().root)
+          val uiElement: UiElement = element.element
+          uiElement
+        }
+      }
+
+      is ArbigentTvCompatDevice.Selector.ByText -> {
+        try {
+          val element: FindElementResult = maestro.findElementWithTimeout(
+            timeoutMs = 100,
+            filter = Filters.compose(
+              Filters.textMatches(selector.text.toRegex()),
+              Filters.index(selector.index)
+            ),
+          ) ?: throw MaestroException.ElementNotFound("Element not found", maestro.viewHierarchy().root)
+          val uiElement: UiElement = element.element
+          uiElement
+        } catch (e: MaestroException.ElementNotFound) {
+          val element: FindElementResult = maestro.findElementWithTimeout(
+            timeoutMs = 100,
+            filter = Filters.compose(
+              Filters.textMatches((".*" + selector.text + ".*").toRegex()),
+              Filters.index(selector.index)
+            )
+          ) ?: throw MaestroException.ElementNotFound("Element not found", maestro.viewHierarchy().root)
+          val uiElement: UiElement = element.element
+          uiElement
+        }
+      }
+    }
+    var remainCount = 10
+    while (remainCount-- > 0) {
+      val currentFocus = findCurrentFocus()
+      val currentBounds = currentFocus.toUiElement().bounds
+      val targetBounds = target.bounds
+
+      // Helper functions to calculate the center X and Y of a Bounds object.
+      fun Bounds.centerY(): Int {
+        return center().y
+      }
+      fun Bounds.centerX(): Int {
+        return center().x
+      }
+
+      fun Bounds.right(): Int {
+        return x + width
+      }
+
+      fun Bounds.bottom(): Int {
+        return y + height
+      }
+
+      // Function to check if two ranges overlap
+      fun isOverlapping(start1: Int, end1: Int, start2: Int, end2: Int): Boolean {
+        return maxOf(start1, start2) <= minOf(end1, end2)
+      }
+
+      arbigentDebugLog("currentBounds: $currentBounds")
+      arbigentDebugLog("targetBounds: $targetBounds")
+
+      val directionCandidates = mutableListOf<KeyCode>()
+
+      // Check if X ranges overlap, prioritize vertical movement
+      if (isOverlapping(currentBounds.x, currentBounds.right(), targetBounds.x, targetBounds.right())) {
+        arbigentDebugLog("X Overlap detected")
+        if (currentBounds.centerY() > targetBounds.centerY()) {
+          directionCandidates.add(KeyCode.REMOTE_UP)
+        } else if (currentBounds.centerY() < targetBounds.centerY()) {
+          directionCandidates.add(KeyCode.REMOTE_DOWN)
+        }
+      }
+
+      // Check if Y ranges overlap, prioritize horizontal movement
+      if (isOverlapping(currentBounds.y, currentBounds.bottom(), targetBounds.y, targetBounds.bottom())) {
+        arbigentDebugLog("Y Overlap detected")
+        if (currentBounds.centerX() > targetBounds.centerX()) {
+          directionCandidates.add(KeyCode.REMOTE_LEFT)
+        } else if (currentBounds.centerX() < targetBounds.centerX()) {
+          directionCandidates.add(KeyCode.REMOTE_RIGHT)
+        }
+      }
+
+      // If no overlap in X or Y, use existing logic to determine the direction
+      if (directionCandidates.isEmpty()) {
+        when {
+          currentBounds.centerY() > targetBounds.centerY() && currentBounds.centerX() > targetBounds.centerX() -> {
+            directionCandidates.add(KeyCode.REMOTE_UP)
+            directionCandidates.add(KeyCode.REMOTE_LEFT)
+          }
+
+          currentBounds.centerY() > targetBounds.centerY() && currentBounds.centerX() < targetBounds.centerX() -> {
+            directionCandidates.add(KeyCode.REMOTE_UP)
+            directionCandidates.add(KeyCode.REMOTE_RIGHT)
+          }
+
+          currentBounds.centerY() < targetBounds.centerY() && currentBounds.centerX() > targetBounds.centerX() -> {
+            directionCandidates.add(KeyCode.REMOTE_DOWN)
+            directionCandidates.add(KeyCode.REMOTE_LEFT)
+          }
+
+          currentBounds.centerY() < targetBounds.centerY() && currentBounds.centerX() < targetBounds.centerX() -> {
+            directionCandidates.add(KeyCode.REMOTE_DOWN)
+            directionCandidates.add(KeyCode.REMOTE_RIGHT)
+          }
+
+          currentBounds.centerY() > targetBounds.centerY() -> directionCandidates.add(KeyCode.REMOTE_UP)
+          currentBounds.centerY() < targetBounds.centerY() -> directionCandidates.add(KeyCode.REMOTE_DOWN)
+          currentBounds.centerX() > targetBounds.centerX() -> directionCandidates.add(KeyCode.REMOTE_LEFT)
+          currentBounds.centerX() < targetBounds.centerX() -> directionCandidates.add(KeyCode.REMOTE_RIGHT)
+          else -> {} // No possible direction
+        }
+      }
+
+      if (directionCandidates.isEmpty()) {
+        arbigentDebugLog("No direction candidates found. Breaking loop.")
+        break
+      }
+
+      val direction = directionCandidates.random()
+      arbigentDebugLog("directionCandidates: $directionCandidates \ndirection: $direction")
+      maestro.pressKey(direction)
+      maestro.waitForAnimationToEnd(100)
+    }
+  }
+
+  private fun findCurrentFocus(): TreeNode {
+    return maestro.viewHierarchy(false)
+      .getFocusedNode()
+      ?: throw IllegalStateException("No focused node")
   }
 
   override fun close() {
