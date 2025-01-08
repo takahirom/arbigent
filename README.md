@@ -8,12 +8,12 @@
 
 ## Screenshot
 
-<img width="650" alt="image" src="https://github.com/user-attachments/assets/c12fd2df-1a4f-484d-9273-794ead2f0b76" />
+<img width="650" alt="image" src="https://github.com/user-attachments/assets/ada9012b-2d95-451d-92c5-3db3436fd2a9" />
 
 
 ## Demo movie
 
-https://github.com/user-attachments/assets/ada9012b-2d95-451d-92c5-3db3436fd2a9
+https://github.com/user-attachments/assets/46fa3034-5671-4ff1-99df-abbdaebaf197
 
 ## Motivation
 
