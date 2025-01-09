@@ -347,15 +347,7 @@ public fun AgentConfigBuilder(
               )
             )
           )
-          device.executeCommands(
-            listOf(
-              MaestroCommand(
-                waitForAnimationToEndCommand = WaitForAnimationToEndCommand(
-                  timeout = 300
-                )
-              )
-            )
-          )
+          device.waitForAppToSettle(method.packageName)
           chain.proceed(device)
         }
       })
