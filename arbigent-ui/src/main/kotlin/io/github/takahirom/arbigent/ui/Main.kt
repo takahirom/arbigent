@@ -53,6 +53,12 @@ fun main() {
                 header("api-key", aiProviderSetting.apiKey)
               }
             )
+          } else if (aiProviderSetting is AiProviderSetting.CustomOpenAiApiBasedAi) {
+            OpenAIAi(
+              apiKey = aiProviderSetting.apiKey,
+              modelName = aiProviderSetting.modelName,
+              baseUrl = aiProviderSetting.baseUrl
+            )
           } else {
             throw IllegalArgumentException("Unsupported aiProviderSetting: $aiProviderSetting")
           }

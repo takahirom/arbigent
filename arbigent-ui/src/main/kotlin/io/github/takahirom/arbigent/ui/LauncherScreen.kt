@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
@@ -142,12 +144,13 @@ class AiSettingStateHolder {
   }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AiProviderSetting(modifier: Modifier) {
   val aiSettingStateHolder = remember { AiSettingStateHolder() }
   GroupHeader("AI Provider")
   val aiSetting = aiSettingStateHolder.aiSetting
-  Column(modifier = modifier) {
+  FlowRow(modifier = modifier) {
     aiSetting.aiSettings.forEach { aiProviderSetting: AiProviderSetting ->
       RadioButtonRow(
         text = aiProviderSetting.name,
@@ -157,7 +160,8 @@ private fun AiProviderSetting(modifier: Modifier) {
         }
       )
     }
-    val selectedAiProviderSetting = aiSetting.aiSettings.first { it.id == aiSetting.selectedId }
+    val selectedAiProviderSetting: AiProviderSetting = aiSetting.aiSettings.firstOrNull() { it.id == aiSetting.selectedId }
+      ?: aiSetting.aiSettings.first()
     if (selectedAiProviderSetting is AiProviderSetting.NormalAiProviderSetting) {
       NormalAiSetting(
         modifier = Modifier.padding(8.dp),
@@ -165,10 +169,17 @@ private fun AiProviderSetting(modifier: Modifier) {
         onAiProviderSettingChanged = {
           aiSettingStateHolder.onAiProviderSettingChanged(it)
         })
-    } else {
+    } else if (selectedAiProviderSetting is AiProviderSetting.AzureOpenAi) {
       AzureOpenAiSetting(
         modifier = Modifier.padding(8.dp),
         aiProviderSetting = selectedAiProviderSetting as AiProviderSetting.AzureOpenAi,
+        onAiProviderSettingChanged = {
+          aiSettingStateHolder.onAiProviderSettingChanged(it)
+        })
+    } else if (selectedAiProviderSetting is AiProviderSetting.CustomOpenAiApiBasedAi) {
+      CustomOpenAiApiBasedAiSetting(
+        modifier = Modifier.padding(8.dp),
+        aiProviderSetting = selectedAiProviderSetting,
         onAiProviderSettingChanged = {
           aiSettingStateHolder.onAiProviderSettingChanged(it)
         })
@@ -205,6 +216,72 @@ private fun NormalAiSetting(
   }
   val providerName = aiProviderSetting.name
   Column(modifier = modifier) {
+    if(aiProviderSetting.isApiKeyRequired) {
+      Text("$providerName API Key(Saved in Keychain on Mac)")
+      BasicSecureTextField(
+        modifier = Modifier.padding(8.dp),
+        decorator = {
+          Box(
+            Modifier.background(color = TextFieldStyle.light().colors.background)
+              .padding(8.dp)
+              .clip(RoundedCornerShape(4.dp))
+          ) {
+            if (openAiApiKey.text.isEmpty()) {
+              Text("Enter $providerName API Key")
+            }
+            it()
+          }
+        },
+        state = openAiApiKey,
+      )
+    }
+    Text("$providerName Model Name")
+    TextField(
+      state = modelName,
+      modifier = Modifier.padding(8.dp)
+    )
+  }
+}
+
+@Composable
+private fun CustomOpenAiApiBasedAiSetting(
+  aiProviderSetting: AiProviderSetting.CustomOpenAiApiBasedAi,
+  onAiProviderSettingChanged: (AiProviderSetting.CustomOpenAiApiBasedAi) -> Unit,
+  modifier: Modifier = Modifier,
+) {
+  val apiKey =
+    rememberSaveable(saver = TextFieldState.Saver, inputs = arrayOf(aiProviderSetting.id)) {
+      TextFieldState(aiProviderSetting.apiKey, TextRange(aiProviderSetting.apiKey.length))
+    }
+  val updatedOnAiProviderSettingChanged by rememberUpdatedState(onAiProviderSettingChanged)
+  LaunchedEffect(Unit) {
+    snapshotFlow { apiKey.text }
+      .collect({
+        updatedOnAiProviderSettingChanged(aiProviderSetting.updatedApiKey(apiKey = it.toString()))
+      })
+  }
+  val modelName =
+    rememberSaveable(saver = TextFieldState.Saver, inputs = arrayOf(aiProviderSetting.id)) {
+      TextFieldState(aiProviderSetting.modelName, TextRange(aiProviderSetting.modelName.length))
+    }
+  LaunchedEffect(Unit) {
+    snapshotFlow { modelName.text }
+      .collect {
+        updatedOnAiProviderSettingChanged(aiProviderSetting.updatedModelName(modelName = it.toString()))
+      }
+  }
+  val endpoint =
+    rememberSaveable(saver = TextFieldState.Saver, inputs = arrayOf(aiProviderSetting.id)) {
+      TextFieldState(aiProviderSetting.baseUrl, TextRange(aiProviderSetting.baseUrl.length))
+    }
+  LaunchedEffect(Unit) {
+    snapshotFlow { endpoint.text }
+      .collect {
+        updatedOnAiProviderSettingChanged(aiProviderSetting.updatedBaseUrl(baseUrl = it.toString()))
+      }
+  }
+  val providerName = aiProviderSetting.name
+  Column(modifier = modifier) {
     Text("$providerName API Key(Saved in Keychain on Mac)")
     BasicSecureTextField(
       modifier = Modifier.padding(8.dp),
@@ -214,17 +291,22 @@ private fun NormalAiSetting(
             .padding(8.dp)
             .clip(RoundedCornerShape(4.dp))
         ) {
-          if (openAiApiKey.text.isEmpty()) {
+          if (apiKey.text.isEmpty()) {
             Text("Enter $providerName API Key")
           }
           it()
         }
       },
-      state = openAiApiKey,
+      state = apiKey,
     )
     Text("$providerName Model Name")
     TextField(
       state = modelName,
+      modifier = Modifier.padding(8.dp)
+    )
+    Text("$providerName Endpoint")
+    TextField(
+      state = endpoint,
       modifier = Modifier.padding(8.dp)
     )
   }

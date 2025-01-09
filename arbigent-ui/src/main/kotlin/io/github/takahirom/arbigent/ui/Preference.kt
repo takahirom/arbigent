@@ -5,8 +5,6 @@ import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
 import com.github.javakeyring.Keyring
 import com.github.javakeyring.PasswordAccessException
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 import kotlin.reflect.KProperty
 
 
@@ -51,6 +49,12 @@ private fun defaultAiProviderSettings() = listOf(
     id = "defaultOpenAi",
     apiKey = "",
     modelName = "gpt-4o-mini"
+  ),
+  AiProviderSetting.CustomOpenAiApiBasedAi(
+    id = "defaultCustomOpenAiApiBasedAi",
+    apiKey = "",
+    modelName = "(e.g. llama3.2-vision)",
+    baseUrl = "https://"
   ),
   AiProviderSetting.Gemini(
     id = "defaultGemini",
