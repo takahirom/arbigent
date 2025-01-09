@@ -106,7 +106,7 @@ class ArbigentAppStateHolder(
       sortedScenariosAndDepths().indexOfFirst { it.first.id == scenarioStateHolder.id }
   }
 
-  var job: Job? = null
+  private var job: Job? = null
 
   fun runAll() {
     job?.cancel()

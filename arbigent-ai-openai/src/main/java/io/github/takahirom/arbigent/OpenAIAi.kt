@@ -147,8 +147,18 @@ class OpenAIAi(
       return decideAgentCommands(decisionInput)
     }
     try {
-      val step = parseResponse(responseText, messages, decisionInput)
-      return ArbigentAi.DecisionOutput(listOf(step.agentCommand!!), step)
+      val step = try {
+        parseResponse(responseText, messages, decisionInput)
+      }catch (e: ArbigentAi.FailedToParseResponseException) {
+        ArbigentContextHolder.Step(
+          memo = "Failed to parse AI response: ${e.message}",
+          screenshotFilePath = screenshotFilePath,
+          aiRequest = messages.toString(),
+          aiResponse = responseText,
+          uiTreeStrings = uiTreeStrings,
+        )
+      }
+      return ArbigentAi.DecisionOutput(listOfNotNull(step.agentCommand), step)
     } catch (e: MissingFieldException) {
       arbigentInfoLog("Missing required field in OpenAI response: $e $responseText")
       throw e
@@ -192,70 +202,78 @@ $templates"""
       val jsonElement = json.parseToJsonElement(content)
       val jsonObject = jsonElement.jsonObject
       val action =
-        jsonObject["action"]?.jsonPrimitive?.content ?: throw Exception("Action not found")
+        jsonObject["action"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Action not found")
       val agentCommandMap = agentCommandList.associateBy { it.actionName }
-      val commandPrototype = agentCommandMap[action] ?: throw Exception("Unknown action: $action")
+      val commandPrototype = agentCommandMap[action] ?: throw IllegalArgumentException("Unknown action: $action")
       val agentCommand: ArbigentAgentCommand = when (commandPrototype) {
         GoalAchievedAgentCommand -> GoalAchievedAgentCommand()
         FailedAgentCommand -> FailedAgentCommand()
         ClickWithTextAgentCommand -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           ClickWithTextAgentCommand(text)
         }
 
         ClickWithIdAgentCommand -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           ClickWithIdAgentCommand(text)
         }
 
         DpadUpArrowAgentCommand -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           DpadUpArrowAgentCommand(text.toIntOrNull() ?: 1)
         }
 
         DpadDownArrowAgentCommand -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           DpadDownArrowAgentCommand(text.toIntOrNull() ?: 1)
         }
 
         DpadLeftArrowAgentCommand -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           DpadLeftArrowAgentCommand(text.toIntOrNull() ?: 1)
         }
 
         DpadRightArrowAgentCommand -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           DpadRightArrowAgentCommand(text.toIntOrNull() ?: 1)
         }
 
         DpadCenterAgentCommand -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           DpadCenterAgentCommand(text.toIntOrNull() ?: 1)
         }
 
         DpadAutoFocusWithIdAgentCommand -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           DpadAutoFocusWithIdAgentCommand(text)
         }
 
         DpadAutoFocusWithTextAgentCommand -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           DpadAutoFocusWithTextAgentCommand(text)
         }
 
         DpadAutoFocusWithIndexAgentCommand -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
-          DpadAutoFocusWithIndexAgentCommand(text.toIntOrNull() ?: throw IllegalArgumentException("Index not found"), elements)
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
+          val index = text.toIntOrNull() ?: throw IllegalArgumentException("Index not found")
+          if(elements.elements.size <= index) {
+            throw IllegalArgumentException("Index out of bounds: $index")
+          }
+          DpadAutoFocusWithIndexAgentCommand(index, elements)
         }
 
         InputTextAgentCommand -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           InputTextAgentCommand(text)
         }
         ClickWithIndex -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
+          val index = text.toIntOrNull() ?: throw IllegalArgumentException("Index not found")
+          if(elements.elements.size <= index) {
+            throw IllegalArgumentException("Index out of bounds: $index")
+          }
           ClickWithIndex(
-            index = text.toIntOrNull() ?: 0,
+            index = index,
             elements = elements
           )
         }
@@ -263,18 +281,18 @@ $templates"""
         BackPressAgentCommand -> BackPressAgentCommand()
 
         KeyPressAgentCommand -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           KeyPressAgentCommand(text)
         }
 
         WaitAgentCommand -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw Exception("Text not found")
+          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           WaitAgentCommand(text.toIntOrNull() ?: 1000)
         }
 
         ScrollAgentCommand -> ScrollAgentCommand()
 
-        else -> throw Exception("Unsupported action: $action")
+        else -> throw IllegalArgumentException("Unsupported action: $action")
       }
       ArbigentContextHolder.Step(
         agentCommand = agentCommand,
@@ -287,7 +305,10 @@ $templates"""
         uiTreeStrings = decisionInput.uiTreeStrings
       )
     } catch (e: Exception) {
-      throw Exception("Failed to parse OpenAI response: $e")
+      throw ArbigentAi.FailedToParseResponseException(
+        "Failed to parse AI response: ${e.message}",
+        e
+      )
     }
   }
 

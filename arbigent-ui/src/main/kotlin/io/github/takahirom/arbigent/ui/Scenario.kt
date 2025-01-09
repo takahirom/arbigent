@@ -173,7 +173,7 @@ fun Scenario(
       }
     }
 
-    ExpandableSection("Options") {
+    ExpandableSection(title = "Options", modifier = Modifier.fillMaxWidth()) {
       ScenarioOptions(scenarioStateHolder, dependencyScenarioMenu)
     }
     Column(Modifier.weight(1f).padding(top = 8.dp)) {
@@ -550,7 +550,7 @@ private fun ContentPanel(tasksToAgent: List<ArbigentTaskAssignment>) {
           .verticalScroll(scrollableState),
       ) {
         step.uiTreeStrings?.let {
-          ExpandableSection("All UI Tree") {
+          ExpandableSection("All UI Tree", modifier = Modifier.fillMaxWidth()) {
             Text(
               modifier = Modifier
                 .padding(8.dp)
@@ -558,7 +558,7 @@ private fun ContentPanel(tasksToAgent: List<ArbigentTaskAssignment>) {
               text = it.allTreeString
             )
           }
-          ExpandableSection("Optimized UI Tree") {
+          ExpandableSection("Optimized UI Tree", modifier = Modifier.fillMaxWidth()) {
             Text(
               modifier = Modifier
                 .padding(8.dp)
@@ -568,28 +568,32 @@ private fun ContentPanel(tasksToAgent: List<ArbigentTaskAssignment>) {
           }
         }
         step.aiRequest?.let { request: String ->
-          GroupHeader(
-            modifier = Modifier.fillMaxWidth(),
-            text = "AI Request"
-          )
-          Text(
-            modifier = Modifier
-              .padding(8.dp)
-              .background(JewelTheme.globalColors.panelBackground),
-            text = request
-          )
+          ExpandableSection(
+            title = "AI Request",
+            defaultExpanded = true,
+            modifier = Modifier.fillMaxWidth()
+          ) {
+            Text(
+              modifier = Modifier
+                .padding(8.dp)
+                .background(JewelTheme.globalColors.panelBackground),
+              text = request
+            )
+          }
         }
         step.aiResponse?.let { response: String ->
-          GroupHeader(
-            modifier = Modifier.fillMaxWidth(),
-            text = "AI Response"
-          )
-          Text(
-            modifier = Modifier
-              .padding(8.dp)
-              .background(JewelTheme.globalColors.panelBackground),
-            text = response
-          )
+          ExpandableSection(
+            title = "AI Response",
+            defaultExpanded = true,
+            modifier = Modifier.fillMaxWidth()
+          ) {
+            Text(
+              modifier = Modifier
+                .padding(8.dp)
+                .background(JewelTheme.globalColors.panelBackground),
+              text = response
+            )
+          }
         }
       }
       Column(
@@ -651,14 +655,17 @@ fun GroupHeader(
 @Composable
 fun ExpandableSection(
   title: String,
+  defaultExpanded: Boolean = false,
+  modifier: Modifier = Modifier,
   content: @Composable () -> Unit,
 ) {
-  var expanded by remember { mutableStateOf(false) }
-  Column {
+  var expanded by remember { mutableStateOf(defaultExpanded) }
+  Column(modifier) {
     Row(
       verticalAlignment = Alignment.CenterVertically,
       modifier = Modifier
         .clickable { expanded = !expanded }
+        .fillMaxWidth()
     ) {
       if (expanded) {
         Icon(

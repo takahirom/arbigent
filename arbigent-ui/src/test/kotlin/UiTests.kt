@@ -211,8 +211,8 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
 
 @ExperimentalTestApi
 class TestRobot(
-  val testScope: TestScope,
-  val composeUiTest: ComposeUiTest,
+  private val testScope: TestScope,
+  private val composeUiTest: ComposeUiTest,
 ) {
   private val fakeAi = FakeAi()
   private val fakeDevice = FakeDevice()
@@ -412,8 +412,8 @@ internal class TestKeyStoreFactory : () -> KeyStore {
 class FakeAi : ArbigentAi {
   sealed interface AiStatus : ArbigentAi {
     class Normal() : AiStatus {
-      var count = 0
-      fun createDecisionOutput(
+      private var count = 0
+      private fun createDecisionOutput(
         agentCommand: ArbigentAgentCommand = ClickWithTextAgentCommand("text")
       ): ArbigentAi.DecisionOutput {
         return ArbigentAi.DecisionOutput(
