@@ -11,7 +11,7 @@ public class ArbigentContextHolder(
     public val agentCommand: ArbigentAgentCommand? = null,
     public val action: String? = null,
     public val memo: String,
-    public val whatYouSaw: String? = null,
+    public val imageDescription: String? = null,
     public val uiTreeStrings: ArbigentUiTreeStrings? = null,
     public val aiRequest: String? = null,
     public val aiResponse: String? = null,
@@ -23,8 +23,8 @@ public class ArbigentContextHolder(
 
     public fun text(): String {
       return buildString {
+        imageDescription?.let { append("image description: $it\n") }
         append("memo: $memo\n")
-        whatYouSaw?.let { append("whatYouSaw: $it\n") }
         agentCommand?.let { append("action done: ${it.stepLogText()}\n") }
       }
     }

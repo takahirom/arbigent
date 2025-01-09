@@ -9,6 +9,10 @@ class FakeDevice : ArbigentDevice {
     arbigentDebugLog("FakeDevice.executeCommands: $commands")
   }
 
+  override fun waitForAppToSettle(appId: String?) {
+    arbigentDebugLog("FakeDevice.waitForAppToSettle")
+  }
+
   override fun focusedTreeString(): String {
     arbigentDebugLog("FakeDevice.focusedTreeString")
     return "focusedTreeString"

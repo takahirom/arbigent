@@ -31,10 +31,12 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.modules.SerializersModule
+import java.awt.image.BufferedImage
 import java.awt.image.BufferedImage.TYPE_INT_ARGB
 import java.io.File
 import java.nio.charset.Charset
 import java.util.Base64
+import javax.imageio.ImageIO
 
 class OpenAIAi(
   private val apiKey: String,
@@ -297,8 +299,8 @@ $templates"""
       ArbigentContextHolder.Step(
         agentCommand = agentCommand,
         action = action,
+        imageDescription = jsonObject["image-description"]?.jsonPrimitive?.content ?: "",
         memo = jsonObject["memo"]?.jsonPrimitive?.content ?: "",
-        whatYouSaw = jsonObject["summary-of-what-you-saw"]?.jsonPrimitive?.content ?: "",
         aiRequest = message.map { it.copy(content = it.content.map { it.copy(imageUrl = null) }) }.toString(),
         aiResponse = content,
         screenshotFilePath = screenshotFilePath,
@@ -359,10 +361,10 @@ $templates"""
       "strict": true,
       "schema": {
         "type": "object",
-        "required": ["summary-of-what-you-saw", "memo",  "action", "text"],
+        "required": ["image-description","memo",  "action", "text"],
         "additionalProperties": false,
         "properties": {
-          "summary-of-what-you-saw": {
+          "image-description": {
             "type": "string"
           },
           "memo": {

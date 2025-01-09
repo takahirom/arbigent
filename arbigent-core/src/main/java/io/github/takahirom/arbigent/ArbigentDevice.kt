@@ -71,6 +71,7 @@ public interface ArbigentDevice {
   public fun focusedTreeString(): String
   public fun close()
   public fun elements(): ArbigentElementList
+  public fun waitForAppToSettle(appId: String? = null)
 }
 
 public data class ArbigentElement(
@@ -116,7 +117,6 @@ public data class ArbigentElementList(
       var index = 0
       val deviceInfo = deviceInfo
       val root = viewHierarchy.root
-      arbigentDebugLog("root:$root")
       val result = root.filterOutOfBounds(
         width = deviceInfo.widthPixels,
         height = deviceInfo.heightPixels
@@ -189,6 +189,10 @@ public class MaestroDevice(
       true
     }
     orchestra.executeCommands(commands, shouldReinitJsEngine = shouldJsReinit)
+  }
+
+  public override fun waitForAppToSettle(appId: String?) {
+    maestro.waitForAppToSettle(appId = appId)
   }
 
   override fun elements(): ArbigentElementList {
