@@ -303,11 +303,11 @@ class TestRobot(
   }
 
   fun expandOptions() {
-    composeUiTest.onNode(hasContentDescription("Expand options")).performClick()
+    composeUiTest.onNode(hasContentDescription("Expand Options")).performClick()
   }
 
   fun collapseOptions() {
-    composeUiTest.onNode(hasContentDescription("Collapse options")).performClick()
+    composeUiTest.onNode(hasContentDescription("Collapse Options")).performClick()
   }
 
   fun clickDependencyDropDown() {

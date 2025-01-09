@@ -657,18 +657,19 @@ fun ExpandableSection(
   Column {
     Row(
       verticalAlignment = Alignment.CenterVertically,
-      modifier = Modifier.clickable { expanded = !expanded }
+      modifier = Modifier
+        .clickable { expanded = !expanded }
     ) {
       if (expanded) {
         Icon(
           key = AllIconsKeys.General.ArrowDown,
-          contentDescription = "Collapse",
+          contentDescription = "Collapse " + title,
           hint = Size(28)
         )
       } else {
         Icon(
           key = AllIconsKeys.General.ArrowRight,
-          contentDescription = "Expand",
+          contentDescription = "Expand " + title,
           hint = Size(28)
         )
       }
