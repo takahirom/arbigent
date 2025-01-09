@@ -5,6 +5,7 @@ import com.github.takahirom.roborazzi.AnySerializer
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.OpenAiAiAssertionModel
 import io.ktor.client.HttpClient
+import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.HttpTimeout.Plugin.INFINITE_TIMEOUT_MS
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -55,6 +56,10 @@ class OpenAIAi(
     seed = null
   ),
   private val httpClient: HttpClient = HttpClient {
+    install(HttpRequestRetry) {
+      maxRetries = 3
+      exponentialDelay()
+    }
     install(ContentNegotiation) {
       json(
         json = Json {
@@ -441,5 +446,5 @@ fun File.getResizedIamgeBase64(scale: Float): String {
 }
 
 public fun File.getAnnotatedFilePath() =
-  nameWithoutExtension + "_annotated" + extension
+  absolutePath.substringBeforeLast(".") + "_annotated" + extension
 
