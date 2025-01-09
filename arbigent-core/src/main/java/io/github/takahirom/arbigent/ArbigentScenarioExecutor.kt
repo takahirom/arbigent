@@ -68,11 +68,19 @@ public sealed interface ArbigentScenarioExecutorState {
     Failed -> "Failed"
   }
 }
+
 public class ArbigentScenarioExecutor {
   private val _taskAssignmentsStateFlow =
     MutableStateFlow<List<ArbigentTaskAssignment>>(listOf())
+  private val _taskAssignmentsHistoryStateFlow =
+    MutableStateFlow<List<List<ArbigentTaskAssignment>>>(listOf())
+  public val taskAssignmentsHistoryFlow: Flow<List<List<ArbigentTaskAssignment>>> =
+    _taskAssignmentsHistoryStateFlow.asSharedFlow()
+  public fun taskAssignmentsHistory(): List<List<ArbigentTaskAssignment>> =
+    _taskAssignmentsHistoryStateFlow.value
   public val taskAssignmentsFlow: Flow<List<ArbigentTaskAssignment>> =
     _taskAssignmentsStateFlow.asSharedFlow()
+
   public fun taskAssignments(): List<ArbigentTaskAssignment> = _taskAssignmentsStateFlow.value
   private var executeJob: Job? = null
   private val coroutineScope =
@@ -81,7 +89,10 @@ public class ArbigentScenarioExecutor {
     MutableStateFlow(null)
   public val runningInfoFlow: Flow<ArbigentScenarioRunningInfo?> =
     _arbigentScenarioRunningInfoStateFlow.asSharedFlow()
-  public fun runningInfo(): ArbigentScenarioRunningInfo? = _arbigentScenarioRunningInfoStateFlow.value
+
+  public fun runningInfo(): ArbigentScenarioRunningInfo? =
+    _arbigentScenarioRunningInfoStateFlow.value
+
   public val isSuccessFlow: Flow<Boolean> = taskAssignmentsFlow.flatMapLatest { taskToAgents ->
     val flows: List<Flow<Boolean>> = taskToAgents.map { taskToAgent ->
       taskToAgent.agent.isGoalArchivedFlow
@@ -95,6 +106,7 @@ public class ArbigentScenarioExecutor {
       started = SharingStarted.WhileSubscribed(),
       replay = 1
     )
+
   public fun isSuccess(): Boolean {
     if (taskAssignments().isEmpty()) {
       return false
@@ -127,6 +139,7 @@ public class ArbigentScenarioExecutor {
       started = SharingStarted.WhileSubscribed(),
       replay = 1
     )
+
   public fun isRunning(): Boolean = _taskAssignmentsStateFlow.value.any { it.agent.isRunning() }
 
   private val _stateFlow: StateFlow<ArbigentScenarioExecutorState> = combine(
@@ -168,6 +181,7 @@ public class ArbigentScenarioExecutor {
   public suspend fun execute(arbigentScenario: ArbigentScenario) {
     _isFailedToArchiveFlow.value = false
     arbigentDebugLog("Arbigent.execute start")
+    _taskAssignmentsHistoryStateFlow.value = listOf()
 
     var finishedSuccessfully = false
     var retryRemain = arbigentScenario.maxRetry
@@ -180,6 +194,7 @@ public class ArbigentScenarioExecutor {
         _taskAssignmentsStateFlow.value = arbigentScenario.agentTasks.map { task ->
           ArbigentTaskAssignment(task, ArbigentAgent(task.agentConfig))
         }
+        _taskAssignmentsHistoryStateFlow.value += listOf(taskAssignments())
         for ((index, taskAgent) in taskAssignments().withIndex()) {
           val (task, agent) = taskAgent
           _arbigentScenarioRunningInfoStateFlow.value = ArbigentScenarioRunningInfo(

@@ -42,11 +42,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import io.github.takahirom.arbigent.ArbigentContextHolder
+import io.github.takahirom.arbigent.ArbigentImageAssertion
 import io.github.takahirom.arbigent.ArbigentScenarioContent
 import io.github.takahirom.arbigent.ArbigentScenarioDeviceFormFactor
 import io.github.takahirom.arbigent.ArbigentScenarioExecutor
 import io.github.takahirom.arbigent.ArbigentTaskAssignment
-import io.github.takahirom.arbigent.ArbigentImageAssertion
 import io.github.takahirom.arbigent.GoalAchievedAgentCommand
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.Orientation
@@ -172,19 +172,15 @@ fun Scenario(
         }
       }
     }
-
     ExpandableSection(title = "Options", modifier = Modifier.fillMaxWidth()) {
       ScenarioOptions(scenarioStateHolder, dependencyScenarioMenu)
     }
-    Column(Modifier.weight(1f).padding(top = 8.dp)) {
-      GroupHeader("AI Agent Logs")
-      arbigentScenarioExecutor?.let { arbigentScenarioExecutor ->
-        val taskToAgents: List<ArbigentTaskAssignment> by arbigentScenarioExecutor.taskAssignmentsFlow.collectAsState(
-          arbigentScenarioExecutor.taskAssignments()
-        )
-        if (taskToAgents.isNotEmpty()) {
-          ContentPanel(taskToAgents)
-        }
+    arbigentScenarioExecutor?.let { arbigentScenarioExecutor ->
+      val taskToAgents: List<List<ArbigentTaskAssignment>> by arbigentScenarioExecutor.taskAssignmentsHistoryFlow.collectAsState(
+        arbigentScenarioExecutor.taskAssignmentsHistory()
+      )
+      if (taskToAgents.isNotEmpty()) {
+        ContentPanel(taskToAgents, modifier = Modifier.weight(1f))
       }
     }
   }
@@ -457,163 +453,186 @@ fun buildSections(tasksToAgent: List<ArbigentTaskAssignment>): List<ScenarioSect
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ContentPanel(tasksToAgent: List<ArbigentTaskAssignment>) {
-  var selectedStep: ArbigentContextHolder.Step? by remember { mutableStateOf(null) }
-  Row(Modifier) {
-    val lazyColumnState = rememberLazyListState()
-    val totalItemsCount by derivedStateOf { lazyColumnState.layoutInfo.totalItemsCount }
-    LaunchedEffect(totalItemsCount) {
-      lazyColumnState.animateScrollToItem(maxOf(totalItemsCount - 1, 0))
-    }
-    println(tasksToAgent)
-    val sections: List<ScenarioSection> = buildSections(tasksToAgent)
-    println(sections)
-    LazyColumn(state = lazyColumnState, modifier = Modifier.weight(1.5f)) {
-      sections.forEachIndexed { index, section ->
-        stickyHeader {
-          val prefix = if (index + 1 == tasksToAgent.size) {
-            "Goal: "
-          } else {
-            "Dependency scenario goal: "
-          }
-          Row(Modifier.background(Color.White)) {
-            GroupHeader(
-              modifier = Modifier.padding(8.dp)
-                .weight(1F),
-              text = prefix + section.goal + "(" + (index + 1) + "/" + tasksToAgent.size + ")",
-            )
-            if (section.isArchived()) {
-              PassedMark(
-                modifier = Modifier.align(Alignment.CenterVertically)
-                  .padding(8.dp)
+private fun ContentPanel(tasksToAgentHistory: List<List<ArbigentTaskAssignment>>, modifier: Modifier) {
+  Column(modifier.padding(top = 8.dp)) {
+    var selectedHistory by remember(tasksToAgentHistory.size) { mutableStateOf(tasksToAgentHistory.lastIndex) }
+    GroupHeader {
+      Text("AI Agent Logs")
+      Dropdown(
+        modifier = Modifier.padding(4.dp),
+        menuContent = {
+          tasksToAgentHistory.forEachIndexed { index, taskToAgent ->
+            selectableItem(
+              selected = index == selectedHistory,
+              onClick = { selectedHistory = index },
+            ) {
+              Text(
+                text = "History " + index,
               )
             }
           }
         }
-        itemsIndexed(items = section.steps) { stepIndex, item ->
-          val step = item.step
-          Column(
-            Modifier.padding(8.dp)
-              .background(
-                color = if (step == selectedStep) {
-                  JewelTheme.colorPalette.purple(9)
-                } else {
-                  Color.Transparent
-                },
+      ) {
+        Text("History $selectedHistory")
+      }
+    }
+    val tasksToAgent = tasksToAgentHistory[selectedHistory]
+    var selectedStep: ArbigentContextHolder.Step? by remember { mutableStateOf(null) }
+    Row(Modifier) {
+      val lazyColumnState = rememberLazyListState()
+      val totalItemsCount by derivedStateOf { lazyColumnState.layoutInfo.totalItemsCount }
+      LaunchedEffect(totalItemsCount) {
+        lazyColumnState.animateScrollToItem(maxOf(totalItemsCount - 1, 0))
+      }
+      val sections: List<ScenarioSection> = buildSections(tasksToAgent)
+      println(sections)
+      LazyColumn(state = lazyColumnState, modifier = Modifier.weight(1.5f)) {
+        sections.forEachIndexed { index, section ->
+          stickyHeader {
+            val prefix = if (index + 1 == tasksToAgent.size) {
+              "Goal: "
+            } else {
+              "Dependency scenario goal: "
+            }
+            Row(Modifier.background(Color.White)) {
+              GroupHeader(
+                modifier = Modifier.padding(8.dp)
+                  .weight(1F),
+                text = prefix + section.goal + "(" + (index + 1) + "/" + tasksToAgent.size + ")",
               )
-              .clickable { selectedStep = step },
-          ) {
-            GroupHeader(
-              modifier = Modifier.fillMaxWidth(),
-            ) {
-              Text(
-                text = "Step ${stepIndex + 1}",
-              )
-              if (step.isFailed()) {
-                Icon(
-                  key = AllIconsKeys.General.Error,
-                  contentDescription = "Failed",
-                  modifier = Modifier.padding(4.dp).align(Alignment.CenterVertically),
-                  hint = Size(12)
-                )
-              } else if (item.isArchived()) {
+              if (section.isArchived()) {
                 PassedMark(
-                  modifier = Modifier.padding(4.dp).size(12.dp)
-                    .align(Alignment.CenterVertically)
+                  modifier = Modifier.align(Alignment.CenterVertically)
+                    .padding(8.dp)
                 )
               }
             }
-            Text(
-              modifier = Modifier.padding(8.dp),
-
-              text = step.text()
-            )
           }
-        }
-        item {
-          if (section.isRunning) {
-            Column(Modifier.fillMaxWidth()) {
-              CircularProgressIndicator(
-                modifier = Modifier.padding(8.dp).align(Alignment.CenterHorizontally),
+          itemsIndexed(items = section.steps) { stepIndex, item ->
+            val step = item.step
+            Column(
+              Modifier.padding(8.dp)
+                .background(
+                  color = if (step == selectedStep) {
+                    JewelTheme.colorPalette.purple(9)
+                  } else {
+                    Color.Transparent
+                  },
+                )
+                .clickable { selectedStep = step },
+            ) {
+              GroupHeader(
+                modifier = Modifier.fillMaxWidth(),
+              ) {
+                Text(
+                  text = "Step ${stepIndex + 1}",
+                )
+                if (step.isFailed()) {
+                  Icon(
+                    key = AllIconsKeys.General.Error,
+                    contentDescription = "Failed",
+                    modifier = Modifier.padding(4.dp).align(Alignment.CenterVertically),
+                    hint = Size(12)
+                  )
+                } else if (item.isArchived()) {
+                  PassedMark(
+                    modifier = Modifier.padding(4.dp).size(12.dp)
+                      .align(Alignment.CenterVertically)
+                  )
+                }
+              }
+              Text(
+                modifier = Modifier.padding(8.dp),
+
+                text = step.text()
               )
+            }
+          }
+          item {
+            if (section.isRunning) {
+              Column(Modifier.fillMaxWidth()) {
+                CircularProgressIndicator(
+                  modifier = Modifier.padding(8.dp).align(Alignment.CenterHorizontally),
+                )
+              }
             }
           }
         }
       }
-    }
-    selectedStep?.let { step ->
-      val scrollableState = rememberScrollState()
-      Column(
-        Modifier
-          .weight(1.5f)
-          .padding(8.dp)
-          .verticalScroll(scrollableState),
-      ) {
-        step.uiTreeStrings?.let {
-          ExpandableSection("All UI Tree", modifier = Modifier.fillMaxWidth()) {
-            Text(
-              modifier = Modifier
-                .padding(8.dp)
-                .background(JewelTheme.globalColors.panelBackground),
-              text = it.allTreeString
-            )
+      selectedStep?.let { step ->
+        val scrollableState = rememberScrollState()
+        Column(
+          Modifier
+            .weight(1.5f)
+            .padding(8.dp)
+            .verticalScroll(scrollableState),
+        ) {
+          step.uiTreeStrings?.let {
+            ExpandableSection("All UI Tree", modifier = Modifier.fillMaxWidth()) {
+              Text(
+                modifier = Modifier
+                  .padding(8.dp)
+                  .background(JewelTheme.globalColors.panelBackground),
+                text = it.allTreeString
+              )
+            }
+            ExpandableSection("Optimized UI Tree", modifier = Modifier.fillMaxWidth()) {
+              Text(
+                modifier = Modifier
+                  .padding(8.dp)
+                  .background(JewelTheme.globalColors.panelBackground),
+                text = it.optimizedTreeString
+              )
+            }
           }
-          ExpandableSection("Optimized UI Tree", modifier = Modifier.fillMaxWidth()) {
-            Text(
-              modifier = Modifier
-                .padding(8.dp)
-                .background(JewelTheme.globalColors.panelBackground),
-              text = it.optimizedTreeString
-            )
+          step.aiRequest?.let { request: String ->
+            ExpandableSection(
+              title = "AI Request",
+              defaultExpanded = true,
+              modifier = Modifier.fillMaxWidth()
+            ) {
+              Text(
+                modifier = Modifier
+                  .padding(8.dp)
+                  .background(JewelTheme.globalColors.panelBackground),
+                text = request
+              )
+            }
+          }
+          step.aiResponse?.let { response: String ->
+            ExpandableSection(
+              title = "AI Response",
+              defaultExpanded = true,
+              modifier = Modifier.fillMaxWidth()
+            ) {
+              Text(
+                modifier = Modifier
+                  .padding(8.dp)
+                  .background(JewelTheme.globalColors.panelBackground),
+                text = response
+              )
+            }
           }
         }
-        step.aiRequest?.let { request: String ->
-          ExpandableSection(
-            title = "AI Request",
-            defaultExpanded = true,
-            modifier = Modifier.fillMaxWidth()
-          ) {
-            Text(
-              modifier = Modifier
-                .padding(8.dp)
-                .background(JewelTheme.globalColors.panelBackground),
-              text = request
-            )
-          }
+        Column(
+          Modifier
+            .fillMaxHeight()
+            .weight(1f)
+            .padding(8.dp),
+          verticalArrangement = Arrangement.Center,
+        ) {
+          val filePath = step.screenshotFilePath
+          Image(
+            bitmap = loadImageBitmap(FileInputStream(filePath)),
+            contentDescription = "screenshot",
+          )
+          Text(
+            modifier = Modifier.onClick {
+              Desktop.getDesktop().open(File(filePath))
+            },
+            text = "Screenshot($filePath)"
+          )
         }
-        step.aiResponse?.let { response: String ->
-          ExpandableSection(
-            title = "AI Response",
-            defaultExpanded = true,
-            modifier = Modifier.fillMaxWidth()
-          ) {
-            Text(
-              modifier = Modifier
-                .padding(8.dp)
-                .background(JewelTheme.globalColors.panelBackground),
-              text = response
-            )
-          }
-        }
-      }
-      Column(
-        Modifier
-          .fillMaxHeight()
-          .weight(1f)
-          .padding(8.dp),
-        verticalArrangement = Arrangement.Center,
-      ) {
-        val filePath = step.screenshotFilePath
-        Image(
-          bitmap = loadImageBitmap(FileInputStream(filePath)),
-          contentDescription = "screenshot",
-        )
-        Text(
-          modifier = Modifier.onClick {
-            Desktop.getDesktop().open(File(filePath))
-          },
-          text = "Screenshot($filePath)"
-        )
       }
     }
   }
