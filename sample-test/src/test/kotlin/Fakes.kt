@@ -65,8 +65,8 @@ class FakeDevice : ArbigentDevice {
 }
 
 class FakeAi : ArbigentAi {
-  var count = 0
-  fun createDecisionOutput(
+  private var count = 0
+  private fun createDecisionOutput(
     agentCommand: ArbigentAgentCommand = ClickWithTextAgentCommand("text")
   ): ArbigentAi.DecisionOutput {
     return ArbigentAi.DecisionOutput(

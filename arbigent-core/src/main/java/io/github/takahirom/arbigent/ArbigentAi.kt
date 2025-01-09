@@ -15,6 +15,7 @@ public interface ArbigentAi {
     val agentCommands: List<ArbigentAgentCommand>,
     val step: ArbigentContextHolder.Step
   )
+  public class FailedToParseResponseException(message: String, cause: Throwable) : Exception(message, cause)
   public fun decideAgentCommands(
     decisionInput: DecisionInput
   ): DecisionOutput

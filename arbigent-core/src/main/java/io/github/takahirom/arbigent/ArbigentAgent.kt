@@ -351,7 +351,7 @@ public fun AgentConfigBuilder(
             listOf(
               MaestroCommand(
                 waitForAnimationToEndCommand = WaitForAnimationToEndCommand(
-                  timeout = 100
+                  timeout = 300
                 )
               )
             )
@@ -469,14 +469,14 @@ public fun defaultAgentCommandTypesForVisualMode(): List<AgentCommandType> {
 
 public fun defaultAgentCommandTypesForTvForVisualMode(): List<AgentCommandType> {
   return listOf(
-//    DpadUpArrowAgentCommand,
-//    DpadDownArrowAgentCommand,
-//    DpadLeftArrowAgentCommand,
-//    DpadRightArrowAgentCommand,
-    DpadCenterAgentCommand,
-//    DpadAutoFocusWithIdAgentCommand,
-//    DpadAutoFocusWithTextAgentCommand,
     DpadAutoFocusWithIndexAgentCommand,
+//    DpadAutoFocusWithIdAgentCommand,
+    DpadAutoFocusWithTextAgentCommand,
+    DpadUpArrowAgentCommand,
+    DpadDownArrowAgentCommand,
+    DpadLeftArrowAgentCommand,
+    DpadRightArrowAgentCommand,
+    DpadCenterAgentCommand,
     InputTextAgentCommand,
     BackPressAgentCommand,
     KeyPressAgentCommand,
@@ -492,7 +492,7 @@ private fun executeCommands(
   val (decisionOutput, arbigentContextHolder, screenshotFilePath, device) = executeCommandsInput
   decisionOutput.agentCommands.forEach { agentCommand ->
     try {
-      agentCommand.runOrchestraCommand(device)
+      agentCommand.runDeviceCommand(device)
     } catch (e: MaestroException) {
       e.printStackTrace()
       arbigentContextHolder.addStep(

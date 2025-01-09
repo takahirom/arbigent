@@ -84,7 +84,7 @@ class ArbigentCli : CliktCommand() {
     .choice("android", "ios", "web")
     .default("android")
 
-  val scenarioFile by option(help = "Path to the scenario YAML file")
+  private val scenarioFile by option(help = "Path to the scenario YAML file")
     .prompt("Scenario file path")
 
   @OptIn(ArbigentInternalApi::class)

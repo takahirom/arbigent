@@ -236,7 +236,7 @@ public class MaestroDevice(
   )
 
 
-  public fun TreeNode.optimizedToString(depth: Int, enableDepth: Boolean = false): String {
+  private fun TreeNode.optimizedToString(depth: Int, enableDepth: Boolean = false): String {
     val blank = " ".repeat(depth)
     fun StringBuilder.appendString(str: String) {
       if (enableDepth) {
@@ -266,7 +266,7 @@ public class MaestroDevice(
   }
 
 
-  public fun ViewHierarchy.toOptimizedString(
+  private fun ViewHierarchy.toOptimizedString(
     meaningfulAttributes: Set<String> = setOf("text", "content description", "hintText", "focused"),
     deviceInfo: DeviceInfo
   ): String {
@@ -307,7 +307,7 @@ public class MaestroDevice(
   private fun moveFocusToElement(
     fetchTarget: () -> Bounds
   ) {
-    var remainCount = 3
+    var remainCount = 10
     while (remainCount-- > 0) {
       val currentFocus = findCurrentFocus()
       val currentBounds = currentFocus.toUiElement().bounds

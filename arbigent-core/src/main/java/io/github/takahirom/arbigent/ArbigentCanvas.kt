@@ -78,7 +78,7 @@ public class ArbigentCanvas(width: Int, height: Int, bufferedImageType: Int) {
     }
   }
 
-  public fun textCalc(texts: List<String>): Pair<Int, Int> {
+  private fun textCalc(texts: List<String>): Pair<Int, Int> {
     return bufferedImage.graphics { graphics2D ->
       val frc: FontRenderContext = graphics2D.getFontRenderContext()
       val longestLineWidth = texts.map {
@@ -96,7 +96,7 @@ public class ArbigentCanvas(width: Int, height: Int, bufferedImageType: Int) {
     }
   }
 
-  public fun drawRect(r: ArbigentElement.Rect, color: Color) {
+  private fun drawRect(r: ArbigentElement.Rect, color: Color) {
     bufferedImage.graphics { graphics2D ->
       graphics2D.color = color
       graphics2D.fillRect(
@@ -106,7 +106,7 @@ public class ArbigentCanvas(width: Int, height: Int, bufferedImageType: Int) {
     }
   }
 
-  public fun drawText(textPointX: Float, textPointY: Float, texts: List<String>, color: Color) {
+  private fun drawText(textPointX: Float, textPointY: Float, texts: List<String>, color: Color) {
     bufferedImage.graphics {
       val graphics2D = bufferedImage.createGraphics()
       graphics2D.color = color
