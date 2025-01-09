@@ -5,8 +5,10 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -48,6 +50,7 @@ import io.github.takahirom.arbigent.ArbigentScenarioDeviceFormFactor
 import io.github.takahirom.arbigent.ArbigentScenarioExecutor
 import io.github.takahirom.arbigent.ArbigentTaskAssignment
 import io.github.takahirom.arbigent.GoalAchievedAgentCommand
+import io.github.takahirom.arbigent.getAnnotatedFilePath
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.Orientation
 import org.jetbrains.jewel.ui.component.CheckboxRow
@@ -485,7 +488,6 @@ private fun ContentPanel(tasksToAgentHistory: List<List<ArbigentTaskAssignment>>
         lazyColumnState.animateScrollToItem(maxOf(totalItemsCount - 1, 0))
       }
       val sections: List<ScenarioSection> = buildSections(tasksToAgent)
-      println(sections)
       LazyColumn(state = lazyColumnState, modifier = Modifier.weight(1.5f)) {
         sections.forEachIndexed { index, section ->
           stickyHeader {
@@ -618,20 +620,44 @@ private fun ContentPanel(tasksToAgentHistory: List<List<ArbigentTaskAssignment>>
           Modifier
             .fillMaxHeight()
             .weight(1f)
-            .padding(8.dp),
+            .padding(8.dp)
+            .scrollable(rememberScrollState(), orientation = androidx.compose.foundation.gestures.Orientation.Vertical),
           verticalArrangement = Arrangement.Center,
         ) {
-          val filePath = step.screenshotFilePath
-          Image(
-            bitmap = loadImageBitmap(FileInputStream(filePath)),
-            contentDescription = "screenshot",
-          )
-          Text(
-            modifier = Modifier.onClick {
-              Desktop.getDesktop().open(File(filePath))
-            },
-            text = "Screenshot($filePath)"
-          )
+          ExpandableSection(
+            title = "Annotated Screenshot",
+            defaultExpanded = true,
+            modifier = Modifier.fillMaxWidth()
+          ) {
+            val filePath = File(step.screenshotFilePath).getAnnotatedFilePath()
+            Image(
+              bitmap = loadImageBitmap(FileInputStream(filePath)),
+              contentDescription = "screenshot",
+            )
+            Text(
+              modifier = Modifier.onClick {
+                Desktop.getDesktop().open(File(filePath))
+              },
+              text = "Screenshot($filePath)"
+            )
+          }
+          ExpandableSection(
+            title = "Screenshot",
+            defaultExpanded = false,
+            modifier = Modifier.fillMaxWidth()
+          ) {
+            val filePath = step.screenshotFilePath
+            Image(
+              bitmap = loadImageBitmap(FileInputStream(filePath)),
+              contentDescription = "screenshot",
+            )
+            Text(
+              modifier = Modifier.onClick {
+                Desktop.getDesktop().open(File(filePath))
+              },
+              text = "Screenshot($filePath)"
+            )
+          }
         }
       }
     }
@@ -676,7 +702,7 @@ fun ExpandableSection(
   title: String,
   defaultExpanded: Boolean = false,
   modifier: Modifier = Modifier,
-  content: @Composable () -> Unit,
+  content: @Composable ColumnScope.() -> Unit,
 ) {
   var expanded by remember { mutableStateOf(defaultExpanded) }
   Column(modifier) {
@@ -702,7 +728,9 @@ fun ExpandableSection(
       Text(title)
     }
     AnimatedVisibility(visible = expanded) {
-      content()
+      Column {
+        content()
+      }
     }
   }
 }
