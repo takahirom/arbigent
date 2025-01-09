@@ -213,25 +213,8 @@ public class MaestroDevice(
   }
 
   override fun focusedTreeString(): String {
-    return maestro.viewHierarchy(false)
-      .getFocusedNode()
+    return findCurrentFocus()
       ?.optimizedToString(0, enableDepth = false) ?: ""
-  }
-
-  private fun ViewHierarchy.getFocusedNode(): TreeNode? {
-    fun dfs(node: TreeNode): TreeNode? {
-      if (node.focused == true) {
-        return node
-      }
-      for (child in node.children) {
-        val result = dfs(child)
-        if (result != null) {
-          return result
-        }
-      }
-      return null
-    }
-    return dfs(root)
   }
 
   public data class OptimizationResult(
@@ -311,10 +294,17 @@ public class MaestroDevice(
   private fun moveFocusToElement(
     fetchTarget: () -> Bounds
   ) {
-    var remainCount = 10
+    var remainCount = 15
+    var lastBounds: Bounds? = null
     while (remainCount-- > 0) {
       val currentFocus = findCurrentFocus()
+        ?: throw IllegalStateException("No focused node")
       val currentBounds = currentFocus.toUiElement().bounds
+      if (lastBounds == currentBounds) {
+        arbigentDebugLog("Same bounds detected. Might be stuck or scrollable view. Breaking loop.")
+        break
+      }
+      lastBounds = currentBounds
       val targetBounds = fetchTarget()
 
       // Helper functions to calculate the center X and Y of a Bounds object.
@@ -483,10 +473,15 @@ public class MaestroDevice(
     }.bounds
   }
 
-  private fun findCurrentFocus(): TreeNode {
-    return maestro.viewHierarchy(false)
-      .getFocusedNode()
-      ?: throw IllegalStateException("No focused node")
+  private fun findCurrentFocus(): TreeNode? {
+    val viewHierarchy = maestro.viewHierarchy(false)
+    return dfs(viewHierarchy.root) {
+      // If keyboard is focused, return the focused node with keyboard
+      it.attributes["resource-id"]?.startsWith("com.google.android.inputmethod.latin:id/") == true && it.focused == true
+    } ?: dfs(viewHierarchy.root) {
+      // If no keyboard is focused, return the focused node
+      it.focused == true
+    }
   }
 
   override fun close() {
