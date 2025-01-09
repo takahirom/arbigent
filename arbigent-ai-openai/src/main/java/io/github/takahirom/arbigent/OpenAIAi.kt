@@ -93,13 +93,20 @@ class OpenAIAi(
 ) : ArbigentAi {
   @OptIn(ExperimentalSerializationApi::class)
   override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
-    val (arbigentContext, formFactor, dumpHierarchy, focusedTree, agentCommandTypes, screenshotFilePath, elements) = decisionInput
+    val arbigentContext = decisionInput.arbigentContextHolder
+    val screenshotFilePath = decisionInput.screenshotFilePath
+    val formFactor = decisionInput.formFactor
+    val uiTreeStrings = decisionInput.uiTreeStrings
+    val focusedTree = decisionInput.focusedTreeString
+    val agentCommandTypes = decisionInput.agentCommandTypes
+    val elements = decisionInput.elements
+
     val canvas = ArbigentCanvas.load(File(screenshotFilePath), TYPE_INT_ARGB)
     canvas.draw(elements)
     canvas.save(screenshotFilePath)
 
     val imageBase64 = File(screenshotFilePath).getResizedIamgeBase64(1.0F)
-    val prompt = buildPrompt(arbigentContext, dumpHierarchy, focusedTree, agentCommandTypes, elements)
+    val prompt = buildPrompt(arbigentContext, uiTreeStrings.optimizedTreeString, focusedTree, agentCommandTypes, elements)
     val messages: List<ChatMessage> = listOf(
       ChatMessage(
         role = "system",
@@ -140,7 +147,7 @@ class OpenAIAi(
       return decideAgentCommands(decisionInput)
     }
     try {
-      val step = parseResponse(responseText, messages, screenshotFilePath, elements, agentCommandTypes)
+      val step = parseResponse(responseText, messages, decisionInput)
       return ArbigentAi.DecisionOutput(listOf(step.agentCommand!!), step)
     } catch (e: MissingFieldException) {
       arbigentInfoLog("Missing required field in OpenAI response: $e $responseText")
@@ -172,10 +179,12 @@ $templates"""
   private fun parseResponse(
     response: String,
     message: List<ChatMessage>,
-    screenshotFilePath: String,
-    elements: ArbigentElementList,
-    agentCommandList: List<AgentCommandType>
+    decisionInput: ArbigentAi.DecisionInput,
   ): ArbigentContextHolder.Step {
+    val screenshotFilePath = decisionInput.screenshotFilePath
+    val elements = decisionInput.elements
+    val agentCommandList = decisionInput.agentCommandTypes
+
     val json = Json { ignoreUnknownKeys = true }
     val responseObj = json.decodeFromString<ChatCompletionResponse>(response)
     val content = responseObj.choices.firstOrNull()?.message?.content ?: ""
@@ -274,7 +283,8 @@ $templates"""
         whatYouSaw = jsonObject["summary-of-what-you-saw"]?.jsonPrimitive?.content ?: "",
         aiRequest = message.map { it.copy(content = it.content.map { it.copy(imageUrl = null) }) }.toString(),
         aiResponse = content,
-        screenshotFilePath = screenshotFilePath
+        screenshotFilePath = screenshotFilePath,
+        uiTreeStrings = decisionInput.uiTreeStrings
       )
     } catch (e: Exception) {
       throw Exception("Failed to parse OpenAI response: $e")

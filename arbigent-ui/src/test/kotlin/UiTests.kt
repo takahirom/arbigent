@@ -30,6 +30,7 @@ import io.github.takahirom.arbigent.ClickWithTextAgentCommand
 import io.github.takahirom.arbigent.ArbigentDevice
 import io.github.takahirom.arbigent.ArbigentAvailableDevice
 import io.github.takahirom.arbigent.ArbigentElementList
+import io.github.takahirom.arbigent.ArbigentUiTreeStrings
 import io.github.takahirom.arbigent.GoalAchievedAgentCommand
 import io.github.takahirom.arbigent.arbigentDebugLog
 import io.github.takahirom.roborazzi.captureRoboImage
@@ -302,11 +303,11 @@ class TestRobot(
   }
 
   fun expandOptions() {
-    composeUiTest.onNode(hasContentDescription("Expand options")).performClick()
+    composeUiTest.onNode(hasContentDescription("Expand Options")).performClick()
   }
 
   fun collapseOptions() {
-    composeUiTest.onNode(hasContentDescription("Collapse options")).performClick()
+    composeUiTest.onNode(hasContentDescription("Collapse Options")).performClick()
   }
 
   fun clickDependencyDropDown() {
@@ -369,12 +370,15 @@ class FakeDevice : ArbigentDevice {
     return "focusedTreeString"
   }
 
-  override fun viewTreeString(): String {
+  override fun viewTreeString(): ArbigentUiTreeStrings {
     arbigentDebugLog("FakeDevice.viewTreeString")
-    return "viewTreeString"
+    return ArbigentUiTreeStrings(
+      "viewTreeString",
+      "optimizedTreeString"
+    )
   }
 
-  override fun elements(meaningfulAttributes: Set<String>): ArbigentElementList {
+  override fun elements(): ArbigentElementList {
     arbigentDebugLog("FakeDevice.elements")
     return ArbigentElementList(emptyList())
   }
@@ -451,7 +455,8 @@ class FakeAi : ArbigentAi {
         )
       }
     }
-    class ImageAssertionFailed(): AiStatus {
+
+    class ImageAssertionFailed() : AiStatus {
       override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
         return ArbigentAi.DecisionOutput(
           listOf(GoalAchievedAgentCommand()),

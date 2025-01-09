@@ -18,7 +18,7 @@ class FakeDevice : ArbigentDevice {
     arbigentDebugLog("FakeDevice.close")
   }
 
-  override fun elements(meaningfulAttributes: Set<String>): ArbigentElementList {
+  override fun elements(): ArbigentElementList {
     return ArbigentElementList(
       (0..10).map {
         ArbigentElement(
@@ -55,9 +55,12 @@ class FakeDevice : ArbigentDevice {
     )
   }
 
-  override fun viewTreeString(): String {
+  override fun viewTreeString(): ArbigentUiTreeStrings {
     arbigentDebugLog("FakeDevice.viewTreeString")
-    return "viewTreeString"
+    return ArbigentUiTreeStrings(
+      "viewTreeString",
+      "optimizedTreeString"
+    )
   }
 }
 
