@@ -31,12 +31,10 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.modules.SerializersModule
-import java.awt.image.BufferedImage
 import java.awt.image.BufferedImage.TYPE_INT_ARGB
 import java.io.File
 import java.nio.charset.Charset
 import java.util.Base64
-import javax.imageio.ImageIO
 
 class OpenAIAi(
   private val apiKey: String,
@@ -103,9 +101,10 @@ class OpenAIAi(
     val agentCommandTypes = decisionInput.agentCommandTypes
     val elements = decisionInput.elements
 
-    val canvas = ArbigentCanvas.load(File(screenshotFilePath), TYPE_INT_ARGB)
+    val original = File(screenshotFilePath)
+    val canvas = ArbigentCanvas.load(original, TYPE_INT_ARGB)
     canvas.draw(elements)
-    canvas.save(screenshotFilePath)
+    canvas.save(original.getAnnotatedFilePath())
 
     val imageBase64 = File(screenshotFilePath).getResizedIamgeBase64(1.0F)
     val prompt = buildPrompt(arbigentContext, uiTreeStrings.optimizedTreeString, focusedTree, agentCommandTypes, elements)
@@ -440,4 +439,7 @@ fun File.getResizedIamgeBase64(scale: Float): String {
 //  return output.readBytes().encodeBase64()
   return this.readBytes().encodeBase64()
 }
+
+public fun File.getAnnotatedFilePath() =
+  nameWithoutExtension + "_annotated" + extension
 
