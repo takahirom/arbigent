@@ -58,19 +58,19 @@ public data class ArbigentUiTreeStrings(
   val optimizedTreeString: String,
 )
 
+private val meaningfulAttributes: Set<String> = setOf(
+  "text",
+  "accessibilityText",
+  "content description",
+  "hintText"
+)
+
 public interface ArbigentDevice {
   public fun executeCommands(commands: List<MaestroCommand>)
   public fun viewTreeString(): ArbigentUiTreeStrings
   public fun focusedTreeString(): String
   public fun close()
-  public fun elements(
-    meaningfulAttributes: Set<String> = setOf(
-      "text",
-      "accessibilityText",
-      "content description",
-      "hintText"
-    ),
-  ): ArbigentElementList
+  public fun elements(): ArbigentElementList
 }
 
 public data class ArbigentElement(
@@ -123,12 +123,6 @@ public data class ArbigentElementList(
       )!!.optimizeTree(
         isRoot = true,
         viewHierarchy = viewHierarchy,
-        meaningfulAttributes = setOf(
-          "text",
-          "accessibilityText",
-          "content description",
-          "hintText"
-        )
       )
       val optimizedTree = result.node ?: result.promotedChildren.firstOrNull()
       val elements = mutableListOf<ArbigentElement>()
@@ -140,7 +134,7 @@ public data class ArbigentElementList(
             val className = attributes["class"]?.substringAfterLast('.') ?: "Node"
             append(className)
             append("(")
-            appendUiElementContents(this@toElement)
+            appendUiElementContents(this@toElement, true)
             append(")")
           },
           rawText = attributes.toString(),
@@ -160,7 +154,8 @@ public data class ArbigentElementList(
         if (clickable == true || focused == true
           || attributes["clickable"] == "true"
           || attributes["focused"] == "true"
-          || attributes["focusable"] == "true") {
+          || attributes["focusable"] == "true"
+        ) {
           elements.add(toElement())
         }
         children
@@ -196,9 +191,7 @@ public class MaestroDevice(
     orchestra.executeCommands(commands, shouldReinitJsEngine = shouldJsReinit)
   }
 
-  override fun elements(
-    meaningfulAttributes: Set<String>,
-  ): ArbigentElementList {
+  override fun elements(): ArbigentElementList {
     val viewHierarchy = maestro.viewHierarchy(false)
     val deviceInfo = maestro.cachedDeviceInfo
     return ArbigentElementList.from(viewHierarchy, deviceInfo)
@@ -497,10 +490,44 @@ public class MaestroDevice(
   }
 }
 
-private fun StringBuilder.appendUiElementContents(treeNode: TreeNode) {
+private fun dfs(node: TreeNode, condition: (TreeNode) -> Boolean): TreeNode? {
+  if (condition(node)) {
+    return node
+  }
+  for (child in node.children) {
+    val result = dfs(child, condition)
+    if (result != null) {
+      return result
+    }
+  }
+  return null
+}
+
+private fun StringBuilder.appendUiElementContents(
+  treeNode: TreeNode,
+  fetchChildrenAttributes: Boolean = false
+) {
   if (treeNode.attributes.isNotEmpty()) {
     //      appendString("attr={")
+    if (fetchChildrenAttributes) {
+      meaningfulAttributes.forEach { attribute ->
+        dfs(treeNode) {
+          it.attributes[attribute]?.isNotBlank() ?: false
+        }?.let {
+          append("$attribute=${it.attributes[attribute]}, ")
+        }
+      }
+    } else {
+      meaningfulAttributes.forEach { attribute ->
+        if (treeNode.attributes[attribute]?.isNotBlank() == true) {
+          append("$attribute=${treeNode.attributes[attribute]}, ")
+        }
+      }
+    }
     treeNode.attributes.forEach { (key, value) ->
+      if (meaningfulAttributes.contains(key)) {
+        return@forEach
+      }
       if (key == "class") {
         // Skip class name
       } else if (key == "resource-id" && value.isNotBlank()) {
