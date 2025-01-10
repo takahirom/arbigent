@@ -3,6 +3,7 @@ package io.github.takahirom.arbigent
 import com.charleskorn.kaml.PolymorphismStyle
 import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
+import io.github.takahirom.arbigent.result.ArbigentProjectExecutionResult
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -124,7 +125,7 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
 }
 
 
-public class ArbigentProjectContentSerializer(
+public class ArbigentProjectSerializer(
   private val fileSystem: FileSystem = object : FileSystem {}
 ) {
   private val yaml = Yaml(
@@ -152,5 +153,14 @@ public class ArbigentProjectContentSerializer(
     val projectFileContent =
       yaml.decodeFromString(ArbigentProjectFileContent.serializer(), jsonString)
     return projectFileContent
+  }
+
+  public fun save(projectResult: ArbigentProjectExecutionResult, file: File) {
+    save(projectResult, file.outputStream())
+  }
+
+  private fun save(projectResult: ArbigentProjectExecutionResult, outputStream: OutputStream) {
+    val jsonString = yaml.encodeToString(ArbigentProjectExecutionResult.serializer(), projectResult)
+    fileSystem.writeText(outputStream, jsonString)
   }
 }

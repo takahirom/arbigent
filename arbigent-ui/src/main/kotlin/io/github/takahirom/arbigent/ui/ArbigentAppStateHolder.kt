@@ -7,7 +7,7 @@ import io.github.takahirom.arbigent.ArbigentDevice
 import io.github.takahirom.arbigent.ArbigentInternalApi
 import io.github.takahirom.arbigent.ArbigentProject
 import io.github.takahirom.arbigent.ArbigentProjectFileContent
-import io.github.takahirom.arbigent.ArbigentProjectContentSerializer
+import io.github.takahirom.arbigent.ArbigentProjectSerializer
 import io.github.takahirom.arbigent.ArbigentScenario
 import io.github.takahirom.arbigent.ArbigentScenarioContent
 import io.github.takahirom.arbigent.ArbigentDeviceOs
@@ -48,16 +48,17 @@ class ArbigentAppStateHolder(
     fun isConnected(): Boolean = this is Connected
   }
 
-  sealed interface FileSelectionState {
-    data object NotSelected : FileSelectionState
-    data object Loading : FileSelectionState
-    data object Saving : FileSelectionState
+  sealed interface ProjectDialogState {
+    data object NotSelected : ProjectDialogState
+    data object LoadProjectContent : ProjectDialogState
+    data object SaveProjectContent : ProjectDialogState
+    data object SaveProjectResult : ProjectDialogState
   }
 
   val deviceConnectionState: MutableStateFlow<DeviceConnectionState> =
     MutableStateFlow(DeviceConnectionState.NotConnected)
-  val fileSelectionState: MutableStateFlow<FileSelectionState> =
-    MutableStateFlow(FileSelectionState.NotSelected)
+  val projectDialogState: MutableStateFlow<ProjectDialogState> =
+    MutableStateFlow(ProjectDialogState.NotSelected)
   private val projectStateFlow = MutableStateFlow<ArbigentProject?>(null)
   private val allScenarioStateHoldersStateFlow: MutableStateFlow<List<ArbigentScenarioStateHolder>> =
     MutableStateFlow(listOf())
@@ -237,13 +238,13 @@ class ArbigentAppStateHolder(
     }
   }
 
-  private val arbigentProjectContentSerializer = ArbigentProjectContentSerializer()
-  fun saveGoals(file: File?) {
+  private val arbigentProjectSerializer = ArbigentProjectSerializer()
+  fun saveProjectContents(file: File?) {
     if (file == null) {
       return
     }
     val sortedScenarios = sortedScenariosAndDepthsStateFlow.value.map { it.first }
-    arbigentProjectContentSerializer.save(
+    arbigentProjectSerializer.save(
       projectFileContent = ArbigentProjectFileContent(
         scenarioContents = sortedScenarios.map {
           it.createArbigentScenarioContent()
@@ -253,11 +254,11 @@ class ArbigentAppStateHolder(
     )
   }
 
-  fun loadGoals(file: File?) {
+  fun loadProjectContents(file: File?) {
     if (file == null) {
       return
     }
-    val projectFile = ArbigentProjectContentSerializer().load(file)
+    val projectFile = ArbigentProjectSerializer().load(file)
     val scenarios = projectFile.scenarioContents
     val arbigentScenarioStateHolders = scenarios.map { scenarioContent ->
       ArbigentScenarioStateHolder(id = scenarioContent.id).apply {
@@ -315,6 +316,15 @@ class ArbigentAppStateHolder(
       if (it.dependencyScenarioStateHolderStateFlow.value == scenario) {
         it.dependencyScenarioStateHolderStateFlow.value = removedScenarioDependency
       }
+    }
+  }
+
+  fun saveProjectResult(file: File?) {
+    if (file == null) {
+      return
+    }
+    projectStateFlow.value?.getResult()?.let {
+      arbigentProjectSerializer.save(it, file)
     }
   }
 }

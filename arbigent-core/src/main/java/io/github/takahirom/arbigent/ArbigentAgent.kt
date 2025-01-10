@@ -4,6 +4,8 @@ import io.github.takahirom.arbigent.ArbigentAgent.ExecuteCommandsInput
 import io.github.takahirom.arbigent.ArbigentAgent.ExecuteCommandsOutput
 import io.github.takahirom.arbigent.ArbigentAgent.StepInput
 import io.github.takahirom.arbigent.ArbigentAgent.StepResult
+import io.github.takahirom.arbigent.result.ArbigentAgentResult
+import io.github.takahirom.arbigent.result.ArbigentAgentTaskStepResult
 import io.grpc.StatusRuntimeException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -26,7 +28,6 @@ import maestro.orchestra.ClearStateCommand
 import maestro.orchestra.LaunchAppCommand
 import maestro.orchestra.MaestroCommand
 import maestro.orchestra.TakeScreenshotCommand
-import maestro.orchestra.WaitForAnimationToEndCommand
 import java.io.File
 
 public class ArbigentAgent(
@@ -231,6 +232,21 @@ public class ArbigentAgent(
   public fun cancel() {
     job?.cancel()
     _isRunningStateFlow.value = false
+  }
+
+  public fun getResult(): ArbigentAgentResult {
+    return ArbigentAgentResult(
+      goal = latestArbigentContext()?.goal ?: "",
+      maxStep = 10,
+      deviceFormFactor = deviceFormFactor,
+      isGoalArchived = isGoalArchived(),
+      steps = latestArbigentContext()?.steps()?.map {
+        ArbigentAgentTaskStepResult(
+          summary = it.text(),
+          screenshotFilePath = it.screenshotFilePath
+        )
+      } ?: emptyList(),
+    )
   }
 }
 
@@ -534,7 +550,7 @@ private fun step(
   }
   arbigentDebugLog("Arbigent step(): ${arbigentContextHolder.prompt()}")
   val screenshotFilePath =
-    ArbigentTempDir.screenshotsDir.absolutePath + File.separator + "$screenshotFileID.png"
+    ArbigentDir.screenshotsDir.absolutePath + File.separator + "$screenshotFileID.png"
   val decisionInput = ArbigentAi.DecisionInput(
     arbigentContextHolder = arbigentContextHolder,
     formFactor = deviceFormFactor,

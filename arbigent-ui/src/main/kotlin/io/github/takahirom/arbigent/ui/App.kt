@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.dp
 import io.github.takahirom.arbigent.ArbigentDeviceOs
 import io.github.takahirom.arbigent.arbigentDebugLog
 import io.github.takahirom.arbigent.ui.ArbigentAppStateHolder.DeviceConnectionState
-import io.github.takahirom.arbigent.ui.ArbigentAppStateHolder.FileSelectionState
+import io.github.takahirom.arbigent.ui.ArbigentAppStateHolder.ProjectDialogState
 import kotlinx.coroutines.launch
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.Orientation
@@ -66,21 +66,29 @@ fun App(
       )
       return@Box
     }
-    val fileSelectionState by appStateHolder.fileSelectionState.collectAsState()
-    if (fileSelectionState is FileSelectionState.Loading) {
+    val projectDialogState by appStateHolder.projectDialogState.collectAsState()
+    if (projectDialogState is ProjectDialogState.LoadProjectContent) {
       FileLoadDialog(
         title = "Choose a file",
         onCloseRequest = { file ->
-          appStateHolder.loadGoals(file)
-          appStateHolder.fileSelectionState.value = FileSelectionState.NotSelected
+          appStateHolder.loadProjectContents(file)
+          appStateHolder.projectDialogState.value = ProjectDialogState.NotSelected
         }
       )
-    } else if (fileSelectionState is FileSelectionState.Saving) {
+    } else if (projectDialogState is ProjectDialogState.SaveProjectContent) {
       FileSaveDialog(
         title = "Save a file",
         onCloseRequest = { file ->
-          appStateHolder.saveGoals(file)
-          appStateHolder.fileSelectionState.value = FileSelectionState.NotSelected
+          appStateHolder.saveProjectContents(file)
+          appStateHolder.projectDialogState.value = ProjectDialogState.NotSelected
+        }
+      )
+    } else if (projectDialogState is ProjectDialogState.SaveProjectResult) {
+      FileSaveDialog(
+        title = "Save a file",
+        onCloseRequest = { file ->
+          appStateHolder.saveProjectResult(file)
+          appStateHolder.projectDialogState.value = ProjectDialogState.NotSelected
         }
       )
     }
@@ -249,26 +257,40 @@ private fun LeftScenariosPanel(
   }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun ScenarioFileControls(appStateHolder: ArbigentAppStateHolder) {
   FlowRow {
     IconActionButton(
       key = AllIconsKeys.Actions.MenuSaveall,
       onClick = {
-        appStateHolder.fileSelectionState.value = FileSelectionState.Saving
+        appStateHolder.projectDialogState.value = ProjectDialogState.SaveProjectContent
       },
       contentDescription = "Save",
       hint = Size(28)
-    )
+    ) {
+      Text("Save project content")
+    }
     IconActionButton(
       key = AllIconsKeys.Actions.MenuOpen,
       onClick = {
-        appStateHolder.fileSelectionState.value = FileSelectionState.Loading
+        appStateHolder.projectDialogState.value = ProjectDialogState.LoadProjectContent
       },
       contentDescription = "Load",
       hint = Size(28)
-    )
+    ) {
+      Text("Load project content")
+    }
+    IconActionButton(
+      key = AllIconsKeys.CodeWithMe.CwmShared,
+      onClick = {
+        appStateHolder.projectDialogState.value = ProjectDialogState.SaveProjectResult
+      },
+      contentDescription = "Save result",
+      hint = Size(28)
+    ) {
+      Text("Save project result")
+    }
   }
 }
 

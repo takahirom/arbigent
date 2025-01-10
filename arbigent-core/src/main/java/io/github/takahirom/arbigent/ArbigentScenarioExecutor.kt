@@ -3,17 +3,7 @@ package io.github.takahirom.arbigent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.shareIn
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.yield
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
@@ -76,8 +66,10 @@ public class ArbigentScenarioExecutor {
     MutableStateFlow<List<List<ArbigentTaskAssignment>>>(listOf())
   public val taskAssignmentsHistoryFlow: Flow<List<List<ArbigentTaskAssignment>>> =
     _taskAssignmentsHistoryStateFlow.asSharedFlow()
+
   public fun taskAssignmentsHistory(): List<List<ArbigentTaskAssignment>> =
     _taskAssignmentsHistoryStateFlow.value
+
   public val taskAssignmentsFlow: Flow<List<ArbigentTaskAssignment>> =
     _taskAssignmentsStateFlow.asSharedFlow()
 
@@ -221,7 +213,8 @@ public class ArbigentScenarioExecutor {
     } catch (e: Exception) {
       errorHandler(e)
     } finally {
-      _arbigentScenarioRunningInfoStateFlow.value = null
+      // To see after tests
+//      _arbigentScenarioRunningInfoStateFlow.value = null
       _taskAssignmentsStateFlow.value.forEach {
         it.agent.cancel()
       }

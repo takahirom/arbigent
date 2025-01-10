@@ -17,7 +17,7 @@ import com.jakewharton.mosaic.layout.background
 import com.jakewharton.mosaic.layout.padding
 import com.jakewharton.mosaic.modifier.Modifier
 import com.jakewharton.mosaic.runMosaicBlocking
-import com.jakewharton.mosaic.ui.Color.*
+import com.jakewharton.mosaic.ui.Color.Companion
 import com.jakewharton.mosaic.ui.Color.Companion.Black
 import com.jakewharton.mosaic.ui.Color.Companion.Green
 import com.jakewharton.mosaic.ui.Color.Companion.Red
@@ -26,20 +26,9 @@ import com.jakewharton.mosaic.ui.Color.Companion.Yellow
 import com.jakewharton.mosaic.ui.Column
 import com.jakewharton.mosaic.ui.Row
 import com.jakewharton.mosaic.ui.Text
-import io.github.takahirom.arbigent.ArbigentAi
-import io.github.takahirom.arbigent.ArbigentInternalApi
-import io.github.takahirom.arbigent.ArbigentLogLevel
-import io.github.takahirom.arbigent.ArbigentProject
-import io.github.takahirom.arbigent.ArbigentScenario
-import io.github.takahirom.arbigent.ArbigentScenarioExecutor
-import io.github.takahirom.arbigent.ArbigentScenarioExecutorState
-import io.github.takahirom.arbigent.ArbigentDeviceOs
-import io.github.takahirom.arbigent.OpenAIAi
-import io.github.takahirom.arbigent.arbigentLogLevel
-import io.github.takahirom.arbigent.fetchAvailableDevicesByOs
-import io.ktor.client.request.header
-import io.ktor.client.request.parameter
-import io.ktor.util.toLowerCasePreservingASCIIRules
+import io.github.takahirom.arbigent.*
+import io.ktor.client.request.*
+import io.ktor.util.*
 import kotlinx.coroutines.delay
 import java.io.File
 import kotlin.system.exitProcess
@@ -89,6 +78,9 @@ class ArbigentCli : CliktCommand() {
 
   @OptIn(ArbigentInternalApi::class)
   override fun run() {
+    val resultDir = File("arbigent-result")
+    ArbigentDir.screenshotsDir = File(resultDir, "screenshots")
+    val resultFile = File(resultDir, "result.yaml")
     val ai: ArbigentAi = aiType.let { aiType ->
       when (aiType) {
         is OpenAIAiConfig -> OpenAIAi(
@@ -131,6 +123,13 @@ class ArbigentCli : CliktCommand() {
       aiFactory = { ai },
       deviceFactory = { device }
     )
+    Runtime.getRuntime().addShutdownHook(object : Thread() {
+      override fun run() {
+        arbigentProject.cancel()
+        ArbigentProjectSerializer().save(arbigentProject.getResult(), resultFile)
+      }
+    })
+
     runMosaicBlocking {
       LaunchedEffect(Unit) {
         arbigentProject.execute()

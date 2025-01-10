@@ -4,6 +4,8 @@
 .kotlin
 screenshots/
 goals.text
+result.yaml
+arbigent-result
 
 build/
 
