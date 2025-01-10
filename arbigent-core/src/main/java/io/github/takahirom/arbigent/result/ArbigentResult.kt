@@ -8,12 +8,12 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 public class ArbigentProjectExecutionResult(
-  public val scenarioAssignmentResults: List<ArbigentScenarioResult>,
+  public val scenarios: List<ArbigentScenarioResult>,
 )
 
 @Serializable
 public class ArbigentScenarioResult(
-  public val scenarioId: String,
+  public val id: String,
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   public val goal: String? = null,
   @EncodeDefault(EncodeDefault.Mode.NEVER)
