@@ -1,6 +1,8 @@
 package io.github.takahirom.arbigent
 
 import dadb.Dadb
+import ios.LocalIOSDevice
+import ios.simctl.SimctlIOSDevice
 import ios.xctest.XCTestIOSDevice
 import maestro.Maestro
 import maestro.drivers.AndroidDriver
@@ -12,9 +14,7 @@ import xcuitest.XCTestDriverClient
 import xcuitest.installer.LocalXCTestInstaller
 
 public enum class ArbigentDeviceOs {
-  Android,
-  iOS,
-  Web;
+  Android, iOS, Web;
 
   public fun isAndroid(): Boolean = this == Android
   public fun isIOS(): Boolean = this == iOS
@@ -75,10 +75,15 @@ public sealed interface ArbigentAvailableDevice {
         client = xcTestDriverClient,
         getInstalledApps = { XCRunnerCLIUtils.listApps(device.udid) },
       )
+
       return MaestroDevice(
         Maestro.ios(
           IOSDriver(
-            xcTestDevice
+            LocalIOSDevice(
+              deviceId = device.udid,
+              xcTestDevice = xcTestDevice,
+              simctlIOSDevice = SimctlIOSDevice(device.udid)
+            )
           )
         )
       )
