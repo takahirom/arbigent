@@ -38,8 +38,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.loadImageBitmap
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -570,10 +572,16 @@ private fun ContentPanel(tasksToAgentHistory: List<List<ArbigentTaskAssignment>>
             .verticalScroll(scrollableState),
         ) {
           step.uiTreeStrings?.let {
+            val clipboardManager = LocalClipboardManager.current
             ExpandableSection("All UI Tree", modifier = Modifier.fillMaxWidth()) {
               Text(
                 modifier = Modifier
                   .padding(8.dp)
+                  .clickable {
+                    clipboardManager.setText(
+                      annotatedString = buildAnnotatedString { append(it.allTreeString) }
+                    )
+                  }
                   .background(JewelTheme.globalColors.panelBackground),
                 text = it.allTreeString
               )

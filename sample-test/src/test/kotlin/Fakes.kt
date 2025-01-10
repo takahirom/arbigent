@@ -55,7 +55,8 @@ class FakeDevice : ArbigentDevice {
           height = 100,
           isVisible = true
         )
-      }
+      },
+      screenWidth = 1000
     )
   }
 

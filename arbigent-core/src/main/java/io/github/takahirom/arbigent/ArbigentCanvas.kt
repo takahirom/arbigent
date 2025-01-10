@@ -32,7 +32,7 @@ internal val colors = listOf(
 public class ArbigentCanvas(width: Int, height: Int, bufferedImageType: Int) {
   private val bufferedImage: BufferedImage = BufferedImage(width, height, bufferedImageType)
 
-  public fun drawImage(image: BufferedImage, compositeMode: CompositeMode = CompositeMode.SrcOver) {
+  public fun drawImage(image: BufferedImage, multiply: Double, compositeMode: CompositeMode = CompositeMode.SrcOver) {
     bufferedImage.graphics { graphics2D ->
       graphics2D.setComposite(
         when (compositeMode) {
@@ -44,6 +44,8 @@ public class ArbigentCanvas(width: Int, height: Int, bufferedImageType: Int) {
         image,
         0,
         0,
+        (image.width * multiply).toInt(),
+        (image.height * multiply).toInt(),
         null
       )
     }
@@ -154,10 +156,15 @@ public class ArbigentCanvas(width: Int, height: Int, bufferedImageType: Int) {
   }
 
   public companion object {
-    public fun load(file: File, bufferedImageType: Int): ArbigentCanvas {
+    public fun load(file: File, width: Int, bufferedImageType: Int): ArbigentCanvas {
       val bufferedImage = ImageIO.read(file)
-      val canvas = ArbigentCanvas(bufferedImage.width, bufferedImage.height,bufferedImageType)
-      canvas.drawImage(bufferedImage, CompositeMode.Src)
+      val multiply = width.toDouble() / bufferedImage.width
+      val canvas = ArbigentCanvas(
+        width = width,
+        height = (bufferedImage.height * multiply).toInt(),
+        bufferedImageType = bufferedImageType
+      )
+      canvas.drawImage(bufferedImage, multiply, CompositeMode.Src)
       return canvas
     }
   }
