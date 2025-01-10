@@ -463,7 +463,7 @@ public fun defaultAgentCommandTypesForTvForVisualMode(): List<AgentCommandType> 
   return listOf(
     DpadAutoFocusWithIndexAgentCommand,
 //    DpadAutoFocusWithIdAgentCommand,
-    DpadAutoFocusWithTextAgentCommand,
+//    DpadAutoFocusWithTextAgentCommand,
     DpadUpArrowAgentCommand,
     DpadDownArrowAgentCommand,
     DpadLeftArrowAgentCommand,
