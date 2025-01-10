@@ -81,8 +81,8 @@ public fun ArbigentProject(
   aiFactory: () -> ArbigentAi,
   deviceFactory: () -> ArbigentDevice
 ): ArbigentProject {
-  val arbigentProjectFileContent = ArbigentProjectSerializer().load(file)
-  return ArbigentProject(arbigentProjectFileContent, aiFactory, deviceFactory)
+  val projectContentFileContent = ArbigentProjectContentSerializer().load(file)
+  return ArbigentProject(projectContentFileContent, aiFactory, deviceFactory)
 }
 
 public data class ArbigentScenario(

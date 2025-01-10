@@ -124,7 +124,7 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
 }
 
 
-public class ArbigentProjectSerializer(
+public class ArbigentProjectContentSerializer(
   private val fileSystem: FileSystem = object : FileSystem {}
 ) {
   private val yaml = Yaml(

@@ -15,7 +15,7 @@ class ArbigentProjectFileContentTest {
   fun tests() = runTest {
     ArbigentCoroutinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
 
-    val projectFileContent: ArbigentProjectFileContent = ArbigentProjectSerializer().load(
+    val projectFileContent: ArbigentProjectFileContent = ArbigentProjectContentSerializer().load(
       File(this::class.java.getResource("/projects/nowinandroidsample.yaml")!!.toURI())
     )
     projectFileContent.scenarioContents.forEach { scenarioContent ->
@@ -34,7 +34,7 @@ class ArbigentProjectFileContentTest {
 
   @Test
   fun loadProjectTest() {
-    val project = ArbigentProjectSerializer().load(
+    val project = ArbigentProjectContentSerializer().load(
       File(this::class.java.getResource("/projects/nowinandroidsample.yaml")!!.toURI())
     )
     assertEquals(2, project.scenarioContents.size)

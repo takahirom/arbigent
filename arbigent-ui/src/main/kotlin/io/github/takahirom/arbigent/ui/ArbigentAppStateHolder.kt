@@ -7,7 +7,7 @@ import io.github.takahirom.arbigent.ArbigentDevice
 import io.github.takahirom.arbigent.ArbigentInternalApi
 import io.github.takahirom.arbigent.ArbigentProject
 import io.github.takahirom.arbigent.ArbigentProjectFileContent
-import io.github.takahirom.arbigent.ArbigentProjectSerializer
+import io.github.takahirom.arbigent.ArbigentProjectContentSerializer
 import io.github.takahirom.arbigent.ArbigentScenario
 import io.github.takahirom.arbigent.ArbigentScenarioContent
 import io.github.takahirom.arbigent.ArbigentDeviceOs
@@ -237,13 +237,13 @@ class ArbigentAppStateHolder(
     }
   }
 
-  private val arbigentProjectSerializer = ArbigentProjectSerializer()
+  private val arbigentProjectContentSerializer = ArbigentProjectContentSerializer()
   fun saveGoals(file: File?) {
     if (file == null) {
       return
     }
     val sortedScenarios = sortedScenariosAndDepthsStateFlow.value.map { it.first }
-    arbigentProjectSerializer.save(
+    arbigentProjectContentSerializer.save(
       projectFileContent = ArbigentProjectFileContent(
         scenarioContents = sortedScenarios.map {
           it.createArbigentScenarioContent()
@@ -257,7 +257,7 @@ class ArbigentAppStateHolder(
     if (file == null) {
       return
     }
-    val projectFile = ArbigentProjectSerializer().load(file)
+    val projectFile = ArbigentProjectContentSerializer().load(file)
     val scenarios = projectFile.scenarioContents
     val arbigentScenarioStateHolders = scenarios.map { scenarioContent ->
       ArbigentScenarioStateHolder(id = scenarioContent.id).apply {
