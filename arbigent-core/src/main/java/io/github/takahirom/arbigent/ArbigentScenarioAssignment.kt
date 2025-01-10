@@ -10,7 +10,7 @@ public data class ArbigentScenarioAssignment(
   public fun getResult(): ArbigentScenarioResult {
     val taskAssignmentsHistory: List<List<ArbigentTaskAssignment>> = scenarioExecutor.taskAssignmentsHistory()
     return ArbigentScenarioResult(
-      scenarioId = scenario.id,
+      id = scenario.id,
       goal = scenario.goal(),
       executionStatus = scenarioExecutor.runningInfo()?.toString(),
       isSuccess = taskAssignmentsHistory.lastOrNull()?.all { it.agent.isGoalArchived() } ?: false,
