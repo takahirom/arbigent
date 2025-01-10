@@ -384,7 +384,7 @@ class FakeDevice : ArbigentDevice {
 
   override fun elements(): ArbigentElementList {
     arbigentDebugLog("FakeDevice.elements")
-    return ArbigentElementList(emptyList())
+    return ArbigentElementList(emptyList(), 1080)
   }
 
   override fun close() {

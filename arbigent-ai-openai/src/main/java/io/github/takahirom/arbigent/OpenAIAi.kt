@@ -107,7 +107,7 @@ class OpenAIAi(
     val elements = decisionInput.elements
 
     val original = File(screenshotFilePath)
-    val canvas = ArbigentCanvas.load(original, TYPE_INT_ARGB)
+    val canvas = ArbigentCanvas.load(original, elements.screenWidth, TYPE_INT_ARGB)
     canvas.draw(elements)
     canvas.save(original.getAnnotatedFilePath())
 

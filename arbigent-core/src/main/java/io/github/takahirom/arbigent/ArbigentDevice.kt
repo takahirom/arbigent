@@ -1,19 +1,9 @@
 package io.github.takahirom.arbigent
 
 import io.github.takahirom.arbigent.MaestroDevice.OptimizationResult
-import maestro.Bounds
-import maestro.DeviceInfo
-import maestro.Filters
-import maestro.FindElementResult
-import maestro.KeyCode
-import maestro.Maestro
-import maestro.MaestroException
-import maestro.TreeNode
-import maestro.UiElement
+import maestro.*
 import maestro.UiElement.Companion.toUiElement
 import maestro.UiElement.Companion.toUiElementOrNull
-import maestro.ViewHierarchy
-import maestro.filterOutOfBounds
 import maestro.orchestra.MaestroCommand
 import maestro.orchestra.Orchestra
 import java.io.File
@@ -60,6 +50,7 @@ public data class ArbigentUiTreeStrings(
 
 private val meaningfulAttributes: Set<String> = setOf(
   "text",
+  "title",
   "accessibilityText",
   "content description",
   "hintText"
@@ -102,7 +93,8 @@ public data class ArbigentElement(
 }
 
 public data class ArbigentElementList(
-  val elements: List<ArbigentElement>
+  val elements: List<ArbigentElement>,
+  val screenWidth: Int
 ) {
 
   public fun getAiTexts(): String {
@@ -114,6 +106,7 @@ public data class ArbigentElementList(
       viewHierarchy: ViewHierarchy,
       deviceInfo: DeviceInfo
     ): ArbigentElementList {
+      val clickableAvailable = deviceInfo.platform != Platform.IOS
       var index = 0
       val deviceInfo = deviceInfo
       val root = viewHierarchy.root
@@ -151,10 +144,15 @@ public data class ArbigentElementList(
 
       fun TreeNode.toElementList(): List<ArbigentElement> {
         val elements = mutableListOf<ArbigentElement>()
-        if (clickable == true || focused == true
-          || attributes["clickable"] == "true"
-          || attributes["focused"] == "true"
-          || attributes["focusable"] == "true"
+        val shouldAddElement = if (clickableAvailable) {
+          (clickable == true || focused == true
+            || attributes["clickable"] == "true"
+            || attributes["focused"] == "true"
+            || attributes["focusable"] == "true")
+        } else {
+          meaningfulAttributes.any { attributes[it]?.isNotBlank() == true }
+        }
+        if (shouldAddElement
         ) {
           elements.add(toElement())
         }
@@ -165,7 +163,12 @@ public data class ArbigentElementList(
         return elements
       }
       elements.addAll(optimizedTree?.toElementList() ?: emptyList())
-      return ArbigentElementList(elements)
+
+
+      return ArbigentElementList(
+        elements = elements,
+        screenWidth = (deviceInfo.widthGrid)
+      )
     }
   }
 }
@@ -253,10 +256,7 @@ public class MaestroDevice(
   }
 
 
-  private fun ViewHierarchy.toOptimizedString(
-    meaningfulAttributes: Set<String> = setOf("text", "content description", "hintText", "focused"),
-    deviceInfo: DeviceInfo
-  ): String {
+  private fun ViewHierarchy.toOptimizedString(deviceInfo: DeviceInfo): String {
     val root = root
     val result = root.filterOutOfBounds(
       width = deviceInfo.widthPixels,
@@ -264,7 +264,6 @@ public class MaestroDevice(
     )!!.optimizeTree(
       isRoot = true,
       viewHierarchy = this,
-      meaningfulAttributes = meaningfulAttributes
     )
     val optimizedTree = result.node ?: result.promotedChildren.firstOrNull()
     arbigentDebugLog("Before optimization (length): ${this.toString().length}")
@@ -564,12 +563,6 @@ private fun StringBuilder.appendUiElementContents(
 
 public fun TreeNode.optimizeTree(
   isRoot: Boolean = false,
-  meaningfulAttributes: Set<String> = setOf(
-    "text",
-    "accessibilityText",
-    "content description",
-    "hintText"
-  ),
   viewHierarchy: ViewHierarchy
 ): OptimizationResult {
   // Optimize children
@@ -583,7 +576,7 @@ public fun TreeNode.optimizeTree(
           it.width > 0 && it.height > 0
         }) ?: true
     }
-    .map { it.optimizeTree(false, meaningfulAttributes, viewHierarchy) }
+    .map { it.optimizeTree(false, viewHierarchy) }
   val optimizedChildren = childResults.flatMap {
     it.node?.let { node -> listOf(node) } ?: it.promotedChildren
   }
