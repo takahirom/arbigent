@@ -446,5 +446,5 @@ fun File.getResizedIamgeBase64(scale: Float): String {
 }
 
 public fun File.getAnnotatedFilePath() =
-  absolutePath.substringBeforeLast(".") + "_annotated" + extension
+  absolutePath.substringBeforeLast(".") + "_annotated." + extension
 

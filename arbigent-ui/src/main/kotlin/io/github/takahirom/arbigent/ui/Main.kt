@@ -17,7 +17,7 @@ import androidx.compose.ui.window.WindowExceptionHandler
 import androidx.compose.ui.window.WindowExceptionHandlerFactory
 import androidx.compose.ui.window.application
 import io.github.takahirom.arbigent.OpenAIAi
-import io.github.takahirom.arbigent.ui.ArbigentAppStateHolder.FileSelectionState
+import io.github.takahirom.arbigent.ui.ArbigentAppStateHolder.ProjectDialogState
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import org.jetbrains.jewel.foundation.theme.JewelTheme
@@ -129,10 +129,10 @@ fun AppWindow(
               appStateHolder.runAllFailed()
             }
             Item("Save") {
-              appStateHolder.fileSelectionState.value = FileSelectionState.Saving
+              appStateHolder.projectDialogState.value = ProjectDialogState.SaveProjectContent
             }
             Item("Load") {
-              appStateHolder.fileSelectionState.value = FileSelectionState.Loading
+              appStateHolder.projectDialogState.value = ProjectDialogState.LoadProjectContent
             }
           }
         }

@@ -172,7 +172,7 @@ public data class ArbigentElementList(
 
 public class MaestroDevice(
   private val maestro: Maestro,
-  screenshotsDir: File = ArbigentTempDir.screenshotsDir
+  screenshotsDir: File = ArbigentDir.screenshotsDir
 ) : ArbigentDevice, ArbigentTvCompatDevice {
   private val orchestra = Orchestra(
     maestro = maestro,

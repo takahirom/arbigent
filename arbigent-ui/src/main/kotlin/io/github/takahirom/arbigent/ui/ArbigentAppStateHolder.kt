@@ -48,16 +48,17 @@ class ArbigentAppStateHolder(
     fun isConnected(): Boolean = this is Connected
   }
 
-  sealed interface FileSelectionState {
-    data object NotSelected : FileSelectionState
-    data object Loading : FileSelectionState
-    data object Saving : FileSelectionState
+  sealed interface ProjectDialogState {
+    data object NotSelected : ProjectDialogState
+    data object LoadProjectContent : ProjectDialogState
+    data object SaveProjectContent : ProjectDialogState
+    data object SaveProjectResult : ProjectDialogState
   }
 
   val deviceConnectionState: MutableStateFlow<DeviceConnectionState> =
     MutableStateFlow(DeviceConnectionState.NotConnected)
-  val fileSelectionState: MutableStateFlow<FileSelectionState> =
-    MutableStateFlow(FileSelectionState.NotSelected)
+  val projectDialogState: MutableStateFlow<ProjectDialogState> =
+    MutableStateFlow(ProjectDialogState.NotSelected)
   private val projectStateFlow = MutableStateFlow<ArbigentProject?>(null)
   private val allScenarioStateHoldersStateFlow: MutableStateFlow<List<ArbigentScenarioStateHolder>> =
     MutableStateFlow(listOf())
@@ -238,7 +239,7 @@ class ArbigentAppStateHolder(
   }
 
   private val arbigentProjectSerializer = ArbigentProjectSerializer()
-  fun saveGoals(file: File?) {
+  fun saveProjectContents(file: File?) {
     if (file == null) {
       return
     }
@@ -253,7 +254,7 @@ class ArbigentAppStateHolder(
     )
   }
 
-  fun loadGoals(file: File?) {
+  fun loadProjectContents(file: File?) {
     if (file == null) {
       return
     }
@@ -315,6 +316,15 @@ class ArbigentAppStateHolder(
       if (it.dependencyScenarioStateHolderStateFlow.value == scenario) {
         it.dependencyScenarioStateHolderStateFlow.value = removedScenarioDependency
       }
+    }
+  }
+
+  fun saveProjectResult(file: File?) {
+    if (file == null) {
+      return
+    }
+    projectStateFlow.value?.getResult()?.let {
+      arbigentProjectSerializer.save(it, file)
     }
   }
 }

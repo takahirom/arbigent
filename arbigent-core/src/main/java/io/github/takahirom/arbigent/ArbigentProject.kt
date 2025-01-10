@@ -1,5 +1,6 @@
 package io.github.takahirom.arbigent
 
+import io.github.takahirom.arbigent.result.ArbigentProjectExecutionResult
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -58,6 +59,12 @@ public class ArbigentProject(
   public fun isSuccess(): Boolean {
     return scenarioAssignments().all { it.scenarioExecutor.isSuccess() }
   }
+
+  public fun getResult(): ArbigentProjectExecutionResult {
+    return ArbigentProjectExecutionResult(
+      scenarioAssignments().map { it.getResult() }
+    )
+  }
 }
 
 public fun ArbigentProject(
@@ -81,8 +88,8 @@ public fun ArbigentProject(
   aiFactory: () -> ArbigentAi,
   deviceFactory: () -> ArbigentDevice
 ): ArbigentProject {
-  val arbigentProjectFileContent = ArbigentProjectSerializer().load(file)
-  return ArbigentProject(arbigentProjectFileContent, aiFactory, deviceFactory)
+  val projectContentFileContent = ArbigentProjectSerializer().load(file)
+  return ArbigentProject(projectContentFileContent, aiFactory, deviceFactory)
 }
 
 public data class ArbigentScenario(
@@ -92,4 +99,8 @@ public data class ArbigentScenario(
   val maxStepCount: Int = 10,
   val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Mobile,
   val isLeaf: Boolean,
-)
+) {
+  public fun goal(): String? {
+    return agentTasks.lastOrNull()?.goal
+  }
+}
