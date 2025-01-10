@@ -626,10 +626,10 @@ private fun ContentPanel(tasksToAgentHistory: List<List<ArbigentTaskAssignment>>
         }
         Column(
           Modifier
+            .verticalScroll(rememberScrollState())
             .fillMaxHeight()
             .weight(1f)
-            .padding(8.dp)
-            .scrollable(rememberScrollState(), orientation = androidx.compose.foundation.gestures.Orientation.Vertical),
+            .padding(8.dp),
           verticalArrangement = Arrangement.Center,
         ) {
           ExpandableSection(
