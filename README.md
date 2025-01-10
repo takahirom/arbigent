@@ -50,7 +50,9 @@ Furthermore, I wanted to make Arbigent accessible to QA engineers by offering a 
 
 ### Installation
 
-Install the Arbigent UI binary from the [GitHub Actions workflow page](https://github.com/takahirom/arbigent/actions/workflows/build-ui.yaml?query=branch%3Amain). Please open the latest successful build and download the artifact.
+Install the Arbigent UI binary from the [Release page](https://github.com/takahirom/arbigent/releases).
+<img width="632" alt="image" src="https://github.com/user-attachments/assets/499da604-4a43-4eb8-b27f-325a83caa013" />
+
 
 ### Device Connection and AI API Key Entry
 
@@ -110,6 +112,7 @@ Options:
 |-------------|-----------|
 | OpenAI      | Yes       |
 | Gemini      | Yes       |
+| OpenAI based APIs like Ollama | Yes |
 
 You can add AI providers by implementing the `ArbigentAi` interface.
 
