@@ -22,17 +22,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
-import io.github.takahirom.arbigent.ArbigentAgentCommand
-import io.github.takahirom.arbigent.ArbigentAi
-import io.github.takahirom.arbigent.ArbigentContextHolder
-import io.github.takahirom.arbigent.ArbigentCoroutinesDispatcher
-import io.github.takahirom.arbigent.ClickWithTextAgentCommand
-import io.github.takahirom.arbigent.ArbigentDevice
-import io.github.takahirom.arbigent.ArbigentAvailableDevice
-import io.github.takahirom.arbigent.ArbigentElementList
-import io.github.takahirom.arbigent.ArbigentUiTreeStrings
-import io.github.takahirom.arbigent.GoalAchievedAgentCommand
-import io.github.takahirom.arbigent.arbigentDebugLog
+import io.github.takahirom.arbigent.*
 import io.github.takahirom.roborazzi.captureRoboImage
 import io.github.takahirom.robospec.BehaviorsTreeBuilder
 import io.github.takahirom.robospec.DescribedBehavior
@@ -363,6 +353,11 @@ class TestRobot(
 class FakeDevice : ArbigentDevice {
   override fun executeCommands(commands: List<MaestroCommand>) {
     arbigentDebugLog("FakeDevice.executeCommands: $commands")
+  }
+
+  override fun os(): ArbigentDeviceOs {
+    arbigentDebugLog("FakeDevice.os")
+    return ArbigentDeviceOs.Android
   }
 
   override fun waitForAppToSettle(appId: String?) {

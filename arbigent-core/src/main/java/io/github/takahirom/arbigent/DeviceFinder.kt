@@ -10,7 +10,7 @@ public fun fetchAvailableDevicesByOs(deviceType: ArbigentDeviceOs): List<Arbigen
       Dadb.list().map { ArbigentAvailableDevice.Android(it) }
     }
 
-    ArbigentDeviceOs.iOS -> {
+    ArbigentDeviceOs.Ios -> {
       LocalSimulatorUtils.list()
         .devices
         .flatMap { runtime ->

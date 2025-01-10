@@ -14,10 +14,10 @@ import xcuitest.XCTestDriverClient
 import xcuitest.installer.LocalXCTestInstaller
 
 public enum class ArbigentDeviceOs {
-  Android, iOS, Web;
+  Android, Ios, Web;
 
   public fun isAndroid(): Boolean = this == Android
-  public fun isIOS(): Boolean = this == iOS
+  public fun isIos(): Boolean = this == Ios
   public fun isWeb(): Boolean = this == Web
 }
 
@@ -52,7 +52,7 @@ public sealed interface ArbigentAvailableDevice {
     // local host
     private val host: String = "[::1]",
   ) : ArbigentAvailableDevice {
-    override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.iOS
+    override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Ios
     override val name: String = device.name
     override fun connectToDevice(): ArbigentDevice {
       val port = port

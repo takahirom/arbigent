@@ -32,7 +32,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.modules.SerializersModule
-import java.awt.image.BufferedImage.TYPE_INT_ARGB
+import java.awt.image.BufferedImage.TYPE_INT_RGB
 import java.io.File
 import java.nio.charset.Charset
 import java.util.Base64
@@ -107,7 +107,7 @@ class OpenAIAi(
     val elements = decisionInput.elements
 
     val original = File(screenshotFilePath)
-    val canvas = ArbigentCanvas.load(original, elements.screenWidth, TYPE_INT_ARGB)
+    val canvas = ArbigentCanvas.load(original, elements.screenWidth, TYPE_INT_RGB)
     canvas.draw(elements)
     canvas.save(original.getAnnotatedFilePath())
 

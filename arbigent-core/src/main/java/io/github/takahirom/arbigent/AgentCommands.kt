@@ -17,6 +17,7 @@ public interface ArbigentAgentCommand {
 public interface AgentCommandType {
   public val actionName: String
   public fun templateForAI(): String
+  public fun isSupported(deviceOs: ArbigentDeviceOs): Boolean = true
 }
 
 private fun getRegexToIndex(text: String): Pair<String, String> {
@@ -470,6 +471,10 @@ public class BackPressAgentCommand() : ArbigentAgentCommand {
 
   public companion object : AgentCommandType {
     override val actionName: String = "BackPress"
+
+    override fun isSupported(deviceOs: ArbigentDeviceOs): Boolean {
+      return !deviceOs.isIos()
+    }
 
     override fun templateForAI(): String {
       return """

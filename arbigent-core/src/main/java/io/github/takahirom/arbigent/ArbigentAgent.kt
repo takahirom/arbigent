@@ -161,13 +161,14 @@ public class ArbigentAgent(
       arbigentDebugLog("Setting new ArbigentContextHolder: $arbigentContextHolder")
       arbigentContextHolderStateFlow.value = arbigentContextHolder
       arbigentContextHistoryStateFlow.value += arbigentContextHolder
+      val supportedAgentCommandTypes = agentCommandTypes.filter { it.isSupported(device.os()) }
 
       initializerChain(device)
       var stepRemain = maxStep
       while (stepRemain-- > 0 && isGoalArchived().not()) {
         val stepInput = StepInput(
           arbigentContextHolder = arbigentContextHolder,
-          agentCommandTypes = agentCommandTypes,
+          agentCommandTypes = supportedAgentCommandTypes,
           device = device,
           deviceFormFactor = deviceFormFactor,
           ai = ai,

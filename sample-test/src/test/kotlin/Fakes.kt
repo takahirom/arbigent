@@ -9,6 +9,11 @@ class FakeDevice : ArbigentDevice {
     arbigentDebugLog("FakeDevice.executeCommands: $commands")
   }
 
+  override fun os(): ArbigentDeviceOs {
+    arbigentDebugLog("FakeDevice.os")
+    return ArbigentDeviceOs.Android
+  }
+
   override fun waitForAppToSettle(appId: String?) {
     arbigentDebugLog("FakeDevice.waitForAppToSettle")
   }
