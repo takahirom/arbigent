@@ -63,8 +63,8 @@ fun BoxScope.LauncherScreen(
       )
       RadioButtonRow(
         text = "iOS",
-        selected = deviceOs.isIOS(),
-        onClick = { devicesStateHolder.selectedDeviceOs.value = ArbigentDeviceOs.iOS }
+        selected = deviceOs.isIos(),
+        onClick = { devicesStateHolder.selectedDeviceOs.value = ArbigentDeviceOs.Ios }
       )
       RadioButtonRow(
         text = "Web(Experimental)",

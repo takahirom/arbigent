@@ -63,6 +63,7 @@ public interface ArbigentDevice {
   public fun close()
   public fun elements(): ArbigentElementList
   public fun waitForAppToSettle(appId: String? = null)
+  public fun os(): ArbigentDeviceOs
 }
 
 public data class ArbigentElement(
@@ -255,6 +256,13 @@ public class MaestroDevice(
     }
   }
 
+  override fun os(): ArbigentDeviceOs {
+    return when (maestro.cachedDeviceInfo.platform) {
+      Platform.ANDROID -> ArbigentDeviceOs.Android
+      Platform.IOS -> ArbigentDeviceOs.Ios
+      else -> ArbigentDeviceOs.Web
+    }
+  }
 
   private fun ViewHierarchy.toOptimizedString(deviceInfo: DeviceInfo): String {
     val root = root
