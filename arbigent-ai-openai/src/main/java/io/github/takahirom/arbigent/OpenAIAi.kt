@@ -35,8 +35,8 @@ import kotlinx.serialization.modules.SerializersModule
 import java.awt.image.BufferedImage.TYPE_INT_RGB
 import java.io.File
 import java.nio.charset.Charset
-import java.util.Base64
 
+@OptIn(ExperimentalRoborazziApi::class, ExperimentalSerializationApi::class)
 class OpenAIAi(
   private val apiKey: String,
   private val baseUrl: String = "https://api.openai.com/v1/",
@@ -116,7 +116,7 @@ class OpenAIAi(
     val messages: List<ChatMessage> = listOf(
       ChatMessage(
         role = "system",
-        content = listOf(
+        contents = listOf(
           Content(
             type = "text",
             text = when (formFactor) {
@@ -128,7 +128,7 @@ class OpenAIAi(
       ),
       ChatMessage(
         role = "user",
-        content = listOf(
+        contents = listOf(
           Content(
             type = "image_url",
             imageUrl = ImageUrl(
@@ -159,7 +159,7 @@ class OpenAIAi(
         ArbigentContextHolder.Step(
           memo = "Failed to parse AI response: ${e.message}",
           screenshotFilePath = screenshotFilePath,
-          aiRequest = messages.toString(),
+          aiRequest = messages.toHumanReadableString(),
           aiResponse = responseText,
           uiTreeStrings = uiTreeStrings,
         )
@@ -183,7 +183,6 @@ class OpenAIAi(
     val focusedTreeText = focusedTree?.let { "\nCurrently focused Tree:\n$it\n\n" } ?: ""
     val prompt = """
 
-
 UI Index to Element Map:
 ${elements.getAiTexts()}
 $focusedTreeText
@@ -194,7 +193,7 @@ $templates"""
 
   private fun parseResponse(
     response: String,
-    message: List<ChatMessage>,
+    messages: List<ChatMessage>,
     decisionInput: ArbigentAi.DecisionInput,
   ): ArbigentContextHolder.Step {
     val screenshotFilePath = decisionInput.screenshotFilePath
@@ -305,7 +304,7 @@ $templates"""
         action = action,
         imageDescription = jsonObject["image-description"]?.jsonPrimitive?.content ?: "",
         memo = jsonObject["memo"]?.jsonPrimitive?.content ?: "",
-        aiRequest = message.map { it.copy(content = it.content.map { it.copy(imageUrl = null) }) }.toString(),
+        aiRequest = messages.toHumanReadableString(),
         aiResponse = content,
         screenshotFilePath = screenshotFilePath,
         uiTreeStrings = decisionInput.uiTreeStrings
@@ -351,7 +350,7 @@ $templates"""
           }"
         )
       }
-      val responseBody = response.bodyAsText() ?: ""
+      val responseBody = response.bodyAsText()
       return@runBlocking responseBody
     }
   }
@@ -387,12 +386,6 @@ $templates"""
     }
     """.trimIndent()
     return Json.parseToJsonElement(schemaJson).jsonObject
-  }
-
-  private fun readFileAsBase64(filename: String): String {
-    val file = File(filename)
-    val bytes = file.readBytes()
-    return Base64.getEncoder().encodeToString(bytes)
   }
 
   @OptIn(ExperimentalRoborazziApi::class)
@@ -445,6 +438,6 @@ fun File.getResizedIamgeBase64(scale: Float): String {
   return this.readBytes().encodeBase64()
 }
 
-public fun File.getAnnotatedFilePath() =
+fun File.getAnnotatedFilePath() =
   absolutePath.substringBeforeLast(".") + "_annotated." + extension
 

@@ -53,8 +53,8 @@ public data class ClickWithIndex(val index: Int, val elements: ArbigentElementLi
       return """
         {
             "action": "$actionName",
-            // Index like 1 or 2
-            "text": "..."
+            // Should be index like 1 or 2 should NOT be text or id
+            "text": "1"
         }
         """.trimIndent()
     }
@@ -74,7 +74,7 @@ public data class ClickWithTextAgentCommand(val textRegex: String) : ArbigentAge
     val maestroCommand = MaestroCommand(
       tapOnElement = TapOnElementCommand(
         selector = ElementSelector(
-          textRegex = "$textRegex", index = index
+          textRegex = textRegex, index = index
         ), waitToSettleTimeoutMs = 500, retryIfNoChange = false, waitUntilVisible = false
       )
     )
@@ -340,8 +340,8 @@ public data class DpadAutoFocusWithIdAgentCommand(val id: String) : ArbigentAgen
   }
 
   override fun runDeviceCommand(device: ArbigentDevice) {
-    val device = (device as? ArbigentTvCompatDevice)?: throw NotImplementedError(message = "This command is only available for TV device")
-    device.moveFocusToElement(ArbigentTvCompatDevice.Selector.ById.fromId(id))
+    val tvCompatibleDevice = (device as? ArbigentTvCompatDevice)?: throw NotImplementedError(message = "This command is only available for TV device")
+    tvCompatibleDevice.moveFocusToElement(ArbigentTvCompatDevice.Selector.ById.fromId(id))
   }
 
   public companion object : AgentCommandType {
@@ -369,8 +369,8 @@ public data class DpadAutoFocusWithTextAgentCommand(val text: String) : Arbigent
   }
 
   override fun runDeviceCommand(device: ArbigentDevice) {
-    val device = (device as? ArbigentTvCompatDevice)?: throw NotImplementedError(message = "This command is only available for TV device")
-    device.moveFocusToElement(ArbigentTvCompatDevice.Selector.ByText.fromText(text))
+    val tvCompatibleDevice = (device as? ArbigentTvCompatDevice)?: throw NotImplementedError(message = "This command is only available for TV device")
+    tvCompatibleDevice.moveFocusToElement(ArbigentTvCompatDevice.Selector.ByText.fromText(text))
   }
 
   public companion object : AgentCommandType {
@@ -398,8 +398,8 @@ public data class DpadAutoFocusWithIndexAgentCommand(val index: Int, val element
   }
 
   public override fun runDeviceCommand(device: ArbigentDevice) {
-    val device = (device as? ArbigentTvCompatDevice)?: throw NotImplementedError(message = "This command is only available for TV device")
-    device.moveFocusToElement(elements.elements[index])
+    val tvCompatibleDevice = (device as? ArbigentTvCompatDevice)?: throw NotImplementedError(message = "This command is only available for TV device")
+    tvCompatibleDevice.moveFocusToElement(elements.elements[index])
   }
 
   public companion object : AgentCommandType {
@@ -409,8 +409,8 @@ public data class DpadAutoFocusWithIndexAgentCommand(val index: Int, val element
       return """
         {
             "action": "$actionName",
-            // Index like 1 or 2
-            "text": "..."
+            // Should be index like 1 or 2 should NOT be text or id
+            "text": "1"
         }
         """.trimIndent()
     }

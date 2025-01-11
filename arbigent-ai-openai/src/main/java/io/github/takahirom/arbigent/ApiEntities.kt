@@ -8,8 +8,27 @@ import kotlinx.serialization.json.JsonObject
 @Serializable
 data class ChatMessage(
   val role: String,
-  val content: List<Content>
+  @SerialName("content")
+  val contents: List<Content>
 )
+
+fun List<ChatMessage>.toHumanReadableString(): String {
+  return buildString {
+    for (chatMessage in this@toHumanReadableString) {
+      append(chatMessage.role + ": ")
+      for (content in chatMessage.contents) {
+        appendLine("type:" + content.type + " ")
+        when (content.type) {
+          "text" -> appendLine(content.text ?: "")
+          "image_url" -> appendLine("size:"+ content.imageUrl?.url?.length + " content:" + content.imageUrl?.url?.take(20) + "...")
+          else -> appendLine("")
+        }
+        appendLine()
+      }
+      appendLine("----")
+    }
+  }
+}
 
 @Serializable
 data class ChatCompletionRequest(
