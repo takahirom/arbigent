@@ -14,17 +14,16 @@ scenarios:
     \ version\"."
   dependency: "f9c17741-093e-49f0-ad45-8311ba68c1a6"
   maxStep: 20
-- id: "210af2d2-1ab8-4423-9c8a-2170432e15d1"
-  goal: "Please go back to the top of the OS settings using the navigation. The goal\
-    \ is to see the OS Settings top page."
-  dependency: "aae28c7e-416f-4297-8fe2-36a9719ec8ed"
 - id: "b11ca7cb-392a-4982-bf5f-e6150c364efc"
   goal: "Please Open \"System\" page in the OS setting app."
-  dependency: "210af2d2-1ab8-4423-9c8a-2170432e15d1"
+  dependency: "aae28c7e-416f-4297-8fe2-36a9719ec8ed"
+  cleanupData:
+    type: "Cleanup"
+    packageName: "com.android.settings"
 - id: "f3f37feb-201f-4f1c-9931-ed3d3fc15ca9"
-  goal: "Open developer's options on System page in OS setting app."
+  goal: "Open developer's options at the bottom of System page in OS setting app."
   dependency: "b11ca7cb-392a-4982-bf5f-e6150c364efc"
 - id: "f369e44d-013f-4c29-b9c6-396461a16cd7"
-  goal: "Turn off \"Use developer options\"."
+  goal: "Turn off \"Use developer options\" in \"developer's options\""
   dependency: "f3f37feb-201f-4f1c-9931-ed3d3fc15ca9"
   maxRetry: 5
