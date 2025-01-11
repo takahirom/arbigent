@@ -78,7 +78,6 @@ class ArbigentCli : CliktCommand() {
 
   @OptIn(ArbigentInternalApi::class)
   override fun run() {
-    System.setProperty("MOSAIC_RAW_MODE", "false")
     val resultDir = File("arbigent-result")
     ArbigentDir.screenshotsDir = File(resultDir, "screenshots")
     val resultFile = File(resultDir, "result.yaml")
