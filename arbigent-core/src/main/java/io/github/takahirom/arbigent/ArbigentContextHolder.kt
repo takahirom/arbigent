@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 
 public class ArbigentContextHolder(
   public val goal: String,
+  public val maxStep: Int,
 ) {
   public class Step(
     public val agentCommand: ArbigentAgentCommand? = null,
@@ -39,11 +40,15 @@ public class ArbigentContextHolder(
 
   public fun prompt(): String {
     return """
-Goal: "$goal"
+Goal:"$goal"
+
+Your step:${steps().size + 1}
+Max step:$maxStep
+
 What you did so far:
 ${
       steps().mapIndexed { index, turn ->
-        "${index + 1}. \n" +
+        "Step:${index + 1}. \n" +
           turn.text()
       }.joinToString("\n")
     }

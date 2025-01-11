@@ -1,0 +1,9 @@
+scenarios:
+- id: "f9c17741-093e-49f0-ad45-8311ba68c1a6"
+  goal: "Open Tips & support from OS Setting app's bottom. Your goal is to see \"\
+    Help\" page"
+  initializeMethods:
+    type: "Back"
+    times: 10
+  imageAssertions:
+  - assertionPrompt: "The screen should show \"Help\" page"

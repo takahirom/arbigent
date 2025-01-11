@@ -7,11 +7,7 @@ import io.github.takahirom.arbigent.ArbigentAgent.StepResult
 import io.github.takahirom.arbigent.result.ArbigentAgentResult
 import io.github.takahirom.arbigent.result.ArbigentAgentTaskStepResult
 import io.grpc.StatusRuntimeException
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -46,7 +42,7 @@ public class ArbigentAgent(
     },
     { interceptor, acc ->
       { device ->
-        interceptor.intercept(device) { device -> acc(device) }
+        interceptor.intercept(device) { d -> acc(d) }
       }
     }
   )
@@ -120,6 +116,7 @@ public class ArbigentAgent(
   public val isRunningFlow: StateFlow<Boolean> = _isRunningStateFlow.asStateFlow()
   public fun isRunning(): Boolean = _isRunningStateFlow.value
   private val currentGoalStateFlow = MutableStateFlow<String?>(null)
+  @OptIn(ExperimentalCoroutinesApi::class)
   public val isGoalArchivedFlow: Flow<Boolean> = arbigentContextHolderStateFlow
     .flatMapLatest {
       it?.stepsFlow ?: flowOf()
@@ -157,7 +154,7 @@ public class ArbigentAgent(
     try {
       _isRunningStateFlow.value = true
       currentGoalStateFlow.value = goal
-      val arbigentContextHolder = ArbigentContextHolder(goal)
+      val arbigentContextHolder = ArbigentContextHolder(goal, maxStep)
       arbigentDebugLog("Setting new ArbigentContextHolder: $arbigentContextHolder")
       arbigentContextHolderStateFlow.value = arbigentContextHolder
       arbigentContextHistoryStateFlow.value += arbigentContextHolder
@@ -192,13 +189,13 @@ public class ArbigentAgent(
           }
         }
       }
-      _isRunningStateFlow.value = false
     } catch (e: CancellationException) {
+      arbigentDebugLog("Cancelled to run agent: $e")
     } catch (e: Exception) {
       arbigentDebugLog("Failed to run agent: $e")
       errorHandler(e)
-      _isRunningStateFlow.value = false
     } finally {
+      _isRunningStateFlow.value = false
       arbigentDebugLog("Arbigent.execute agent.execute end $goal")
     }
   }
