@@ -96,6 +96,7 @@ class OpenAIAi(
     }
   },
 ) : ArbigentAi {
+  private var  retried = 0
   @OptIn(ExperimentalSerializationApi::class)
   override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
     val arbigentContext = decisionInput.arbigentContextHolder
@@ -112,7 +113,8 @@ class OpenAIAi(
     canvas.save(original.getAnnotatedFilePath())
 
     val imageBase64 = File(screenshotFilePath).getResizedIamgeBase64(1.0F)
-    val prompt = buildPrompt(arbigentContext, uiTreeStrings.optimizedTreeString, focusedTree, agentCommandTypes, elements)
+    val prompt =
+      buildPrompt(arbigentContext, uiTreeStrings.optimizedTreeString, focusedTree, agentCommandTypes, elements)
     val messages: List<ChatMessage> = listOf(
       ChatMessage(
         role = "system",
@@ -149,13 +151,15 @@ class OpenAIAi(
       )
     } catch (e: AiRateLimitExceededException) {
       arbigentInfoLog("Rate limit exceeded. Waiting for 10 seconds.")
-      Thread.sleep(10000)
+      Thread.sleep(10000L * (1 shl retried))
+      retried++
       return decideAgentCommands(decisionInput)
     }
+    retried = 0
     try {
       val step = try {
         parseResponse(responseText, messages, decisionInput)
-      }catch (e: ArbigentAi.FailedToParseResponseException) {
+      } catch (e: ArbigentAi.FailedToParseResponseException) {
         ArbigentContextHolder.Step(
           memo = "Failed to parse AI response: ${e.message}",
           screenshotFilePath = screenshotFilePath,
@@ -260,8 +264,9 @@ $templates"""
 
         DpadAutoFocusWithIndexAgentCommand -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
-          val index = text.toIntOrNull() ?: throw IllegalArgumentException("text should be a number for ${DpadAutoFocusWithIndexAgentCommand.actionName}")
-          if(elements.elements.size <= index) {
+          val index = text.toIntOrNull()
+            ?: throw IllegalArgumentException("text should be a number for ${DpadAutoFocusWithIndexAgentCommand.actionName}")
+          if (elements.elements.size <= index) {
             throw IllegalArgumentException("Index out of bounds: $index")
           }
           DpadAutoFocusWithIndexAgentCommand(index, elements)
@@ -271,10 +276,12 @@ $templates"""
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           InputTextAgentCommand(text)
         }
+
         ClickWithIndex -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
-          val index = text.toIntOrNull() ?: throw IllegalArgumentException("text should be a number for ${ClickWithIndex.actionName}")
-          if(elements.elements.size <= index) {
+          val index = text.toIntOrNull()
+            ?: throw IllegalArgumentException("text should be a number for ${ClickWithIndex.actionName}")
+          if (elements.elements.size <= index) {
             throw IllegalArgumentException("Index out of bounds: $index")
           }
           ClickWithIndex(
@@ -390,35 +397,45 @@ $templates"""
 
   @OptIn(ExperimentalRoborazziApi::class)
   override fun assertImage(imageAssertionInput: ArbigentAi.ImageAssertionInput): ArbigentAi.ImageAssertionOutput {
-    val result = openAiImageAssertionModel.assert(
-      referenceImageFilePath = imageAssertionInput.screenshotFilePath,
-      comparisonImageFilePath = imageAssertionInput.screenshotFilePath,
-      actualImageFilePath = imageAssertionInput.screenshotFilePath,
-      aiAssertionOptions = AiAssertionOptions(
-        openAiImageAssertionModel,
-        aiAssertions = imageAssertionInput.assertions.map { assertion ->
-          AiAssertionOptions.AiAssertion(
-            assertionPrompt = assertion.assertionPrompt,
-            requiredFulfillmentPercent = assertion.requiredFulfillmentPercent
+    fun assert(retry: Int = 0): ArbigentAi.ImageAssertionOutput {
+      try {
+        val result = openAiImageAssertionModel.assert(
+          referenceImageFilePath = imageAssertionInput.screenshotFilePath,
+          comparisonImageFilePath = imageAssertionInput.screenshotFilePath,
+          actualImageFilePath = imageAssertionInput.screenshotFilePath,
+          aiAssertionOptions = AiAssertionOptions(
+            openAiImageAssertionModel,
+            aiAssertions = imageAssertionInput.assertions.map { assertion ->
+              AiAssertionOptions.AiAssertion(
+                assertionPrompt = assertion.assertionPrompt,
+                requiredFulfillmentPercent = assertion.requiredFulfillmentPercent
+              )
+            },
+            systemPrompt = ArbigentPrompts.imageAssertionSystemPrompt
           )
-        },
-        systemPrompt = ArbigentPrompts.imageAssertionSystemPrompt
-      )
-    )
-    return ArbigentAi.ImageAssertionOutput(
-      results = result.aiAssertionResults.map { aiAssertionResult ->
-        ArbigentAi.ImageAssertionResult(
-          assertionPrompt = aiAssertionResult.assertionPrompt,
-          isPassed = aiAssertionResult.fulfillmentPercent >= aiAssertionResult.requiredFulfillmentPercent!!,
-          fulfillmentPercent = aiAssertionResult.fulfillmentPercent,
-          explanation = aiAssertionResult.explanation
         )
+        return ArbigentAi.ImageAssertionOutput(
+          results = result.aiAssertionResults.map { aiAssertionResult ->
+            ArbigentAi.ImageAssertionResult(
+              assertionPrompt = aiAssertionResult.assertionPrompt,
+              isPassed = aiAssertionResult.fulfillmentPercent >= aiAssertionResult.requiredFulfillmentPercent!!,
+              fulfillmentPercent = aiAssertionResult.fulfillmentPercent,
+              explanation = aiAssertionResult.explanation
+            )
+          }
+        )
+      } catch (e: Exception) {
+        // TODO: Implement error handling in Roborazzi
+        Thread.sleep(10000L * (1 shl retry))
+        arbigentDebugLog("Retrying assertion: $retry")
+        return assert(retry + 1)
       }
-    )
+    }
+    return assert()
   }
 }
 
-fun File.getResizedIamgeBase64(scale: Float): String {
+  fun File.getResizedIamgeBase64(scale: Float): String {
 //  val scale = 0.1F
 //  val image = ImageIO.read(this)
 //  val scaledImage = image.getScaledInstance(
@@ -435,9 +452,9 @@ fun File.getResizedIamgeBase64(scale: Float): String {
 //  val output = File.createTempFile("scaled", ".png")
 //  ImageIO.write(bufferedImage, "png", output)
 //  return output.readBytes().encodeBase64()
-  return this.readBytes().encodeBase64()
-}
+    return this.readBytes().encodeBase64()
+  }
 
-fun File.getAnnotatedFilePath() =
-  absolutePath.substringBeforeLast(".") + "_annotated." + extension
+  fun File.getAnnotatedFilePath() =
+    absolutePath.substringBeforeLast(".") + "_annotated." + extension
 
