@@ -6,6 +6,9 @@ plugins {
 }
 
 kotlin {
+  java.toolchain {
+    languageVersion.set(JavaLanguageVersion.of(17))
+  }
   jvm()
   js {
     nodejs()
