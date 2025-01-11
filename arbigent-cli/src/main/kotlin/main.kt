@@ -117,7 +117,7 @@ class ArbigentCli : CliktCommand() {
           ArbigentDeviceOs.values().joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
         }")
     val device = fetchAvailableDevicesByOs(os).first().connectToDevice()
-    arbigentLogLevel = ArbigentLogLevel.ERROR
+    arbigentLogLevel = ArbigentLogLevel.INFO
 
     val arbigentProject = ArbigentProject(
       file = File(scenarioFile),
