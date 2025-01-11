@@ -150,7 +150,7 @@ fun App(
               appStateHolder.run(it)
             },
             onCancel = {
-              appStateHolder.close()
+              appStateHolder.cancel()
               scenarioStateHolderAndDepth.first.cancel()
             },
             onRemove = {

@@ -68,6 +68,7 @@ fun main() {
     AppWindow(
       appStateHolder = appStateHolder,
       onExit = {
+        appStateHolder.cancel()
         appStateHolder.close()
         exitApplication()
       }
@@ -86,7 +87,6 @@ fun AppWindow(
     DecoratedWindow(
       title = "App Test AI Agent",
       onCloseRequest = {
-        appStateHolder.close()
         onExit()
       }) {
       CompositionLocalProvider(

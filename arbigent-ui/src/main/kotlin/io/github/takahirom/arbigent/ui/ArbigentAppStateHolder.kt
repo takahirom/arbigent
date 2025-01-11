@@ -291,8 +291,16 @@ class ArbigentAppStateHolder(
     allScenarioStateHoldersStateFlow.value = arbigentScenarioStateHolders
   }
 
+  fun cancel() {
+    job?.cancel()
+  }
+
   fun close() {
     job?.cancel()
+    projectStateFlow.value?.cancel()
+    allScenarioStateHoldersStateFlow.value.forEach { it.cancel() }
+    deviceConnectionState.value = DeviceConnectionState.NotConnected
+    deviceCache.values.forEach { it.close() }
   }
 
   fun onClickConnect(devicesStateHolder: DevicesStateHolder) {
