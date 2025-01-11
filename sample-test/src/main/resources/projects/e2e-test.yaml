@@ -1,24 +1,25 @@
 scenarios:
 - id: "f9c17741-093e-49f0-ad45-8311ba68c1a6"
-  goal: "Search \"About emulated device\" item from OS Setting. Your goal is to see\
-    \ \"About emulated device\" page"
+  goal: "Search for the \"About emulated device\" item in the OS Settings. Your goal\
+    \ is to reach the \"About emulated device\" page."
   initializeMethods:
     type: "LaunchApp"
     packageName: "com.android.settings"
   imageAssertions:
-  - assertionPrompt: "The screen should show \"About emulated device\" page"
+  - assertionPrompt: "The screen should display the \"About emulated device\" page."
 - id: "aae28c7e-416f-4297-8fe2-36a9719ec8ed"
-  goal: "I would like to be developer. Click \"Build number\" 7 times on the bottom\
-    \ of \"About emulated device\" page. Please do not click \"Android version\". "
+  goal: "I would like to become a developer. Click \"Build number\" 7 times at the\
+    \ bottom of the \"About emulated device\" page. Please do not click \"Android\
+    \ version\"."
   dependency: "f9c17741-093e-49f0-ad45-8311ba68c1a6"
   maxStep: 20
 - id: "210af2d2-1ab8-4423-9c8a-2170432e15d1"
-  goal: "Please go back using navigation to OS setting top. Goal is to see OS Setting\
-    \ top page."
+  goal: "Please go back to the top of the OS settings using the navigation. The goal\
+    \ is to see the OS Settings top page."
   dependency: "aae28c7e-416f-4297-8fe2-36a9719ec8ed"
 - id: "f369e44d-013f-4c29-b9c6-396461a16cd7"
-  goal: "I would like to disable developers option in OS setting. It is on the bottom\
-    \ of \"System\" item in the setting app. Then turn off the \"Use developer options\"\
-    ."
+  goal: "I would like to disable developer options in the OS settings. It is at the\
+    \ bottom of the \"System\" item in the settings app. Then, turn off \"Use developer\
+    \ options\"."
   dependency: "210af2d2-1ab8-4423-9c8a-2170432e15d1"
   maxRetry: 5
