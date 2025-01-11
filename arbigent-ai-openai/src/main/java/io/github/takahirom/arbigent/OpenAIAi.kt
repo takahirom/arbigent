@@ -4,6 +4,7 @@ import com.github.takahirom.roborazzi.AiAssertionOptions
 import com.github.takahirom.roborazzi.AnySerializer
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.OpenAiAiAssertionModel
+import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.client.plugins.HttpTimeout

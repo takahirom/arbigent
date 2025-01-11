@@ -1,5 +1,7 @@
 package io.github.takahirom.arbigent
 
+import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
+
 public interface ArbigentAi {
   public data class DecisionInput(
     val arbigentContextHolder: ArbigentContextHolder,

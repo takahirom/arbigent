@@ -21,6 +21,7 @@ dependencies {
   api("dev.mobile:maestro-ios:1.39.1")
   api("dev.mobile:maestro-ios-driver:1.39.1")
 
+  api(project(":arbigent-core-model"))
   implementation("com.charleskorn.kaml:kaml:0.67.0")
 
   // To expose requestBuilderModifier
@@ -33,4 +34,5 @@ dependencies {
   implementation(libs.kotlinx.io.core)
   implementation(libs.kotlinx.serialization.json)
   implementation(libs.identity.jvm)
+  implementation(project(":arbigent-core-model"))
 }

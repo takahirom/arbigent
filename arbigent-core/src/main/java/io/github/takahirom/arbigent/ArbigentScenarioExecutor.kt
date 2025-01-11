@@ -3,23 +3,8 @@ package io.github.takahirom.arbigent
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.EncodeDefault
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.coroutines.cancellation.CancellationException
-
-@Serializable
-public sealed interface ArbigentScenarioDeviceFormFactor {
-  @Serializable
-  @SerialName("Mobile")
-  public data object Mobile : ArbigentScenarioDeviceFormFactor
-
-  @Serializable
-  @SerialName("Tv")
-  public data object Tv : ArbigentScenarioDeviceFormFactor
-
-  public fun isMobile(): Boolean = this == Mobile
-  public fun isTv(): Boolean = this is Tv
-}
 
 public data class ArbigentScenarioRunningInfo(
   val allTasks: Int,

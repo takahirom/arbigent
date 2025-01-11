@@ -30,6 +30,7 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "arbigent"
+include(":arbigent-core-model")
 include(":arbigent-core")
 include(":arbigent-device-maestro")
 include(":arbigent-ai-openai")

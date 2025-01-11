@@ -1,6 +1,7 @@
 package io.github.takahirom.arbigent
 
 import io.github.takahirom.arbigent.result.ArbigentProjectExecutionResult
+import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
