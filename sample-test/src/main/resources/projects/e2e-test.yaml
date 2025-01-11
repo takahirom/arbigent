@@ -8,22 +8,7 @@ scenarios:
     packageName: "com.android.settings"
   imageAssertions:
   - assertionPrompt: "The screen should display the \"About emulated device\" page."
-- id: "aae28c7e-416f-4297-8fe2-36a9719ec8ed"
-  goal: "I would like to become a developer. Click \"Build number\" 7 times at the\
-    \ bottom of the \"About emulated device\" page. Please do not click \"Android\
-    \ version\"."
+- id: "7c325428-4e0b-4756-ada5-4f53bdc433a2"
+  goal: "Scroll and open \"Model\" page in \"About emulated device\" page. Be careful\
+    \ not to open other pages"
   dependency: "f9c17741-093e-49f0-ad45-8311ba68c1a6"
-  maxStep: 20
-- id: "b11ca7cb-392a-4982-bf5f-e6150c364efc"
-  goal: "Please Open \"System\" page in the OS setting app."
-  dependency: "aae28c7e-416f-4297-8fe2-36a9719ec8ed"
-  cleanupData:
-    type: "Cleanup"
-    packageName: "com.android.settings"
-- id: "f3f37feb-201f-4f1c-9931-ed3d3fc15ca9"
-  goal: "Open developer's options at the bottom of System page in OS setting app."
-  dependency: "b11ca7cb-392a-4982-bf5f-e6150c364efc"
-- id: "f369e44d-013f-4c29-b9c6-396461a16cd7"
-  goal: "Turn off \"Use developer options\" in \"developer's options\""
-  dependency: "f3f37feb-201f-4f1c-9931-ed3d3fc15ca9"
-  maxRetry: 5
