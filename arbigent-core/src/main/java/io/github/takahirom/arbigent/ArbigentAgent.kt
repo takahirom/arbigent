@@ -6,6 +6,7 @@ import io.github.takahirom.arbigent.ArbigentAgent.StepInput
 import io.github.takahirom.arbigent.ArbigentAgent.StepResult
 import io.github.takahirom.arbigent.result.ArbigentAgentResult
 import io.github.takahirom.arbigent.result.ArbigentAgentTaskStepResult
+import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import io.grpc.StatusRuntimeException
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
@@ -141,6 +142,7 @@ public class ArbigentAgent(
       agentCommandTypes = when (agentTask.deviceFormFactor) {
         ArbigentScenarioDeviceFormFactor.Mobile -> defaultAgentCommandTypesForVisualMode()
         ArbigentScenarioDeviceFormFactor.Tv -> defaultAgentCommandTypesForTvForVisualMode()
+        else -> throw IllegalArgumentException("Unsupported device form factor: ${agentTask.deviceFormFactor}")
       }
     )
   }

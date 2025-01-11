@@ -48,11 +48,11 @@ import androidx.compose.ui.window.Dialog
 import io.github.takahirom.arbigent.ArbigentContextHolder
 import io.github.takahirom.arbigent.ArbigentImageAssertion
 import io.github.takahirom.arbigent.ArbigentScenarioContent
-import io.github.takahirom.arbigent.ArbigentScenarioDeviceFormFactor
 import io.github.takahirom.arbigent.ArbigentScenarioExecutor
 import io.github.takahirom.arbigent.ArbigentTaskAssignment
 import io.github.takahirom.arbigent.GoalAchievedAgentCommand
 import io.github.takahirom.arbigent.getAnnotatedFilePath
+import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.Orientation
 import org.jetbrains.jewel.ui.component.CheckboxRow

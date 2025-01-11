@@ -1,15 +1,27 @@
 package io.github.takahirom.arbigent.result
 
+import com.charleskorn.kaml.PolymorphismStyle
+import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlComment
-import io.github.takahirom.arbigent.ArbigentScenarioDeviceFormFactor
+import com.charleskorn.kaml.YamlConfiguration
 import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 
 @Serializable
 public class ArbigentProjectExecutionResult(
   public val scenarios: List<ArbigentScenarioResult>,
-)
+) {
+  companion object {
+    val yaml = Yaml(
+      configuration = YamlConfiguration(
+        strictMode = false,
+        polymorphismStyle = PolymorphismStyle.Property
+      )
+    )
+  }
+}
 
 @Serializable
 public class ArbigentScenarioResult(
@@ -45,3 +57,18 @@ public class ArbigentAgentTaskStepResult(
   public val summary: String,
   public val screenshotFilePath: String
 )
+
+
+@Serializable
+public sealed interface ArbigentScenarioDeviceFormFactor {
+  @Serializable
+  @SerialName("Mobile")
+  public data object Mobile : ArbigentScenarioDeviceFormFactor
+
+  @Serializable
+  @SerialName("Tv")
+  public data object Tv : ArbigentScenarioDeviceFormFactor
+
+  public fun isMobile(): Boolean = this == Mobile
+  public fun isTv(): Boolean = this is Tv
+}

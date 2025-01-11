@@ -4,6 +4,7 @@ import com.charleskorn.kaml.PolymorphismStyle
 import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
 import io.github.takahirom.arbigent.result.ArbigentProjectExecutionResult
+import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -160,7 +161,7 @@ public class ArbigentProjectSerializer(
   }
 
   private fun save(projectResult: ArbigentProjectExecutionResult, outputStream: OutputStream) {
-    val jsonString = yaml.encodeToString(ArbigentProjectExecutionResult.serializer(), projectResult)
+    val jsonString = ArbigentProjectExecutionResult.yaml.encodeToString(ArbigentProjectExecutionResult.serializer(), projectResult)
     fileSystem.writeText(outputStream, jsonString)
   }
 }
