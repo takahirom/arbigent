@@ -144,7 +144,10 @@ class ArbigentCli : CliktCommand() {
       Column {
         val assignments by arbigentProject.scenarioAssignmentsFlow.collectAsState(arbigentProject.scenarioAssignments())
         assignments.forEach { (scenario, scenarioExecutor) ->
-          ScenarioRow(scenario, scenarioExecutor)
+          if (scenario.isLeaf) {
+            // Show only leaf scenarios
+            ScenarioRow(scenario, scenarioExecutor)
+          }
         }
       }
     }
