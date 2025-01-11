@@ -96,7 +96,8 @@ class OpenAIAi(
     }
   },
 ) : ArbigentAi {
-  private var  retried = 0
+  private var retried = 0
+
   @OptIn(ExperimentalSerializationApi::class)
   override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
     val arbigentContext = decisionInput.arbigentContextHolder
@@ -150,7 +151,7 @@ class OpenAIAi(
         messages = messages,
       )
     } catch (e: AiRateLimitExceededException) {
-      arbigentInfoLog("Rate limit exceeded. Waiting for 10 seconds.")
+      arbigentInfoLog("Rate limit exceeded. Waiting for ${10L * (1 shl retried)} seconds.")
       Thread.sleep(10000L * (1 shl retried))
       retried++
       return decideAgentCommands(decisionInput)
@@ -425,17 +426,21 @@ $templates"""
           }
         )
       } catch (e: Exception) {
-        // TODO: Implement error handling in Roborazzi
-        Thread.sleep(10000L * (1 shl retry))
-        arbigentDebugLog("Retrying assertion: $retry")
-        return assert(retry + 1)
+        if (retry < 6) {
+          // TODO: Implement error handling in Roborazzi
+          Thread.sleep(10000L * (1 shl retry))
+          arbigentDebugLog("Retrying assertion: retryCount: $retry. Wait for ${10L * (1 shl retried)}")
+          return assert(retry + 1)
+        } else {
+          throw e
+        }
       }
     }
     return assert()
   }
 }
 
-  fun File.getResizedIamgeBase64(scale: Float): String {
+fun File.getResizedIamgeBase64(scale: Float): String {
 //  val scale = 0.1F
 //  val image = ImageIO.read(this)
 //  val scaledImage = image.getScaledInstance(
@@ -452,9 +457,9 @@ $templates"""
 //  val output = File.createTempFile("scaled", ".png")
 //  ImageIO.write(bufferedImage, "png", output)
 //  return output.readBytes().encodeBase64()
-    return this.readBytes().encodeBase64()
-  }
+  return this.readBytes().encodeBase64()
+}
 
-  fun File.getAnnotatedFilePath() =
-    absolutePath.substringBeforeLast(".") + "_annotated." + extension
+fun File.getAnnotatedFilePath() =
+  absolutePath.substringBeforeLast(".") + "_annotated." + extension
 

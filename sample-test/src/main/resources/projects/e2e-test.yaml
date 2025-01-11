@@ -1,7 +1,7 @@
 scenarios:
 - id: "f9c17741-093e-49f0-ad45-8311ba68c1a6"
-  goal: "Open \"About emulated device\" from OS Setting. Your goal is to see \"\
-    About emulated device\" page"
+  goal: "Open \"About emulated device\" item from OS Setting. Your goal is to see\
+    \ \"About emulated device\" page"
   initializeMethods:
     type: "LaunchApp"
     packageName: "com.android.settings"
