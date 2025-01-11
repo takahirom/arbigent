@@ -112,7 +112,8 @@ class ArbigentCli : CliktCommand() {
 
     val os =
       ArbigentDeviceOs.entries.find { it.name.toLowerCasePreservingASCIIRules() == os.toLowerCasePreservingASCIIRules() }
-        ?: throw IllegalArgumentException("Invalid OS. The OS should be one of ${
+        ?: throw IllegalArgumentException(
+          "Invalid OS. The OS should be one of ${
           ArbigentDeviceOs.values().joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
         }")
     val device = fetchAvailableDevicesByOs(os).first().connectToDevice()
