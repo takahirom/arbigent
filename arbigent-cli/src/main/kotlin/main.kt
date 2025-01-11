@@ -138,8 +138,10 @@ class ArbigentCli : CliktCommand() {
         // Show the result
         delay(100)
         if (arbigentProject.isSuccess()) {
+          arbigentInfoLog("All scenarios are succeeded.")
           exitProcess(0)
         } else {
+          arbigentInfoLog("Some scenarios are failed.")
           exitProcess(1)
         }
       }
