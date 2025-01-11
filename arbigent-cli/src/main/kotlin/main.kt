@@ -135,7 +135,7 @@ class ArbigentCli : CliktCommand() {
         arbigentProject.execute()
         // Show the result
         delay(100)
-        if (!arbigentProject.isSuccess()) {
+        if (arbigentProject.isSuccess()) {
           exitProcess(0)
         } else {
           exitProcess(1)
