@@ -3,7 +3,7 @@ scenarios:
   goal: "Open Tips & support from OS Setting app's bottom. Your goal is to see \"\
     Help\" page"
   initializeMethods:
-    type: "Back"
-    times: 10
+    type: "LaunchApp"
+    packageName: "com.android.settings"
   imageAssertions:
   - assertionPrompt: "The screen should show \"Help\" page"
