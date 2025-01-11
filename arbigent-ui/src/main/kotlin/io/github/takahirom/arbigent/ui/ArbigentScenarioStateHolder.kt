@@ -79,7 +79,7 @@ constructor(
   }
 
   fun isGoalAchieved(): Boolean {
-    return arbigentScenarioExecutorStateFlow.value?.isSuccess() ?: false
+    return arbigentScenarioExecutorStateFlow.value?.isSuccessful() ?: false
   }
 
   fun cancel() {

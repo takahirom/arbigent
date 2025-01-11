@@ -78,6 +78,7 @@ class ArbigentCli : CliktCommand() {
 
   @OptIn(ArbigentInternalApi::class)
   override fun run() {
+    System.setProperty("MOSAIC_RAW_MODE", "false")
     val resultDir = File("arbigent-result")
     ArbigentDir.screenshotsDir = File(resultDir, "screenshots")
     val resultFile = File(resultDir, "result.yaml")
@@ -137,7 +138,7 @@ class ArbigentCli : CliktCommand() {
         arbigentProject.execute()
         // Show the result
         delay(100)
-        if (arbigentProject.isSuccess()) {
+        if (arbigentProject.isAllLeafScenariosSuccessful()) {
           arbigentInfoLog("All scenarios are succeeded.")
           exitProcess(0)
         } else {

@@ -99,7 +99,7 @@ public class ArbigentScenarioExecutor {
       replay = 1
     )
 
-  public fun isSuccess(): Boolean {
+  public fun isSuccessful(): Boolean {
     if (taskAssignments().isEmpty()) {
       return false
     }
@@ -154,7 +154,7 @@ public class ArbigentScenarioExecutor {
   public val scenarioStateFlow: Flow<ArbigentScenarioExecutorState> = _stateFlow
   public fun scenarioState(): ArbigentScenarioExecutorState {
     val isRunning = isRunning()
-    val isArchived = isSuccess()
+    val isArchived = isSuccessful()
     val isFailedToArchive = isFailedToArchive()
     return when {
       isFailedToArchive -> ArbigentScenarioExecutorState.Failed
