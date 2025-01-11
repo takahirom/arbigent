@@ -194,7 +194,7 @@ public class ArbigentScenarioExecutor {
             runningTasks = index + 1,
             retriedTasks = scenario.maxRetry - retryRemain,
             maxRetry = scenario.maxRetry,
-            maxStep = scenario.maxStepCount,
+            maxStep = 0,
             currentStep = 0,
           )
           supervisorScope {
@@ -204,6 +204,7 @@ public class ArbigentScenarioExecutor {
               }
               .onEach { steps ->
                 _arbigentScenarioRunningInfoStateFlow.value = _arbigentScenarioRunningInfoStateFlow.value?.copy(
+                  maxStep = task.maxStep,
                   currentStep = steps.size
                 )
               }

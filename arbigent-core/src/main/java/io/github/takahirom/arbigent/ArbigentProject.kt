@@ -96,7 +96,7 @@ public data class ArbigentScenario(
   val id: String,
   val agentTasks: List<ArbigentAgentTask>,
   val maxRetry: Int = 0,
-  val maxStepCount: Int = 10,
+  val maxStepCount: Int,
   val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Mobile,
   // Leaf means that the scenario does not have any dependant scenarios.
   // Even if we only run leaf scenarios, we can run all scenarios.
