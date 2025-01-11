@@ -18,6 +18,59 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - name: Setup JBR 17
+        uses: gmitch215/setup-java@main
+        with:
+          distribution: 'jetbrains'
+          java-version: 17
+          cache: 'gradle'
+          package-type: 'jdk+jcef'
+        # For GitHub API (use if you believe you'd run into rate limits)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: build
+        id: build
+        run: |
+          ./gradlew arbigent-cli:assemble --stacktrace
+
+      - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
+        if: ${{ always() }}
+        with:
+          name: cli-artifact
+          path: |
+            arbigent-cli/build/distributions/*
+          retention-days: 120
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            arbigent-cli/build/distributions/*
+      - name: Extract version
+        id: extract-version
+        run: |
+          printf "::set-output name=%s::%s\n" tag-name "${GITHUB_REF#refs/tags/}"
+      - name: Update formula on tag
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        uses: "mislav/bump-homebrew-formula-action@v2"
+        with:
+          download-url: https://github.com/takahirom/arbigent/releases/download/${{ steps.extract-version.outputs.tag-name }}/arbigent-${{ steps.extract-version.outputs.tag-name }}.tar.gz
+          formula-name: arbigent
+          homebrew-tap: takahirom/homebrew-repo
+        env:
+          COMMITTER_TOKEN: ${{ secrets.COMMITTER_TOKEN }}
+
+  cli-e2e:
+    runs-on: ubuntu-latest
+    steps:
       - name: Delete unnecessary tools 🔧
         uses: jlumbroso/free-disk-space@v1.3.1
         with:
@@ -56,10 +109,9 @@ jobs:
       - name: build
         id: build
         run: |
-          ./gradlew arbigent-cli:assemble --stacktrace
           ./gradlew arbigent-cli:installDist --stacktrace
 
-      - name: Build projects and run instrumentation tests
+      - name: CLI E2E test
         uses: reactivecircus/android-emulator-runner@v2
         env:
           MOSAIC_RAW_MODE: false
@@ -80,31 +132,3 @@ jobs:
           path: |
             arbigent-result/*
           retention-days: 120
-
-      - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
-        if: ${{ always() }}
-        with:
-          name: cli-artifact
-          path: |
-            arbigent-cli/build/distributions/*
-          retention-days: 120
-
-      - name: Release
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: |
-            arbigent-cli/build/distributions/*
-      - name: Extract version
-        id: extract-version
-        run: |
-          printf "::set-output name=%s::%s\n" tag-name "${GITHUB_REF#refs/tags/}"
-      - name: Update formula on tag
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-        uses: "mislav/bump-homebrew-formula-action@v2"
-        with:
-          download-url: https://github.com/takahirom/arbigent/releases/download/${{ steps.extract-version.outputs.tag-name }}/arbigent-${{ steps.extract-version.outputs.tag-name }}.tar.gz
-          formula-name: arbigent
-          homebrew-tap: takahirom/homebrew-repo
-        env:
-          COMMITTER_TOKEN: ${{ secrets.COMMITTER_TOKEN }}
