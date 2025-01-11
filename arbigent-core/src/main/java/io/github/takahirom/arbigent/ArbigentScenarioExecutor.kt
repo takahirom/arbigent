@@ -1,10 +1,7 @@
 package io.github.takahirom.arbigent
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.yield
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -27,12 +24,15 @@ public sealed interface ArbigentScenarioDeviceFormFactor {
 public data class ArbigentScenarioRunningInfo(
   val allTasks: Int,
   val runningTasks: Int,
+  val maxStep: Int,
+  val currentStep: Int,
   val retriedTasks: Int,
   val maxRetry: Int,
 ) {
   override fun toString(): String {
     return """
         task: $runningTasks/$allTasks
+        step: $currentStep/$maxStep
         retry: $retriedTasks/$maxRetry
     """.trimIndent()
   }
@@ -99,7 +99,7 @@ public class ArbigentScenarioExecutor {
       replay = 1
     )
 
-  public fun isSuccess(): Boolean {
+  public fun isSuccessful(): Boolean {
     if (taskAssignments().isEmpty()) {
       return false
     }
@@ -154,7 +154,7 @@ public class ArbigentScenarioExecutor {
   public val scenarioStateFlow: Flow<ArbigentScenarioExecutorState> = _stateFlow
   public fun scenarioState(): ArbigentScenarioExecutorState {
     val isRunning = isRunning()
-    val isArchived = isSuccess()
+    val isArchived = isSuccessful()
     val isFailedToArchive = isFailedToArchive()
     return when {
       isFailedToArchive -> ArbigentScenarioExecutorState.Failed
@@ -170,20 +170,20 @@ public class ArbigentScenarioExecutor {
     arbigentDebugLog("Arbigent.waitUntilFinished end")
   }
 
-  public suspend fun execute(arbigentScenario: ArbigentScenario) {
+  public suspend fun execute(scenario: ArbigentScenario) {
     _isFailedToArchiveFlow.value = false
     arbigentDebugLog("Arbigent.execute start")
     _taskAssignmentsHistoryStateFlow.value = listOf()
 
     var finishedSuccessfully = false
-    var retryRemain = arbigentScenario.maxRetry
+    var retryRemain = scenario.maxRetry
     try {
       do {
         yield()
         _taskAssignmentsStateFlow.value.forEach {
           it.agent.cancel()
         }
-        _taskAssignmentsStateFlow.value = arbigentScenario.agentTasks.map { task ->
+        _taskAssignmentsStateFlow.value = scenario.agentTasks.map { task ->
           ArbigentTaskAssignment(task, ArbigentAgent(task.agentConfig))
         }
         _taskAssignmentsHistoryStateFlow.value += listOf(taskAssignments())
@@ -192,12 +192,27 @@ public class ArbigentScenarioExecutor {
           _arbigentScenarioRunningInfoStateFlow.value = ArbigentScenarioRunningInfo(
             allTasks = taskAssignments().size,
             runningTasks = index + 1,
-            retriedTasks = arbigentScenario.maxRetry - retryRemain,
-            maxRetry = arbigentScenario.maxRetry,
+            retriedTasks = scenario.maxRetry - retryRemain,
+            maxRetry = scenario.maxRetry,
+            maxStep = 0,
+            currentStep = 0,
           )
-          agent.execute(
-            agentTask = task,
-          )
+          supervisorScope {
+            agent.latestArbigentContextFlow
+              .flatMapLatest {
+                it?.stepsFlow ?: emptyFlow()
+              }
+              .onEach { steps ->
+                _arbigentScenarioRunningInfoStateFlow.value = _arbigentScenarioRunningInfoStateFlow.value?.copy(
+                  maxStep = task.maxStep,
+                  currentStep = steps.size
+                )
+              }
+              .launchIn(coroutineScope)
+            agent.execute(
+              agentTask = task,
+            )
+          }
           if (!agent.isGoalArchived()) {
             arbigentDebugLog("Arbigent.execute break because agent is not archived")
             break

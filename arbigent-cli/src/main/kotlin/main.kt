@@ -112,11 +112,12 @@ class ArbigentCli : CliktCommand() {
 
     val os =
       ArbigentDeviceOs.entries.find { it.name.toLowerCasePreservingASCIIRules() == os.toLowerCasePreservingASCIIRules() }
-        ?: throw IllegalArgumentException("Invalid OS. The OS should be one of ${
+        ?: throw IllegalArgumentException(
+          "Invalid OS. The OS should be one of ${
           ArbigentDeviceOs.values().joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
         }")
     val device = fetchAvailableDevicesByOs(os).first().connectToDevice()
-    arbigentLogLevel = ArbigentLogLevel.ERROR
+    arbigentLogLevel = ArbigentLogLevel.INFO
 
     val arbigentProject = ArbigentProject(
       file = File(scenarioFile),
@@ -127,6 +128,7 @@ class ArbigentCli : CliktCommand() {
       override fun run() {
         arbigentProject.cancel()
         ArbigentProjectSerializer().save(arbigentProject.getResult(), resultFile)
+        device.close()
       }
     })
 
@@ -135,16 +137,21 @@ class ArbigentCli : CliktCommand() {
         arbigentProject.execute()
         // Show the result
         delay(100)
-        if (!arbigentProject.isSuccess()) {
+        if (arbigentProject.isAllLeafScenariosSuccessful()) {
+          arbigentInfoLog("All scenarios are succeeded.")
           exitProcess(0)
         } else {
+          arbigentInfoLog("Some scenarios are failed.")
           exitProcess(1)
         }
       }
       Column {
         val assignments by arbigentProject.scenarioAssignmentsFlow.collectAsState(arbigentProject.scenarioAssignments())
         assignments.forEach { (scenario, scenarioExecutor) ->
-          ScenarioRow(scenario, scenarioExecutor)
+          if (scenario.isLeaf) {
+            // Show only leaf scenarios
+            ScenarioRow(scenario, scenarioExecutor)
+          }
         }
       }
     }

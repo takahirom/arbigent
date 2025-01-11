@@ -573,7 +573,7 @@ private fun ContentPanel(tasksToAgentHistory: List<List<ArbigentTaskAssignment>>
         ) {
           step.uiTreeStrings?.let {
             val clipboardManager = LocalClipboardManager.current
-            ExpandableSection("All UI Tree", modifier = Modifier.fillMaxWidth()) {
+            ExpandableSection("All UI Tree(length=${it.allTreeString.length})", modifier = Modifier.fillMaxWidth()) {
               Text(
                 modifier = Modifier
                   .padding(8.dp)
@@ -586,7 +586,7 @@ private fun ContentPanel(tasksToAgentHistory: List<List<ArbigentTaskAssignment>>
                 text = it.allTreeString
               )
             }
-            ExpandableSection("Optimized UI Tree", modifier = Modifier.fillMaxWidth()) {
+            ExpandableSection("Optimized UI Tree(length=${it.optimizedTreeString.length})", modifier = Modifier.fillMaxWidth()) {
               Text(
                 modifier = Modifier
                   .padding(8.dp)

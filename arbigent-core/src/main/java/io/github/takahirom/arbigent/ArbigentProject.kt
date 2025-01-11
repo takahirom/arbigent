@@ -29,8 +29,7 @@ public class ArbigentProject(
 
 
   public suspend fun execute() {
-    scenarioAssignments()
-      .filter { it.scenario.isLeaf }
+    leafScenarioAssignments()
       .forEach { (scenario, scenarioExecutor) ->
         arbigentInfoLog("Start scenario: $scenario")
         try {
@@ -41,6 +40,9 @@ public class ArbigentProject(
         arbigentDebugLog(scenarioExecutor.statusText())
       }
   }
+
+  private fun leafScenarioAssignments() = scenarioAssignments()
+    .filter { it.scenario.isLeaf }
 
   public suspend fun execute(scenario: ArbigentScenario) {
     arbigentInfoLog("Start scenario: ${scenario}")
@@ -56,8 +58,8 @@ public class ArbigentProject(
     }
   }
 
-  public fun isSuccess(): Boolean {
-    return scenarioAssignments().all { it.scenarioExecutor.isSuccess() }
+  public fun isAllLeafScenariosSuccessful(): Boolean {
+    return leafScenarioAssignments().all { it.scenarioExecutor.isSuccessful() }
   }
 
   public fun getResult(): ArbigentProjectExecutionResult {
@@ -96,8 +98,10 @@ public data class ArbigentScenario(
   val id: String,
   val agentTasks: List<ArbigentAgentTask>,
   val maxRetry: Int = 0,
-  val maxStepCount: Int = 10,
+  val maxStepCount: Int,
   val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Mobile,
+  // Leaf means that the scenario does not have any dependant scenarios.
+  // Even if we only run leaf scenarios, we can run all scenarios.
   val isLeaf: Boolean,
 ) {
   public fun goal(): String? {

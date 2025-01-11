@@ -162,7 +162,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
           doIt {
             clickRunAllButton()
           }
-          describe("should finish the scenario") {
+          describe("when finish the scenario") {
             doIt {
               waitUntilScenarioRunning()
             }

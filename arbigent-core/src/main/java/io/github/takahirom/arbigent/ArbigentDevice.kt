@@ -274,9 +274,7 @@ public class MaestroDevice(
       viewHierarchy = this,
     )
     val optimizedTree = result.node ?: result.promotedChildren.firstOrNull()
-    arbigentDebugLog("Before optimization (length): ${this.toString().length}")
     val optimizedToString = optimizedTree?.optimizedToString(depth = 0)
-    arbigentDebugLog("After optimization (length): ${optimizedToString?.length}")
     return optimizedToString ?: ""
   }
 
