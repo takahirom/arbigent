@@ -260,7 +260,7 @@ $templates"""
 
         DpadAutoFocusWithIndexAgentCommand -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
-          val index = text.toIntOrNull() ?: throw IllegalArgumentException("Index not found")
+          val index = text.toIntOrNull() ?: throw IllegalArgumentException("text should be a number for ${DpadAutoFocusWithIndexAgentCommand.actionName}")
           if(elements.elements.size <= index) {
             throw IllegalArgumentException("Index out of bounds: $index")
           }
@@ -273,7 +273,7 @@ $templates"""
         }
         ClickWithIndex -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
-          val index = text.toIntOrNull() ?: throw IllegalArgumentException("Index not found")
+          val index = text.toIntOrNull() ?: throw IllegalArgumentException("text should be a number for ${ClickWithIndex.actionName}")
           if(elements.elements.size <= index) {
             throw IllegalArgumentException("Index out of bounds: $index")
           }
