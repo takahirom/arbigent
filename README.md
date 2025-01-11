@@ -2,9 +2,8 @@
 
 **Zero to AI agent testing in minutes. Arbigent's intuitive UI and powerful code interface make it accessible to everyone, while its scenario breakdown feature ensures scalability for even the most complex tasks.**
 
-
 > [!WARNING]
-> This project is still under development and may change in the future.
+> There seems to be a spam account posing as Arbigent, but the account is not related to me. The creator's accounts are [https://x.com/_takahirom_](https://x.com/_takahirom_) and [https://x.com/new_runnable](https://x.com/new_runnable) .
 
 ## Screenshot
 
