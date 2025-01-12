@@ -61,7 +61,10 @@ private fun ArbigentReportComposeApp(reportString: String) {
 }
 
 @Composable
-private fun ScenarioList(scenarios: List<ArbigentScenarioResult>, onScenarioSelected: (ArbigentScenarioResult) -> Unit) {
+private fun ScenarioList(
+  scenarios: List<ArbigentScenarioResult>,
+  onScenarioSelected: (ArbigentScenarioResult) -> Unit
+) {
   scenarios.forEach { scenario ->
     Div({
       style {
@@ -96,9 +99,15 @@ private fun ScenarioDetails(scenario: ArbigentScenarioResult) {
       }
     }
   ) {
-    Text("Goal: ${scenario.goal ?: "N/A"}")
-    Text("Status: ${scenario.executionStatus ?: "N/A"}")
-    Text("Success: ${scenario.isSuccess}")
+    Div {
+      Text("Goal: ${scenario.goal ?: "N/A"}")
+    }
+    Div {
+      Text("Status: ${scenario.executionStatus ?: "N/A"}")
+    }
+    Div {
+      Text("Success: ${scenario.isSuccess}")
+    }
 
     scenario.histories.forEach { agentResults ->
       AgentResultsView(agentResults)
@@ -110,14 +119,14 @@ private fun ScenarioDetails(scenario: ArbigentScenarioResult) {
 private fun AgentResultsView(agentResults: ArbigentAgentResults) {
   Div {
     Text("Agent Status: ${agentResults.status}")
-    agentResults.agentResult.forEach { agentResult ->
-      AgentResultView(agentResult)
+    agentResults.agentResult.forEachIndexed { taskIndex, agentResult ->
+      AgentResultView(taskIndex, agentResult)
     }
   }
 }
 
 @Composable
-private fun AgentResultView(agentResult: ArbigentAgentResult) {
+private fun AgentResultView(taskIndex: Int, agentResult: ArbigentAgentResult) {
   Div({
     style {
       display(DisplayStyle.Flex)
@@ -127,10 +136,18 @@ private fun AgentResultView(agentResult: ArbigentAgentResult) {
       marginTop(5.px)
     }
   }) {
-    Text("Goal: ${agentResult.goal}")
-    Text("Max Steps: ${agentResult.maxStep}")
-    Text("Device Form Factor: ${agentResult.deviceFormFactor}")
-    Text("Goal Archived: ${agentResult.isGoalArchived}")
+    Div {
+      Text("Task($taskIndex) Goal: ${agentResult.goal}")
+    }
+    Div {
+      Text("Max Steps: ${agentResult.maxStep}")
+    }
+    Div {
+      Text("Device Form Factor: ${agentResult.deviceFormFactor}")
+    }
+    Div {
+      Text("Goal Archived: ${agentResult.isGoalArchived}")
+    }
 
     agentResult.steps.forEach { step ->
       StepView(step)
@@ -143,18 +160,24 @@ private fun StepView(step: ArbigentAgentTaskStepResult) {
   Div({
     style {
       display(DisplayStyle.Flex)
-      flexDirection(FlexDirection.Column)
+      flexDirection(FlexDirection.Row)
       marginTop(5.px)
     }
   }) {
-    Pre {
+    Pre({
+      style {
+        flexGrow(1)
+        whiteSpace("pre-wrap")
+      }
+    }) {
       Text("Summary: ${step.summary}")
     }
 
     if (step.screenshotFilePath.isNotEmpty()) {
       Div({
         style {
-          width(100.percent)
+          width(40.percent)
+          minWidth(20.percent)
           display(DisplayStyle.Flex)
           justifyContent(JustifyContent.Center)
         }
