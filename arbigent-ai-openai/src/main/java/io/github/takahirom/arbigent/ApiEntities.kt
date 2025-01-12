@@ -6,13 +6,13 @@ import kotlinx.serialization.json.JsonObject
 
 
 @Serializable
-data class ChatMessage(
+public data class ChatMessage(
   val role: String,
   @SerialName("content")
   val contents: List<Content>
 )
 
-fun List<ChatMessage>.toHumanReadableString(): String {
+public fun List<ChatMessage>.toHumanReadableString(): String {
   return buildString {
     for (chatMessage in this@toHumanReadableString) {
       append(chatMessage.role + ": ")
@@ -31,20 +31,20 @@ fun List<ChatMessage>.toHumanReadableString(): String {
 }
 
 @Serializable
-data class ChatCompletionRequest(
+public data class ChatCompletionRequest(
   val model: String,
   val messages: List<ChatMessage>,
   @SerialName("response_format") val responseFormat: ResponseFormat?,
 )
 
 @Serializable
-data class ResponseFormat(
+public data class ResponseFormat(
   val type: String,
   @SerialName("json_schema") val jsonSchema: JsonObject
 )
 
 @Serializable
-data class ChatCompletionResponse(
+public data class ChatCompletionResponse(
   val `object`: String,
   val created: Long,
   val model: String,
@@ -53,31 +53,31 @@ data class ChatCompletionResponse(
 )
 
 @Serializable
-data class Choice(
+public data class Choice(
   val index: Int,
   val message: MessageContent,
   @SerialName("finish_reason") val finishReason: String? = null,
 )
 
 @Serializable
-data class MessageContent(
+public data class MessageContent(
   val role: String,
   val content: String
 )
 
 @Serializable
-data class Content(
+public data class Content(
   val type: String,
   val text: String? = null,
   @SerialName("image_url") val imageUrl: ImageUrl? = null
 )
 
 @Serializable
-data class ImageUrl(
+public data class ImageUrl(
   val url: String
 )
 
 @Serializable
-data class Usage(
+public data class Usage(
   @SerialName("completion_tokens") val completionTokens: Int? = null,
 )

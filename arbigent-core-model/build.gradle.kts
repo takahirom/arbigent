@@ -6,6 +6,7 @@ plugins {
 }
 
 kotlin {
+  explicitApi()
   java.toolchain {
     languageVersion.set(JavaLanguageVersion.of(17))
   }
