@@ -2,6 +2,7 @@
 .gradle
 .idea
 .kotlin
+yarn.lock
 screenshots/
 goals.text
 result.yaml

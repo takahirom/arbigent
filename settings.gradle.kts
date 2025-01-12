@@ -19,7 +19,7 @@ pluginManagement {
     }
 }
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
     repositories {
         google()
         mavenCentral()
@@ -34,6 +34,7 @@ include(":arbigent-core-model")
 include(":arbigent-core")
 include(":arbigent-device-maestro")
 include(":arbigent-ai-openai")
-include(":arbigent-ui")
 include(":arbigent-cli")
+include(":arbigent-ui")
+include(":arbigent-core-web-report")
 include(":sample-test")

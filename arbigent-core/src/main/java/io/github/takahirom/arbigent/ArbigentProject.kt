@@ -65,7 +65,7 @@ public class ArbigentProject(
 
   public fun getResult(): ArbigentProjectExecutionResult {
     return ArbigentProjectExecutionResult(
-      scenarioAssignments().map { it.getResult() }
+      leafScenarioAssignments().map { it.getResult() }
     )
   }
 }

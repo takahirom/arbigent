@@ -79,6 +79,7 @@ class ArbigentCli : CliktCommand() {
   @OptIn(ArbigentInternalApi::class)
   override fun run() {
     val resultDir = File("arbigent-result")
+    val htmlDir = File(resultDir, "html")
     ArbigentDir.screenshotsDir = File(resultDir, "screenshots")
     val resultFile = File(resultDir, "result.yaml")
     val ai: ArbigentAi = aiType.let { aiType ->
@@ -128,6 +129,7 @@ class ArbigentCli : CliktCommand() {
       override fun run() {
         arbigentProject.cancel()
         ArbigentProjectSerializer().save(arbigentProject.getResult(), resultFile)
+        ArbigentHtmlReport().saveReportHtml(htmlDir.absolutePath, arbigentProject.getResult())
         device.close()
       }
     })
