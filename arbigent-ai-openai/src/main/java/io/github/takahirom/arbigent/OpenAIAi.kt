@@ -37,8 +37,10 @@ import java.awt.image.BufferedImage.TYPE_INT_RGB
 import java.io.File
 import java.nio.charset.Charset
 
+public class ArbigentAiRateLimitExceededException : Exception("Rate limit exceeded")
+
 @OptIn(ExperimentalRoborazziApi::class, ExperimentalSerializationApi::class)
-class OpenAIAi(
+public class OpenAIAi(
   private val apiKey: String,
   private val baseUrl: String = "https://api.openai.com/v1/",
   private val modelName: String = "gpt-4o-mini",
@@ -151,7 +153,7 @@ class OpenAIAi(
         agentCommandTypes = agentCommandTypes,
         messages = messages,
       )
-    } catch (e: AiRateLimitExceededException) {
+    } catch (e: ArbigentAiRateLimitExceededException) {
       arbigentInfoLog("Rate limit exceeded. Waiting for ${10L * (1 shl retried)} seconds.")
       Thread.sleep(10000L * (1 shl retried))
       retried++
@@ -326,8 +328,6 @@ $templates"""
     }
   }
 
-  class AiRateLimitExceededException : Exception("Rate limit exceeded")
-
   private fun chatCompletion(
     agentCommandTypes: List<AgentCommandType>,
     messages: List<ChatMessage>
@@ -349,7 +349,7 @@ $templates"""
           )
         }
       if (response.status == HttpStatusCode.TooManyRequests) {
-        throw AiRateLimitExceededException()
+        throw ArbigentAiRateLimitExceededException()
       } else if (400 <= response.status.value) {
         throw IllegalStateException(
           "Failed to call API: ${response.status} ${
@@ -441,7 +441,7 @@ $templates"""
   }
 }
 
-fun File.getResizedIamgeBase64(scale: Float): String {
+private fun File.getResizedIamgeBase64(scale: Float): String {
 //  val scale = 0.1F
 //  val image = ImageIO.read(this)
 //  val scaledImage = image.getScaledInstance(
@@ -461,6 +461,6 @@ fun File.getResizedIamgeBase64(scale: Float): String {
   return this.readBytes().encodeBase64()
 }
 
-fun File.getAnnotatedFilePath() =
+public fun File.getAnnotatedFilePath(): String =
   absolutePath.substringBeforeLast(".") + "_annotated." + extension
 

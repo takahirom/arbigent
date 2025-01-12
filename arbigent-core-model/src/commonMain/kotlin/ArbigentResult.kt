@@ -13,8 +13,8 @@ import kotlinx.serialization.Serializable
 public class ArbigentProjectExecutionResult(
   public val scenarios: List<ArbigentScenarioResult>,
 ) {
-  companion object {
-    val yaml = Yaml(
+  public companion object {
+    public val yaml: Yaml = Yaml(
       configuration = YamlConfiguration(
         strictMode = false,
         polymorphismStyle = PolymorphismStyle.Property
