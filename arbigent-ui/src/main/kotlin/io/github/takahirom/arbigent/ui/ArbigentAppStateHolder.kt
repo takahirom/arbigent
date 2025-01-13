@@ -251,7 +251,7 @@ class ArbigentAppStateHolder(
     val arbigentScenarioStateHolders = scenarios.map { scenarioContent ->
       ArbigentScenarioStateHolder(id = scenarioContent.id).apply {
         onGoalChanged(scenarioContent.goal)
-        initializeMethodsStateFlow.value = scenarioContent.initializeMethods
+        initializeMethodsStateFlow.value = scenarioContent.initializeMethods.firstOrNull() ?: ArbigentScenarioContent.InitializeMethods.Noop
         maxRetryState.edit {
           replace(0, length, scenarioContent.maxRetry.toString())
         }

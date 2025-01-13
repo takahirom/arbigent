@@ -5,7 +5,6 @@ import io.github.takahirom.arbigent.ArbigentAgent.ExecuteCommandsOutput
 import io.github.takahirom.arbigent.ArbigentAgent.StepInput
 import io.github.takahirom.arbigent.ArbigentAgent.StepResult
 import io.github.takahirom.arbigent.result.ArbigentAgentResult
-import io.github.takahirom.arbigent.result.ArbigentAgentTaskStepResult
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import io.grpc.StatusRuntimeException
 import kotlinx.coroutines.*
@@ -117,6 +116,7 @@ public class ArbigentAgent(
   public val isRunningFlow: StateFlow<Boolean> = _isRunningStateFlow.asStateFlow()
   public fun isRunning(): Boolean = _isRunningStateFlow.value
   private val currentGoalStateFlow = MutableStateFlow<String?>(null)
+
   @OptIn(ExperimentalCoroutinesApi::class)
   public val isGoalArchivedFlow: Flow<Boolean> = arbigentContextHolderStateFlow
     .flatMapLatest {
@@ -312,58 +312,60 @@ public fun AgentConfigBuilder(block: AgentConfig.Builder.() -> Unit): AgentConfi
 
 public fun AgentConfigBuilder(
   deviceFormFactor: ArbigentScenarioDeviceFormFactor,
-  initializeMethods: ArbigentScenarioContent.InitializeMethods,
+  initializeMethods: List<ArbigentScenarioContent.InitializeMethods>,
   cleanupData: ArbigentScenarioContent.CleanupData,
   imageAssertions: List<ArbigentImageAssertion>
 ): AgentConfig.Builder = AgentConfigBuilder {
   deviceFormFactor(deviceFormFactor)
-  when (val method = initializeMethods) {
-    is ArbigentScenarioContent.InitializeMethods.Back -> {
-      addInterceptor(object : ArbigentInitializerInterceptor {
-        override fun intercept(
-          device: ArbigentDevice,
-          chain: ArbigentInitializerInterceptor.Chain
-        ) {
-          repeat(method.times) {
-            try {
-              device.executeCommands(
-                commands = listOf(
-                  MaestroCommand(
-                    backPressCommand = BackPressCommand()
-                  )
-                ),
-              )
-            } catch (e: Exception) {
-              arbigentDebugLog("Failed to back press: $e")
+  initializeMethods.reversed().forEach { initializeMethod ->
+    when (initializeMethod) {
+      is ArbigentScenarioContent.InitializeMethods.Back -> {
+        addInterceptor(object : ArbigentInitializerInterceptor {
+          override fun intercept(
+            device: ArbigentDevice,
+            chain: ArbigentInitializerInterceptor.Chain
+          ) {
+            repeat(initializeMethod.times) {
+              try {
+                device.executeCommands(
+                  commands = listOf(
+                    MaestroCommand(
+                      backPressCommand = BackPressCommand()
+                    )
+                  ),
+                )
+              } catch (e: Exception) {
+                arbigentDebugLog("Failed to back press: $e")
+              }
             }
+            chain.proceed(device)
           }
-          chain.proceed(device)
-        }
-      })
-    }
+        })
+      }
 
-    ArbigentScenarioContent.InitializeMethods.Noop -> {
-    }
+      ArbigentScenarioContent.InitializeMethods.Noop -> {
+      }
 
-    is ArbigentScenarioContent.InitializeMethods.LaunchApp -> {
-      addInterceptor(object : ArbigentInitializerInterceptor {
-        override fun intercept(
-          device: ArbigentDevice,
-          chain: ArbigentInitializerInterceptor.Chain
-        ) {
-          device.executeCommands(
-            listOf(
-              MaestroCommand(
-                launchAppCommand = LaunchAppCommand(
-                  appId = method.packageName
+      is ArbigentScenarioContent.InitializeMethods.LaunchApp -> {
+        addInterceptor(object : ArbigentInitializerInterceptor {
+          override fun intercept(
+            device: ArbigentDevice,
+            chain: ArbigentInitializerInterceptor.Chain
+          ) {
+            device.executeCommands(
+              listOf(
+                MaestroCommand(
+                  launchAppCommand = LaunchAppCommand(
+                    appId = initializeMethod.packageName
+                  )
                 )
               )
             )
-          )
-          device.waitForAppToSettle(method.packageName)
-          chain.proceed(device)
-        }
-      })
+            device.waitForAppToSettle(initializeMethod.packageName)
+            chain.proceed(device)
+          }
+        })
+      }
     }
   }
   when (val cleanupData = cleanupData) {

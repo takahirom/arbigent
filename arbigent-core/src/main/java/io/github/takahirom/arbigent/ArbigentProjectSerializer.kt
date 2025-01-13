@@ -85,7 +85,7 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   public val dependencyId: String? = null,
   @EncodeDefault(EncodeDefault.Mode.NEVER)
-  public val initializeMethods: InitializeMethods = InitializeMethods.Noop,
+  public val initializeMethods: List<InitializeMethods> = listOf(),
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   public val maxRetry: Int = 3,
   @EncodeDefault(EncodeDefault.Mode.NEVER)

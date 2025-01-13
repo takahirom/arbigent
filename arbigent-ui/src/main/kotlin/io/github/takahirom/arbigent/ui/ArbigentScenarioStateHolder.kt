@@ -97,7 +97,8 @@ constructor(
       id = id,
       goal = goal,
       dependencyId = dependencyScenarioStateHolderStateFlow.value?.id,
-      initializeMethods = initializeMethodsStateFlow.value,
+      initializeMethods = listOf(initializeMethodsStateFlow.value)
+        .filter { it !is ArbigentScenarioContent.InitializeMethods.Noop },
       maxRetry = maxRetryState.text.toString().toIntOrNull() ?: 3,
       maxStep = maxStepState.text.toString().toIntOrNull() ?: 10,
       deviceFormFactor = deviceFormFactorStateFlow.value,

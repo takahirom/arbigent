@@ -3,7 +3,7 @@ scenarios:
   goal: "Open the Now in Android app from the app list. The goal is to view the list\
     \ of topics.  Do not interact with the app beyond this."
   initializeMethods:
-    type: "LaunchApp"
+  - type: "LaunchApp"
     packageName: "com.google.samples.apps.nowinandroid"
   cleanupData:
     type: "Cleanup"
