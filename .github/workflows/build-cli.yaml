@@ -123,7 +123,7 @@ jobs:
           disk-size: 6000M
           heap-size: 600M
           script: |
-            arbigent-cli/build/install/arbigent/bin/arbigent --os=android --scenario-file=sample-test/src/main/resources/projects/e2e-test.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-exp
+            arbigent-cli/build/install/arbigent/bin/arbigent --os=android --project-file=sample-test/src/main/resources/projects/e2e-test.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-exp
 
       - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
         if: ${{ always() }}
