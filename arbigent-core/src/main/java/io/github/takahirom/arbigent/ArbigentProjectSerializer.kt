@@ -3,7 +3,6 @@ package io.github.takahirom.arbigent
 import com.charleskorn.kaml.PolymorphismStyle
 import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
-import io.github.takahirom.arbigent.result.ArbigentAgentResults
 import io.github.takahirom.arbigent.result.ArbigentProjectExecutionResult
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import kotlinx.serialization.EncodeDefault
@@ -55,7 +54,7 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
         deviceFormFactor = nodeScenario.deviceFormFactor,
         agentConfig = AgentConfigBuilder(
           deviceFormFactor = nodeScenario.deviceFormFactor,
-          initializeMethods = nodeScenario.initializeMethods,
+          initializationMethods = nodeScenario.initializationMethods.ifEmpty { listOf(nodeScenario.initializeMethods) },
           cleanupData = nodeScenario.cleanupData,
           imageAssertions = nodeScenario.imageAssertions
         ).apply {
@@ -85,7 +84,10 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   public val dependencyId: String? = null,
   @EncodeDefault(EncodeDefault.Mode.NEVER)
-  public val initializeMethods: List<InitializeMethods> = listOf(),
+  public val initializationMethods: List<InitializationMethods> = listOf(),
+  @Deprecated("use initializationMethods")
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  public val initializeMethods: InitializationMethods = InitializationMethods.Noop,
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   public val maxRetry: Int = 3,
   @EncodeDefault(EncodeDefault.Mode.NEVER)
@@ -109,20 +111,20 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
   }
 
   @Serializable
-  public sealed interface InitializeMethods {
+  public sealed interface InitializationMethods {
     @Serializable
     @SerialName("Back")
     public data class Back(
       val times: Int = 3
-    ) : InitializeMethods
+    ) : InitializationMethods
 
     @Serializable
     @SerialName("Noop")
-    public data object Noop : InitializeMethods
+    public data object Noop : InitializationMethods
 
     @Serializable
     @SerialName("LaunchApp")
-    public data class LaunchApp(val packageName: String) : InitializeMethods
+    public data class LaunchApp(val packageName: String) : InitializationMethods
   }
 }
 
@@ -148,6 +150,10 @@ public class ArbigentProjectSerializer(
 
   public fun load(file: File): ArbigentProjectFileContent {
     return load(file.inputStream())
+  }
+
+  internal fun load(yamlString: String): ArbigentProjectFileContent {
+    return yaml.decodeFromString(ArbigentProjectFileContent.serializer(), yamlString)
   }
 
   private fun load(inputStream: InputStream): ArbigentProjectFileContent {

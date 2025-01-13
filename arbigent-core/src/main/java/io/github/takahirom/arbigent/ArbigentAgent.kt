@@ -312,14 +312,14 @@ public fun AgentConfigBuilder(block: AgentConfig.Builder.() -> Unit): AgentConfi
 
 public fun AgentConfigBuilder(
   deviceFormFactor: ArbigentScenarioDeviceFormFactor,
-  initializeMethods: List<ArbigentScenarioContent.InitializeMethods>,
+  initializationMethods: List<ArbigentScenarioContent.InitializationMethods>,
   cleanupData: ArbigentScenarioContent.CleanupData,
   imageAssertions: List<ArbigentImageAssertion>
 ): AgentConfig.Builder = AgentConfigBuilder {
   deviceFormFactor(deviceFormFactor)
-  initializeMethods.reversed().forEach { initializeMethod ->
+  initializationMethods.reversed().forEach { initializeMethod ->
     when (initializeMethod) {
-      is ArbigentScenarioContent.InitializeMethods.Back -> {
+      is ArbigentScenarioContent.InitializationMethods.Back -> {
         addInterceptor(object : ArbigentInitializerInterceptor {
           override fun intercept(
             device: ArbigentDevice,
@@ -343,10 +343,10 @@ public fun AgentConfigBuilder(
         })
       }
 
-      ArbigentScenarioContent.InitializeMethods.Noop -> {
+      ArbigentScenarioContent.InitializationMethods.Noop -> {
       }
 
-      is ArbigentScenarioContent.InitializeMethods.LaunchApp -> {
+      is ArbigentScenarioContent.InitializationMethods.LaunchApp -> {
         addInterceptor(object : ArbigentInitializerInterceptor {
           override fun intercept(
             device: ArbigentDevice,

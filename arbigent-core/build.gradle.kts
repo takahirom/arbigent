@@ -36,4 +36,7 @@ dependencies {
   implementation(libs.kotlinx.serialization.json)
   implementation(libs.identity.jvm)
   implementation(project(":arbigent-core-model"))
+  testImplementation(kotlin("test"))
+  // coroutine test
+  testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.5.2")
 }

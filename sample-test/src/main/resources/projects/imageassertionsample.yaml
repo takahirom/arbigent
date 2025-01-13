@@ -2,7 +2,7 @@ scenarios:
 - id: "be6d2f30-01ad-40df-9c68-0a045f336b01"
   goal: "Just launch now in android app and just see For you tab"
   initializeMethods:
-  - type: "Back"
+    type: "Back"
     times: 3
   imageAssertions:
   - assertionPrompt: "The screen should have interesting tech topics"
