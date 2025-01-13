@@ -149,7 +149,7 @@ private fun AgentResultView(taskIndex: Int, agentResult: ArbigentAgentResult) {
 
     agentResult.steps.forEachIndexed { index, step ->
       Div {
-        Text("Step($index/${agentResult.steps.size})")
+        Text("Step(${(index + 1)}/${agentResult.steps.size})")
       }
       StepView(step)
     }
