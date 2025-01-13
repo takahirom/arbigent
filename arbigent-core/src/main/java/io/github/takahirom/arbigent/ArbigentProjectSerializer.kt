@@ -5,7 +5,6 @@ import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
 import io.github.takahirom.arbigent.result.ArbigentProjectExecutionResult
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
-import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.io.File
@@ -81,22 +80,14 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
   public val id: String = Uuid.random().toString(),
   public val goal: String,
   @SerialName("dependency")
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
   public val dependencyId: String? = null,
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
   public val initializationMethods: List<InitializationMethods> = listOf(),
   @Deprecated("use initializationMethods")
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
   public val initializeMethods: InitializationMethods = InitializationMethods.Noop,
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
   public val maxRetry: Int = 3,
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
   public val maxStep: Int = 10,
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
   public val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Mobile,
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
   public val cleanupData: CleanupData = CleanupData.Noop,
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
   public val imageAssertions: List<ArbigentImageAssertion> = emptyList()
 ) {
   @Serializable
@@ -135,6 +126,7 @@ public class ArbigentProjectSerializer(
   private val yaml = Yaml(
     configuration = YamlConfiguration(
       strictMode = false,
+      encodeDefaults = false,
       polymorphismStyle = PolymorphismStyle.Property
     )
   )
