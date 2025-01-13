@@ -3,8 +3,8 @@ scenarios:
   goal: "Search for the \"About emulated device\" item in the OS Settings. Please\
     \ do not click \"Device name\". Your goal is to reach the \"About emulated device\"\
     \ page."
-  initializeMethods:
-    type: "LaunchApp"
+  initializationMethods:
+  - type: "LaunchApp"
     packageName: "com.android.settings"
   imageAssertions:
   - assertionPrompt: "The screen should display the \"About emulated device\" page."
@@ -14,8 +14,8 @@ scenarios:
   dependency: "f9c17741-093e-49f0-ad45-8311ba68c1a6"
 - id: "16c24dfc-cbc7-4e17-af68-c97ad0a2aa3f"
   goal: "Just open camera app"
-  initializeMethods:
-    type: "LaunchApp"
+  initializationMethods:
+  - type: "LaunchApp"
     packageName: "com.android.camera2"
   cleanupData:
     type: "Cleanup"

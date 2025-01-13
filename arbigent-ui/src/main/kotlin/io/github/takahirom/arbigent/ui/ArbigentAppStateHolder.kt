@@ -13,8 +13,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import okio.Path.Companion.toPath
-import okio.asResourceFileSystem
 import java.io.File
 
 @OptIn(ArbigentInternalApi::class)
@@ -80,7 +78,7 @@ class ArbigentAppStateHolder(
   fun addSubScenario(parent: ArbigentScenarioStateHolder) {
     val scenarioStateHolder = ArbigentScenarioStateHolder().apply {
       dependencyScenarioStateHolderStateFlow.value = parent
-      initializeMethodsStateFlow.value = ArbigentScenarioContent.InitializeMethods.Noop
+      initializationMethodsStateFlow.value = ArbigentScenarioContent.InitializationMethods.Noop
       deviceFormFactorStateFlow.value = parent.deviceFormFactor()
     }
     allScenarioStateHoldersStateFlow.value += scenarioStateHolder
@@ -251,7 +249,7 @@ class ArbigentAppStateHolder(
     val arbigentScenarioStateHolders = scenarios.map { scenarioContent ->
       ArbigentScenarioStateHolder(id = scenarioContent.id).apply {
         onGoalChanged(scenarioContent.goal)
-        initializeMethodsStateFlow.value = scenarioContent.initializeMethods
+        initializationMethodsStateFlow.value = scenarioContent.initializationMethods.firstOrNull() ?: scenarioContent.initializeMethods
         maxRetryState.edit {
           replace(0, length, scenarioContent.maxRetry.toString())
         }

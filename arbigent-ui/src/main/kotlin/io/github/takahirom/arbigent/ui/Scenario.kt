@@ -5,7 +5,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -240,7 +239,7 @@ private fun ScenarioOptions(
     Column(
       modifier = Modifier.padding(8.dp).width(200.dp)
     ) {
-      val initializeMethods by scenarioStateHolder.initializeMethodsStateFlow.collectAsState()
+      val initializeMethods by scenarioStateHolder.initializationMethodsStateFlow.collectAsState()
       val cleanupData by scenarioStateHolder.cleanupDataStateFlow.collectAsState()
       GroupHeader("Initialize method")
       CheckboxRow(
@@ -272,14 +271,14 @@ private fun ScenarioOptions(
       ) {
         var editingText by remember(initializeMethods) {
           mutableStateOf(
-            (initializeMethods as? ArbigentScenarioContent.InitializeMethods.Back)?.times.toString()
+            (initializeMethods as? ArbigentScenarioContent.InitializationMethods.Back)?.times.toString()
           )
         }
         RadioButtonRow(
-          selected = initializeMethods is ArbigentScenarioContent.InitializeMethods.Back,
+          selected = initializeMethods is ArbigentScenarioContent.InitializationMethods.Back,
           onClick = {
-            scenarioStateHolder.initializeMethodsStateFlow.value =
-              ArbigentScenarioContent.InitializeMethods.Back()
+            scenarioStateHolder.initializationMethodsStateFlow.value =
+              ArbigentScenarioContent.InitializationMethods.Back()
           }
         ) {
           Column {
@@ -287,14 +286,14 @@ private fun ScenarioOptions(
             TextField(
               modifier = Modifier
                 .padding(4.dp),
-              enabled = initializeMethods is ArbigentScenarioContent.InitializeMethods.Back,
+              enabled = initializeMethods is ArbigentScenarioContent.InitializationMethods.Back,
               value = editingText,
               placeholder = { Text("Times") },
               keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
               onValueChange = {
                 editingText = it
-                scenarioStateHolder.initializeMethodsStateFlow.value =
-                  ArbigentScenarioContent.InitializeMethods.Back(it.toIntOrNull() ?: 1)
+                scenarioStateHolder.initializationMethodsStateFlow.value =
+                  ArbigentScenarioContent.InitializationMethods.Back(it.toIntOrNull() ?: 1)
               },
             )
           }
@@ -305,10 +304,10 @@ private fun ScenarioOptions(
       ) {
         RadioButtonRow(
           text = "Do nothing",
-          selected = initializeMethods is ArbigentScenarioContent.InitializeMethods.Noop,
+          selected = initializeMethods is ArbigentScenarioContent.InitializationMethods.Noop,
           onClick = {
-            scenarioStateHolder.initializeMethodsStateFlow.value =
-              ArbigentScenarioContent.InitializeMethods.Noop
+            scenarioStateHolder.initializationMethodsStateFlow.value =
+              ArbigentScenarioContent.InitializationMethods.Noop
           }
         )
       }
@@ -317,15 +316,15 @@ private fun ScenarioOptions(
       ) {
         var editingText by remember(initializeMethods) {
           mutableStateOf(
-            (initializeMethods as? ArbigentScenarioContent.InitializeMethods.LaunchApp)?.packageName
+            (initializeMethods as? ArbigentScenarioContent.InitializationMethods.LaunchApp)?.packageName
               ?: ""
           )
         }
         RadioButtonRow(
-          selected = initializeMethods is ArbigentScenarioContent.InitializeMethods.LaunchApp,
+          selected = initializeMethods is ArbigentScenarioContent.InitializationMethods.LaunchApp,
           onClick = {
-            scenarioStateHolder.initializeMethodsStateFlow.value =
-              ArbigentScenarioContent.InitializeMethods.LaunchApp(editingText)
+            scenarioStateHolder.initializationMethodsStateFlow.value =
+              ArbigentScenarioContent.InitializationMethods.LaunchApp(editingText)
           }
         ) {
           Column {
@@ -333,12 +332,12 @@ private fun ScenarioOptions(
             TextField(
               modifier = Modifier
                 .padding(4.dp),
-              enabled = initializeMethods is ArbigentScenarioContent.InitializeMethods.LaunchApp,
+              enabled = initializeMethods is ArbigentScenarioContent.InitializationMethods.LaunchApp,
               value = editingText,
               onValueChange = {
                 editingText = it
-                scenarioStateHolder.initializeMethodsStateFlow.value =
-                  ArbigentScenarioContent.InitializeMethods.LaunchApp(it)
+                scenarioStateHolder.initializationMethodsStateFlow.value =
+                  ArbigentScenarioContent.InitializationMethods.LaunchApp(it)
               },
             )
           }
