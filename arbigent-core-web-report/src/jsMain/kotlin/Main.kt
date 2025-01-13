@@ -47,7 +47,7 @@ private fun ArbigentReportComposeApp(reportString: String) {
         }
       }
     ) {
-      ScenarioList(result.scenarios) { scenario ->
+      ScenarioList(result.scenarios, selectedScenario) { scenario ->
         selectedScenario = scenario
       }
     }
@@ -61,6 +61,7 @@ private fun ArbigentReportComposeApp(reportString: String) {
 @Composable
 private fun ScenarioList(
   scenarios: List<ArbigentScenarioResult>,
+  selectedScenario: ArbigentScenarioResult?,
   onScenarioSelected: (ArbigentScenarioResult) -> Unit
 ) {
   scenarios.forEach { scenario ->
@@ -72,6 +73,9 @@ private fun ScenarioList(
           right(1.px)
           style(LineStyle.Solid)
           color(Color.gray)
+        }
+        if (scenario == selectedScenario) {
+          backgroundColor(Color.lightgray)
         }
 //        hover {
 //          backgroundColor(Color.lightgray)
@@ -180,13 +184,6 @@ private fun StepView(step: ArbigentAgentTaskStepResult) {
         }
       }) {
         Text("${step.summary}")
-      }
-      Pre({
-        style {
-          whiteSpace("pre-wrap")
-        }
-      }) {
-        Text(("AgentCommand:" + step.agentCommand) ?: "N/A")
       }
       ExpandableSection("UI Tree Strings") {
         Pre({
