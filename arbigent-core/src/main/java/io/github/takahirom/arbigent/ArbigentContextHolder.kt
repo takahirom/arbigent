@@ -1,5 +1,7 @@
 package io.github.takahirom.arbigent
 
+import io.github.takahirom.arbigent.result.ArbigentAgentTaskStepResult
+import io.github.takahirom.arbigent.result.ArbigentUiTreeStrings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -28,6 +30,17 @@ public class ArbigentContextHolder(
         append("memo: $memo\n")
         agentCommand?.let { append("action done: ${it.stepLogText()}\n") }
       }
+    }
+
+    public fun getResult(): ArbigentAgentTaskStepResult {
+      return ArbigentAgentTaskStepResult(
+        summary = text(),
+        screenshotFilePath = screenshotFilePath,
+        agentCommand = agentCommand?.stepLogText(),
+        uiTreeStrings = uiTreeStrings,
+        aiRequest = aiRequest,
+        aiResponse = aiResponse,
+      )
     }
   }
 

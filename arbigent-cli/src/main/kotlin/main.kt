@@ -114,9 +114,10 @@ class ArbigentCli : CliktCommand() {
       ArbigentDeviceOs.entries.find { it.name.toLowerCasePreservingASCIIRules() == os.toLowerCasePreservingASCIIRules() }
         ?: throw IllegalArgumentException(
           "Invalid OS. The OS should be one of ${
-          ArbigentDeviceOs.values().joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
-        }")
-    val device = fetchAvailableDevicesByOs(os).first().connectToDevice()
+            ArbigentDeviceOs.values().joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
+          }")
+    val device = fetchAvailableDevicesByOs(os).firstOrNull()?.connectToDevice()
+      ?: throw IllegalArgumentException("No available device found")
     arbigentLogLevel = ArbigentLogLevel.INFO
 
     val arbigentProject = ArbigentProject(
@@ -128,6 +129,7 @@ class ArbigentCli : CliktCommand() {
       override fun run() {
         arbigentProject.cancel()
         ArbigentProjectSerializer().save(arbigentProject.getResult(), resultFile)
+        ArbigentHtmlReport().saveReportHtml(resultDir.absolutePath, arbigentProject.getResult())
         device.close()
       }
     })

@@ -1,6 +1,7 @@
 package io.github.takahirom.arbigent
 
 import io.github.takahirom.arbigent.MaestroDevice.OptimizationResult
+import io.github.takahirom.arbigent.result.ArbigentUiTreeStrings
 import maestro.*
 import maestro.UiElement.Companion.toUiElement
 import maestro.UiElement.Companion.toUiElementOrNull
@@ -43,10 +44,6 @@ public interface ArbigentTvCompatDevice {
   public fun moveFocusToElement(element: ArbigentElement)
 }
 
-public data class ArbigentUiTreeStrings(
-  val allTreeString: String,
-  val optimizedTreeString: String,
-)
 
 private val meaningfulAttributes: Set<String> = setOf(
   "text",

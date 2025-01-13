@@ -1,20 +1,6 @@
 package io.github.takahirom.arbigent.ui
 
-import io.github.takahirom.arbigent.ArbigentAi
-import io.github.takahirom.arbigent.ArbigentAvailableDevice
-import io.github.takahirom.arbigent.ArbigentCoroutinesDispatcher
-import io.github.takahirom.arbigent.ArbigentDevice
-import io.github.takahirom.arbigent.ArbigentInternalApi
-import io.github.takahirom.arbigent.ArbigentProject
-import io.github.takahirom.arbigent.ArbigentProjectFileContent
-import io.github.takahirom.arbigent.ArbigentProjectSerializer
-import io.github.takahirom.arbigent.ArbigentScenario
-import io.github.takahirom.arbigent.ArbigentScenarioContent
-import io.github.takahirom.arbigent.ArbigentDeviceOs
-import io.github.takahirom.arbigent.FailedToArchiveException
-import io.github.takahirom.arbigent.arbigentDebugLog
-import io.github.takahirom.arbigent.createArbigentScenario
-import io.github.takahirom.arbigent.fetchAvailableDevicesByOs
+import io.github.takahirom.arbigent.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -27,6 +13,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import okio.Path.Companion.toPath
+import okio.asResourceFileSystem
 import java.io.File
 
 @OptIn(ArbigentInternalApi::class)
@@ -333,6 +321,7 @@ class ArbigentAppStateHolder(
     }
     projectStateFlow.value?.getResult()?.let {
       arbigentProjectSerializer.save(it, file)
+      ArbigentHtmlReport().saveReportHtml(file.parentFile.absolutePath, it)
     }
   }
 }

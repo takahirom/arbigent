@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
 
 
 @Serializable
-public class ArbigentProjectExecutionResult(
+public data class ArbigentProjectExecutionResult(
   public val scenarios: List<ArbigentScenarioResult>,
 ) {
   public companion object {
@@ -24,7 +24,7 @@ public class ArbigentProjectExecutionResult(
 }
 
 @Serializable
-public class ArbigentScenarioResult(
+public data class ArbigentScenarioResult(
   public val id: String,
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   public val goal: String? = null,
@@ -35,14 +35,14 @@ public class ArbigentScenarioResult(
 )
 
 @Serializable
-public class ArbigentAgentResults(
+public data class ArbigentAgentResults(
   @YamlComment
   public val status:String,
   public val agentResult: List<ArbigentAgentResult>,
 )
 
 @Serializable
-public class ArbigentAgentResult(
+public data class ArbigentAgentResult(
   public val goal: String,
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   public val maxStep: Int = 10,
@@ -53,11 +53,20 @@ public class ArbigentAgentResult(
 )
 
 @Serializable
-public class ArbigentAgentTaskStepResult(
+public data class ArbigentAgentTaskStepResult(
   public val summary: String,
-  public val screenshotFilePath: String
+  public val screenshotFilePath: String,
+  public val agentCommand: String?,
+  public val uiTreeStrings: ArbigentUiTreeStrings?,
+  public val aiRequest: String?,
+  public val aiResponse: String?
 )
 
+@Serializable
+public data class ArbigentUiTreeStrings(
+  val allTreeString: String,
+  val optimizedTreeString: String,
+)
 
 @Serializable
 public sealed interface ArbigentScenarioDeviceFormFactor {

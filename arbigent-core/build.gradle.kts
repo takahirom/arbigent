@@ -16,6 +16,7 @@ kotlin {
 }
 
 dependencies {
+  implementation(project(":arbigent-core-web-report"))
   api("dev.mobile:maestro-orchestra:1.39.1")
   api("dev.mobile:maestro-client:1.39.1")
   api("dev.mobile:maestro-ios:1.39.1")
