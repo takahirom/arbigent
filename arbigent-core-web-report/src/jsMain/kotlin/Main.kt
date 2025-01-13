@@ -149,7 +149,10 @@ private fun AgentResultView(taskIndex: Int, agentResult: ArbigentAgentResult) {
       Text("Goal Archived: ${agentResult.isGoalArchived}")
     }
 
-    agentResult.steps.forEach { step ->
+    agentResult.steps.forEachIndexed { index, step ->
+      Div {
+        Text("Step($index/${agentResult.steps.size})")
+      }
       StepView(step)
     }
   }
@@ -164,13 +167,58 @@ private fun StepView(step: ArbigentAgentTaskStepResult) {
       marginTop(5.px)
     }
   }) {
-    Pre({
-      style {
-        flexGrow(1)
-        whiteSpace("pre-wrap")
+    Div(
+      {
+        style {
+          display(DisplayStyle.Flex)
+          flexDirection(FlexDirection.Column)
+          flexGrow(1)
+        }
       }
-    }) {
-      Text("Summary: ${step.summary}")
+    ) {
+      Pre({
+        style {
+          whiteSpace("pre-wrap")
+        }
+      }) {
+        Text("${step.summary}")
+      }
+      Pre({
+        style {
+          whiteSpace("pre-wrap")
+        }
+      }) {
+        Text(("AgentCommand:" + step.agentCommand) ?: "N/A")
+      }
+      ExpandableSection("UI Tree Strings") {
+        Pre({
+          style {
+            whiteSpace("pre-wrap")
+          }
+        }) {
+          Text("All Tree String: ${step.uiTreeStrings?.allTreeString ?: "N/A"}")
+          Text("Optimized Tree String: ${step.uiTreeStrings?.optimizedTreeString ?: "N/A"}")
+        }
+      }
+
+      ExpandableSection("AI Request") {
+        Pre({
+          style {
+            whiteSpace("pre-wrap")
+          }
+        }) {
+          Text(step.aiRequest ?: "N/A")
+        }
+      }
+      ExpandableSection("AI Response") {
+        Pre({
+          style {
+            whiteSpace("pre-wrap")
+          }
+        }) {
+          Text(step.aiResponse ?: "N/A")
+        }
+      }
     }
 
     if (step.screenshotFilePath.isNotEmpty()) {
@@ -187,6 +235,43 @@ private fun StepView(step: ArbigentAgentTaskStepResult) {
           contentDescription = "Screenshot for step: ${step.summary}"
         )
       }
+    }
+  }
+}
+
+@Composable
+public fun ExpandableSection(
+  title: String,
+  content: @Composable () -> Unit
+) {
+  var expanded by remember { mutableStateOf(false) }
+  Div(
+    {
+      style {
+        display(DisplayStyle.Flex)
+        flexDirection(FlexDirection.Column)
+        marginBottom(10.px)
+      }
+    }
+  ) {
+    Div({
+      style {
+        display(DisplayStyle.Flex)
+        flexDirection(FlexDirection.Row)
+        justifyContent(JustifyContent.SpaceBetween)
+        cursor("pointer")
+        padding(5.px)
+        backgroundColor(Color.lightgray)
+      }
+      onClick {
+        expanded = !expanded
+      }
+    }) {
+      Text(title)
+      Text(if (expanded) "-" else "+")
+    }
+    if (expanded) {
+      content()
     }
   }
 }

@@ -241,10 +241,7 @@ public class ArbigentAgent(
       deviceFormFactor = deviceFormFactor,
       isGoalArchived = isGoalArchived(),
       steps = latestArbigentContext()?.steps()?.map {
-        ArbigentAgentTaskStepResult(
-          summary = it.text(),
-          screenshotFilePath = it.screenshotFilePath
-        )
+        it.getResult()
       } ?: emptyList(),
     )
   }

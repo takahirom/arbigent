@@ -1,6 +1,7 @@
 package io.github.takahirom.arbigent
 
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
+import io.github.takahirom.arbigent.result.ArbigentUiTreeStrings
 
 public interface ArbigentAi {
   public data class DecisionInput(

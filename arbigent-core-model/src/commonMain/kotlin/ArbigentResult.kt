@@ -55,9 +55,18 @@ public class ArbigentAgentResult(
 @Serializable
 public class ArbigentAgentTaskStepResult(
   public val summary: String,
-  public val screenshotFilePath: String
+  public val screenshotFilePath: String,
+  public val agentCommand: String?,
+  public val uiTreeStrings: ArbigentUiTreeStrings?,
+  public val aiRequest: String?,
+  public val aiResponse: String?
 )
 
+@Serializable
+public data class ArbigentUiTreeStrings(
+  val allTreeString: String,
+  val optimizedTreeString: String,
+)
 
 @Serializable
 public sealed interface ArbigentScenarioDeviceFormFactor {
