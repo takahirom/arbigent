@@ -23,6 +23,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import io.github.takahirom.arbigent.*
+import io.github.takahirom.arbigent.result.ArbigentUiTreeStrings
 import io.github.takahirom.roborazzi.captureRoboImage
 import io.github.takahirom.robospec.BehaviorsTreeBuilder
 import io.github.takahirom.robospec.DescribedBehavior
