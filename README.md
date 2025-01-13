@@ -105,6 +105,12 @@ Options:
   -h, --help                             Show this message and exit
 ```
 
+### Minimal GitHub Actions CI sample
+
+You can use the CLI in GitHub Actions like in this sample. There are only two files: `.github/workflows/arbigent-test.yaml` and `arbigent-project.yaml`. This example demonstrates GitHub Actions and an `arbigent-project.yaml` file created by the Arbigent UI.
+
+https://github.com/takahirom/arbigent-sample
+
 ## Supported AI Providers
 
 | AI Provider | Supported |
