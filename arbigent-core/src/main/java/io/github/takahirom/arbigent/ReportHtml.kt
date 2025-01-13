@@ -1,5 +1,6 @@
 package io.github.takahirom.arbigent
 
+import io.github.takahirom.arbigent.result.ArbigentAgentResults
 import io.github.takahirom.arbigent.result.ArbigentProjectExecutionResult
 import kotlinx.serialization.encodeToString
 import okio.FileSystem
@@ -34,9 +35,31 @@ $arbigentReportTemplateString
 """
 
 public class ArbigentHtmlReport {
+  private fun modifyScreenshotPathToRelativePath(projectResult: ArbigentProjectExecutionResult, from: File): ArbigentProjectExecutionResult {
+    return projectResult.copy(
+      scenarios = projectResult.scenarios.map { scenario ->
+        scenario.copy(
+          histories = scenario.histories.map { agentResults: ArbigentAgentResults ->
+            agentResults.copy(
+              agentResult = agentResults.agentResult.map { agentResult ->
+                agentResult.copy(
+                  steps = agentResult.steps.map { step ->
+                    step.copy(
+                      screenshotFilePath = from.toPath().relativize(File(step.screenshotFilePath).toPath()).toString()
+                    )
+                  }
+                )
+              }
+            )
+          }
+        )
+      }
+    )
+  }
   public fun saveReportHtml(outputDir: String, projectExecutionResult: ArbigentProjectExecutionResult) {
+    val modifiedProjectExecutionResult = modifyScreenshotPathToRelativePath(projectExecutionResult, File(outputDir))
     File(outputDir).mkdirs()
-    val yaml = ArbigentProjectExecutionResult.yaml.encodeToString(projectExecutionResult)
+    val yaml = ArbigentProjectExecutionResult.yaml.encodeToString(modifiedProjectExecutionResult)
     val reportHtml = arbigentReportHtml.replace(arbigentReportTemplateString, yaml)
     File(outputDir, "report.html").writeText(reportHtml)
 

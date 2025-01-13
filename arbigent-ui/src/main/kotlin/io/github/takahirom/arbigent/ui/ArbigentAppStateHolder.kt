@@ -321,8 +321,7 @@ class ArbigentAppStateHolder(
     }
     projectStateFlow.value?.getResult()?.let {
       arbigentProjectSerializer.save(it, file)
-      val htmlDir = File(file.parentFile, "html")
-      ArbigentHtmlReport().saveReportHtml(htmlDir.absolutePath, it)
+      ArbigentHtmlReport().saveReportHtml(file.parentFile.absolutePath, it)
     }
   }
 }
