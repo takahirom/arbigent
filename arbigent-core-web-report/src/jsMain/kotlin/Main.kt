@@ -2,11 +2,9 @@ import androidx.compose.runtime.*
 import io.github.takahirom.arbigent.result.*
 import kotlinx.serialization.decodeFromString
 import org.jetbrains.compose.web.css.*
-import org.jetbrains.compose.web.dom.Div
-import org.jetbrains.compose.web.dom.Img
-import org.jetbrains.compose.web.dom.Pre
-import org.jetbrains.compose.web.dom.Text
+import org.jetbrains.compose.web.dom.*
 import org.jetbrains.compose.web.renderComposableInBody
+import org.w3c.dom.HTMLDivElement
 
 @JsExport
 public abstract class ArbigentReportAppController {
@@ -220,20 +218,30 @@ private fun StepView(step: ArbigentAgentTaskStepResult) {
         }
       }
     }
-
-    if (step.screenshotFilePath.isNotEmpty()) {
-      Div({
-        style {
-          width(40.percent)
-          minWidth(20.percent)
-          display(DisplayStyle.Flex)
-          justifyContent(JustifyContent.Center)
+    Div({
+      style {
+        width(40.percent)
+        minWidth(20.percent)
+        display(DisplayStyle.Flex)
+        flexDirection(FlexDirection.Column)
+        alignItems(AlignItems.Center)
+      }
+    }) {
+      if (step.screenshotFilePath.isNotEmpty()) {
+        ExpandableSection("Annotated Screenshot", defaultExpanded = true) {
+          AsyncImage(
+            path = step.screenshotFilePath.substringBeforeLast(".") + "_annotated." + step.screenshotFilePath.substringAfterLast(
+              "."
+            ),
+            contentDescription = "Annotated Screenshot for step: ${step.summary}"
+          )
         }
-      }) {
-        AsyncImage(
-          path = step.screenshotFilePath,
-          contentDescription = "Screenshot for step: ${step.summary}"
-        )
+        ExpandableSection("Screenshot", defaultExpanded = false) {
+          AsyncImage(
+            path = step.screenshotFilePath,
+            contentDescription = "Screenshot for step: ${step.summary}"
+          )
+        }
       }
     }
   }
@@ -242,11 +250,14 @@ private fun StepView(step: ArbigentAgentTaskStepResult) {
 @Composable
 public fun ExpandableSection(
   title: String,
+  attrs: AttrBuilderContext<HTMLDivElement>? = null,
+  defaultExpanded: Boolean = false,
   content: @Composable () -> Unit
 ) {
-  var expanded by remember { mutableStateOf(false) }
+  var expanded by remember { mutableStateOf(defaultExpanded) }
   Div(
     {
+      attrs?.invoke(this)
       style {
         display(DisplayStyle.Flex)
         flexDirection(FlexDirection.Column)
