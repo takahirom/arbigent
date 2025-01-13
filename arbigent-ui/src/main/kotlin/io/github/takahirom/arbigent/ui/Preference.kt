@@ -10,6 +10,7 @@ import kotlin.reflect.KProperty
 
 val aiSettingYaml = Yaml(
   configuration = YamlConfiguration(
+    encodeDefaults = false,
     strictMode = false,
     polymorphismStyle = PolymorphismStyle.Property
   )

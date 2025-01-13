@@ -4,7 +4,6 @@ import com.charleskorn.kaml.PolymorphismStyle
 import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlComment
 import com.charleskorn.kaml.YamlConfiguration
-import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -16,6 +15,7 @@ public data class ArbigentProjectExecutionResult(
   public companion object {
     public val yaml: Yaml = Yaml(
       configuration = YamlConfiguration(
+        encodeDefaults = false,
         strictMode = false,
         polymorphismStyle = PolymorphismStyle.Property
       )
@@ -26,9 +26,7 @@ public data class ArbigentProjectExecutionResult(
 @Serializable
 public data class ArbigentScenarioResult(
   public val id: String,
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
   public val goal: String? = null,
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
   public val executionStatus: String? = null,
   public val isSuccess: Boolean,
   public val histories: List<ArbigentAgentResults>,
@@ -44,9 +42,7 @@ public data class ArbigentAgentResults(
 @Serializable
 public data class ArbigentAgentResult(
   public val goal: String,
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
   public val maxStep: Int = 10,
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
   public val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Mobile,
   public val isGoalArchived: Boolean,
   public val steps: List<ArbigentAgentTaskStepResult>,
