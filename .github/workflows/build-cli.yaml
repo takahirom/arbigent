@@ -114,7 +114,6 @@ jobs:
       - name: CLI E2E test
         uses: reactivecircus/android-emulator-runner@v2
         env:
-          MOSAIC_RAW_MODE: false
           GEMINI_API_KEY: ${{ secrets.GEMINI_FREE_API_KEY }}
         with:
           api-level: 34
