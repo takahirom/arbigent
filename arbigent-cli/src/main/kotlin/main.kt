@@ -16,7 +16,7 @@ import com.github.ajalt.clikt.parameters.types.choice
 import com.jakewharton.mosaic.layout.background
 import com.jakewharton.mosaic.layout.padding
 import com.jakewharton.mosaic.modifier.Modifier
-import com.jakewharton.mosaic.runMosaicBlocking
+import com.jakewharton.mosaic.runMosaic
 import com.jakewharton.mosaic.ui.Color.Companion
 import com.jakewharton.mosaic.ui.Color.Companion.Black
 import com.jakewharton.mosaic.ui.Color.Companion.Green
@@ -30,6 +30,7 @@ import io.github.takahirom.arbigent.*
 import io.ktor.client.request.*
 import io.ktor.util.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import java.io.File
 import kotlin.system.exitProcess
 
@@ -134,7 +135,7 @@ class ArbigentCli : CliktCommand() {
       }
     })
 
-    runMosaicBlocking {
+    runNoRawMosaicBlocking {
       LaunchedEffect(Unit) {
         arbigentProject.execute()
         // Show the result
@@ -158,7 +159,12 @@ class ArbigentCli : CliktCommand() {
       }
     }
   }
+}
 
+fun runNoRawMosaicBlocking(block: @Composable () -> Unit) = runBlocking {
+  runMosaic(enterRawMode = false) {
+    block()
+  }
 }
 
 @Composable
