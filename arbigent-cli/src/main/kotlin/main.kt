@@ -73,8 +73,8 @@ class ArbigentCli : CliktCommand() {
     .choice("android", "ios", "web")
     .default("android")
 
-  private val scenarioFile by option(help = "Path to the scenario YAML file")
-    .prompt("Scenario file path")
+  private val projectFile by option(help = "Path to the project YAML file")
+    .prompt("Project file path")
 
   @OptIn(ArbigentInternalApi::class)
   override fun run() {
@@ -121,7 +121,7 @@ class ArbigentCli : CliktCommand() {
     arbigentLogLevel = ArbigentLogLevel.INFO
 
     val arbigentProject = ArbigentProject(
-      file = File(scenarioFile),
+      file = File(projectFile),
       aiFactory = { ai },
       deviceFactory = { device }
     )

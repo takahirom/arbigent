@@ -259,7 +259,7 @@ private fun LeftScenariosPanel(
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
-fun ScenarioFileControls(appStateHolder: ArbigentAppStateHolder) {
+fun ProjectFileControls(appStateHolder: ArbigentAppStateHolder) {
   FlowRow {
     IconActionButton(
       key = AllIconsKeys.Actions.MenuSaveall,

@@ -336,7 +336,7 @@ class TestRobot(
             horizontalArrangement = Arrangement.SpaceBetween,
           ) {
             Box(Modifier.padding(8.dp)) {
-              ScenarioFileControls(appStateHolder)
+              ProjectFileControls(appStateHolder)
             }
             Box(Modifier.padding(8.dp)) {
               ScenarioControls(appStateHolder)

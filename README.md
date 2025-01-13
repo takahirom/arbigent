@@ -101,7 +101,7 @@ Options for Azure OpenAI:
 Options:
   --ai-type=(openai|gemini|azureopenai)  Type of AI to use
   --os=(android|ios|web)                 Target operating system
-  --scenario-file=<text>                 Path to the scenario YAML file
+  --project-file=<text>                 Path to the scenario YAML file
   -h, --help                             Show this message and exit
 ```
 

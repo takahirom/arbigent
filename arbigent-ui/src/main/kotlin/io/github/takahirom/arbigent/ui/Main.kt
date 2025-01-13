@@ -107,7 +107,7 @@ fun AppWindow(
         ) {
           if (isDeviceConnected) {
             Box(Modifier.padding(8.dp).align(Alignment.Start)) {
-              ScenarioFileControls(appStateHolder)
+              ProjectFileControls(appStateHolder)
             }
             Box(Modifier.padding(8.dp).align(Alignment.End)) {
               ScenarioControls(appStateHolder)
