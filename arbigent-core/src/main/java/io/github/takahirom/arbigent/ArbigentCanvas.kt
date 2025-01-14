@@ -159,6 +159,7 @@ public class ArbigentCanvas(width: Int, height: Int, bufferedImageType: Int) {
     public fun load(file: File, width: Int, bufferedImageType: Int): ArbigentCanvas {
       val bufferedImage = ImageIO.read(file)
       val multiply = width.toDouble() / bufferedImage.width
+      arbigentDebugLog("ArbigentCanvas: ${width.toDouble()} / ${bufferedImage.width} =multiply: $multiply")
       val canvas = ArbigentCanvas(
         width = width,
         height = (bufferedImage.height * multiply).toInt(),

@@ -162,6 +162,7 @@ public data class ArbigentElementList(
       }
       elements.addAll(optimizedTree?.toElementList() ?: emptyList())
 
+      arbigentDebugLog("ArbigentDevice: widthGrid:${deviceInfo.widthGrid} widthPixels:${deviceInfo.widthPixels}")
 
       return ArbigentElementList(
         elements = elements,
@@ -335,6 +336,22 @@ public class MaestroDevice(
       arbigentDebugLog("targetBounds: $targetBounds")
 
       val directionCandidates = mutableListOf<KeyCode>()
+
+      if (isOverlapping(
+          currentBounds.x,
+          currentBounds.right(),
+          targetBounds.x,
+          targetBounds.right()
+        ) && isOverlapping(
+          currentBounds.y,
+          currentBounds.bottom(),
+          targetBounds.y,
+          targetBounds.bottom()
+        )
+      ) {
+        arbigentDebugLog("Overlap detected. Breaking loop.")
+        break
+      }
 
       // Check if X ranges overlap, prioritize vertical movement
       if (isOverlapping(
