@@ -548,18 +548,22 @@ private fun step(
 ): StepResult {
   val (arbigentContextHolder, agentCommandTypes, device, deviceFormFactor, ai, decisionChain, imageAssertionChain, executeCommandChain) = stepInput
   val screenshotFileID = System.currentTimeMillis().toString()
-  try {
-    device.executeCommands(
-      commands = listOf(
-        MaestroCommand(
-          takeScreenshotCommand = TakeScreenshotCommand(
-            screenshotFileID
-          )
+  for (it in 0..2) {
+    try {
+      device.executeCommands(
+        commands = listOf(
+          MaestroCommand(
+            takeScreenshotCommand = TakeScreenshotCommand(
+              screenshotFileID
+            )
+          ),
         ),
-      ),
-    )
-  } catch (e: Exception) {
-    arbigentDebugLog("Failed to take screenshot: $e")
+      )
+      break
+    } catch (e: StatusRuntimeException) {
+      arbigentDebugLog("Failed to take screenshot: $e retry:$it")
+      Thread.sleep(1000)
+    }
   }
   arbigentDebugLog("Arbigent step(): ${arbigentContextHolder.prompt()}")
   val screenshotFilePath =
