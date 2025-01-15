@@ -209,6 +209,7 @@ public class ArbigentScenarioExecutor {
         }
       } while (!finishedSuccessfully && retryRemain-- > 0)
     } catch (e: CancellationException) {
+      arbigentDebugLog("Arbigent.execute canceled")
     } catch (e: Exception) {
       errorHandler(e)
     } finally {
@@ -221,7 +222,7 @@ public class ArbigentScenarioExecutor {
     if (!isGoalArchived()) {
       _isFailedToArchiveFlow.value = true
       throw FailedToArchiveException(
-        "Failed to archive scenario:" + statusText()
+        "Failed to archive scenario:" + statusText() + " retryRemain:$retryRemain"
       )
     }
     arbigentDebugLog("Arbigent.execute end")
