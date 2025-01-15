@@ -99,6 +99,8 @@ public data class ArbigentElementList(
     return elements.joinToString("\n") { "" + it.index + ":" + it.textForAI }
   }
 
+  public class NodeInBoundsNotFoundException : Exception()
+
   public companion object {
     public fun from(
       viewHierarchy: ViewHierarchy,
@@ -108,10 +110,11 @@ public data class ArbigentElementList(
       var index = 0
       val deviceInfo = deviceInfo
       val root = viewHierarchy.root
-      val result = root.filterOutOfBounds(
+      val treeNode = root.filterOutOfBounds(
         width = deviceInfo.widthPixels,
         height = deviceInfo.heightPixels
-      )!!.optimizeTree(
+      ) ?: throw NodeInBoundsNotFoundException()
+      val result = treeNode.optimizeTree(
         isRoot = true,
         viewHierarchy = viewHierarchy,
       )
@@ -198,9 +201,18 @@ public class MaestroDevice(
   }
 
   override fun elements(): ArbigentElementList {
-    val viewHierarchy = maestro.viewHierarchy(false)
-    val deviceInfo = maestro.cachedDeviceInfo
-    return ArbigentElementList.from(viewHierarchy, deviceInfo)
+    for (it in 0..2) {
+      try {
+        val viewHierarchy = maestro.viewHierarchy(false)
+        val deviceInfo = maestro.cachedDeviceInfo
+        val elementList = ArbigentElementList.from(viewHierarchy, deviceInfo)
+        return elementList
+      } catch (e: ArbigentElementList.NodeInBoundsNotFoundException) {
+        arbigentDebugLog("NodeInBoundsNotFoundException. Retry $it")
+        Thread.sleep(1000)
+      }
+    }
+    return ArbigentElementList(emptyList(), maestro.cachedDeviceInfo.widthPixels)
   }
 
 
