@@ -35,6 +35,7 @@ class ArbigentProjectFileContentTest {
     val projectFileContent: ArbigentProjectFileContent = basicProject
     projectFileContent.scenarioContents.forEach { scenarioContent ->
       val executorScenario = projectFileContent.scenarioContents.createArbigentScenario(
+        projectSettings = ArbigentProjectSettings(),
         scenario = scenarioContent,
         aiFactory = { FakeAi() },
         deviceFactory = { FakeDevice() }
@@ -51,6 +52,7 @@ class ArbigentProjectFileContentTest {
   fun loadProjectTest() {
     assertEquals(2, basicProject.scenarioContents.size)
     val firstTask = basicProject.scenarioContents.createArbigentScenario(
+      projectSettings = ArbigentProjectSettings(),
       scenario = basicProject.scenarioContents[0],
       aiFactory = { FakeAi() },
       deviceFactory = { FakeDevice() }
@@ -58,6 +60,7 @@ class ArbigentProjectFileContentTest {
     assertEquals(1, firstTask.size)
 
     val secondTask = basicProject.scenarioContents.createArbigentScenario(
+      projectSettings = ArbigentProjectSettings(),
       scenario = basicProject.scenarioContents[1],
       aiFactory = { FakeAi() },
       deviceFactory = { FakeDevice() }
@@ -89,6 +92,7 @@ class ArbigentProjectFileContentTest {
     )
 
     val firstTask = oldInitializeProject.scenarioContents.createArbigentScenario(
+      projectSettings = ArbigentProjectSettings(),
       scenario = oldInitializeProject.scenarioContents[0],
       aiFactory = { FakeAi() },
       deviceFactory = { FakeDevice() }
