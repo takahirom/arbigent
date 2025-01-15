@@ -178,10 +178,12 @@ public class ArbigentAgent(
         when (stepChain(stepInput)) {
           StepResult.GoalAchieved -> {
             isGoalArchivedFlow.first { it }
+            arbigentDebugLog("Goal achieved: $goal stepRemain:$stepRemain")
             break
           }
 
           StepResult.Failed -> {
+            arbigentDebugLog("Failed to run agent: $goal stepRemain:$stepRemain")
             break
           }
 

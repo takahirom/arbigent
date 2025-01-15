@@ -77,6 +77,10 @@ class ArbigentCli : CliktCommand() {
   private val projectFile by option(help = "Path to the project YAML file")
     .prompt("Project file path")
 
+  private val logLevel by option(help = "Log level")
+    .choice("debug", "info", "warn", "error")
+    .default("info")
+
   @OptIn(ArbigentInternalApi::class)
   override fun run() {
     val resultDir = File("arbigent-result")
@@ -119,7 +123,11 @@ class ArbigentCli : CliktCommand() {
           }")
     val device = fetchAvailableDevicesByOs(os).firstOrNull()?.connectToDevice()
       ?: throw IllegalArgumentException("No available device found")
-    arbigentLogLevel = ArbigentLogLevel.INFO
+    arbigentLogLevel = ArbigentLogLevel.entries.find { it.name.toLowerCasePreservingASCIIRules() == logLevel.toLowerCasePreservingASCIIRules() }
+      ?: throw IllegalArgumentException(
+        "Invalid log level. The log level should be one of ${
+          ArbigentLogLevel.values().joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
+        }")
 
     val arbigentProject = ArbigentProject(
       file = File(projectFile),
