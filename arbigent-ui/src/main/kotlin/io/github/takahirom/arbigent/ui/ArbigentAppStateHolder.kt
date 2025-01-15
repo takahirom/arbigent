@@ -1,18 +1,8 @@
 package io.github.takahirom.arbigent.ui
 
 import io.github.takahirom.arbigent.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
 import java.io.File
 
 @OptIn(ArbigentInternalApi::class)
@@ -39,6 +29,7 @@ class ArbigentAppStateHolder(
     data object LoadProjectContent : ProjectDialogState
     data object SaveProjectContent : ProjectDialogState
     data object SaveProjectResult : ProjectDialogState
+    data object ShowProjectSettings : ProjectDialogState
   }
 
   val deviceConnectionState: MutableStateFlow<DeviceConnectionState> =
@@ -68,6 +59,7 @@ class ArbigentAppStateHolder(
         started = SharingStarted.WhileSubscribed(),
         initialValue = emptyList()
       )
+  val promptFlow = MutableStateFlow(ArbigentPrompt())
 
   fun sortedScenariosAndDepths() = sortedScenarioAndDepth(allScenarioStateHoldersStateFlow.value)
 
@@ -126,6 +118,7 @@ class ArbigentAppStateHolder(
   private fun recreateProject() {
     projectStateFlow.value?.cancel()
     val arbigentProject = ArbigentProject(
+      settings = ArbigentProjectSettings(promptFlow.value),
       initialScenarios = allScenarioStateHoldersStateFlow.value.map { scenario ->
         scenario.createScenario(allScenarioStateHoldersStateFlow.value)
       },
@@ -146,6 +139,7 @@ class ArbigentAppStateHolder(
   private fun ArbigentScenarioStateHolder.createScenario(allScenarioStateHolder: List<ArbigentScenarioStateHolder>) =
     allScenarioStateHolder.map { it.createArbigentScenarioContent() }
       .createArbigentScenario(
+        projectSettings = ArbigentProjectSettings(promptFlow.value),
         scenario = createArbigentScenarioContent(),
         aiFactory = aiFactory,
         deviceFactory = {
@@ -232,6 +226,7 @@ class ArbigentAppStateHolder(
     val sortedScenarios = sortedScenariosAndDepthsStateFlow.value.map { it.first }
     arbigentProjectSerializer.save(
       projectFileContent = ArbigentProjectFileContent(
+        settings = ArbigentProjectSettings(promptFlow.value),
         scenarioContents = sortedScenarios.map {
           it.createArbigentScenarioContent()
         },
@@ -267,7 +262,9 @@ class ArbigentAppStateHolder(
           it.id == scenario.dependencyId
         }
     }
+    promptFlow.value = projectFile.settings.prompt
     projectStateFlow.value = ArbigentProject(
+      settings = projectFile.settings,
       initialScenarios = arbigentScenarioStateHolders.map {
         it.createScenario(
           arbigentScenarioStateHolders
@@ -321,5 +318,9 @@ class ArbigentAppStateHolder(
       arbigentProjectSerializer.save(it, file)
       ArbigentHtmlReport().saveReportHtml(file.parentFile.absolutePath, it)
     }
+  }
+
+  fun onPromptChanged(prompt: ArbigentPrompt) {
+    promptFlow.value = prompt
   }
 }

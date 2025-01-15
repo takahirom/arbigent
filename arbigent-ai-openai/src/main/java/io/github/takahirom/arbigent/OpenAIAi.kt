@@ -44,8 +44,6 @@ public class OpenAIAi(
   private val apiKey: String,
   private val baseUrl: String = "https://api.openai.com/v1/",
   private val modelName: String = "gpt-4o-mini",
-  private val systemPrompt: String = ArbigentPrompts.systemPrompt,
-  private val systemPromptForTv: String = ArbigentPrompts.systemPromptForTv,
   private val requestBuilderModifier: HttpRequestBuilder.() -> Unit = {
     header("Authorization", "Bearer $apiKey")
   },
@@ -122,15 +120,20 @@ public class OpenAIAi(
     val messages: List<ChatMessage> = listOf(
       ChatMessage(
         role = "system",
-        contents = listOf(
+        contents = when (formFactor) {
+          ArbigentScenarioDeviceFormFactor.Tv -> decisionInput.prompt.systemPromptsForTv
+          else -> decisionInput.prompt.systemPrompts
+        }.map {
           Content(
             type = "text",
-            text = when (formFactor) {
-              ArbigentScenarioDeviceFormFactor.Tv -> systemPromptForTv
-              else -> systemPrompt
-            }
+            text = it
           )
-        )
+        } + decisionInput.prompt.additionalSystemPrompts.map {
+          Content(
+            type = "text",
+            text = it
+          )
+        }
       ),
       ChatMessage(
         role = "user",

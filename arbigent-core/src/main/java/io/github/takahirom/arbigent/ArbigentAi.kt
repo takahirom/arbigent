@@ -13,6 +13,7 @@ public interface ArbigentAi {
     val agentCommandTypes: List<AgentCommandType>,
     val screenshotFilePath: String,
     val elements: ArbigentElementList,
+    val prompt: ArbigentPrompt,
   )
   public data class DecisionOutput(
     val agentCommands: List<ArbigentAgentCommand>,

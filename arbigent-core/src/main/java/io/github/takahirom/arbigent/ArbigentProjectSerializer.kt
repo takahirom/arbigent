@@ -27,9 +27,23 @@ public interface FileSystem {
 public class ArbigentProjectFileContent(
   @SerialName("scenarios")
   public val scenarioContents: List<ArbigentScenarioContent>,
+  public val settings: ArbigentProjectSettings = ArbigentProjectSettings()
+)
+
+@Serializable
+public data class ArbigentProjectSettings(
+  public val prompt: ArbigentPrompt = ArbigentPrompt()
+)
+
+@Serializable
+public data class ArbigentPrompt(
+  public val systemPrompts: List<String> = listOf(ArbigentPrompts.systemPrompt),
+  public val systemPromptsForTv: List<String> = listOf(ArbigentPrompts.systemPromptForTv),
+  public val additionalSystemPrompts: List<String> = listOf()
 )
 
 public fun List<ArbigentScenarioContent>.createArbigentScenario(
+  projectSettings: ArbigentProjectSettings,
   scenario: ArbigentScenarioContent,
   aiFactory: () -> ArbigentAi,
   deviceFactory: () -> ArbigentDevice,
@@ -52,6 +66,7 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
         maxStep = nodeScenario.maxStep,
         deviceFormFactor = nodeScenario.deviceFormFactor,
         agentConfig = AgentConfigBuilder(
+          prompt = projectSettings.prompt,
           deviceFormFactor = nodeScenario.deviceFormFactor,
           initializationMethods = nodeScenario.initializationMethods.ifEmpty { listOf(nodeScenario.initializeMethods) },
           cleanupData = nodeScenario.cleanupData,
@@ -157,7 +172,8 @@ public class ArbigentProjectSerializer(
 
   public fun save(projectResult: ArbigentProjectExecutionResult, file: File) {
     val outputStream = file.outputStream()
-    val jsonString = ArbigentProjectExecutionResult.yaml.encodeToString(ArbigentProjectExecutionResult.serializer(), projectResult)
+    val jsonString =
+      ArbigentProjectExecutionResult.yaml.encodeToString(ArbigentProjectExecutionResult.serializer(), projectResult)
     fileSystem.writeText(outputStream, jsonString)
   }
 }
