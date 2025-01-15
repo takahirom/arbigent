@@ -91,6 +91,13 @@ fun App(
           appStateHolder.projectDialogState.value = ProjectDialogState.NotSelected
         }
       )
+    } else if (projectDialogState is ProjectDialogState.ShowProjectSettings) {
+      ProjectSettingsDialog(
+        appStateHolder = appStateHolder,
+        onCloseRequest = {
+          appStateHolder.projectDialogState.value = ProjectDialogState.NotSelected
+        }
+      )
     }
     val scenarioIndex by appStateHolder.selectedScenarioIndex.collectAsState()
     var scenariosWidth by remember { mutableStateOf(200.dp) }
@@ -290,6 +297,17 @@ fun ProjectFileControls(appStateHolder: ArbigentAppStateHolder) {
       hint = Size(28)
     ) {
       Text("Save project result")
+    }
+    // Setting
+    IconActionButton(
+      key = AllIconsKeys.General.Settings,
+      onClick = {
+        appStateHolder.projectDialogState.value = ProjectDialogState.ShowProjectSettings
+      },
+      contentDescription = "Settings",
+      hint = Size(28)
+    ) {
+      Text("Settings")
     }
   }
 }

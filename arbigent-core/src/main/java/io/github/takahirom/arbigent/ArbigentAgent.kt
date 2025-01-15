@@ -33,6 +33,7 @@ public class ArbigentAgent(
   public val device: ArbigentDevice by lazy { agentConfig.deviceFactory() }
   private val interceptors: List<ArbigentInterceptor> = agentConfig.interceptors
   private val deviceFormFactor = agentConfig.deviceFormFactor
+  private val prompt = agentConfig.prompt
 
   private val initializerInterceptors: List<ArbigentInitializerInterceptor> = interceptors
     .filterIsInstance<ArbigentInitializerInterceptor>()
@@ -173,7 +174,8 @@ public class ArbigentAgent(
           ai = ai,
           decisionChain = decisionChain,
           imageAssertionChain = imageAssertionChain,
-          executeCommandChain = executeCommandChain
+          executeCommandChain = executeCommandChain,
+          prompt = prompt
         )
         when (stepChain(stepInput)) {
           StepResult.GoalAchieved -> {
@@ -213,6 +215,7 @@ public class ArbigentAgent(
     val decisionChain: (ArbigentAi.DecisionInput) -> ArbigentAi.DecisionOutput,
     val imageAssertionChain: (ArbigentAi.ImageAssertionInput) -> ArbigentAi.ImageAssertionOutput,
     val executeCommandChain: (ExecuteCommandsInput) -> ExecuteCommandsOutput,
+    val prompt: ArbigentPrompt,
   )
 
   public sealed interface StepResult {
@@ -253,7 +256,8 @@ public class AgentConfig(
   internal val interceptors: List<ArbigentInterceptor>,
   internal val ai: ArbigentAi,
   internal val deviceFactory: () -> ArbigentDevice,
-  internal val deviceFormFactor: ArbigentScenarioDeviceFormFactor
+  internal val deviceFormFactor: ArbigentScenarioDeviceFormFactor,
+  internal val prompt: ArbigentPrompt
 ) {
   public class Builder {
     private val interceptors = mutableListOf<ArbigentInterceptor>()
@@ -261,6 +265,7 @@ public class AgentConfig(
     private var ai: ArbigentAi? = null
     private var deviceFormFactor: ArbigentScenarioDeviceFormFactor =
       ArbigentScenarioDeviceFormFactor.Mobile
+    private var prompt: ArbigentPrompt = ArbigentPrompt()
 
     public fun addInterceptor(interceptor: ArbigentInterceptor) {
       interceptors.add(0, interceptor)
@@ -278,12 +283,17 @@ public class AgentConfig(
       this.deviceFormFactor = deviceFormFactor
     }
 
+    public fun prompt(prompt: ArbigentPrompt) {
+      this.prompt = prompt
+    }
+
     public fun build(): AgentConfig {
       return AgentConfig(
         interceptors = interceptors,
         ai = ai!!,
         deviceFactory = deviceFactory!!,
-        deviceFormFactor = deviceFormFactor
+        deviceFormFactor = deviceFormFactor,
+        prompt = prompt
       )
     }
   }
@@ -313,12 +323,14 @@ public fun AgentConfigBuilder(block: AgentConfig.Builder.() -> Unit): AgentConfi
 
 
 public fun AgentConfigBuilder(
+  prompt: ArbigentPrompt,
   deviceFormFactor: ArbigentScenarioDeviceFormFactor,
   initializationMethods: List<ArbigentScenarioContent.InitializationMethods>,
   cleanupData: ArbigentScenarioContent.CleanupData,
   imageAssertions: List<ArbigentImageAssertion>
 ): AgentConfig.Builder = AgentConfigBuilder {
   deviceFormFactor(deviceFormFactor)
+  prompt(prompt)
   initializationMethods.reversed().forEach { initializeMethod ->
     when (initializeMethod) {
       is ArbigentScenarioContent.InitializationMethods.Back -> {
@@ -564,7 +576,8 @@ private fun step(
       null
     },
     agentCommandTypes = agentCommandTypes,
-    screenshotFilePath = screenshotFilePath
+    screenshotFilePath = screenshotFilePath,
+    prompt = stepInput.prompt,
   )
   val decisionOutput = decisionChain(decisionInput)
   if (decisionOutput.agentCommands.any { it is GoalAchievedAgentCommand }) {

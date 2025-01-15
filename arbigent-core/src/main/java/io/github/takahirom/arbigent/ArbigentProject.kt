@@ -10,6 +10,7 @@ import java.io.File
 public class FailedToArchiveException(message: String) : RuntimeException(message)
 
 public class ArbigentProject(
+  public val settings: ArbigentProjectSettings,
   initialScenarios: List<ArbigentScenario>,
 ) {
   private val _scenarioAssignmentsFlow =
@@ -76,8 +77,10 @@ public fun ArbigentProject(
   deviceFactory: () -> ArbigentDevice
 ): ArbigentProject {
   return ArbigentProject(
+    settings = projectFileContent.settings,
     projectFileContent.scenarioContents.map {
       projectFileContent.scenarioContents.createArbigentScenario(
+        projectSettings = projectFileContent.settings,
         scenario = it,
         aiFactory = aiFactory,
         deviceFactory = deviceFactory
