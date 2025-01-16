@@ -229,6 +229,7 @@ class TestRobot(
   }
 
   fun enterImageAssertion(assertion: String) {
+    composeUiTest.onNode(hasContentDescription("Add image assertion")).performClick()
     composeUiTest.onNode(hasTestTag("image_assertion")).performTextInput(assertion)
     waitALittle()
   }
