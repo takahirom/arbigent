@@ -373,10 +373,23 @@ private fun ScenarioOptions(
       }
     }
     Column(
-      modifier = Modifier.padding(8.dp).width(200.dp)
+      modifier = Modifier.padding(8.dp).width(250.dp)
     ) {
       GroupHeader {
         Text("Image assertion")
+        // Add button
+        IconActionButton(
+          key = AllIconsKeys.General.Add,
+          onClick = {
+            scenarioStateHolder.onAddImageAssertion()
+          },
+          contentDescription = "Add image assertion",
+          hint = Size(16),
+        ) {
+          Text(
+            text = "Add image assertion",
+          )
+        }
         IconActionButton(
           key = AllIconsKeys.General.Information,
           onClick = {},
@@ -389,29 +402,38 @@ private fun ScenarioOptions(
         }
       }
       val imageAssertions by scenarioStateHolder.imageAssertionsStateFlow.collectAsState()
-      // We don't support multiple image assertions yet.
-      val imageAssertion = imageAssertions.firstOrNull()
-      Row(
-        verticalAlignment = Alignment.CenterVertically
-      ) {
-        TextField(
-          modifier = Modifier
-            .padding(4.dp)
-            .testTag("image_assertion"),
-          placeholder = { Text("The register button should exist") },
-          value = imageAssertion?.assertionPrompt ?: "",
-          onValueChange = {
-            if (it.isBlank()) {
-              scenarioStateHolder.imageAssertionsStateFlow.value = emptyList()
-            } else {
-              scenarioStateHolder.imageAssertionsStateFlow.value = listOf(
-                ArbigentImageAssertion(
-                  assertionPrompt = it,
-                )
-              )
-            }
-          },
-        )
+      imageAssertions.forEachIndexed { index, imageAssertion: ArbigentImageAssertion ->
+        Row(
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          TextField(
+            modifier = Modifier
+              .padding(4.dp)
+              .weight(1f)
+              .testTag("image_assertion"),
+            placeholder = { Text("XX button should exist") },
+            value = imageAssertion.assertionPrompt,
+            onValueChange = {
+              val newImageAssertions = imageAssertions.toMutableList()
+              newImageAssertions[index] = imageAssertion.copy(assertionPrompt = it)
+              scenarioStateHolder.imageAssertionsStateFlow.value = newImageAssertions
+            },
+          )
+          IconActionButton(
+            key = AllIconsKeys.General.Delete,
+            onClick = {
+              val newImageAssertions = imageAssertions.toMutableList()
+              newImageAssertions.removeAt(index)
+              scenarioStateHolder.imageAssertionsStateFlow.value = newImageAssertions
+            },
+            contentDescription = "Remove",
+            hint = Size(16),
+          ) {
+            Text(
+              text = "Remove",
+            )
+          }
+        }
       }
     }
   }
@@ -579,7 +601,10 @@ private fun ContentPanel(tasksToAgentHistory: List<List<ArbigentTaskAssignment>>
                 text = it.allTreeString
               )
             }
-            ExpandableSection("Optimized UI Tree(length=${it.optimizedTreeString.length})", modifier = Modifier.fillMaxWidth()) {
+            ExpandableSection(
+              "Optimized UI Tree(length=${it.optimizedTreeString.length})",
+              modifier = Modifier.fillMaxWidth()
+            ) {
               Text(
                 modifier = Modifier
                   .padding(8.dp)

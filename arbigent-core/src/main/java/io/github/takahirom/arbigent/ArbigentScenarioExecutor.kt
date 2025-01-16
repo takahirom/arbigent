@@ -24,7 +24,7 @@ public data class ArbigentScenarioRunningInfo(
 }
 
 @Serializable
-public class ArbigentImageAssertion(
+public data class ArbigentImageAssertion(
   public val assertionPrompt: String,
   public val requiredFulfillmentPercent: Int = 80,
 )

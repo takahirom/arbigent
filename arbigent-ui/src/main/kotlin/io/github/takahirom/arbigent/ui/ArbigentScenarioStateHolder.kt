@@ -100,7 +100,11 @@ constructor(
       maxStep = maxStepState.text.toString().toIntOrNull() ?: 10,
       deviceFormFactor = deviceFormFactorStateFlow.value,
       cleanupData = cleanupDataStateFlow.value,
-      imageAssertions = imageAssertionsStateFlow.value
+      imageAssertions = imageAssertionsStateFlow.value.filter { it.assertionPrompt.isNotBlank() }
     )
+  }
+
+  fun onAddImageAssertion() {
+    imageAssertionsStateFlow.value += ArbigentImageAssertion("")
   }
 }
