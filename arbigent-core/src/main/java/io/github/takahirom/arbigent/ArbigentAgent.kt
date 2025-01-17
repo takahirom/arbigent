@@ -190,8 +190,7 @@ public class ArbigentAgent(
           }
 
           StepResult.Continue -> {
-            // continue
-            delay(1000)
+            // Continue
           }
         }
       }
