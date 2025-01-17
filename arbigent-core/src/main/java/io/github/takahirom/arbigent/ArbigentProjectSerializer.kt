@@ -96,9 +96,9 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
   public val goal: String,
   @SerialName("dependency")
   public val dependencyId: String? = null,
-  public val initializationMethods: List<InitializationMethods> = listOf(),
+  public val initializationMethods: List<InitializationMethod> = listOf(),
   @Deprecated("use initializationMethods")
-  public val initializeMethods: InitializationMethods = InitializationMethods.Noop,
+  public val initializeMethods: InitializationMethod = InitializationMethod.Noop,
   public val maxRetry: Int = 3,
   public val maxStep: Int = 10,
   public val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Mobile,
@@ -117,20 +117,28 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
   }
 
   @Serializable
-  public sealed interface InitializationMethods {
+  public sealed interface InitializationMethod {
     @Serializable
     @SerialName("Back")
     public data class Back(
       val times: Int = 3
-    ) : InitializationMethods
+    ) : InitializationMethod
 
     @Serializable
     @SerialName("Noop")
-    public data object Noop : InitializationMethods
+    public data object Noop : InitializationMethod
 
     @Serializable
     @SerialName("LaunchApp")
-    public data class LaunchApp(val packageName: String) : InitializationMethods
+    public data class LaunchApp(val packageName: String) : InitializationMethod
+
+    @Serializable
+    @SerialName("CleanupData")
+    public data class CleanupData(val packageName: String) : InitializationMethod
+
+    @Serializable
+    @SerialName("OpenLink")
+    public data class OpenLink(val link: String) : InitializationMethod
   }
 }
 

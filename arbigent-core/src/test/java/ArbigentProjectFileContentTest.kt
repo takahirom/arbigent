@@ -69,7 +69,7 @@ class ArbigentProjectFileContentTest {
 
     val initializationMethods = basicProject.scenarioContents[0].initializationMethods
     assertEquals(
-      (initializationMethods[0] as ArbigentScenarioContent.InitializationMethods.LaunchApp).packageName,
+      (initializationMethods[0] as ArbigentScenarioContent.InitializationMethod.LaunchApp).packageName,
       "com.example"
     )
   }
@@ -87,7 +87,7 @@ class ArbigentProjectFileContentTest {
   fun loadOldInitializeProject() {
     val initializeMethods = oldInitializeProject.scenarioContents[0].initializeMethods
     assertEquals(
-      (initializeMethods as ArbigentScenarioContent.InitializationMethods.LaunchApp).packageName,
+      (initializeMethods as ArbigentScenarioContent.InitializationMethod.LaunchApp).packageName,
       "com.example"
     )
 

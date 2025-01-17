@@ -32,8 +32,8 @@ constructor(
     )
   val imageAssertionsStateFlow: MutableStateFlow<List<ArbigentImageAssertion>> =
     MutableStateFlow(emptyList())
-  val initializationMethodsStateFlow: MutableStateFlow<ArbigentScenarioContent.InitializationMethods> =
-    MutableStateFlow(ArbigentScenarioContent.InitializationMethods.Back())
+  val initializationMethodStateFlow: MutableStateFlow<List<ArbigentScenarioContent.InitializationMethod>> =
+    MutableStateFlow(listOf(ArbigentScenarioContent.InitializationMethod.Back()))
   val deviceFormFactorStateFlow: MutableStateFlow<ArbigentScenarioDeviceFormFactor> =
     MutableStateFlow(ArbigentScenarioDeviceFormFactor.Mobile)
   fun deviceFormFactor() = deviceFormFactorStateFlow.value
@@ -94,8 +94,8 @@ constructor(
       id = id,
       goal = goal,
       dependencyId = dependencyScenarioStateHolderStateFlow.value?.id,
-      initializationMethods = listOf(initializationMethodsStateFlow.value)
-        .filter { it !is ArbigentScenarioContent.InitializationMethods.Noop },
+      initializationMethods = initializationMethodStateFlow.value
+        .filter { it !is ArbigentScenarioContent.InitializationMethod.Noop },
       maxRetry = maxRetryState.text.toString().toIntOrNull() ?: 3,
       maxStep = maxStepState.text.toString().toIntOrNull() ?: 10,
       deviceFormFactor = deviceFormFactorStateFlow.value,
@@ -106,5 +106,9 @@ constructor(
 
   fun onAddImageAssertion() {
     imageAssertionsStateFlow.value += ArbigentImageAssertion("")
+  }
+
+  fun onAddInitializationMethod() {
+    initializationMethodStateFlow.value += ArbigentScenarioContent.InitializationMethod.Noop
   }
 }

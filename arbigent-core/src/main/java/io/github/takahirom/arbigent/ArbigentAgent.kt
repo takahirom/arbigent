@@ -19,11 +19,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
 import maestro.MaestroException
-import maestro.orchestra.BackPressCommand
-import maestro.orchestra.ClearStateCommand
-import maestro.orchestra.LaunchAppCommand
-import maestro.orchestra.MaestroCommand
-import maestro.orchestra.TakeScreenshotCommand
+import maestro.orchestra.*
 import java.io.File
 
 public class ArbigentAgent(
@@ -328,7 +324,7 @@ public fun AgentConfigBuilder(block: AgentConfig.Builder.() -> Unit): AgentConfi
 public fun AgentConfigBuilder(
   prompt: ArbigentPrompt,
   deviceFormFactor: ArbigentScenarioDeviceFormFactor,
-  initializationMethods: List<ArbigentScenarioContent.InitializationMethods>,
+  initializationMethods: List<ArbigentScenarioContent.InitializationMethod>,
   cleanupData: ArbigentScenarioContent.CleanupData,
   imageAssertions: List<ArbigentImageAssertion>
 ): AgentConfig.Builder = AgentConfigBuilder {
@@ -336,7 +332,7 @@ public fun AgentConfigBuilder(
   prompt(prompt)
   initializationMethods.reversed().forEach { initializeMethod ->
     when (initializeMethod) {
-      is ArbigentScenarioContent.InitializationMethods.Back -> {
+      is ArbigentScenarioContent.InitializationMethod.Back -> {
         addInterceptor(object : ArbigentInitializerInterceptor {
           override fun intercept(
             device: ArbigentDevice,
@@ -360,10 +356,10 @@ public fun AgentConfigBuilder(
         })
       }
 
-      ArbigentScenarioContent.InitializationMethods.Noop -> {
+      ArbigentScenarioContent.InitializationMethod.Noop -> {
       }
 
-      is ArbigentScenarioContent.InitializationMethods.LaunchApp -> {
+      is ArbigentScenarioContent.InitializationMethod.LaunchApp -> {
         addInterceptor(object : ArbigentInitializerInterceptor {
           override fun intercept(
             device: ArbigentDevice,
@@ -379,6 +375,46 @@ public fun AgentConfigBuilder(
               )
             )
             device.waitForAppToSettle(initializeMethod.packageName)
+            chain.proceed(device)
+          }
+        })
+      }
+
+      is ArbigentScenarioContent.InitializationMethod.CleanupData -> {
+        addInterceptor(object : ArbigentInitializerInterceptor {
+          override fun intercept(
+            device: ArbigentDevice,
+            chain: ArbigentInitializerInterceptor.Chain
+          ) {
+            device.executeCommands(
+              listOf(
+                MaestroCommand(
+                  clearStateCommand = ClearStateCommand(
+                    appId = initializeMethod.packageName
+                  )
+                )
+              )
+            )
+            chain.proceed(device)
+          }
+        })
+      }
+
+      is ArbigentScenarioContent.InitializationMethod.OpenLink -> {
+        addInterceptor(object : ArbigentInitializerInterceptor {
+          override fun intercept(
+            device: ArbigentDevice,
+            chain: ArbigentInitializerInterceptor.Chain
+          ) {
+            device.executeCommands(
+              listOf(
+                MaestroCommand(
+                  openLinkCommand = OpenLinkCommand(
+                    link = initializeMethod.link
+                  )
+                )
+              )
+            )
             chain.proceed(device)
           }
         })
