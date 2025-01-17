@@ -70,7 +70,7 @@ class ArbigentAppStateHolder(
   fun addSubScenario(parent: ArbigentScenarioStateHolder) {
     val scenarioStateHolder = ArbigentScenarioStateHolder().apply {
       dependencyScenarioStateHolderStateFlow.value = parent
-      initializationMethodsStateFlow.value = ArbigentScenarioContent.InitializationMethods.Noop
+      initializationMethodStateFlow.value = listOf()
       deviceFormFactorStateFlow.value = parent.deviceFormFactor()
     }
     allScenarioStateHoldersStateFlow.value += scenarioStateHolder
@@ -244,7 +244,7 @@ class ArbigentAppStateHolder(
     val arbigentScenarioStateHolders = scenarios.map { scenarioContent ->
       ArbigentScenarioStateHolder(id = scenarioContent.id).apply {
         onGoalChanged(scenarioContent.goal)
-        initializationMethodsStateFlow.value = scenarioContent.initializationMethods.firstOrNull() ?: scenarioContent.initializeMethods
+        initializationMethodStateFlow.value = scenarioContent.initializationMethods.ifEmpty { listOf(scenarioContent.initializeMethods) }
         maxRetryState.edit {
           replace(0, length, scenarioContent.maxRetry.toString())
         }
