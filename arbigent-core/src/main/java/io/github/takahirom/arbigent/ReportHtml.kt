@@ -57,7 +57,7 @@ public class ArbigentHtmlReport {
         scenario.copy(
           histories = scenario.histories.map { agentResults: ArbigentAgentResults ->
             agentResults.copy(
-              agentResult = agentResults.agentResult.map { agentResult ->
+              agentResults = agentResults.agentResults.map { agentResult ->
                 agentResult.copy(
                   steps = agentResult.steps.map { step ->
                     val screenshotFile = File(step.screenshotFilePath)
@@ -82,7 +82,7 @@ public class ArbigentHtmlReport {
         scenario.copy(
           histories = scenario.histories.map { agentResults: ArbigentAgentResults ->
             agentResults.copy(
-              agentResult = agentResults.agentResult.map { agentResult ->
+              agentResults = agentResults.agentResults.map { agentResult ->
                 agentResult.copy(
                   steps = agentResult.steps.map { step ->
                     step.copy(

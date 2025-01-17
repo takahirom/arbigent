@@ -17,7 +17,7 @@ public data class ArbigentScenarioAssignment(
       histories = taskAssignmentsHistory.mapIndexed { index, taskAssignments ->
         ArbigentAgentResults(
           status = "History ${index + 1} / " + taskAssignmentsHistory.size,
-          agentResult = taskAssignments.map { (task, agent) ->
+          agentResults = taskAssignments.map { (task, agent) ->
             agent.getResult()
           }
         )

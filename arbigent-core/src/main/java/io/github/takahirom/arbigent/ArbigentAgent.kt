@@ -240,12 +240,16 @@ public class ArbigentAgent(
   }
 
   public fun getResult(): ArbigentAgentResult {
+    val context = latestArbigentContext()
     return ArbigentAgentResult(
-      goal = latestArbigentContext()?.goal ?: "",
-      maxStep = 10,
+      goal = context?.goal ?: "",
+      maxStep = context?.maxStep ?: 10,
+      startTimestamp = context?.startTimestamp,
+      endTimestamp = context?.steps()?.lastOrNull()?.timestamp,
+      deviceName = device.deviceName(),
       deviceFormFactor = deviceFormFactor,
       isGoalArchived = isGoalArchived(),
-      steps = latestArbigentContext()?.steps()?.map {
+      steps = context?.steps()?.map {
         it.getResult()
       } ?: emptyList(),
     )

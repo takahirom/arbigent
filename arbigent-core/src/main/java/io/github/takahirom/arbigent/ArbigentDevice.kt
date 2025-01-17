@@ -54,6 +54,7 @@ private val meaningfulAttributes: Set<String> = setOf(
 )
 
 public interface ArbigentDevice {
+  public fun deviceName(): String = "ArbigentDevice"
   public fun executeCommands(commands: List<MaestroCommand>)
   public fun viewTreeString(): ArbigentUiTreeStrings
   public fun focusedTreeString(): String
@@ -183,6 +184,10 @@ public class MaestroDevice(
     maestro = maestro,
     screenshotsDir = screenshotsDir
   )
+
+  override fun deviceName(): String {
+    return maestro.deviceName
+  }
 
   override fun executeCommands(commands: List<MaestroCommand>) {
     // If the jsEngine is already initialized, we don't need to reinitialize it
