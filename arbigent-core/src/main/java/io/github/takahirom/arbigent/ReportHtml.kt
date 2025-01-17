@@ -62,8 +62,8 @@ public class ArbigentHtmlReport {
                   steps = agentResult.steps.map { step ->
                     val screenshotFile = File(step.screenshotFilePath)
                     val newScreenshotFile = File(screenshotsDir, screenshotFile.name)
-                    screenshotFile.copyTo(newScreenshotFile)
-                    screenshotFile.toAnnotatedFile().copyTo(newScreenshotFile.toAnnotatedFile())
+                    screenshotFile.copyTo(newScreenshotFile, overwrite = true)
+                    screenshotFile.toAnnotatedFile().copyTo(newScreenshotFile.toAnnotatedFile(), overwrite = true)
                     step.copy(
                       screenshotFilePath = newScreenshotFile.absolutePath
                     )
