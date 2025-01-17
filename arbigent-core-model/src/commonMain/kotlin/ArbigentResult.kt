@@ -12,6 +12,8 @@ import kotlinx.serialization.Serializable
 public data class ArbigentProjectExecutionResult(
   public val scenarios: List<ArbigentScenarioResult>,
 ) {
+  public fun startTimestamp(): Long? = scenarios.firstOrNull()?.startTimestamp()
+  public fun endTimestamp(): Long? = scenarios.lastOrNull()?.endTimestamp()
   public companion object {
     public val yaml: Yaml = Yaml(
       configuration = YamlConfiguration(
@@ -30,7 +32,10 @@ public data class ArbigentScenarioResult(
   public val executionStatus: String? = null,
   public val isSuccess: Boolean,
   public val histories: List<ArbigentAgentResults>,
-)
+) {
+  public fun startTimestamp(): Long? = histories.firstOrNull()?.startTimestamp()
+  public fun endTimestamp(): Long? = histories.lastOrNull()?.endTimestamp()
+}
 
 @Serializable
 public data class ArbigentAgentResults(

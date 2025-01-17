@@ -47,6 +47,16 @@ private fun ArbigentReportComposeApp(reportString: String) {
         }
       }
     ) {
+      val startTimestamp = result.startTimestamp()
+      val endTimestamp = result.endTimestamp()
+      if (startTimestamp != null && endTimestamp != null) {
+        Div {
+          Text("Duration: ${(endTimestamp.toDouble() - startTimestamp) / 1000}s")
+        }
+      }
+      Div {
+        Text("Scenarios")
+      }
       ScenarioList(result.scenarios, selectedScenario) { scenario ->
         selectedScenario = scenario
       }
@@ -110,6 +120,13 @@ private fun ScenarioDetails(scenario: ArbigentScenarioResult) {
     Div {
       Text("Success: ${scenario.isSuccess}")
     }
+    val startTimestamp = scenario.startTimestamp()
+    val endTimestamp = scenario.endTimestamp()
+    if (startTimestamp != null && endTimestamp != null) {
+      Div {
+        Text("Duration: ${(endTimestamp.toDouble() - startTimestamp) / 1000}s")
+      }
+    }
 
     scenario.histories.forEach { agentResults ->
       AgentResultsView(agentResults)
@@ -129,7 +146,7 @@ private fun AgentResultsView(agentResults: ArbigentAgentResults) {
     }
   ) {
     Div {
-      Text("Agent Status: ${agentResults.status}")
+      Text("Retry History Status: ${agentResults.status}")
     }
     val startTimestamp = agentResults.startTimestamp()
     val endTimestamp = agentResults.endTimestamp()
