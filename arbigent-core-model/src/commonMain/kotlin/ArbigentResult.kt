@@ -36,7 +36,7 @@ public data class ArbigentScenarioResult(
 public data class ArbigentAgentResults(
   @YamlComment
   public val status:String,
-  public val agentResult: List<ArbigentAgentResult>,
+  public val agentResults: List<ArbigentAgentResult>,
 )
 
 @Serializable
@@ -46,6 +46,9 @@ public data class ArbigentAgentResult(
   public val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Mobile,
   public val isGoalArchived: Boolean,
   public val steps: List<ArbigentAgentTaskStepResult>,
+  public val deviceName: String,
+  public val startTimestamp: Long? = null,
+  public val endTimestamp: Long?,
 )
 
 @Serializable
@@ -55,7 +58,8 @@ public data class ArbigentAgentTaskStepResult(
   public val agentCommand: String?,
   public val uiTreeStrings: ArbigentUiTreeStrings?,
   public val aiRequest: String?,
-  public val aiResponse: String?
+  public val aiResponse: String?,
+  public val timestamp: Long
 )
 
 @Serializable

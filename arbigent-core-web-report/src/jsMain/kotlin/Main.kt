@@ -121,7 +121,7 @@ private fun ScenarioDetails(scenario: ArbigentScenarioResult) {
 private fun AgentResultsView(agentResults: ArbigentAgentResults) {
   Div {
     Text("Agent Status: ${agentResults.status}")
-    agentResults.agentResult.forEachIndexed { taskIndex, agentResult ->
+    agentResults.agentResults.forEachIndexed { taskIndex, agentResult ->
       AgentResultView(taskIndex, agentResult)
     }
   }
@@ -145,10 +145,17 @@ private fun AgentResultView(taskIndex: Int, agentResult: ArbigentAgentResult) {
       Text("Max Steps: ${agentResult.maxStep}")
     }
     Div {
-      Text("Device Form Factor: ${agentResult.deviceFormFactor}")
+      Text("Device(Form Factor): ${agentResult.deviceName}(${agentResult.deviceFormFactor})")
     }
     Div {
       Text("Goal Archived: ${agentResult.isGoalArchived}")
+    }
+    val startTimestamp = agentResult.startTimestamp
+    val endTimestamp = agentResult.endTimestamp
+    if (startTimestamp != null && endTimestamp != null) {
+      Div {
+        Text("Duration: ${(endTimestamp.toDouble() - startTimestamp) / 1000}s")
+      }
     }
 
     agentResult.steps.forEachIndexed { index, step ->
@@ -183,7 +190,7 @@ private fun StepView(step: ArbigentAgentTaskStepResult) {
           whiteSpace("pre-wrap")
         }
       }) {
-        Text("${step.summary}")
+        Text(step.summary)
       }
       ExpandableSection("UI Tree Strings") {
         Pre({

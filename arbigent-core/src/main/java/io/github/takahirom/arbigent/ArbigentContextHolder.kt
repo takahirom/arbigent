@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 public class ArbigentContextHolder(
   public val goal: String,
   public val maxStep: Int,
+  public val startTimestamp: Long = System.currentTimeMillis(),
 ) {
   public class Step(
     public val agentCommand: ArbigentAgentCommand? = null,
@@ -18,6 +19,7 @@ public class ArbigentContextHolder(
     public val uiTreeStrings: ArbigentUiTreeStrings? = null,
     public val aiRequest: String? = null,
     public val aiResponse: String? = null,
+    public val timestamp: Long = System.currentTimeMillis(),
     public val screenshotFilePath: String
   ) {
     public fun isFailed(): Boolean {
@@ -35,6 +37,7 @@ public class ArbigentContextHolder(
     public fun getResult(): ArbigentAgentTaskStepResult {
       return ArbigentAgentTaskStepResult(
         summary = text(),
+        timestamp = timestamp,
         screenshotFilePath = screenshotFilePath,
         agentCommand = agentCommand?.stepLogText(),
         uiTreeStrings = uiTreeStrings,
