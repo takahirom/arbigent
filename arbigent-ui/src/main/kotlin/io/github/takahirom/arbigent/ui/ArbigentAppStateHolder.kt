@@ -315,8 +315,9 @@ class ArbigentAppStateHolder(
       return
     }
     projectStateFlow.value?.getResult()?.let {
-      arbigentProjectSerializer.save(it, file)
-      ArbigentHtmlReport().saveReportHtml(file.parentFile.absolutePath, it)
+      file.mkdirs()
+      arbigentProjectSerializer.save(it, File(file, "result.yml"))
+      ArbigentHtmlReport().saveReportHtml(file.absolutePath, it)
     }
   }
 

@@ -85,7 +85,7 @@ class ArbigentCli : CliktCommand() {
   override fun run() {
     val resultDir = File("arbigent-result")
     ArbigentDir.screenshotsDir = File(resultDir, "screenshots")
-    val resultFile = File(resultDir, "result.yaml")
+    val resultFile = File(resultDir, "result.yml")
     val ai: ArbigentAi = aiType.let { aiType ->
       when (aiType) {
         is OpenAIAiConfig -> OpenAIAi(
@@ -138,7 +138,7 @@ class ArbigentCli : CliktCommand() {
       override fun run() {
         arbigentProject.cancel()
         ArbigentProjectSerializer().save(arbigentProject.getResult(), resultFile)
-        ArbigentHtmlReport().saveReportHtml(resultDir.absolutePath, arbigentProject.getResult())
+        ArbigentHtmlReport().saveReportHtml(resultDir.absolutePath, arbigentProject.getResult(), needCopy = false)
         device.close()
       }
     })
