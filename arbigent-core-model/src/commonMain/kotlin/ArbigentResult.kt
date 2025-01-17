@@ -12,6 +12,8 @@ import kotlinx.serialization.Serializable
 public data class ArbigentProjectExecutionResult(
   public val scenarios: List<ArbigentScenarioResult>,
 ) {
+  public fun startTimestamp(): Long? = scenarios.firstOrNull()?.startTimestamp()
+  public fun endTimestamp(): Long? = scenarios.lastOrNull()?.endTimestamp()
   public companion object {
     public val yaml: Yaml = Yaml(
       configuration = YamlConfiguration(
@@ -30,14 +32,20 @@ public data class ArbigentScenarioResult(
   public val executionStatus: String? = null,
   public val isSuccess: Boolean,
   public val histories: List<ArbigentAgentResults>,
-)
+) {
+  public fun startTimestamp(): Long? = histories.firstOrNull()?.startTimestamp()
+  public fun endTimestamp(): Long? = histories.lastOrNull()?.endTimestamp()
+}
 
 @Serializable
 public data class ArbigentAgentResults(
   @YamlComment
   public val status:String,
-  public val agentResult: List<ArbigentAgentResult>,
-)
+  public val agentResults: List<ArbigentAgentResult>,
+) {
+  public fun startTimestamp(): Long? = agentResults.firstOrNull()?.startTimestamp
+  public fun endTimestamp(): Long? = agentResults.lastOrNull()?.endTimestamp
+}
 
 @Serializable
 public data class ArbigentAgentResult(
@@ -46,6 +54,9 @@ public data class ArbigentAgentResult(
   public val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Mobile,
   public val isGoalArchived: Boolean,
   public val steps: List<ArbigentAgentTaskStepResult>,
+  public val deviceName: String,
+  public val startTimestamp: Long? = null,
+  public val endTimestamp: Long?,
 )
 
 @Serializable
@@ -55,7 +66,8 @@ public data class ArbigentAgentTaskStepResult(
   public val agentCommand: String?,
   public val uiTreeStrings: ArbigentUiTreeStrings?,
   public val aiRequest: String?,
-  public val aiResponse: String?
+  public val aiResponse: String?,
+  public val timestamp: Long
 )
 
 @Serializable

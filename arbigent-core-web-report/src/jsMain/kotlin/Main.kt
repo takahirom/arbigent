@@ -47,6 +47,16 @@ private fun ArbigentReportComposeApp(reportString: String) {
         }
       }
     ) {
+      val startTimestamp = result.startTimestamp()
+      val endTimestamp = result.endTimestamp()
+      if (startTimestamp != null && endTimestamp != null) {
+        Div {
+          Text("Duration: ${(endTimestamp.toDouble() - startTimestamp) / 1000}s")
+        }
+      }
+      Div {
+        Text("Scenarios")
+      }
       ScenarioList(result.scenarios, selectedScenario) { scenario ->
         selectedScenario = scenario
       }
@@ -110,6 +120,13 @@ private fun ScenarioDetails(scenario: ArbigentScenarioResult) {
     Div {
       Text("Success: ${scenario.isSuccess}")
     }
+    val startTimestamp = scenario.startTimestamp()
+    val endTimestamp = scenario.endTimestamp()
+    if (startTimestamp != null && endTimestamp != null) {
+      Div {
+        Text("Duration: ${(endTimestamp.toDouble() - startTimestamp) / 1000}s")
+      }
+    }
 
     scenario.histories.forEach { agentResults ->
       AgentResultsView(agentResults)
@@ -119,9 +136,26 @@ private fun ScenarioDetails(scenario: ArbigentScenarioResult) {
 
 @Composable
 private fun AgentResultsView(agentResults: ArbigentAgentResults) {
-  Div {
-    Text("Agent Status: ${agentResults.status}")
-    agentResults.agentResult.forEachIndexed { taskIndex, agentResult ->
+  Div(
+    {
+      style {
+        display(DisplayStyle.Flex)
+        flexDirection(FlexDirection.Column)
+        marginTop(10.px)
+      }
+    }
+  ) {
+    Div {
+      Text("Retry History Status: ${agentResults.status}")
+    }
+    val startTimestamp = agentResults.startTimestamp()
+    val endTimestamp = agentResults.endTimestamp()
+    if (startTimestamp != null && endTimestamp != null) {
+      Div {
+        Text("Duration: ${(endTimestamp.toDouble() - startTimestamp) / 1000}s")
+      }
+    }
+    agentResults.agentResults.forEachIndexed { taskIndex, agentResult ->
       AgentResultView(taskIndex, agentResult)
     }
   }
@@ -145,10 +179,17 @@ private fun AgentResultView(taskIndex: Int, agentResult: ArbigentAgentResult) {
       Text("Max Steps: ${agentResult.maxStep}")
     }
     Div {
-      Text("Device Form Factor: ${agentResult.deviceFormFactor}")
+      Text("Device(Form Factor): ${agentResult.deviceName}(${agentResult.deviceFormFactor})")
     }
     Div {
       Text("Goal Archived: ${agentResult.isGoalArchived}")
+    }
+    val startTimestamp = agentResult.startTimestamp
+    val endTimestamp = agentResult.endTimestamp
+    if (startTimestamp != null && endTimestamp != null) {
+      Div {
+        Text("Duration: ${(endTimestamp.toDouble() - startTimestamp) / 1000}s")
+      }
     }
 
     agentResult.steps.forEachIndexed { index, step ->
@@ -183,7 +224,7 @@ private fun StepView(step: ArbigentAgentTaskStepResult) {
           whiteSpace("pre-wrap")
         }
       }) {
-        Text("${step.summary}")
+        Text(step.summary)
       }
       ExpandableSection("UI Tree Strings") {
         Pre({
