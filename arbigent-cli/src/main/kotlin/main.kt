@@ -138,7 +138,7 @@ class ArbigentCli : CliktCommand() {
       override fun run() {
         arbigentProject.cancel()
         ArbigentProjectSerializer().save(arbigentProject.getResult(), resultFile)
-        ArbigentHtmlReport().saveReportHtml(resultDir.absolutePath, arbigentProject.getResult())
+        ArbigentHtmlReport().saveReportHtml(resultDir.absolutePath, arbigentProject.getResult(), needCopy = false)
         device.close()
       }
     })
