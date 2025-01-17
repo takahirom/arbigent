@@ -119,8 +119,25 @@ private fun ScenarioDetails(scenario: ArbigentScenarioResult) {
 
 @Composable
 private fun AgentResultsView(agentResults: ArbigentAgentResults) {
-  Div {
-    Text("Agent Status: ${agentResults.status}")
+  Div(
+    {
+      style {
+        display(DisplayStyle.Flex)
+        flexDirection(FlexDirection.Column)
+        marginTop(10.px)
+      }
+    }
+  ) {
+    Div {
+      Text("Agent Status: ${agentResults.status}")
+    }
+    val startTimestamp = agentResults.startTimestamp()
+    val endTimestamp = agentResults.endTimestamp()
+    if (startTimestamp != null && endTimestamp != null) {
+      Div {
+        Text("Duration: ${(endTimestamp.toDouble() - startTimestamp) / 1000}s")
+      }
+    }
     agentResults.agentResults.forEachIndexed { taskIndex, agentResult ->
       AgentResultView(taskIndex, agentResult)
     }

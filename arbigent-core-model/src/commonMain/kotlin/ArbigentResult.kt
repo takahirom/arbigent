@@ -37,7 +37,10 @@ public data class ArbigentAgentResults(
   @YamlComment
   public val status:String,
   public val agentResults: List<ArbigentAgentResult>,
-)
+) {
+  public fun startTimestamp(): Long? = agentResults.firstOrNull()?.startTimestamp
+  public fun endTimestamp(): Long? = agentResults.lastOrNull()?.endTimestamp
+}
 
 @Serializable
 public data class ArbigentAgentResult(
