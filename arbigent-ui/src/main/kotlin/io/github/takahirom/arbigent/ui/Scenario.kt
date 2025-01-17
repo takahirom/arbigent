@@ -241,7 +241,7 @@ private fun ScenarioOptions(
     ) {
       val cleanupData by scenarioStateHolder.cleanupDataStateFlow.collectAsState()
       GroupHeader {
-        Text("Initialize method")
+        Text("Initialization methods")
         // Add button
         IconActionButton(
           key = AllIconsKeys.General.Add,
@@ -257,7 +257,7 @@ private fun ScenarioOptions(
         }
       }
       CheckboxRow(
-        text = "Cleanup app data(deprecated)",
+        text = "Cleanup app data(Deprecated. Add initialization method instead)",
         checked = cleanupData is ArbigentScenarioContent.CleanupData.Cleanup,
         onCheckedChange = {
           scenarioStateHolder.cleanupDataStateFlow.value = if (it) {
@@ -533,20 +533,6 @@ private fun InitializationOptions(
           )
         }
       }
-    }
-    Row(
-      verticalAlignment = Alignment.CenterVertically
-    ) {
-      RadioButtonRow(
-        text = "Do nothing",
-        selected = initializeMethod is ArbigentScenarioContent.InitializationMethod.Noop,
-        onClick = {
-          scenarioStateHolder.initializationMethodStateFlow.value =
-            initializeMethods.toMutableList().apply {
-              set(index, ArbigentScenarioContent.InitializationMethod.Noop)
-            }
-        }
-      )
     }
     Row(
       verticalAlignment = Alignment.CenterVertically
