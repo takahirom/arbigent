@@ -168,7 +168,7 @@ public class OpenAIAi(
         parseResponse(responseText, messages, decisionInput)
       } catch (e: ArbigentAi.FailedToParseResponseException) {
         ArbigentContextHolder.Step(
-          memo = "Failed to parse AI response: ${e.message}",
+          feedback = "Failed to parse AI response: ${e.message}",
           screenshotFilePath = screenshotFilePath,
           aiRequest = messages.toHumanReadableString(),
           aiResponse = responseText,
