@@ -168,7 +168,7 @@ public class OpenAIAi(
         parseResponse(responseText, messages, decisionInput)
       } catch (e: ArbigentAi.FailedToParseResponseException) {
         ArbigentContextHolder.Step(
-          memo = "Failed to parse AI response: ${e.message}",
+          feedback = "Failed to parse AI response: ${e.message}",
           screenshotFilePath = screenshotFilePath,
           aiRequest = messages.toHumanReadableString(),
           aiResponse = responseText,
@@ -317,7 +317,7 @@ $templates"""
         agentCommand = agentCommand,
         action = action,
         imageDescription = jsonObject["image-description"]?.jsonPrimitive?.content ?: "",
-        memo = jsonObject["memo"]?.jsonPrimitive?.content ?: "",
+        thought = jsonObject["thought"]?.jsonPrimitive?.content ?: "",
         aiRequest = messages.toHumanReadableString(),
         aiResponse = content,
         screenshotFilePath = screenshotFilePath,
@@ -376,13 +376,13 @@ $templates"""
       "strict": true,
       "schema": {
         "type": "object",
-        "required": ["image-description","memo",  "action", "text"],
+        "required": ["image-description","thought",  "action", "text"],
         "additionalProperties": false,
         "properties": {
           "image-description": {
             "type": "string"
           },
-          "memo": {
+          "thought": {
             "type": "string"
           },
           "action": {
