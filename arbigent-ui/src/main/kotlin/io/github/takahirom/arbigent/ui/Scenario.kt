@@ -5,18 +5,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -190,7 +179,7 @@ private fun ScenarioOptions(
   scenarioStateHolder: ArbigentScenarioStateHolder,
   dependencyScenarioMenu: MenuScope.() -> Unit
 ) {
-  FlowRow(modifier = Modifier.padding(4.dp)) {
+  FlowRow(modifier = Modifier.padding(4.dp).height(320.dp).verticalScroll(rememberScrollState())) {
     Column(
       modifier = Modifier.padding(8.dp).width(200.dp)
     ) {
@@ -429,22 +418,23 @@ private fun InitializationOptions(
       ) {
         Column {
           Text(modifier = Modifier.padding(top = 4.dp), text = "Cleanup app data")
-          TextField(
-            modifier = Modifier
-              .padding(4.dp),
-            enabled = initializeMethod is ArbigentScenarioContent.InitializationMethod.CleanupData,
-            value = (initializeMethod as? ArbigentScenarioContent.InitializationMethod.CleanupData)?.packageName
-              ?: "",
-            onValueChange = {
-              scenarioStateHolder.initializationMethodStateFlow.value =
-                initializeMethods.toMutableList().apply {
-                  set(
-                    index,
-                    ArbigentScenarioContent.InitializationMethod.CleanupData(it)
-                  )
-                }
-            },
-          )
+          if (initializeMethod is ArbigentScenarioContent.InitializationMethod.CleanupData) {
+            TextField(
+              modifier = Modifier
+                .padding(4.dp),
+              value = (initializeMethod as? ArbigentScenarioContent.InitializationMethod.CleanupData)?.packageName
+                ?: "",
+              onValueChange = {
+                scenarioStateHolder.initializationMethodStateFlow.value =
+                  initializeMethods.toMutableList().apply {
+                    set(
+                      index,
+                      ArbigentScenarioContent.InitializationMethod.CleanupData(it)
+                    )
+                  }
+              },
+            )
+          }
         }
       }
     }
@@ -474,24 +464,25 @@ private fun InitializationOptions(
       ) {
         Column {
           Text(modifier = Modifier.padding(top = 4.dp), text = "Back")
-          TextField(
-            modifier = Modifier
-              .padding(4.dp),
-            enabled = initializeMethod is ArbigentScenarioContent.InitializationMethod.Back,
-            value = editingText,
-            placeholder = { Text("Times") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            onValueChange = {
-              editingText = it
-              scenarioStateHolder.initializationMethodStateFlow.value =
-                initializeMethods.toMutableList().apply {
-                  set(
-                    index,
-                    ArbigentScenarioContent.InitializationMethod.Back(it.toIntOrNull() ?: 1)
-                  )
-                }
-            },
-          )
+          if (initializeMethod is ArbigentScenarioContent.InitializationMethod.Back) {
+            TextField(
+              modifier = Modifier
+                .padding(4.dp),
+              value = editingText,
+              placeholder = { Text("Times") },
+              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+              onValueChange = {
+                editingText = it
+                scenarioStateHolder.initializationMethodStateFlow.value =
+                  initializeMethods.toMutableList().apply {
+                    set(
+                      index,
+                      ArbigentScenarioContent.InitializationMethod.Back(it.toIntOrNull() ?: 1)
+                    )
+                  }
+              },
+            )
+          }
         }
       }
     }
@@ -515,22 +506,23 @@ private fun InitializationOptions(
       ) {
         Column {
           Text(modifier = Modifier.padding(top = 4.dp), text = "Open link")
-          TextField(
-            modifier = Modifier
-              .padding(4.dp),
-            enabled = initializeMethod is ArbigentScenarioContent.InitializationMethod.OpenLink,
-            value = (initializeMethod as? ArbigentScenarioContent.InitializationMethod.OpenLink)?.link
-              ?: "",
-            onValueChange = {
-              scenarioStateHolder.initializationMethodStateFlow.value =
-                initializeMethods.toMutableList().apply {
-                  set(
-                    index,
-                    ArbigentScenarioContent.InitializationMethod.OpenLink(it)
-                  )
-                }
-            },
-          )
+          if (initializeMethod is ArbigentScenarioContent.InitializationMethod.OpenLink) {
+            TextField(
+              modifier = Modifier
+                .padding(4.dp),
+              value = (initializeMethod as? ArbigentScenarioContent.InitializationMethod.OpenLink)?.link
+                ?: "",
+              onValueChange = {
+                scenarioStateHolder.initializationMethodStateFlow.value =
+                  initializeMethods.toMutableList().apply {
+                    set(
+                      index,
+                      ArbigentScenarioContent.InitializationMethod.OpenLink(it)
+                    )
+                  }
+              },
+            )
+          }
         }
       }
     }
@@ -557,22 +549,23 @@ private fun InitializationOptions(
       ) {
         Column {
           Text(modifier = Modifier.padding(top = 4.dp), text = "Launch app")
-          TextField(
-            modifier = Modifier
-              .padding(4.dp),
-            enabled = initializeMethod is ArbigentScenarioContent.InitializationMethod.LaunchApp,
-            value = editingText,
-            onValueChange = {
-              editingText = it
-              scenarioStateHolder.initializationMethodStateFlow.value =
-                initializeMethods.toMutableList().apply {
-                  set(
-                    index,
-                    ArbigentScenarioContent.InitializationMethod.LaunchApp(it)
-                  )
-                }
-            },
-          )
+          if (initializeMethod is ArbigentScenarioContent.InitializationMethod.LaunchApp) {
+            TextField(
+              modifier = Modifier
+                .padding(4.dp),
+              value = editingText,
+              onValueChange = {
+                editingText = it
+                scenarioStateHolder.initializationMethodStateFlow.value =
+                  initializeMethods.toMutableList().apply {
+                    set(
+                      index,
+                      ArbigentScenarioContent.InitializationMethod.LaunchApp(it)
+                    )
+                  }
+              },
+            )
+          }
         }
       }
     }
