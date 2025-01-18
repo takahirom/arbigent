@@ -160,6 +160,8 @@ jobs:
           sudo xcode-select -s /Applications/Xcode_15.4.app
           # Check Xcode version
           xcodebuild -version
+      - name: Install applesimutils
+        run: brew tap wix/brew && brew install applesimutils
       - name: Start iOS Simulator (with debug)
         run: |
           # List available devices
