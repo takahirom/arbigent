@@ -156,8 +156,8 @@ jobs:
           ./gradlew arbigent-cli:installDist --stacktrace
       - name: Install Xcode
         run: |
-          # Select Xcode 15.1
-          sudo xcode-select -s /Applications/Xcode_15.1.app
+          # Select Xcode 15.4
+          sudo xcode-select -s /Applications/Xcode_15.4.app
           # Check Xcode version
           xcodebuild -version
       - name: Start iOS Simulator (with debug)
