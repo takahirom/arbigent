@@ -84,6 +84,7 @@ class ArbigentCli : CliktCommand() {
   @OptIn(ArbigentInternalApi::class)
   override fun run() {
     val resultDir = File("arbigent-result")
+    resultDir.mkdirs()
     ArbigentDir.screenshotsDir = File(resultDir, "screenshots")
     val resultFile = File(resultDir, "result.yml")
     val ai: ArbigentAi = aiType.let { aiType ->
