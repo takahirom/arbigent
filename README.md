@@ -40,10 +40,13 @@ Furthermore, I wanted to make Arbigent accessible to QA engineers by offering a 
 *   **Achieve Complex Goals Through Scenario Dependencies:** AI agents often struggle with complex tasks. Arbigent addresses this by allowing you to break down goals into smaller, dependent scenarios. For example, you can create a scenario to log in, followed by a dependent scenario to perform a search. The name "Arbigent" was chosen to reflect the framework's role as a mediator, orchestrating the actions of AI agents across multiple scenarios.
 *   **UI-Based Scenario Creation, Code-Based Execution:**  Create scenarios visually in the UI and execute them programmatically using a saved project yaml file, allowing to create scenarios by QA engineer and execute by Software engineer.
 *   **Support for Multiple Form Factors:**  Arbigent supports testing on iOS, Android, and even TV interfaces using D-pad navigation.
-*   **Optimized for AI:**  Through experimentation, I discovered that LLMs perform poorly when presented with the entire UI tree. Arbigent optimizes the UI tree by removing unnecessary information, enhancing the AI's ability to understand and interact with the UI.
+*   **Optimized for AI:**
+    *   Through experimentation, I discovered that LLMs perform poorly when presented with the entire UI tree. Arbigent optimizes the UI tree by removing unnecessary information, enhancing the AI's ability to understand and interact with the UI.
+    *   For the UI which doesn't have accessibility information, Arbigent provides an annotated screenshot for the AI to understand the UI.
 *   **Cost-Effective:**  Beyond being open source, Arbigent can utilize models like `GPT-4o mini` to execute tests, significantly reducing costs.
 *   **Flexible Code Interface:**  For advanced customization, Arbigent offers a code interface for test execution like adding custom initialization and cleanup methods for scenarios.
 *   **Open Source:** Arbigent is free to use, modify, and distribute. Contributions to the project are welcome!
+*   **Double check:** Arbigent provides a way to double-check the AI's decision using [Roborazzi's AI-powered Image Assertion](https://takahirom.github.io/roborazzi/ai-powered-image-assertion.html) feature. You can provide a prompt for the AI to check the screenshot. If the screenshot doesn't match the prompt, the AI can re-decide the action or re-evaluate its decision/reconsider its choice.
 
 ## How to Use
 
