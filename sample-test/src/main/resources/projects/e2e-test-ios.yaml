@@ -1,0 +1,12 @@
+scenarios:
+- id: "bc48fe6d-3c21-4933-b232-524905dadcc2"
+  goal: "Just Open \"General\" setting. That's it."
+  initializationMethods:
+  - type: "Back"
+  - type: "LaunchApp"
+    packageName: "com.apple.Preferences"
+- id: "8f770919-12f3-4cd3-a4e5-63b6823bee23"
+  goal: "Open About and see phone name"
+  dependency: "bc48fe6d-3c21-4933-b232-524905dadcc2"
+  imageAssertions:
+  - assertionPrompt: "You can see \"iPhone\" in the screen"

@@ -122,13 +122,61 @@ jobs:
           disk-size: 6000M
           heap-size: 600M
           script: |
-            arbigent-cli/build/install/arbigent/bin/arbigent --os=android --project-file=sample-test/src/main/resources/projects/e2e-test.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-exp
+            arbigent-cli/build/install/arbigent/bin/arbigent --os=android --project-file=sample-test/src/main/resources/projects/e2e-test-android.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-exp
 
       - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
         if: ${{ always() }}
         with:
-          name: cli-report
+          name: cli-report-android
           path: |
             arbigent-result/*
           retention-days: 120
 
+  cli-e2e-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - name: Setup JBR 17
+        uses: gmitch215/setup-java@main
+        with:
+          distribution: 'jetbrains'
+          java-version: 17
+          cache: 'gradle'
+          package-type: 'jdk+jcef'
+        # For GitHub API (use if you believe you'd run into rate limits)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+      - name: build
+        id: build
+        run: |
+          ./gradlew arbigent-cli:installDist --stacktrace
+      - name: Install Xcode
+        run: |
+          # Select Xcode 15.1
+          sudo xcode-select -s /Applications/Xcode_15.1.app
+          # Check Xcode version
+          xcodebuild -version
+      - name: Start iOS Simulator
+        run: |
+          # List available devices
+          xcrun simctl list devices
+          # Start iPhone 15 Pro simulator
+          xcrun simctl boot "iPhone 15 Pro"
+          # Wait until the simulator is fully booted
+          while ! xcrun simctl bootstatus "iPhone 15 Pro" | grep -q "Booted"; do sleep 1; done
+      - name: CLI E2E test for iOS
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_FREE_API_KEY }}
+        run: |
+          arbigent-cli/build/install/arbigent/bin/arbigent --os=ios --project-file=sample-test/src/main/resources/projects/e2e-test-ios.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-exp
+      - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
+        if: ${{ always() }}
+        with:
+          name: cli-ios-report
+          path: |
+            arbigent-result/*
+          retention-days: 120
