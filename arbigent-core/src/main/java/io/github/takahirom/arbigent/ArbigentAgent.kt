@@ -557,7 +557,7 @@ private fun executeCommands(
       e.printStackTrace()
       arbigentContextHolder.addStep(
         ArbigentContextHolder.Step(
-          memo = "Failed to perform action: ${e.message}. Please try other actions.",
+          feedback = "Failed to perform action: ${e.message}. Please try other actions.",
           screenshotFilePath = screenshotFilePath
         )
       )
@@ -565,7 +565,7 @@ private fun executeCommands(
       e.printStackTrace()
       arbigentContextHolder.addStep(
         ArbigentContextHolder.Step(
-          memo = "Failed to perform action: ${e.message}. Please try other actions.",
+          feedback = "Failed to perform action: ${e.message}. Please try other actions.",
           screenshotFilePath = screenshotFilePath
         )
       )
@@ -573,7 +573,7 @@ private fun executeCommands(
       e.printStackTrace()
       arbigentContextHolder.addStep(
         ArbigentContextHolder.Step(
-          memo = "Failed to perform action: ${e.message}. Please try other actions.",
+          feedback = "Failed to perform action: ${e.message}. Please try other actions.",
           screenshotFilePath = screenshotFilePath
         )
       )
@@ -638,7 +638,7 @@ private fun step(
     imageAssertionOutput.results.forEach {
       arbigentContextHolder.addStep(
         ArbigentContextHolder.Step(
-          memo = "Image assertion ${if (it.isPassed) "passed" else "failed"}. \nfulfillmentPercent:${it.fulfillmentPercent} \nprompt:${it.assertionPrompt} \nexplanation:${it.explanation}",
+          feedback = "Image assertion ${if (it.isPassed) "passed" else "failed"}. \nfulfillmentPercent:${it.fulfillmentPercent} \nprompt:${it.assertionPrompt} \nexplanation:${it.explanation}",
           screenshotFilePath = screenshotFilePath,
           aiRequest = decisionOutput.step.aiRequest,
           aiResponse = decisionOutput.step.aiResponse
@@ -654,7 +654,7 @@ private fun step(
       imageAssertionOutput.results.filter { it.isPassed.not() }.forEach {
         arbigentContextHolder.addStep(
           ArbigentContextHolder.Step(
-            memo = "Failed to reach the goal by image assertion. Image assertion prompt:${it.assertionPrompt}. explanation:${it.explanation}",
+            feedback = "Failed to reach the goal by image assertion. Image assertion prompt:${it.assertionPrompt}. explanation:${it.explanation}",
             screenshotFilePath = screenshotFilePath,
             aiRequest = decisionOutput.step.aiRequest,
             aiResponse = decisionOutput.step.aiResponse
