@@ -127,8 +127,82 @@ jobs:
       - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
         if: ${{ always() }}
         with:
-          name: cli-report
+          name: cli-report-android
           path: |
             arbigent-result/*
           retention-days: 120
 
+  cli-e2e-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - name: Setup JBR 17
+        uses: gmitch215/setup-java@main
+        with:
+          distribution: 'jetbrains'
+          java-version: 17
+          cache: 'gradle'
+          package-type: 'jdk+jcef'
+        # For GitHub API (use if you believe you'd run into rate limits)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+      - name: build
+        id: build
+        run: |
+          ./gradlew arbigent-cli:installDist --stacktrace
+      - name: Install Xcode
+        run: |
+          # Select Xcode 15.4
+          sudo xcode-select -s /Applications/Xcode_15.4.app
+          # Check Xcode version
+          xcodebuild -version
+      - name: Install applesimutils
+        run: brew tap wix/brew && brew install applesimutils
+      - name: Start iOS Simulator (with debug)
+        run: |
+          # List available devices
+          xcrun simctl list devices
+          # Start iPhone 15 Pro simulator
+          xcrun simctl boot "iPhone 15 Pro"
+          # Check simulator status periodically
+          SIMULATOR_BOOTED="false"
+          for i in {1..60}; do # Check for 1 minute (adjust as needed)
+            echo "Simulator status (attempt $i):"
+            STATUS=$(xcrun simctl bootstatus "iPhone 15 Pro")
+            echo "$STATUS"
+            if echo "$STATUS" | grep -q "Device already booted, nothing to do."; then
+              SIMULATOR_BOOTED="true"
+              break
+            elif echo "$STATUS" | grep -q "Status=4294967295, isTerminal=YES"; then
+              # This case is Finished, so treat it as Booted.
+              SIMULATOR_BOOTED="true"
+              break
+            elif echo "$STATUS" | grep -q "Error:"; then
+              echo "Error: Simulator encountered an error during boot."
+              exit 1
+            fi
+            sleep 5
+          done
+          
+          # Check if the simulator booted successfully
+          if [ "$SIMULATOR_BOOTED" = "false" ]; then
+            echo "Error: Simulator failed to boot within the timeout period."
+            exit 1
+          fi
+          echo "Simulator booted successfully."
+      - name: CLI E2E test for iOS
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_FREE_API_KEY }}
+        run: |
+          arbigent-cli/build/install/arbigent/bin/arbigent --os=ios --project-file=sample-test/src/main/resources/projects/e2e-test-ios.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-exp
+      - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
+        if: ${{ always() }}
+        with:
+          name: cli-ios-report
+          path: |
+            arbigent-result/*
+          retention-days: 120

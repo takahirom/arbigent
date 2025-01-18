@@ -587,6 +587,7 @@ private fun step(
 ): StepResult {
   val (arbigentContextHolder, agentCommandTypes, device, deviceFormFactor, ai, decisionChain, imageAssertionChain, executeCommandChain) = stepInput
   val screenshotFileID = System.currentTimeMillis().toString()
+  val elements = device.elements()
   for (it in 0..2) {
     try {
       device.executeCommands(
@@ -604,14 +605,15 @@ private fun step(
       Thread.sleep(1000)
     }
   }
+  val uiTreeStrings = device.viewTreeString()
   arbigentDebugLog("Arbigent step(): ${arbigentContextHolder.prompt()}")
   val screenshotFilePath =
     ArbigentDir.screenshotsDir.absolutePath + File.separator + "$screenshotFileID.png"
   val decisionInput = ArbigentAi.DecisionInput(
     arbigentContextHolder = arbigentContextHolder,
     formFactor = deviceFormFactor,
-    elements = device.elements(),
-    uiTreeStrings = device.viewTreeString(),
+    elements = elements,
+    uiTreeStrings = uiTreeStrings,
     focusedTreeString = if (deviceFormFactor.isTv()) {
       // It is important to get focused tree string for TV form factor
       device.focusedTreeString()
