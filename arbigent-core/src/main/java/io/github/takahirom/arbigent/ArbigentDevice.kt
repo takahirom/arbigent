@@ -1,5 +1,6 @@
 package io.github.takahirom.arbigent
 
+import io.github.takahirom.arbigent.ArbigentElementList.NodeInBoundsNotFoundException
 import io.github.takahirom.arbigent.MaestroDevice.OptimizationResult
 import io.github.takahirom.arbigent.result.ArbigentUiTreeStrings
 import maestro.*
@@ -212,7 +213,7 @@ public class MaestroDevice(
         val deviceInfo = maestro.cachedDeviceInfo
         val elementList = ArbigentElementList.from(viewHierarchy, deviceInfo)
         return elementList
-      } catch (e: ArbigentElementList.NodeInBoundsNotFoundException) {
+      } catch (e: NodeInBoundsNotFoundException) {
         arbigentDebugLog("NodeInBoundsNotFoundException. Retry $it")
         Thread.sleep(1000)
       }
@@ -222,12 +223,23 @@ public class MaestroDevice(
 
 
   override fun viewTreeString(): ArbigentUiTreeStrings {
-    val viewHierarchy = maestro.viewHierarchy(false)
+    for (it in 0..2) {
+      try {
+        val viewHierarchy = maestro.viewHierarchy(false)
+        return ArbigentUiTreeStrings(
+          allTreeString = viewHierarchy.toString(),
+          optimizedTreeString = viewHierarchy.toOptimizedString(
+            deviceInfo = maestro.cachedDeviceInfo
+          )
+        )
+      } catch (e: NodeInBoundsNotFoundException) {
+        arbigentDebugLog("NodeInBoundsNotFoundException. Retry $it")
+        Thread.sleep(1000)
+      }
+    }
     return ArbigentUiTreeStrings(
-      allTreeString = viewHierarchy.toString(),
-      optimizedTreeString = viewHierarchy.toOptimizedString(
-        deviceInfo = maestro.cachedDeviceInfo
-      )
+      allTreeString = "",
+      optimizedTreeString = ""
     )
   }
 
@@ -281,10 +293,11 @@ public class MaestroDevice(
 
   private fun ViewHierarchy.toOptimizedString(deviceInfo: DeviceInfo): String {
     val root = root
-    val result = root.filterOutOfBounds(
+    val nodes = root.filterOutOfBounds(
       width = deviceInfo.widthPixels,
       height = deviceInfo.heightPixels
-    )!!.optimizeTree(
+    ) ?: throw NodeInBoundsNotFoundException()
+    val result = nodes.optimizeTree(
       isRoot = true,
       viewHierarchy = this,
     )
