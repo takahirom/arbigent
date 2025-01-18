@@ -170,13 +170,22 @@ jobs:
           SIMULATOR_BOOTED="false"
           for i in {1..60}; do # Check for 1 minute (adjust as needed)
             echo "Simulator status (attempt $i):"
-            xcrun simctl bootstatus "iPhone 15 Pro"
-            if xcrun simctl bootstatus "iPhone 15 Pro" | grep -q "Booted"; then
+            STATUS=$(xcrun simctl bootstatus "iPhone 15 Pro")
+            echo "$STATUS"
+            if echo "$STATUS" | grep -q "Device already booted, nothing to do."; then
               SIMULATOR_BOOTED="true"
               break
+            elif echo "$STATUS" | grep -q "Status=4294967295, isTerminal=YES"; then
+              # This case is Finished, so treat it as Booted.
+              SIMULATOR_BOOTED="true"
+              break
+            elif echo "$STATUS" | grep -q "Error:"; then
+              echo "Error: Simulator encountered an error during boot."
+              exit 1
             fi
             sleep 5
           done
+          
           # Check if the simulator booted successfully
           if [ "$SIMULATOR_BOOTED" = "false" ]; then
             echo "Error: Simulator failed to boot within the timeout period."
