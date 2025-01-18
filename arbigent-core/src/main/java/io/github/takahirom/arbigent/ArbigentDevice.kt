@@ -107,7 +107,7 @@ public data class ArbigentElementList(
       viewHierarchy: ViewHierarchy,
       deviceInfo: DeviceInfo
     ): ArbigentElementList {
-      val clickableAvailable = deviceInfo.platform != Platform.IOS
+      val clickableAvailable = deviceInfo.platform == Platform.ANDROID
       var index = 0
       val deviceInfo = deviceInfo
       val root = viewHierarchy.root
