@@ -1,8 +1,9 @@
 scenarios:
 - id: "bc48fe6d-3c21-4933-b232-524905dadcc2"
-  goal: "Just Open Safari"
+  goal: "Just Wait a second and Open Safari"
   initializationMethods:
-  - type: "Back"
+  - type: "LaunchApp"
+    packageName: "com.apple.mobilesafari"
 - id: "8f770919-12f3-4cd3-a4e5-63b6823bee23"
   goal: "Just Open Google"
   dependency: "bc48fe6d-3c21-4933-b232-524905dadcc2"
