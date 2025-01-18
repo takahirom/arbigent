@@ -160,14 +160,29 @@ jobs:
           sudo xcode-select -s /Applications/Xcode_15.1.app
           # Check Xcode version
           xcodebuild -version
-      - name: Start iOS Simulator
+      - name: Start iOS Simulator (with debug)
         run: |
           # List available devices
           xcrun simctl list devices
           # Start iPhone 15 Pro simulator
           xcrun simctl boot "iPhone 15 Pro"
-          # Wait until the simulator is fully booted
-          while ! xcrun simctl bootstatus "iPhone 15 Pro" | grep -q "Booted"; do sleep 1; done
+          # Check simulator status periodically
+          SIMULATOR_BOOTED="false"
+          for i in {1..60}; do # Check for 1 minute (adjust as needed)
+            echo "Simulator status (attempt $i):"
+            xcrun simctl bootstatus "iPhone 15 Pro"
+            if xcrun simctl bootstatus "iPhone 15 Pro" | grep -q "Booted"; then
+              SIMULATOR_BOOTED="true"
+              break
+            fi
+            sleep 5
+          done
+          # Check if the simulator booted successfully
+          if [ "$SIMULATOR_BOOTED" = "false" ]; then
+            echo "Error: Simulator failed to boot within the timeout period."
+            exit 1
+          fi
+          echo "Simulator booted successfully."
       - name: CLI E2E test for iOS
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_FREE_API_KEY }}
