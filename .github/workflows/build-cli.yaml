@@ -68,7 +68,7 @@ jobs:
         env:
           COMMITTER_TOKEN: ${{ secrets.COMMITTER_TOKEN }}
 
-  cli-e2e:
+  cli-e2e-android:
     runs-on: ubuntu-latest
     steps:
       - name: Delete unnecessary tools 🔧
@@ -131,3 +131,4 @@ jobs:
           path: |
             arbigent-result/*
           retention-days: 120
+
