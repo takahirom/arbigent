@@ -107,7 +107,7 @@ public data class ArbigentElementList(
       viewHierarchy: ViewHierarchy,
       deviceInfo: DeviceInfo
     ): ArbigentElementList {
-      val clickableAvailable = deviceInfo.platform != Platform.IOS
+      val clickableAvailable = deviceInfo.platform == Platform.ANDROID
       var index = 0
       val deviceInfo = deviceInfo
       val root = viewHierarchy.root
@@ -222,12 +222,23 @@ public class MaestroDevice(
 
 
   override fun viewTreeString(): ArbigentUiTreeStrings {
-    val viewHierarchy = maestro.viewHierarchy(false)
+    for (it in 0..2) {
+      try {
+        val viewHierarchy = maestro.viewHierarchy(false)
+        return ArbigentUiTreeStrings(
+          allTreeString = viewHierarchy.toString(),
+          optimizedTreeString = viewHierarchy.toOptimizedString(
+            deviceInfo = maestro.cachedDeviceInfo
+          )
+        )
+      } catch (e: ArbigentElementList.NodeInBoundsNotFoundException) {
+        arbigentDebugLog("NodeInBoundsNotFoundException. Retry $it")
+        Thread.sleep(1000)
+      }
+    }
     return ArbigentUiTreeStrings(
-      allTreeString = viewHierarchy.toString(),
-      optimizedTreeString = viewHierarchy.toOptimizedString(
-        deviceInfo = maestro.cachedDeviceInfo
-      )
+      allTreeString = "",
+      optimizedTreeString = ""
     )
   }
 
@@ -281,10 +292,11 @@ public class MaestroDevice(
 
   private fun ViewHierarchy.toOptimizedString(deviceInfo: DeviceInfo): String {
     val root = root
-    val result = root.filterOutOfBounds(
+    val nodes = root.filterOutOfBounds(
       width = deviceInfo.widthPixels,
       height = deviceInfo.heightPixels
-    )!!.optimizeTree(
+    ) ?: throw ArbigentElementList.NodeInBoundsNotFoundException()
+    val result = nodes.optimizeTree(
       isRoot = true,
       viewHierarchy = this,
     )

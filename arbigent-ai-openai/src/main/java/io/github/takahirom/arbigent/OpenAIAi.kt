@@ -101,7 +101,7 @@ public class OpenAIAi(
 
   @OptIn(ExperimentalSerializationApi::class)
   override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
-    val arbigentContext = decisionInput.arbigentContextHolder
+    val contextHolder = decisionInput.contextHolder
     val screenshotFilePath = decisionInput.screenshotFilePath
     val formFactor = decisionInput.formFactor
     val uiTreeStrings = decisionInput.uiTreeStrings
@@ -116,7 +116,7 @@ public class OpenAIAi(
 
     val imageBase64 = File(screenshotFilePath).getResizedIamgeBase64(1.0F)
     val prompt =
-      buildPrompt(arbigentContext, uiTreeStrings.optimizedTreeString, focusedTree, agentCommandTypes, elements)
+      buildPrompt(contextHolder, uiTreeStrings.optimizedTreeString, focusedTree, agentCommandTypes, elements)
     val messages: List<ChatMessage> = listOf(
       ChatMessage(
         role = "system",
@@ -168,7 +168,7 @@ public class OpenAIAi(
         parseResponse(responseText, messages, decisionInput)
       } catch (e: ArbigentAi.FailedToParseResponseException) {
         ArbigentContextHolder.Step(
-          memo = "Failed to parse AI response: ${e.message}",
+          feedback = "Failed to parse AI response: ${e.message}",
           screenshotFilePath = screenshotFilePath,
           aiRequest = messages.toHumanReadableString(),
           aiResponse = responseText,

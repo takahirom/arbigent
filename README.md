@@ -35,15 +35,60 @@ To address these issues, I aimed to create a framework that empowers users with 
 
 Furthermore, I wanted to make Arbigent accessible to QA engineers by offering a user-friendly UI. This allows for scenario creation within the UI and seamless test execution via the code interface.
 
-## Features
+##  Key Feature Breakdown
 
-*   **Achieve Complex Goals Through Scenario Dependencies:** AI agents often struggle with complex tasks. Arbigent addresses this by allowing you to break down goals into smaller, dependent scenarios. For example, you can create a scenario to log in, followed by a dependent scenario to perform a search. The name "Arbigent" was chosen to reflect the framework's role as a mediator, orchestrating the actions of AI agents across multiple scenarios.
-*   **UI-Based Scenario Creation, Code-Based Execution:**  Create scenarios visually in the UI and execute them programmatically using a saved project yaml file, allowing to create scenarios by QA engineer and execute by Software engineer.
-*   **Support for Multiple Form Factors:**  Arbigent supports testing on iOS, Android, and even TV interfaces using D-pad navigation.
-*   **Optimized for AI:**  Through experimentation, I discovered that LLMs perform poorly when presented with the entire UI tree. Arbigent optimizes the UI tree by removing unnecessary information, enhancing the AI's ability to understand and interact with the UI.
-*   **Cost-Effective:**  Beyond being open source, Arbigent can utilize models like `GPT-4o mini` to execute tests, significantly reducing costs.
-*   **Flexible Code Interface:**  For advanced customization, Arbigent offers a code interface for test execution like adding custom initialization and cleanup methods for scenarios.
-*   **Open Source:** Arbigent is free to use, modify, and distribute. Contributions to the project are welcome!
+**I. Core Functionality & Design**
+
+*   **Complex Task Management:**
+    *   **Scenario Dependencies:** Breaks down complex goals into smaller, manageable scenarios that depend on each other (e.g., login -> search).
+    *   **Orchestration:** Acts as a mediator, managing the execution flow of AI agents across multiple, interconnected scenarios.
+*   **Hybrid Development Workflow:**
+    *   **UI-Driven Scenario Creation:**  Allows non-programmers (e.g., QA engineers) to visually design test scenarios through a user-friendly interface.
+    *   **Code-Based Execution:** Enables software engineers to execute the saved scenarios programmatically (YAML files), allowing for integration with existing testing infrastructure.
+
+**II. Cross-Platform & Device Support**
+
+*   **Multi-Platform Compatibility:**
+    *   **Mobile & TV:** Supports testing on iOS, Android, Web, and TV interfaces.
+    *   **D-Pad Navigation:**  Handles TV interfaces that rely on D-pad navigation.
+
+**III. AI Optimization & Efficiency**
+
+*   **Enhanced AI Understanding:**
+    *   **UI Tree Optimization:** Simplifies and filters the UI tree to improve AI comprehension and performance.
+    *   **Accessibility-Independent:** Provides annotated screenshots to assist AI in understanding UIs that lack accessibility information.
+*   **Cost Savings:**
+    *   **Open Source:** Free to use, modify, and distribute, eliminating licensing costs.
+    *   **Efficient Model Usage:** Compatible with cost-effective models like `GPT-4o mini`, reducing operational expenses.
+
+**IV. Robustness & Reliability**
+
+*   **Double Check with AI-Powered Image Assertion:** Integrates [Roborazzi's feature](https://takahirom.github.io/roborazzi/ai-powered-image-assertion.html#behavior-of-ai-powered-image-assertion) to verify AI decisions using image-based prompts and allows the AI to re-evaluate if needed.
+*   **Stuck Screen Detection:** Identifies and recovers from situations where the AI agent gets stuck on the same screen, prompting it to reconsider its actions.
+
+**V. Advanced Features & Customization**
+
+*   **Flexible Code Interface:**
+    *   **Custom Hooks:** Offers a code interface for adding custom initialization and cleanup methods, providing greater control over scenario execution.
+
+**VI. Community & Open Source**
+
+*   **Open Source Nature:**
+    *   **Free & Open:** Freely available for use, modification, and distribution.
+    *   **Community Driven:** Welcomes contributions from the community to enhance and expand the framework.
+
+## Arbigent's Strengths and Weaknesses Based on [SMURF](https://testing.googleblog.com/2024/10/smurf-beyond-test-pyramid.html)
+
+I categorized automated testing frameworks into five levels using the [SMURF](https://testing.googleblog.com/2024/10/smurf-beyond-test-pyramid.html) framework. Here's how Arbigent stacks up:
+
+*   **Speed (1/5):** Arbigent's speed is currently limited by the underlying AI technology and the need to interact with the application's UI in real-time. This makes it slower than traditional unit or integration tests.
+*   **Maintainability (4/5):** Arbigent excels in maintainability. You can write tests in natural language (e.g., "Complete the tutorial"), making them resilient to UI changes. The task decomposition feature also reduces duplication, further enhancing maintainability. Maintenance can be done by non-engineers, thanks to the natural language interface.
+*   **Utilization (1/5):** Arbigent requires both device resources (emulators or physical devices) and AI resources, which can be costly. (AI cost can be around $0.005 per step and $0.02 per task when using GPT-4o.)
+*   **Reliability (3/5):** Arbigent has several features to improve reliability. It automatically waits during loading screens, handles unexpected dialogs, and even attempts self-correction. However, external factors like emulator flakiness can still impact reliability.
+    *   Recently I found Arbigent has retry feature and can execute the scenario from the beginning. But, even without retry, Arbigent works fine without failures thanks to the flexibility of AI.
+*   **Fidelity (5/5):** Arbigent provides high fidelity by testing on real or emulated devices with the actual application. It can even assess aspects that were previously difficult to test, such as verifying video playback by checking for visual changes on the screen.
+
+I believe that many of its current limitations, such as speed, maintainability, utilization, and reliability, will be addressed as AI technology continues to evolve. The need for extensive prompt engineering will likely diminish as AI models become more capable.
 
 ## How to Use
 
@@ -123,11 +168,11 @@ You can add AI providers by implementing the `ArbigentAi` interface.
 
 ## Supported OSes / Form Factors
 
-| OS          | Supported |
-|-------------|-----------|
-| Android     | Yes       |
-| iOS         | Yes       |
-| Web(Chrome) | Yes       |
+| OS          | Supported | Test Status in the Arbigent repository            |
+|-------------|-----------|---------------------------------------------------|
+| Android     | Yes       | End-to-End including Android emulator and real AI |
+| iOS         | Yes       | End-to-End including iOS simulator and real AI    |
+| Web(Chrome) | Yes       | Currently, Testing not yet conducted              |
 
 You can add OSes by implementing the `ArbigentDevice` interface. Thanks to the excellent [Maestro](https://github.com/mobile-dev-inc/maestro) library, we are able to support multiple OSes.
 

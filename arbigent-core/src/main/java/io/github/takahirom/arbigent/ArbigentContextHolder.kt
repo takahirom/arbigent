@@ -14,7 +14,8 @@ public class ArbigentContextHolder(
   public class Step(
     public val agentCommand: ArbigentAgentCommand? = null,
     public val action: String? = null,
-    public val memo: String,
+    public val feedback: String? = null,
+    public val memo: String? = null,
     public val imageDescription: String? = null,
     public val uiTreeStrings: ArbigentUiTreeStrings? = null,
     public val aiRequest: String? = null,
@@ -23,13 +24,14 @@ public class ArbigentContextHolder(
     public val screenshotFilePath: String
   ) {
     public fun isFailed(): Boolean {
-      return memo.contains("Failed")
+      return feedback?.contains("Failed") == true
     }
 
     public fun text(): String {
       return buildString {
         imageDescription?.let { append("image description: $it\n") }
-        append("memo: $memo\n")
+        memo?.let { append("memo: $it\n") }
+        feedback?.let { append("feedback: $it\n") }
         agentCommand?.let { append("action done: ${it.stepLogText()}\n") }
       }
     }

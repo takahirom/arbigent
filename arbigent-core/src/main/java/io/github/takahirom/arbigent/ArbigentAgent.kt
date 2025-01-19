@@ -19,12 +19,9 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
 import maestro.MaestroException
-import maestro.orchestra.BackPressCommand
-import maestro.orchestra.ClearStateCommand
-import maestro.orchestra.LaunchAppCommand
-import maestro.orchestra.MaestroCommand
-import maestro.orchestra.TakeScreenshotCommand
+import maestro.orchestra.*
 import java.io.File
+import javax.imageio.ImageIO
 
 public class ArbigentAgent(
   agentConfig: AgentConfig
@@ -328,7 +325,7 @@ public fun AgentConfigBuilder(block: AgentConfig.Builder.() -> Unit): AgentConfi
 public fun AgentConfigBuilder(
   prompt: ArbigentPrompt,
   deviceFormFactor: ArbigentScenarioDeviceFormFactor,
-  initializationMethods: List<ArbigentScenarioContent.InitializationMethods>,
+  initializationMethods: List<ArbigentScenarioContent.InitializationMethod>,
   cleanupData: ArbigentScenarioContent.CleanupData,
   imageAssertions: List<ArbigentImageAssertion>
 ): AgentConfig.Builder = AgentConfigBuilder {
@@ -336,7 +333,7 @@ public fun AgentConfigBuilder(
   prompt(prompt)
   initializationMethods.reversed().forEach { initializeMethod ->
     when (initializeMethod) {
-      is ArbigentScenarioContent.InitializationMethods.Back -> {
+      is ArbigentScenarioContent.InitializationMethod.Back -> {
         addInterceptor(object : ArbigentInitializerInterceptor {
           override fun intercept(
             device: ArbigentDevice,
@@ -360,10 +357,10 @@ public fun AgentConfigBuilder(
         })
       }
 
-      ArbigentScenarioContent.InitializationMethods.Noop -> {
+      ArbigentScenarioContent.InitializationMethod.Noop -> {
       }
 
-      is ArbigentScenarioContent.InitializationMethods.LaunchApp -> {
+      is ArbigentScenarioContent.InitializationMethod.LaunchApp -> {
         addInterceptor(object : ArbigentInitializerInterceptor {
           override fun intercept(
             device: ArbigentDevice,
@@ -379,6 +376,46 @@ public fun AgentConfigBuilder(
               )
             )
             device.waitForAppToSettle(initializeMethod.packageName)
+            chain.proceed(device)
+          }
+        })
+      }
+
+      is ArbigentScenarioContent.InitializationMethod.CleanupData -> {
+        addInterceptor(object : ArbigentInitializerInterceptor {
+          override fun intercept(
+            device: ArbigentDevice,
+            chain: ArbigentInitializerInterceptor.Chain
+          ) {
+            device.executeCommands(
+              listOf(
+                MaestroCommand(
+                  clearStateCommand = ClearStateCommand(
+                    appId = initializeMethod.packageName
+                  )
+                )
+              )
+            )
+            chain.proceed(device)
+          }
+        })
+      }
+
+      is ArbigentScenarioContent.InitializationMethod.OpenLink -> {
+        addInterceptor(object : ArbigentInitializerInterceptor {
+          override fun intercept(
+            device: ArbigentDevice,
+            chain: ArbigentInitializerInterceptor.Chain
+          ) {
+            device.executeCommands(
+              listOf(
+                MaestroCommand(
+                  openLinkCommand = OpenLinkCommand(
+                    link = initializeMethod.link
+                  )
+                )
+              )
+            )
             chain.proceed(device)
           }
         })
@@ -521,7 +558,7 @@ private fun executeCommands(
       e.printStackTrace()
       arbigentContextHolder.addStep(
         ArbigentContextHolder.Step(
-          memo = "Failed to perform action: ${e.message}. Please try other actions.",
+          feedback = "Failed to perform action: ${e.message}. Please try other actions.",
           screenshotFilePath = screenshotFilePath
         )
       )
@@ -529,7 +566,7 @@ private fun executeCommands(
       e.printStackTrace()
       arbigentContextHolder.addStep(
         ArbigentContextHolder.Step(
-          memo = "Failed to perform action: ${e.message}. Please try other actions.",
+          feedback = "Failed to perform action: ${e.message}. Please try other actions.",
           screenshotFilePath = screenshotFilePath
         )
       )
@@ -537,7 +574,7 @@ private fun executeCommands(
       e.printStackTrace()
       arbigentContextHolder.addStep(
         ArbigentContextHolder.Step(
-          memo = "Failed to perform action: ${e.message}. Please try other actions.",
+          feedback = "Failed to perform action: ${e.message}. Please try other actions.",
           screenshotFilePath = screenshotFilePath
         )
       )
@@ -549,8 +586,17 @@ private fun executeCommands(
 private fun step(
   stepInput: StepInput
 ): StepResult {
-  val (arbigentContextHolder, agentCommandTypes, device, deviceFormFactor, ai, decisionChain, imageAssertionChain, executeCommandChain) = stepInput
+  val contextHolder = stepInput.arbigentContextHolder
+  val commandTypes = stepInput.agentCommandTypes
+  val device = stepInput.device
+  val deviceFormFactor = stepInput.deviceFormFactor
+  val ai = stepInput.ai
+  val decisionChain = stepInput.decisionChain
+  val imageAssertionChain = stepInput.imageAssertionChain
+  val executeCommandChain = stepInput.executeCommandChain
+
   val screenshotFileID = System.currentTimeMillis().toString()
+  val elements = device.elements()
   for (it in 0..2) {
     try {
       device.executeCommands(
@@ -568,21 +614,33 @@ private fun step(
       Thread.sleep(1000)
     }
   }
-  arbigentDebugLog("Arbigent step(): ${arbigentContextHolder.prompt()}")
+  val uiTreeStrings = device.viewTreeString()
+  arbigentDebugLog("Arbigent step(): ${contextHolder.prompt()}")
   val screenshotFilePath =
     ArbigentDir.screenshotsDir.absolutePath + File.separator + "$screenshotFileID.png"
+  val lastScreenshot = contextHolder.steps().lastOrNull()?.screenshotFilePath
+  val newScreenshot = File(screenshotFilePath)
+  if (detectStuckScreen(lastScreenshot, newScreenshot)) {
+    arbigentDebugLog("Stuck screen detected.")
+    contextHolder.addStep(
+      ArbigentContextHolder.Step(
+        feedback = "Failed to produce the intended outcome. The current screen is identical to the previous one. Please try other actions.",
+        screenshotFilePath = screenshotFilePath
+      )
+    )
+  }
   val decisionInput = ArbigentAi.DecisionInput(
-    arbigentContextHolder = arbigentContextHolder,
+    contextHolder = contextHolder,
     formFactor = deviceFormFactor,
-    elements = device.elements(),
-    uiTreeStrings = device.viewTreeString(),
+    elements = elements,
+    uiTreeStrings = uiTreeStrings,
     focusedTreeString = if (deviceFormFactor.isTv()) {
       // It is important to get focused tree string for TV form factor
       device.focusedTreeString()
     } else {
       null
     },
-    agentCommandTypes = agentCommandTypes,
+    agentCommandTypes = commandTypes,
     screenshotFilePath = screenshotFilePath,
     prompt = stepInput.prompt,
   )
@@ -591,16 +649,16 @@ private fun step(
     val imageAssertionOutput = imageAssertionChain(
       ArbigentAi.ImageAssertionInput(
         ai = ai,
-        arbigentContextHolder = arbigentContextHolder,
+        arbigentContextHolder = contextHolder,
         screenshotFilePath = screenshotFilePath,
         // Added by interceptors
         assertions = listOf()
       )
     )
     imageAssertionOutput.results.forEach {
-      arbigentContextHolder.addStep(
+      contextHolder.addStep(
         ArbigentContextHolder.Step(
-          memo = "Image assertion ${if (it.isPassed) "passed" else "failed"}. \nfulfillmentPercent:${it.fulfillmentPercent} \nprompt:${it.assertionPrompt} \nexplanation:${it.explanation}",
+          feedback = "Image assertion ${if (it.isPassed) "passed" else "failed"}. \nfulfillmentPercent:${it.fulfillmentPercent} \nprompt:${it.assertionPrompt} \nexplanation:${it.explanation}",
           screenshotFilePath = screenshotFilePath,
           aiRequest = decisionOutput.step.aiRequest,
           aiResponse = decisionOutput.step.aiResponse
@@ -611,12 +669,12 @@ private fun step(
         it.isPassed
       }) {
       // All assertions are passed
-      arbigentContextHolder.addStep(decisionOutput.step)
+      contextHolder.addStep(decisionOutput.step)
     } else {
       imageAssertionOutput.results.filter { it.isPassed.not() }.forEach {
-        arbigentContextHolder.addStep(
+        contextHolder.addStep(
           ArbigentContextHolder.Step(
-            memo = "Failed to reach the goal by image assertion. Image assertion prompt:${it.assertionPrompt}. explanation:${it.explanation}",
+            feedback = "Failed to reach the goal by image assertion. Image assertion prompt:${it.assertionPrompt}. explanation:${it.explanation}",
             screenshotFilePath = screenshotFilePath,
             aiRequest = decisionOutput.step.aiRequest,
             aiResponse = decisionOutput.step.aiResponse
@@ -625,23 +683,51 @@ private fun step(
       }
     }
   } else {
-    arbigentContextHolder.addStep(decisionOutput.step)
+    contextHolder.addStep(decisionOutput.step)
   }
-  if (arbigentContextHolder.steps().last().agentCommand is GoalAchievedAgentCommand) {
-    arbigentDebugLog("Goal achieved: ${decisionInput.arbigentContextHolder.goal}")
+  if (contextHolder.steps().last().agentCommand is GoalAchievedAgentCommand) {
+    arbigentDebugLog("Goal achieved: ${decisionInput.contextHolder.goal}")
     return StepResult.GoalAchieved
   }
-  if (arbigentContextHolder.steps().last().agentCommand is FailedAgentCommand) {
-    arbigentDebugLog("Failed to achieve the goal: ${decisionInput.arbigentContextHolder.goal}")
+  if (contextHolder.steps().last().agentCommand is FailedAgentCommand) {
+    arbigentDebugLog("Failed to achieve the goal: ${decisionInput.contextHolder.goal}")
     return StepResult.Failed
   }
   executeCommandChain(
     ExecuteCommandsInput(
       decisionOutput = decisionOutput,
-      arbigentContextHolder = arbigentContextHolder,
+      arbigentContextHolder = contextHolder,
       screenshotFilePath = screenshotFilePath,
       device = device
     )
   )
   return StepResult.Continue
+}
+
+public fun detectStuckScreen(lastScreenshot: String?, newScreenshot: File): Boolean {
+  if (lastScreenshot == null) {
+    return false
+  }
+  val lastScreenshotFile = File(lastScreenshot)
+  if (lastScreenshotFile.exists().not()) {
+    return false
+  }
+  val oldBufferedImage = ImageIO.read(lastScreenshotFile)
+  val newBufferedImage = ImageIO.read(newScreenshot)
+  try {
+    if (oldBufferedImage.width != newBufferedImage.width || oldBufferedImage.height != newBufferedImage.height) {
+      return false
+    }
+    for (x in 0 until oldBufferedImage.width) {
+      for (y in 0 until oldBufferedImage.height) {
+        if (oldBufferedImage.getRGB(x, y) != newBufferedImage.getRGB(x, y)) {
+          return false
+        }
+      }
+    }
+    return true
+  } finally {
+    oldBufferedImage.flush()
+    newBufferedImage.flush()
+  }
 }
