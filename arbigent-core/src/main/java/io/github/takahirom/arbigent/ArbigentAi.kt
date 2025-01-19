@@ -5,7 +5,7 @@ import io.github.takahirom.arbigent.result.ArbigentUiTreeStrings
 
 public interface ArbigentAi {
   public data class DecisionInput(
-    val arbigentContextHolder: ArbigentContextHolder,
+    val contextHolder: ArbigentContextHolder,
     val formFactor: ArbigentScenarioDeviceFormFactor,
     val uiTreeStrings: ArbigentUiTreeStrings,
     // Only true if it is TV form factor

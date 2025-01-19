@@ -585,7 +585,15 @@ private fun executeCommands(
 private fun step(
   stepInput: StepInput
 ): StepResult {
-  val (arbigentContextHolder, agentCommandTypes, device, deviceFormFactor, ai, decisionChain, imageAssertionChain, executeCommandChain) = stepInput
+  val contextHolder = stepInput.arbigentContextHolder
+  val commandTypes = stepInput.agentCommandTypes
+  val device = stepInput.device
+  val deviceFormFactor = stepInput.deviceFormFactor
+  val ai = stepInput.ai
+  val decisionChain = stepInput.decisionChain
+  val imageAssertionChain = stepInput.imageAssertionChain
+  val executeCommandChain = stepInput.executeCommandChain
+
   val screenshotFileID = System.currentTimeMillis().toString()
   val elements = device.elements()
   for (it in 0..2) {
@@ -606,11 +614,11 @@ private fun step(
     }
   }
   val uiTreeStrings = device.viewTreeString()
-  arbigentDebugLog("Arbigent step(): ${arbigentContextHolder.prompt()}")
+  arbigentDebugLog("Arbigent step(): ${contextHolder.prompt()}")
   val screenshotFilePath =
     ArbigentDir.screenshotsDir.absolutePath + File.separator + "$screenshotFileID.png"
   val decisionInput = ArbigentAi.DecisionInput(
-    arbigentContextHolder = arbigentContextHolder,
+    contextHolder = contextHolder,
     formFactor = deviceFormFactor,
     elements = elements,
     uiTreeStrings = uiTreeStrings,
@@ -620,7 +628,7 @@ private fun step(
     } else {
       null
     },
-    agentCommandTypes = agentCommandTypes,
+    agentCommandTypes = commandTypes,
     screenshotFilePath = screenshotFilePath,
     prompt = stepInput.prompt,
   )
@@ -629,14 +637,14 @@ private fun step(
     val imageAssertionOutput = imageAssertionChain(
       ArbigentAi.ImageAssertionInput(
         ai = ai,
-        arbigentContextHolder = arbigentContextHolder,
+        arbigentContextHolder = contextHolder,
         screenshotFilePath = screenshotFilePath,
         // Added by interceptors
         assertions = listOf()
       )
     )
     imageAssertionOutput.results.forEach {
-      arbigentContextHolder.addStep(
+      contextHolder.addStep(
         ArbigentContextHolder.Step(
           feedback = "Image assertion ${if (it.isPassed) "passed" else "failed"}. \nfulfillmentPercent:${it.fulfillmentPercent} \nprompt:${it.assertionPrompt} \nexplanation:${it.explanation}",
           screenshotFilePath = screenshotFilePath,
@@ -649,10 +657,10 @@ private fun step(
         it.isPassed
       }) {
       // All assertions are passed
-      arbigentContextHolder.addStep(decisionOutput.step)
+      contextHolder.addStep(decisionOutput.step)
     } else {
       imageAssertionOutput.results.filter { it.isPassed.not() }.forEach {
-        arbigentContextHolder.addStep(
+        contextHolder.addStep(
           ArbigentContextHolder.Step(
             feedback = "Failed to reach the goal by image assertion. Image assertion prompt:${it.assertionPrompt}. explanation:${it.explanation}",
             screenshotFilePath = screenshotFilePath,
@@ -663,20 +671,20 @@ private fun step(
       }
     }
   } else {
-    arbigentContextHolder.addStep(decisionOutput.step)
+    contextHolder.addStep(decisionOutput.step)
   }
-  if (arbigentContextHolder.steps().last().agentCommand is GoalAchievedAgentCommand) {
-    arbigentDebugLog("Goal achieved: ${decisionInput.arbigentContextHolder.goal}")
+  if (contextHolder.steps().last().agentCommand is GoalAchievedAgentCommand) {
+    arbigentDebugLog("Goal achieved: ${decisionInput.contextHolder.goal}")
     return StepResult.GoalAchieved
   }
-  if (arbigentContextHolder.steps().last().agentCommand is FailedAgentCommand) {
-    arbigentDebugLog("Failed to achieve the goal: ${decisionInput.arbigentContextHolder.goal}")
+  if (contextHolder.steps().last().agentCommand is FailedAgentCommand) {
+    arbigentDebugLog("Failed to achieve the goal: ${decisionInput.contextHolder.goal}")
     return StepResult.Failed
   }
   executeCommandChain(
     ExecuteCommandsInput(
       decisionOutput = decisionOutput,
-      arbigentContextHolder = arbigentContextHolder,
+      arbigentContextHolder = contextHolder,
       screenshotFilePath = screenshotFilePath,
       device = device
     )
