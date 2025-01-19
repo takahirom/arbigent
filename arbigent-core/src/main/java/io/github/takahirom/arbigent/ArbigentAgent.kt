@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.shareIn
 import maestro.MaestroException
 import maestro.orchestra.*
 import java.io.File
+import javax.imageio.ImageIO
 
 public class ArbigentAgent(
   agentConfig: AgentConfig
@@ -617,6 +618,17 @@ private fun step(
   arbigentDebugLog("Arbigent step(): ${contextHolder.prompt()}")
   val screenshotFilePath =
     ArbigentDir.screenshotsDir.absolutePath + File.separator + "$screenshotFileID.png"
+  val lastScreenshot = contextHolder.steps().lastOrNull()?.screenshotFilePath
+  val newScreenshot = File(screenshotFilePath)
+  if (detectStuckScreen(lastScreenshot, newScreenshot)) {
+    arbigentDebugLog("Stuck screen detected.")
+    contextHolder.addStep(
+      ArbigentContextHolder.Step(
+        feedback = "Failed to produce the intended outcome. The current screen is identical to the previous one. Please try other actions.",
+        screenshotFilePath = screenshotFilePath
+      )
+    )
+  }
   val decisionInput = ArbigentAi.DecisionInput(
     contextHolder = contextHolder,
     formFactor = deviceFormFactor,
@@ -690,4 +702,32 @@ private fun step(
     )
   )
   return StepResult.Continue
+}
+
+public fun detectStuckScreen(lastScreenshot: String?, newScreenshot: File): Boolean {
+  if (lastScreenshot == null) {
+    return false
+  }
+  val lastScreenshotFile = File(lastScreenshot)
+  if (lastScreenshotFile.exists().not()) {
+    return false
+  }
+  val oldBufferedImage = ImageIO.read(lastScreenshotFile)
+  val newBufferedImage = ImageIO.read(newScreenshot)
+  try {
+    if (oldBufferedImage.width != newBufferedImage.width || oldBufferedImage.height != newBufferedImage.height) {
+      return false
+    }
+    for (x in 0 until oldBufferedImage.width) {
+      for (y in 0 until oldBufferedImage.height) {
+        if (oldBufferedImage.getRGB(x, y) != newBufferedImage.getRGB(x, y)) {
+          return false
+        }
+      }
+    }
+    return true
+  } finally {
+    oldBufferedImage.flush()
+    newBufferedImage.flush()
+  }
 }
