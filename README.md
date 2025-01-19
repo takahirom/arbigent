@@ -35,19 +35,47 @@ To address these issues, I aimed to create a framework that empowers users with 
 
 Furthermore, I wanted to make Arbigent accessible to QA engineers by offering a user-friendly UI. This allows for scenario creation within the UI and seamless test execution via the code interface.
 
-## Features
+##  Key Feature Breakdown
 
-*   **Achieve Complex Goals Through Scenario Dependencies:** AI agents often struggle with complex tasks. Arbigent addresses this by allowing you to break down goals into smaller, dependent scenarios. For example, you can create a scenario to log in, followed by a dependent scenario to perform a search. The name "Arbigent" was chosen to reflect the framework's role as a mediator, orchestrating the actions of AI agents across multiple scenarios.
-*   **UI-Based Scenario Creation, Code-Based Execution:**  Create scenarios visually in the UI and execute them programmatically using a saved project yaml file, allowing to create scenarios by QA engineer and execute by Software engineer.
-*   **Support for Multiple Form Factors:**  Arbigent supports testing on iOS, Android, and even TV interfaces using D-pad navigation.
-*   **Optimized for AI:**
-    *   Through experimentation, I discovered that LLMs perform poorly when presented with the entire UI tree. Arbigent optimizes the UI tree by removing unnecessary information, enhancing the AI's ability to understand and interact with the UI.
-    *   For the UI which doesn't have accessibility information, Arbigent provides an annotated screenshot for the AI to understand the UI.
-*   **Cost-Effective:**  Beyond being open source, Arbigent can utilize models like `GPT-4o mini` to execute tests, significantly reducing costs.
-*   **Flexible Code Interface:**  For advanced customization, Arbigent offers a code interface for test execution like adding custom initialization and cleanup methods for scenarios.
-*   **Open Source:** Arbigent is free to use, modify, and distribute. Contributions to the project are welcome!
-*   **Double check:** Arbigent provides a way to double-check the AI's decision using [Roborazzi's AI-powered Image Assertion](https://takahirom.github.io/roborazzi/ai-powered-image-assertion.html) feature. You can provide a prompt for the AI to check the screenshot. If the screenshot doesn't match the prompt, the AI can re-decide the action or re-evaluate its decision/reconsider its choice.
-*   **Stuck Screen Detection:** Arbigent can detect stuck screens by comparing the current screen with the previous one. If the screens are identical, Arbigent will notify the AI to re-decide the action.
+**I. Core Functionality & Design**
+
+*   **Complex Task Management:**
+    *   **Scenario Dependencies:** Breaks down complex goals into smaller, manageable scenarios that depend on each other (e.g., login -> search).
+    *   **Orchestration:** Acts as a mediator, managing the execution flow of AI agents across multiple, interconnected scenarios.
+*   **Hybrid Development Workflow:**
+    *   **UI-Driven Scenario Creation:**  Allows non-programmers (e.g., QA engineers) to visually design test scenarios through a user-friendly interface.
+    *   **Code-Based Execution:** Enables software engineers to execute the saved scenarios programmatically (YAML files), allowing for integration with existing testing infrastructure.
+
+**II. Cross-Platform & Device Support**
+
+*   **Multi-Platform Compatibility:**
+    *   **Mobile & TV:** Supports testing on iOS, Android, Web, and TV interfaces.
+    *   **D-Pad Navigation:**  Handles TV interfaces that rely on D-pad navigation.
+
+**III. AI Optimization & Efficiency**
+
+*   **Enhanced AI Understanding:**
+    *   **UI Tree Optimization:** Simplifies and filters the UI tree to improve AI comprehension and performance.
+    *   **Accessibility-Independent:** Provides annotated screenshots to assist AI in understanding UIs that lack accessibility information.
+*   **Cost Savings:**
+    *   **Open Source:** Free to use, modify, and distribute, eliminating licensing costs.
+    *   **Efficient Model Usage:** Compatible with cost-effective models like `GPT-4o mini`, reducing operational expenses.
+
+**IV. Robustness & Reliability**
+
+*   **Double Check with AI-Powered Image Assertion:** Integrates [Roborazzi's feature](https://takahirom.github.io/roborazzi/ai-powered-image-assertion.html#behavior-of-ai-powered-image-assertion) to verify AI decisions using image-based prompts and allows the AI to re-evaluate if needed.
+*   **Stuck Screen Detection:** Identifies and recovers from situations where the AI agent gets stuck on the same screen, prompting it to reconsider its actions.
+
+**V. Advanced Features & Customization**
+
+*   **Flexible Code Interface:**
+    *   **Custom Hooks:** Offers a code interface for adding custom initialization and cleanup methods, providing greater control over scenario execution.
+
+**VI. Community & Open Source**
+
+*   **Open Source Nature:**
+    *   **Free & Open:** Freely available for use, modification, and distribution.
+    *   **Community Driven:** Welcomes contributions from the community to enhance and expand the framework.
 
 ## Arbigent's Strengths and Weaknesses Based on [SMURF](https://testing.googleblog.com/2024/10/smurf-beyond-test-pyramid.html)
 
