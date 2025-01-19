@@ -68,9 +68,11 @@ fun main() {
     AppWindow(
       appStateHolder = appStateHolder,
       onExit = {
+        if (!appStateHolder.deviceConnectionState.value.isConnected()) {
+          exitApplication()
+        }
         appStateHolder.cancel()
         appStateHolder.close()
-        exitApplication()
       }
     )
   }
