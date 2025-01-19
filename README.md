@@ -47,6 +47,20 @@ Furthermore, I wanted to make Arbigent accessible to QA engineers by offering a 
 *   **Flexible Code Interface:**  For advanced customization, Arbigent offers a code interface for test execution like adding custom initialization and cleanup methods for scenarios.
 *   **Open Source:** Arbigent is free to use, modify, and distribute. Contributions to the project are welcome!
 *   **Double check:** Arbigent provides a way to double-check the AI's decision using [Roborazzi's AI-powered Image Assertion](https://takahirom.github.io/roborazzi/ai-powered-image-assertion.html) feature. You can provide a prompt for the AI to check the screenshot. If the screenshot doesn't match the prompt, the AI can re-decide the action or re-evaluate its decision/reconsider its choice.
+*   **Stuck Screen Detection:** Arbigent can detect stuck screens by comparing the current screen with the previous one. If the screens are identical, Arbigent will notify the AI to re-decide the action.
+
+## Arbigent's Strengths and Weaknesses Based on [SMURF](https://testing.googleblog.com/2024/10/smurf-beyond-test-pyramid.html)
+
+I categorized automated testing frameworks into five levels using the [SMURF](https://testing.googleblog.com/2024/10/smurf-beyond-test-pyramid.html) framework. Here's how Arbigent stacks up:
+
+*   **Speed (1/5):** Arbigent's speed is currently limited by the underlying AI technology and the need to interact with the application's UI in real-time. This makes it slower than traditional unit or integration tests.
+*   **Maintainability (4/5):** Arbigent excels in maintainability. You can write tests in natural language (e.g., "Complete the tutorial"), making them resilient to UI changes. The task decomposition feature also reduces duplication, further enhancing maintainability. Maintenance can be done by non-engineers, thanks to the natural language interface.
+*   **Utilization (1/5):** Arbigent requires both device resources (emulators or physical devices) and AI resources, which can be costly.
+*   **Reliability (3/5):** Arbigent has several features to improve reliability. It automatically waits during loading screens, handles unexpected dialogs, and even attempts self-correction. However, external factors like emulator flakiness can still impact reliability.
+    *   Recently I found Arbigent has retry feature and can execute the scenario from the beginning. But, even without retry, Arbigent works fine without failures thanks to the flexibility of AI.
+*   **Fidelity (5/5):** Arbigent provides high fidelity by testing on real or emulated devices with the actual application. It can even assess aspects that were previously difficult to test, such as verifying video playback by checking for visual changes on the screen.
+
+I believe that many of its current limitations, such as speed, maintainability, utilization, and reliability, will be addressed as AI technology continues to evolve. The need for extensive prompt engineering will likely diminish as AI models become more capable.
 
 ## How to Use
 
