@@ -7,7 +7,7 @@
 
 ## Screenshot
 
-<img width="650" alt="arbigent-screenshot" src="https://github.com/user-attachments/assets/0dc529db-0f48-4df1-8fff-079cd88672fa" />
+<img width="650" alt="arbigent-screenshot" src="https://github.com/user-attachments/assets/77ebfcb1-3a44-4eaf-9775-3dff2597f9d1" />
 
 ## Demo movie
 
