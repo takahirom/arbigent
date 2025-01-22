@@ -6,6 +6,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import java.io.File
+import kotlin.math.ceil
+import kotlin.math.min
 
 public class FailedToArchiveException(message: String) : RuntimeException(message)
 
@@ -41,6 +43,34 @@ public class ArbigentProject(
         }
         arbigentDebugLog(scenarioExecutor.statusText())
       }
+  }
+
+  public suspend fun executeShard(shardIndex: Int, shardCount: Int) {
+    val leafScenarios = leafScenarioAssignments()
+    val shardScenarios = leafScenarios.shard(shardCount, shardIndex)
+    shardScenarios.forEach { (scenario, scenarioExecutor) ->
+      arbigentInfoLog("Start scenario: $scenario")
+      try {
+        scenarioExecutor.execute(scenario)
+      } catch (e: FailedToArchiveException) {
+        arbigentErrorLog("Failed to archive: $scenario" + e.stackTraceToString())
+      }
+      arbigentDebugLog(scenarioExecutor.statusText())
+    }
+  }
+
+  private fun <T> List<T>.shard(
+    totalShards: Int,
+    shardIndex: Int
+  ): List<T> {
+    require(totalShards > 0) { "Total shards must be positive" }
+    require(shardIndex in 0 until totalShards) { "Invalid shard index" }
+
+    val shardSize = ceil(size.toDouble() / totalShards).toInt()
+    val start = shardIndex * shardSize
+    val end = min(start + shardSize, size)
+
+    return subList(start, end)
   }
 
   private fun leafScenarioAssignments() = scenarioAssignments()
