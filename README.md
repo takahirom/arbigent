@@ -254,19 +254,27 @@ scenarios:
   - id: "7788d7f4-7276-4cb3-8e98-7d3ad1d1cd47"
     goal: "Open the Now in Android app from the app list. The goal is to view the list\
     \ of topics.  Do not interact with the app beyond this."
-    initializeMethods:
-      type: "LaunchApp"
-      packageName: "com.google.samples.apps.nowinandroid"
-    cleanupData:
-      type: "Cleanup"
-      packageName: "com.google.samples.apps.nowinandroid"
+    initializationMethods:
+      - type: "CleanupData"
+        packageName: "com.google.samples.apps.nowinandroid"
+      - type: "LaunchApp"
+        packageName: "com.google.samples.apps.nowinandroid"
   - id: "f0ef0129-c764-443f-897d-fc4408e5952b"
     goal: "In the Now in Android app, select an tech topic and complete the form in\
     \ the \"For you\" tab. The goal is reached when articles are displayed.  Do not\
     \ click on any articles. If the browser opens, return to the app."
     dependency: "7788d7f4-7276-4cb3-8e98-7d3ad1d1cd47"
     imageAssertions:
-      - assertionPrompt: "Articles should be visible on the screen"
+      - assertionPrompt: "Articles are visible on the screen"
+  - id: "73c785f7-0f45-4709-97b5-601b6803eb0d"
+    goal: "Save an article using the Bookmark button."
+    dependency: "f0ef0129-c764-443f-897d-fc4408e5952b"
+  - id: "797514d2-fb04-4b92-9c07-09d46cd8f931"
+    goal: "Check if a saved article appears in the Saved tab."
+    dependency: "73c785f7-0f45-4709-97b5-601b6803eb0d"
+    imageAssertions:
+      - assertionPrompt: "The screen is showing Saved tab"
+      - assertionPrompt: "There is an article in the screen"
 ```
 
 ## Code Interface
