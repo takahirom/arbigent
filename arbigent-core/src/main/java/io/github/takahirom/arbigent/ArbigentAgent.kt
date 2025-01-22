@@ -58,7 +58,11 @@ public class ArbigentAgent(
     .filterIsInstance<ArbigentDecisionInterceptor>()
   private val decisionChain: (ArbigentAi.DecisionInput) -> ArbigentAi.DecisionOutput =
     decisionInterceptors.foldRight(
-      { input: ArbigentAi.DecisionInput -> ai.decideAgentCommands(input) },
+      { input: ArbigentAi.DecisionInput ->
+        ArbigentGlobalStatus.onAi {
+          ai.decideAgentCommands(input)
+        }
+      },
       { interceptor, acc ->
         { input ->
           interceptor.intercept(
@@ -73,7 +77,9 @@ public class ArbigentAgent(
   private val imageAssertionChain: (ArbigentAi.ImageAssertionInput) -> ArbigentAi.ImageAssertionOutput =
     imageAssertionInterceptors.foldRight(
       { input: ArbigentAi.ImageAssertionInput ->
-        input.ai.assertImage(input)
+        ArbigentGlobalStatus.onImageAssertion {
+          input.ai.assertImage(input)
+        }
       },
       { interceptor, acc ->
         { input ->
@@ -160,7 +166,9 @@ public class ArbigentAgent(
       arbigentContextHistoryStateFlow.value += arbigentContextHolder
       val supportedAgentCommandTypes = agentCommandTypes.filter { it.isSupported(device.os()) }
 
-      initializerChain(device)
+      ArbigentGlobalStatus.onInitializing {
+        initializerChain(device)
+      }
       var stepRemain = maxStep
       while (stepRemain-- > 0 && isGoalArchived().not()) {
         val stepInput = StepInput(
@@ -190,15 +198,20 @@ public class ArbigentAgent(
             // Continue
           }
         }
+        yield()
       }
+      ArbigentGlobalStatus.onFinished()
     } catch (e: CancellationException) {
       arbigentDebugLog("Cancelled to run agent: $e")
+      ArbigentGlobalStatus.onCanceled()
     } catch (e: Exception) {
       arbigentDebugLog("Failed to run agent: $e")
       errorHandler(e)
+      ArbigentGlobalStatus.onError(e)
     } finally {
       _isRunningStateFlow.value = false
       arbigentDebugLog("Arbigent.execute agent.execute end $goal")
+      ArbigentGlobalStatus.onFinished()
     }
   }
 

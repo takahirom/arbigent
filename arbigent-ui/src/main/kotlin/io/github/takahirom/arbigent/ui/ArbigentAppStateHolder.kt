@@ -9,7 +9,9 @@ import java.io.File
 class ArbigentAppStateHolder(
   val aiFactory: () -> ArbigentAi,
   val deviceFactory: (ArbigentAvailableDevice) -> ArbigentDevice = { avaiableDevice ->
-    avaiableDevice.connectToDevice()
+    ArbigentGlobalStatus.onConnect {
+      avaiableDevice.connectToDevice()
+    }
   },
   val availableDeviceListFactory: (ArbigentDeviceOs) -> List<ArbigentAvailableDevice> = { os ->
     fetchAvailableDevicesByOs(os)
@@ -198,15 +200,15 @@ class ArbigentAppStateHolder(
       sortedScenariosAndDepthsStateFlow.value.map { it.first }.filter { scenario ->
         !scenario.isGoalAchieved()
       }
-        .map{ scenarioStateHolder ->
+        .map { scenarioStateHolder ->
           scenarioStateHolder.createScenario(allScenarioStateHoldersStateFlow.value)
         }
         .filter { it.isLeaf }
-        .forEach{ scenario ->
-        selectedScenarioIndex.value =
-          sortedScenariosAndDepths().indexOfFirst { it.first.id == scenario.id }
+        .forEach { scenario ->
+          selectedScenarioIndex.value =
+            sortedScenariosAndDepths().indexOfFirst { it.first.id == scenario.id }
           executeScenario(scenario)
-      }
+        }
     }
   }
 
@@ -244,7 +246,8 @@ class ArbigentAppStateHolder(
     val arbigentScenarioStateHolders = scenarios.map { scenarioContent ->
       ArbigentScenarioStateHolder(id = scenarioContent.id).apply {
         onGoalChanged(scenarioContent.goal)
-        initializationMethodStateFlow.value = scenarioContent.initializationMethods.ifEmpty { listOf(scenarioContent.initializeMethods) }
+        initializationMethodStateFlow.value =
+          scenarioContent.initializationMethods.ifEmpty { listOf(scenarioContent.initializeMethods) }
         maxRetryState.edit {
           replace(0, length, scenarioContent.maxRetry.toString())
         }
@@ -283,7 +286,9 @@ class ArbigentAppStateHolder(
     projectStateFlow.value?.cancel()
     allScenarioStateHoldersStateFlow.value.forEach { it.cancel() }
     deviceConnectionState.value = DeviceConnectionState.NotConnected
-    deviceCache.values.forEach { it.close() }
+    ArbigentGlobalStatus.onDisconnect {
+      deviceCache.values.forEach { it.close() }
+    }
   }
 
   fun onClickConnect(devicesStateHolder: DevicesStateHolder) {
