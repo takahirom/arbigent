@@ -3,10 +3,9 @@ scenarios:
   goal: "Open the Now in Android app from the app list. The goal is to view the list\
     \ of topics.  Do not interact with the app beyond this."
   initializationMethods:
-  - type: "LaunchApp"
+  - type: "CleanupData"
     packageName: "com.google.samples.apps.nowinandroid"
-  cleanupData:
-    type: "Cleanup"
+  - type: "LaunchApp"
     packageName: "com.google.samples.apps.nowinandroid"
 - id: "f0ef0129-c764-443f-897d-fc4408e5952b"
   goal: "In the Now in Android app, select an tech topic and complete the form in\
