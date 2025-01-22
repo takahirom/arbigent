@@ -4,7 +4,7 @@ import kotlinx.coroutines.flow.*
 
 // Just for showing the status of the global status
 public object ArbigentGlobalStatus {
-  private val statusFlow: MutableStateFlow<String> = MutableStateFlow("Not connected")
+  private val statusFlow: MutableStateFlow<String> = MutableStateFlow("Device Not connected")
   public val status: Flow<String> = statusFlow.asStateFlow()
   public fun status(): String = statusFlow.value
   private fun set(value: String) {
@@ -13,11 +13,11 @@ public object ArbigentGlobalStatus {
   }
 
   public fun<T : Any> onConnect(block: () -> T): T {
-    return on("Connecting", block, "Connected")
+    return on("Device Connecting", block, "Device Connected")
   }
 
   public fun<T : Any> onDisconnect(block: () -> T): T {
-    return on("Disconnecting", block, "Not connected")
+    return on("Device Disconnecting", block, "Device Not connected")
   }
 
   public fun<T : Any> onAi(block: () -> T): T {
@@ -29,7 +29,7 @@ public object ArbigentGlobalStatus {
   }
 
   public fun<T : Any> onDevice(command:String, block: () -> T): T {
-    return on("Device..command:$command", block)
+    return on("Device..  command:$command", block)
   }
 
   public fun<T : Any> onImageAssertion(block: () -> T): T {

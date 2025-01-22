@@ -1,28 +1,12 @@
 package io.github.takahirom.arbigent.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicSecureTextField
 import androidx.compose.foundation.text.input.TextFieldState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,13 +14,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import io.github.takahirom.arbigent.ArbigentDeviceOs
 import org.jetbrains.jewel.intui.standalone.styling.light
-import org.jetbrains.jewel.ui.component.DefaultButton
-import org.jetbrains.jewel.ui.component.GroupHeader
-import org.jetbrains.jewel.ui.component.Icon
-import org.jetbrains.jewel.ui.component.IconButton
-import org.jetbrains.jewel.ui.component.RadioButtonRow
-import org.jetbrains.jewel.ui.component.Text
-import org.jetbrains.jewel.ui.component.TextField
+import org.jetbrains.jewel.ui.component.*
 import org.jetbrains.jewel.ui.component.styling.TextFieldStyle
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
@@ -116,7 +94,7 @@ fun LauncherScreen(
     if (devices.isNotEmpty()) {
       DefaultButton(
         modifier = Modifier.align(Alignment.CenterHorizontally), onClick = {
-            appStateHolder.onClickConnect(devicesStateHolder)
+          appStateHolder.onClickConnect(devicesStateHolder)
         }) {
         Text("Connect to device")
       }
@@ -160,8 +138,9 @@ private fun AiProviderSetting(modifier: Modifier) {
         }
       )
     }
-    val selectedAiProviderSetting: AiProviderSetting = aiSetting.aiSettings.firstOrNull() { it.id == aiSetting.selectedId }
-      ?: aiSetting.aiSettings.first()
+    val selectedAiProviderSetting: AiProviderSetting =
+      aiSetting.aiSettings.firstOrNull() { it.id == aiSetting.selectedId }
+        ?: aiSetting.aiSettings.first()
     if (selectedAiProviderSetting is AiProviderSetting.NormalAiProviderSetting) {
       NormalAiSetting(
         modifier = Modifier.padding(8.dp),
@@ -216,7 +195,7 @@ private fun NormalAiSetting(
   }
   val providerName = aiProviderSetting.name
   Column(modifier = modifier) {
-    if(aiProviderSetting.isApiKeyRequired) {
+    if (aiProviderSetting.isApiKeyRequired) {
       Text("$providerName API Key(Saved in Keychain on Mac)")
       BasicSecureTextField(
         modifier = Modifier.padding(8.dp),

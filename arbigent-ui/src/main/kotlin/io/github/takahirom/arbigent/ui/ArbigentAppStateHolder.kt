@@ -292,15 +292,17 @@ class ArbigentAppStateHolder(
   }
 
   fun onClickConnect(devicesStateHolder: DevicesStateHolder) {
-    val currentConnection = deviceConnectionState.value
-    if (currentConnection is DeviceConnectionState.Connected) {
-      currentConnection.device.close()
+    coroutineScope.launch {
+      val currentConnection = deviceConnectionState.value
+      if (currentConnection is DeviceConnectionState.Connected) {
+        currentConnection.device.close()
+      }
+      if (devicesStateHolder.selectedDevice.value == null) {
+        devicesStateHolder.onSelectedDeviceChanged(devicesStateHolder.devices.value.firstOrNull())
+      }
+      val device = deviceFactory(devicesStateHolder.selectedDevice.value!!)
+      deviceConnectionState.value = DeviceConnectionState.Connected(device)
     }
-    if (devicesStateHolder.selectedDevice.value == null) {
-      devicesStateHolder.onSelectedDeviceChanged(devicesStateHolder.devices.value.firstOrNull())
-    }
-    val device = deviceFactory(devicesStateHolder.selectedDevice.value!!)
-    deviceConnectionState.value = DeviceConnectionState.Connected(device)
   }
 
   fun removeScenario(scenario: ArbigentScenarioStateHolder) {
