@@ -18,13 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -33,6 +27,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.takahirom.arbigent.ArbigentDeviceOs
+import io.github.takahirom.arbigent.ArbigentGlobalStatus
 import io.github.takahirom.arbigent.arbigentDebugLog
 import io.github.takahirom.arbigent.ui.ArbigentAppStateHolder.DeviceConnectionState
 import io.github.takahirom.arbigent.ui.ArbigentAppStateHolder.ProjectDialogState
@@ -56,115 +51,133 @@ import org.jetbrains.jewel.ui.theme.simpleListItemStyle
 fun App(
   appStateHolder: ArbigentAppStateHolder
 ) {
-  Box(
+  Column(
     Modifier.fillMaxSize().background(JewelTheme.globalColors.panelBackground)
   ) {
     val deviceConnectionState by appStateHolder.deviceConnectionState.collectAsState()
     if (deviceConnectionState is DeviceConnectionState.NotConnected) {
       LauncherScreen(
-        appStateHolder = appStateHolder
-      )
-      return@Box
-    }
-    val projectDialogState by appStateHolder.projectDialogState.collectAsState()
-    if (projectDialogState is ProjectDialogState.LoadProjectContent) {
-      FileLoadDialog(
-        title = "Choose a file",
-        onCloseRequest = { file ->
-          appStateHolder.loadProjectContents(file)
-          appStateHolder.projectDialogState.value = ProjectDialogState.NotSelected
-        }
-      )
-    } else if (projectDialogState is ProjectDialogState.SaveProjectContent) {
-      FileSaveDialog(
-        title = "Save a file",
-        onCloseRequest = { file ->
-          appStateHolder.saveProjectContents(file)
-          appStateHolder.projectDialogState.value = ProjectDialogState.NotSelected
-        }
-      )
-    } else if (projectDialogState is ProjectDialogState.SaveProjectResult) {
-      FileSaveDialog(
-        title = "Save a file",
-        onCloseRequest = { file ->
-          appStateHolder.saveProjectResult(file)
-          appStateHolder.projectDialogState.value = ProjectDialogState.NotSelected
-        }
-      )
-    } else if (projectDialogState is ProjectDialogState.ShowProjectSettings) {
-      ProjectSettingsDialog(
         appStateHolder = appStateHolder,
-        onCloseRequest = {
-          appStateHolder.projectDialogState.value = ProjectDialogState.NotSelected
-        }
+        modifier = Modifier.align(Alignment.CenterHorizontally).weight(1F)
+      )
+    } else {
+      MainScreen(
+        appStateHolder,
+        modifier = Modifier.weight(1F)
       )
     }
-    val scenarioIndex by appStateHolder.selectedScenarioIndex.collectAsState()
-    var scenariosWidth by remember { mutableStateOf(200.dp) }
-    Row {
-      val scenarioAndDepths by appStateHolder.sortedScenariosAndDepthsStateFlow.collectAsState()
-      LeftScenariosPanel(scenarioAndDepths, scenariosWidth, scenarioIndex, appStateHolder)
-      Divider(
-        orientation = Orientation.Vertical,
-        modifier = Modifier
-          .fillMaxHeight()
-          .pointerInput(Unit) {
-            detectDragGestures { change, dragAmount ->
-              change.consume()
-              scenariosWidth += dragAmount.x.toDp()
-            }
+    Row(
+      modifier = Modifier.padding(8.dp).fillMaxWidth()
+    ) {
+      val globalStatus by ArbigentGlobalStatus.status.collectAsState(ArbigentGlobalStatus.status())
+      Text(globalStatus)
+    }
+  }
+}
+
+@Composable
+private fun MainScreen(
+  appStateHolder: ArbigentAppStateHolder,
+  modifier: Modifier
+) {
+  val projectDialogState by appStateHolder.projectDialogState.collectAsState()
+  if (projectDialogState is ProjectDialogState.LoadProjectContent) {
+    FileLoadDialog(
+      title = "Choose a file",
+      onCloseRequest = { file ->
+        appStateHolder.loadProjectContents(file)
+        appStateHolder.projectDialogState.value = ProjectDialogState.NotSelected
+      }
+    )
+  } else if (projectDialogState is ProjectDialogState.SaveProjectContent) {
+    FileSaveDialog(
+      title = "Save a file",
+      onCloseRequest = { file ->
+        appStateHolder.saveProjectContents(file)
+        appStateHolder.projectDialogState.value = ProjectDialogState.NotSelected
+      }
+    )
+  } else if (projectDialogState is ProjectDialogState.SaveProjectResult) {
+    FileSaveDialog(
+      title = "Save a file",
+      onCloseRequest = { file ->
+        appStateHolder.saveProjectResult(file)
+        appStateHolder.projectDialogState.value = ProjectDialogState.NotSelected
+      }
+    )
+  } else if (projectDialogState is ProjectDialogState.ShowProjectSettings) {
+    ProjectSettingsDialog(
+      appStateHolder = appStateHolder,
+      onCloseRequest = {
+        appStateHolder.projectDialogState.value = ProjectDialogState.NotSelected
+      }
+    )
+  }
+  val scenarioIndex by appStateHolder.selectedScenarioIndex.collectAsState()
+  var scenariosWidth by remember { mutableStateOf(200.dp) }
+  Row(modifier) {
+    val scenarioAndDepths by appStateHolder.sortedScenariosAndDepthsStateFlow.collectAsState()
+    LeftScenariosPanel(scenarioAndDepths, scenariosWidth, scenarioIndex, appStateHolder)
+    Divider(
+      orientation = Orientation.Vertical,
+      modifier = Modifier
+        .fillMaxHeight()
+        .pointerInput(Unit) {
+          detectDragGestures { change, dragAmount ->
+            change.consume()
+            scenariosWidth += dragAmount.x.toDp()
+          }
+        },
+      thickness = 8.dp
+    )
+    val scenarioStateHolderAndDepth = scenarioAndDepths.getOrNull(scenarioIndex)
+    if (scenarioStateHolderAndDepth != null) {
+      Column(Modifier.weight(3f)) {
+        Scenario(
+          scenarioStateHolder = scenarioStateHolderAndDepth.first,
+          dependencyScenarioMenu = {
+            selectableItem(
+              selected = scenarioStateHolderAndDepth.first.dependencyScenarioStateHolderStateFlow.value == null,
+              onClick = {
+                scenarioStateHolderAndDepth.first.dependencyScenarioStateHolderStateFlow.value =
+                  null
+              },
+              content = {
+                Text("No dependency")
+              }
+            )
+            appStateHolder.sortedScenariosAndDepthsStateFlow.value.map { it.first }
+              .filter { senario -> senario != scenarioStateHolderAndDepth.first }
+              .forEach { scenarioStateHolder: ArbigentScenarioStateHolder ->
+                selectableItem(
+                  selected = scenarioStateHolderAndDepth.first.dependencyScenarioStateHolderStateFlow.value == scenarioStateHolder,
+                  onClick = {
+                    scenarioStateHolderAndDepth.first.dependencyScenarioStateHolderStateFlow.value =
+                      scenarioStateHolder
+                  },
+                  content = {
+                    Text(
+                      modifier = Modifier.testTag("dependency_scenario"),
+                      text = scenarioStateHolder.goal
+                    )
+                  }
+                )
+              }
           },
-        thickness = 8.dp
-      )
-      val scenarioStateHolderAndDepth = scenarioAndDepths.getOrNull(scenarioIndex)
-      if (scenarioStateHolderAndDepth != null) {
-        Column(Modifier.weight(3f)) {
-          Scenario(
-            scenarioStateHolder = scenarioStateHolderAndDepth.first,
-            dependencyScenarioMenu = {
-              selectableItem(
-                selected = scenarioStateHolderAndDepth.first.dependencyScenarioStateHolderStateFlow.value == null,
-                onClick = {
-                  scenarioStateHolderAndDepth.first.dependencyScenarioStateHolderStateFlow.value =
-                    null
-                },
-                content = {
-                  Text("No dependency")
-                }
-              )
-              appStateHolder.sortedScenariosAndDepthsStateFlow.value.map { it.first }
-                .filter { senario -> senario != scenarioStateHolderAndDepth.first }
-                .forEach { scenarioStateHolder: ArbigentScenarioStateHolder ->
-                  selectableItem(
-                    selected = scenarioStateHolderAndDepth.first.dependencyScenarioStateHolderStateFlow.value == scenarioStateHolder,
-                    onClick = {
-                      scenarioStateHolderAndDepth.first.dependencyScenarioStateHolderStateFlow.value =
-                        scenarioStateHolder
-                    },
-                    content = {
-                      Text(
-                        modifier = Modifier.testTag("dependency_scenario"),
-                        text = scenarioStateHolder.goal
-                      )
-                    }
-                  )
-                }
-            },
-            onAddSubScenario = {
-              appStateHolder.addSubScenario(parent = it)
-            },
-            onExecute = {
-              appStateHolder.run(it)
-            },
-            onCancel = {
-              appStateHolder.cancel()
-              scenarioStateHolderAndDepth.first.cancel()
-            },
-            onRemove = {
-              appStateHolder.removeScenario(it)
-            }
-          )
-        }
+          onAddSubScenario = {
+            appStateHolder.addSubScenario(parent = it)
+          },
+          onExecute = {
+            appStateHolder.run(it)
+          },
+          onCancel = {
+            appStateHolder.cancel()
+            scenarioStateHolderAndDepth.first.cancel()
+          },
+          onRemove = {
+            appStateHolder.removeScenario(it)
+          }
+        )
       }
     }
   }
@@ -325,7 +338,7 @@ fun ScenarioControls(appStateHolder: ArbigentAppStateHolder) {
       maxPopupHeight = 150.dp,
     ) {
       Column {
-        ArbigentDeviceOs.values().forEach { item ->
+        ArbigentDeviceOs.entries.forEach { item ->
           val isSelected = item == deviceOs
           val isItemHovered = false
           val isPreviewSelection = false

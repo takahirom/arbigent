@@ -157,8 +157,11 @@ public class OpenAIAi(
         messages = messages,
       )
     } catch (e: ArbigentAiRateLimitExceededException) {
-      arbigentInfoLog("Rate limit exceeded. Waiting for ${10L * (1 shl retried)} seconds.")
-      Thread.sleep(10000L * (1 shl retried))
+      val waitMs = 10000L * (1 shl retried)
+      arbigentInfoLog("Rate limit exceeded. Waiting for ${waitMs / 1000} seconds.")
+      ArbigentGlobalStatus.onRateLimitWait(waitSec = waitMs / 1000) {
+        Thread.sleep(waitMs)
+      }
       retried++
       return decideAgentCommands(decisionInput)
     }
@@ -432,8 +435,11 @@ $templates"""
       } catch (e: Exception) {
         if (retry < 6) {
           // TODO: Implement error handling in Roborazzi
-          Thread.sleep(10000L * (1 shl retry))
-          arbigentDebugLog("Retrying assertion: retryCount: $retry. Wait for ${10L * (1 shl retried)}")
+          val waitMs = 10000L * (1 shl retry)
+          ArbigentGlobalStatus.onRateLimitWait(waitSec = waitMs / 1000) {
+            Thread.sleep(waitMs)
+          }
+          arbigentDebugLog("Retrying assertion: retryCount: $retry. Wait for ${waitMs / 1000}")
           return assert(retry + 1)
         } else {
           throw e

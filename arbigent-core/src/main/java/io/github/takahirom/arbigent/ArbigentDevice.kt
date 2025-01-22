@@ -190,15 +190,17 @@ public class MaestroDevice(
   }
 
   override fun executeCommands(commands: List<MaestroCommand>) {
-    // If the jsEngine is already initialized, we don't need to reinitialize it
-    val shouldJsReinit = if (orchestra::class.java.getDeclaredField("jsEngine").apply {
-        isAccessible = true
-      }.get(orchestra) != null) {
-      false
-    } else {
-      true
+    ArbigentGlobalStatus.onDevice(commands.joinToString { it.toString() }) {
+      // If the jsEngine is already initialized, we don't need to reinitialize it
+      val shouldJsReinit = if (orchestra::class.java.getDeclaredField("jsEngine").apply {
+          isAccessible = true
+        }.get(orchestra) != null) {
+        false
+      } else {
+        true
+      }
+      orchestra.executeCommands(commands, shouldReinitJsEngine = shouldJsReinit)
     }
-    orchestra.executeCommands(commands, shouldReinitJsEngine = shouldJsReinit)
   }
 
   public override fun waitForAppToSettle(appId: String?) {

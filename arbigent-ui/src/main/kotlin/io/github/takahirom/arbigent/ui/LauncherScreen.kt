@@ -3,7 +3,6 @@ package io.github.takahirom.arbigent.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -43,12 +42,13 @@ import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
 
 @Composable
-fun BoxScope.LauncherScreen(
-  appStateHolder: ArbigentAppStateHolder
+fun LauncherScreen(
+  appStateHolder: ArbigentAppStateHolder,
+  modifier: Modifier = Modifier
 ) {
   val devicesStateHolder = appStateHolder.devicesStateHolder
   Column(
-    Modifier.align(Alignment.Center).width(400.dp).fillMaxHeight(),
+    modifier.width(400.dp).fillMaxHeight(),
     verticalArrangement = Arrangement.Center
   ) {
     GroupHeader("Device Type")
@@ -116,7 +116,7 @@ fun BoxScope.LauncherScreen(
     if (devices.isNotEmpty()) {
       DefaultButton(
         modifier = Modifier.align(Alignment.CenterHorizontally), onClick = {
-          appStateHolder.onClickConnect(devicesStateHolder)
+            appStateHolder.onClickConnect(devicesStateHolder)
         }) {
         Text("Connect to device")
       }
