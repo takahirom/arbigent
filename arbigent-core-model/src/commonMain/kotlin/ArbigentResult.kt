@@ -64,7 +64,8 @@ public data class ArbigentAgentTaskStepResult(
   public val summary: String,
   public val screenshotFilePath: String,
   public val agentCommand: String?,
-  public val uiTreeStrings: ArbigentUiTreeStrings?,
+  // UiTree is too big to store in the yaml file.
+//  public val uiTreeStrings: ArbigentUiTreeStrings?,
   public val aiRequest: String?,
   public val aiResponse: String?,
   public val timestamp: Long
