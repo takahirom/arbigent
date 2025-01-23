@@ -6,7 +6,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import java.io.File
-import kotlin.math.ceil
 import kotlin.math.min
 
 public class FailedToArchiveException(message: String) : RuntimeException(message)
@@ -134,18 +133,18 @@ public data class ArbigentScenario(
 }
 
 /**
- * [current] starts from 1
+ * [index] starts from 1
  */
-public data class ArbigentShard(val current: Int, val total: Int) {
+public data class ArbigentShard(val index: Int, val total: Int) {
   init {
     require(total >= 1) { "Total shards must be at least 1" }
-    require(current >= 1) { "Shard number must be at least 1" }
-    require(current <= total) { "Shard number ($current) exceeds total ($total)" }
+    require(index >= 1) { "Shard number must be at least 1" }
+    require(index <= total) { "Shard number ($index) exceeds total ($total)" }
   }
 
   override fun toString(): String {
     if (total == 1) return ""
-    return "Shard($current/$total)"
+    return "Shard($index/$total)"
   }
 }
 

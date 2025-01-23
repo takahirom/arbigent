@@ -73,7 +73,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [ 1/4, 2/4, 3/4, 4/4 ]
+        shardIndex: [ 1, 2, 3, 4 ]
+        shardTotal: [ 4 ]
     steps:
       - name: Delete unnecessary tools 🔧
         uses: jlumbroso/free-disk-space@v1.3.1
@@ -126,12 +127,12 @@ jobs:
           disk-size: 6000M
           heap-size: 600M
           script: |
-            arbigent-cli/build/install/arbigent/bin/arbigent --os=android --project-file=sample-test/src/main/resources/projects/e2e-test-android.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-exp --shard=${{ matrix.shard }}
+            arbigent-cli/build/install/arbigent/bin/arbigent --os=android --project-file=sample-test/src/main/resources/projects/e2e-test-android.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-exp --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
 
       - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
         if: ${{ always() }}
         with:
-          name: cli-report-android-${{ matrix.shard }}
+          name: cli-report-android-${{ matrix.shardIndex }}-${{ matrix.shardTotal }}
           path: |
             arbigent-result/*
           retention-days: 120
