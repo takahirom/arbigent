@@ -59,6 +59,7 @@ public interface ArbigentDevice {
   public fun viewTreeString(): ArbigentUiTreeStrings
   public fun focusedTreeString(): String
   public fun close()
+  public fun isClosed(): Boolean
   public fun elements(): ArbigentElementList
   public fun waitForAppToSettle(appId: String? = null)
   public fun os(): ArbigentDeviceOs
@@ -534,8 +535,14 @@ public class MaestroDevice(
     }
   }
 
+  private var isClosed = false
   override fun close() {
+    isClosed = true
     maestro.close()
+  }
+
+  override fun isClosed(): Boolean {
+    return isClosed
   }
 }
 

@@ -24,8 +24,15 @@ class FakeDevice : ArbigentDevice {
     return "focusedTreeString"
   }
 
+  private var isClosed = false
   override fun close() {
     arbigentDebugLog("FakeDevice.close")
+    isClosed = true
+  }
+
+  override fun isClosed(): Boolean {
+    arbigentDebugLog("FakeDevice.isClosed")
+    return isClosed
   }
 
   override fun elements(): ArbigentElementList {

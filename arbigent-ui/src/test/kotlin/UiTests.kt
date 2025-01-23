@@ -384,8 +384,14 @@ class FakeDevice : ArbigentDevice {
     return ArbigentElementList(emptyList(), 1080)
   }
 
+  private var isClosed = false
   override fun close() {
     arbigentDebugLog("FakeDevice.close")
+  }
+
+  override fun isClosed(): Boolean {
+    arbigentDebugLog("FakeDevice.isClosed")
+    return isClosed
   }
 }
 

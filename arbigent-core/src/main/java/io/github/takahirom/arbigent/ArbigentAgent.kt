@@ -717,7 +717,7 @@ private fun step(
   return StepResult.Continue
 }
 
-public fun detectStuckScreen(lastScreenshot: String?, newScreenshot: File): Boolean {
+private fun detectStuckScreen(lastScreenshot: String?, newScreenshot: File): Boolean {
   if (lastScreenshot == null) {
     return false
   }
