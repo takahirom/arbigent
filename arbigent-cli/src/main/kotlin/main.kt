@@ -5,13 +5,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.CliktError
 import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.parameters.groups.OptionGroup
 import com.github.ajalt.clikt.parameters.groups.defaultByName
 import com.github.ajalt.clikt.parameters.groups.groupChoice
-import com.github.ajalt.clikt.parameters.options.default
-import com.github.ajalt.clikt.parameters.options.option
-import com.github.ajalt.clikt.parameters.options.prompt
+import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.choice
 import com.jakewharton.mosaic.layout.background
 import com.jakewharton.mosaic.layout.padding
@@ -81,6 +80,28 @@ class ArbigentCli : CliktCommand() {
     .choice("debug", "info", "warn", "error")
     .default("info")
 
+  private val shard by option("--shard", help = "Shard specification (e.g., 1/5)")
+    .convert { input ->
+      val regex = """(\d+)/(\d+)""".toRegex()
+      val match = regex.matchEntire(input)
+        ?: throw CliktError("Invalid shard format. Use `<current>/<total>` (e.g., 1/5)")
+
+      val (currentStr, totalStr) = match.destructured
+      val current = currentStr.toIntOrNull()
+        ?: throw CliktError("Shard number must be an integer")
+      val total = totalStr.toIntOrNull()
+        ?: throw CliktError("Total shards must be an integer")
+
+      when {
+        total < 1 -> throw CliktError("Total shards must be at least 1")
+        current < 1 -> throw CliktError("Shard number must be at least 1")
+        current > total -> throw CliktError("Shard number ($current) exceeds total ($total)")
+      }
+
+      ArbigentShard(current, total)
+    }
+    .default(ArbigentShard(1, 1))
+
   @OptIn(ArbigentInternalApi::class)
   override fun run() {
     val resultDir = File("arbigent-result")
@@ -124,11 +145,12 @@ class ArbigentCli : CliktCommand() {
           }")
     val device = fetchAvailableDevicesByOs(os).firstOrNull()?.connectToDevice()
       ?: throw IllegalArgumentException("No available device found")
-    arbigentLogLevel = ArbigentLogLevel.entries.find { it.name.toLowerCasePreservingASCIIRules() == logLevel.toLowerCasePreservingASCIIRules() }
-      ?: throw IllegalArgumentException(
-        "Invalid log level. The log level should be one of ${
-          ArbigentLogLevel.values().joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
-        }")
+    arbigentLogLevel =
+      ArbigentLogLevel.entries.find { it.name.toLowerCasePreservingASCIIRules() == logLevel.toLowerCasePreservingASCIIRules() }
+        ?: throw IllegalArgumentException(
+          "Invalid log level. The log level should be one of ${
+            ArbigentLogLevel.values().joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
+          }")
 
     val arbigentProject = ArbigentProject(
       file = File(projectFile),
@@ -138,33 +160,34 @@ class ArbigentCli : CliktCommand() {
     Runtime.getRuntime().addShutdownHook(object : Thread() {
       override fun run() {
         arbigentProject.cancel()
-        ArbigentProjectSerializer().save(arbigentProject.getResult(), resultFile)
-        ArbigentHtmlReport().saveReportHtml(resultDir.absolutePath, arbigentProject.getResult(), needCopy = false)
+        ArbigentProjectSerializer().save(arbigentProject.getResult(shard), resultFile)
+        ArbigentHtmlReport().saveReportHtml(resultDir.absolutePath, arbigentProject.getResult(shard), needCopy = false)
         device.close()
       }
     })
 
     runNoRawMosaicBlocking {
       LaunchedEffect(Unit) {
-        arbigentProject.execute()
+        arbigentProject.executeShard(shard)
         // Show the result
         delay(100)
-        if (arbigentProject.isAllLeafScenariosSuccessful()) {
-          arbigentInfoLog("All scenarios are succeeded.")
+        if (arbigentProject.isAllLeafScenariosSuccessful(shard)) {
+          arbigentInfoLog("All scenarios are succeeded. $shard")
           exitProcess(0)
         } else {
-          arbigentInfoLog("Some scenarios are failed.")
+          arbigentInfoLog("Some scenarios are failed. $shard")
           exitProcess(1)
         }
       }
       Column {
         val assignments by arbigentProject.scenarioAssignmentsFlow.collectAsState(arbigentProject.scenarioAssignments())
-        assignments.forEach { (scenario, scenarioExecutor) ->
-          if (scenario.isLeaf) {
+        assignments
+          .filter { it.scenario.isLeaf }
+          .shard(shard)
+          .forEach { (scenario, scenarioExecutor) ->
             // Show only leaf scenarios
             ScenarioRow(scenario, scenarioExecutor)
           }
-        }
       }
     }
   }

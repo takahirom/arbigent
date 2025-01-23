@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import java.io.File
+import kotlin.math.min
 
 public class FailedToArchiveException(message: String) : RuntimeException(message)
 
@@ -43,6 +44,20 @@ public class ArbigentProject(
       }
   }
 
+  public suspend fun executeShard(shard: ArbigentShard) {
+    val leafScenarios = leafScenarioAssignments()
+    val shardScenarios = leafScenarios.shard(shard)
+    shardScenarios.forEach { (scenario, scenarioExecutor) ->
+      arbigentInfoLog("Start scenario: $scenario")
+      try {
+        scenarioExecutor.execute(scenario)
+      } catch (e: FailedToArchiveException) {
+        arbigentErrorLog("Failed to archive: $scenario" + e.stackTraceToString())
+      }
+      arbigentDebugLog(scenarioExecutor.statusText())
+    }
+  }
+
   private fun leafScenarioAssignments() = scenarioAssignments()
     .filter { it.scenario.isLeaf }
 
@@ -60,13 +75,17 @@ public class ArbigentProject(
     }
   }
 
-  public fun isAllLeafScenariosSuccessful(): Boolean {
-    return leafScenarioAssignments().all { it.scenarioExecutor.isSuccessful() }
+  public fun isAllLeafScenariosSuccessful(shard: ArbigentShard): Boolean {
+    return leafScenarioAssignments()
+      .shard(shard)
+      .all { it.scenarioExecutor.isSuccessful() }
   }
 
-  public fun getResult(): ArbigentProjectExecutionResult {
+  public fun getResult(shard: ArbigentShard = ArbigentShard(1, 1)): ArbigentProjectExecutionResult {
     return ArbigentProjectExecutionResult(
-      leafScenarioAssignments().map { it.getResult() }
+      leafScenarioAssignments()
+        .shard(shard)
+        .map { it.getResult() }
     )
   }
 }
@@ -111,4 +130,54 @@ public data class ArbigentScenario(
   public fun goal(): String? {
     return agentTasks.lastOrNull()?.goal
   }
+}
+
+/**
+ * [index] starts from 1
+ */
+public data class ArbigentShard(val index: Int, val total: Int) {
+  init {
+    require(total >= 1) { "Total shards must be at least 1" }
+    require(index >= 1) { "Shard number must be at least 1" }
+    require(index <= total) { "Shard number ($index) exceeds total ($total)" }
+  }
+
+  override fun toString(): String {
+    if (total == 1) return ""
+    return "Shard($index/$total)"
+  }
+}
+
+@ArbigentInternalApi
+public fun <T> List<T>.shard(
+  shard: ArbigentShard
+): List<T> {
+  val (current, total) = shard
+
+  if (current > total || total <= 0 || current <= 0) {
+    return emptyList()
+  }
+
+  val size = this.size
+  if (size == 0) return emptyList()
+
+  val baseShardSize = size / total
+  val remainder = size % total
+
+  val shardSize = if (current <= remainder) baseShardSize + 1 else baseShardSize
+
+  val start = if (current <= remainder) {
+    (current - 1) * (baseShardSize + 1)
+  } else {
+    remainder * (baseShardSize + 1) + (current - 1 - remainder) * baseShardSize
+  }
+
+  if (start >= size) {
+    return emptyList()
+  }
+
+  val end = start + shardSize
+  val adjustedEnd = min(end, size)
+
+  return subList(start, adjustedEnd)
 }
