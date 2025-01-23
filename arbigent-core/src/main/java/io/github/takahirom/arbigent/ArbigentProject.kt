@@ -134,7 +134,7 @@ public data class ArbigentScenario(
 }
 
 /**
- * @current starts from 1
+ * [current] starts from 1
  */
 public data class ArbigentShard(val current: Int, val total: Int) {
   init {
@@ -154,9 +154,30 @@ public fun <T> List<T>.shard(
 ): List<T> {
   val (current, total) = shard
 
-  val shardSize = ceil(size.toDouble() / total).toInt()
-  val start = (current - 1) * shardSize
-  val end = min(start + shardSize, size)
+  if (current > total || total <= 0 || current <= 0) {
+    return emptyList()
+  }
 
-  return subList(start, end)
+  val size = this.size
+  if (size == 0) return emptyList()
+
+  val baseShardSize = size / total
+  val remainder = size % total
+
+  val shardSize = if (current <= remainder) baseShardSize + 1 else baseShardSize
+
+  val start = if (current <= remainder) {
+    (current - 1) * (baseShardSize + 1)
+  } else {
+    remainder * (baseShardSize + 1) + (current - 1 - remainder) * baseShardSize
+  }
+
+  if (start >= size) {
+    return emptyList()
+  }
+
+  val end = start + shardSize
+  val adjustedEnd = min(end, size)
+
+  return subList(start, adjustedEnd)
 }
