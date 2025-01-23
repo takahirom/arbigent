@@ -7,11 +7,11 @@
 
 ## Screenshot
 
-<img width="650" alt="arbigent-screenshot" src="https://github.com/user-attachments/assets/0dc529db-0f48-4df1-8fff-079cd88672fa" />
+<img width="650" alt="arbigent-screenshot" src="https://github.com/user-attachments/assets/77ebfcb1-3a44-4eaf-9775-3dff2597f9d1" />
 
 ## Demo movie
 
-https://github.com/user-attachments/assets/46fa3034-5671-4ff1-99df-abbdaebaf197
+https://github.com/user-attachments/assets/ec582760-5d6a-4ee3-8067-87cb2b673c8d
 
 ## Motivation
 
@@ -82,8 +82,8 @@ Furthermore, I wanted to make Arbigent accessible to QA engineers by offering a 
 I categorized automated testing frameworks into five levels using the [SMURF](https://testing.googleblog.com/2024/10/smurf-beyond-test-pyramid.html) framework. Here's how Arbigent stacks up:
 
 *   **Speed (1/5):** Arbigent's speed is currently limited by the underlying AI technology and the need to interact with the application's UI in real-time. This makes it slower than traditional unit or integration tests. We can parallelize tests using the `--shard` option to speed up execution.
-*   **Maintainability (4/5):** Arbigent promotes maintainability through natural language test definitions and task decomposition. More significantly, the underlying AI model can adapt to minor UI changes, minimizing the need to rewrite tests for every small update, thus reducing maintenance effort.
-*   **Utilization (1/5):** Arbigent requires both device resources (emulators or physical devices) and AI resources, which can be costly.
+*   **Maintainability (4/5):** Arbigent excels in maintainability. The underlying AI model can adapt to minor UI changes, minimizing the need to rewrite tests for every small update, thus reducing maintenance effort. You can write tests in natural language (e.g., "Complete the tutorial"), making them resilient to UI changes. The task decomposition feature also reduces duplication, further enhancing maintainability. Maintenance can be done by non-engineers, thanks to the natural language interface.
+*   **Utilization (1/5):** Arbigent requires both device resources (emulators or physical devices) and AI resources, which can be costly. (AI cost can be around $0.005 per step and $0.02 per task when using GPT-4o.)
 *   **Reliability (3/5):** Arbigent has several features to improve reliability. It automatically waits during loading screens, handles unexpected dialogs, and even attempts self-correction. However, external factors like emulator flakiness can still impact reliability.
     *   Recently I found Arbigent has retry feature and can execute the scenario from the beginning. But, even without retry, Arbigent works fine without failures thanks to the flexibility of AI.
 *   **Fidelity (5/5):** Arbigent provides high fidelity by testing on real or emulated devices with the actual application. It can even assess aspects that were previously difficult to test, such as verifying video playback by checking for visual changes on the screen.

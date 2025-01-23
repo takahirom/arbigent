@@ -226,16 +226,16 @@ private fun StepView(step: ArbigentAgentTaskStepResult) {
       }) {
         Text(step.summary)
       }
-      ExpandableSection("UI Tree Strings") {
-        Pre({
-          style {
-            whiteSpace("pre-wrap")
-          }
-        }) {
-          Text("All Tree String: ${step.uiTreeStrings?.allTreeString ?: "N/A"}")
-          Text("Optimized Tree String: ${step.uiTreeStrings?.optimizedTreeString ?: "N/A"}")
-        }
-      }
+//      ExpandableSection("UI Tree Strings") {
+//        Pre({
+//          style {
+//            whiteSpace("pre-wrap")
+//          }
+//        }) {
+//          Text("All Tree String: ${step.uiTreeStrings?.allTreeString ?: "N/A"}")
+//          Text("Optimized Tree String: ${step.uiTreeStrings?.optimizedTreeString ?: "N/A"}")
+//        }
+//      }
 
       ExpandableSection("AI Request") {
         Pre({
