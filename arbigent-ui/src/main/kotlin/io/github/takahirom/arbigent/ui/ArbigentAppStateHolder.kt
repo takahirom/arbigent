@@ -300,7 +300,10 @@ class ArbigentAppStateHolder(
       if (devicesStateHolder.selectedDevice.value == null) {
         devicesStateHolder.onSelectedDeviceChanged(devicesStateHolder.devices.value.firstOrNull())
       }
-      val device = deviceFactory(devicesStateHolder.selectedDevice.value!!)
+      val selectedDevice = devicesStateHolder.selectedDevice.value!!
+      val device = deviceCache.getOrPut(selectedDevice) {
+        deviceFactory(devicesStateHolder.selectedDevice.value!!)
+      }
       deviceConnectionState.value = DeviceConnectionState.Connected(device)
     }
   }
