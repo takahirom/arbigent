@@ -181,7 +181,6 @@ class ArbigentCli : CliktCommand() {
       }
       Column {
         val assignments by arbigentProject.scenarioAssignmentsFlow.collectAsState(arbigentProject.scenarioAssignments())
-        println("shard: $shard")
         assignments
           .filter { it.scenario.isLeaf }
           .shard(shard)
