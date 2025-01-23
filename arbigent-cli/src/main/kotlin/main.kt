@@ -98,9 +98,9 @@ class ArbigentCli : CliktCommand() {
         current > total -> throw CliktError("Shard number ($current) exceeds total ($total)")
       }
 
-      current - 1 to total
+      ArbigentShard(current, total)
     }
-    .default(0 to 1)
+    .default(ArbigentShard(1, 1))
 
   @OptIn(ArbigentInternalApi::class)
   override fun run() {
@@ -160,33 +160,35 @@ class ArbigentCli : CliktCommand() {
     Runtime.getRuntime().addShutdownHook(object : Thread() {
       override fun run() {
         arbigentProject.cancel()
-        ArbigentProjectSerializer().save(arbigentProject.getResult(), resultFile)
-        ArbigentHtmlReport().saveReportHtml(resultDir.absolutePath, arbigentProject.getResult(), needCopy = false)
+        ArbigentProjectSerializer().save(arbigentProject.getResult(shard), resultFile)
+        ArbigentHtmlReport().saveReportHtml(resultDir.absolutePath, arbigentProject.getResult(shard), needCopy = false)
         device.close()
       }
     })
 
     runNoRawMosaicBlocking {
       LaunchedEffect(Unit) {
-        arbigentProject.executeShard(shard.first, shard.second)
+        arbigentProject.executeShard(shard)
         // Show the result
         delay(100)
-        if (arbigentProject.isAllLeafScenariosSuccessful()) {
-          arbigentInfoLog("All scenarios are succeeded.")
+        if (arbigentProject.isAllLeafScenariosSuccessful(shard)) {
+          arbigentInfoLog("All scenarios are succeeded. $shard")
           exitProcess(0)
         } else {
-          arbigentInfoLog("Some scenarios are failed.")
+          arbigentInfoLog("Some scenarios are failed. $shard")
           exitProcess(1)
         }
       }
       Column {
         val assignments by arbigentProject.scenarioAssignmentsFlow.collectAsState(arbigentProject.scenarioAssignments())
-        assignments.forEach { (scenario, scenarioExecutor) ->
-          if (scenario.isLeaf) {
+        println("shard: $shard")
+        assignments
+          .filter { it.scenario.isLeaf }
+          .shard(shard)
+          .forEach { (scenario, scenarioExecutor) ->
             // Show only leaf scenarios
             ScenarioRow(scenario, scenarioExecutor)
           }
-        }
       }
     }
   }

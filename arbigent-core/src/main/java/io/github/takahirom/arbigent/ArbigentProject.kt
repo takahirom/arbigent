@@ -45,9 +45,9 @@ public class ArbigentProject(
       }
   }
 
-  public suspend fun executeShard(shardIndex: Int, shardCount: Int) {
+  public suspend fun executeShard(shard: ArbigentShard) {
     val leafScenarios = leafScenarioAssignments()
-    val shardScenarios = leafScenarios.shard(shardCount, shardIndex)
+    val shardScenarios = leafScenarios.shard(shard)
     shardScenarios.forEach { (scenario, scenarioExecutor) ->
       arbigentInfoLog("Start scenario: $scenario")
       try {
@@ -57,20 +57,6 @@ public class ArbigentProject(
       }
       arbigentDebugLog(scenarioExecutor.statusText())
     }
-  }
-
-  private fun <T> List<T>.shard(
-    totalShards: Int,
-    shardIndex: Int
-  ): List<T> {
-    require(totalShards > 0) { "Total shards must be positive" }
-    require(shardIndex in 0 until totalShards) { "Invalid shard index" }
-
-    val shardSize = ceil(size.toDouble() / totalShards).toInt()
-    val start = shardIndex * shardSize
-    val end = min(start + shardSize, size)
-
-    return subList(start, end)
   }
 
   private fun leafScenarioAssignments() = scenarioAssignments()
@@ -90,13 +76,17 @@ public class ArbigentProject(
     }
   }
 
-  public fun isAllLeafScenariosSuccessful(): Boolean {
-    return leafScenarioAssignments().all { it.scenarioExecutor.isSuccessful() }
+  public fun isAllLeafScenariosSuccessful(shard: ArbigentShard): Boolean {
+    return leafScenarioAssignments()
+      .shard(shard)
+      .all { it.scenarioExecutor.isSuccessful() }
   }
 
-  public fun getResult(): ArbigentProjectExecutionResult {
+  public fun getResult(shard: ArbigentShard = ArbigentShard(1, 1)): ArbigentProjectExecutionResult {
     return ArbigentProjectExecutionResult(
-      leafScenarioAssignments().map { it.getResult() }
+      leafScenarioAssignments()
+        .shard(shard)
+        .map { it.getResult() }
     )
   }
 }
@@ -141,4 +131,32 @@ public data class ArbigentScenario(
   public fun goal(): String? {
     return agentTasks.lastOrNull()?.goal
   }
+}
+
+/**
+ * @current starts from 1
+ */
+public data class ArbigentShard(val current: Int, val total: Int) {
+  init {
+    require(total >= 1) { "Total shards must be at least 1" }
+    require(current >= 1) { "Shard number must be at least 1" }
+    require(current <= total) { "Shard number ($current) exceeds total ($total)" }
+  }
+
+  override fun toString(): String {
+    return "Shard($current/$total)"
+  }
+}
+
+@ArbigentInternalApi
+public fun <T> List<T>.shard(
+  shard: ArbigentShard
+): List<T> {
+  val (current, total) = shard
+
+  val shardSize = ceil(size.toDouble() / total).toInt()
+  val start = (current - 1) * shardSize
+  val end = min(start + shardSize, size)
+
+  return subList(start, end)
 }
