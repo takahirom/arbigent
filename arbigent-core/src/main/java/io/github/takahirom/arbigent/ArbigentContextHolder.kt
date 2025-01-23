@@ -42,7 +42,7 @@ public class ArbigentContextHolder(
         timestamp = timestamp,
         screenshotFilePath = screenshotFilePath,
         agentCommand = agentCommand?.stepLogText(),
-        uiTreeStrings = uiTreeStrings,
+//        uiTreeStrings = uiTreeStrings,
         aiRequest = aiRequest,
         aiResponse = aiResponse,
       )
