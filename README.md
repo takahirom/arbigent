@@ -81,8 +81,8 @@ Furthermore, I wanted to make Arbigent accessible to QA engineers by offering a 
 
 I categorized automated testing frameworks into five levels using the [SMURF](https://testing.googleblog.com/2024/10/smurf-beyond-test-pyramid.html) framework. Here's how Arbigent stacks up:
 
-*   **Speed (1/5):** Arbigent's speed is currently limited by the underlying AI technology and the need to interact with the application's UI in real-time. This makes it slower than traditional unit or integration tests.
-*   **Maintainability (4/5):** Arbigent excels in maintainability. You can write tests in natural language (e.g., "Complete the tutorial"), making them resilient to UI changes. The task decomposition feature also reduces duplication, further enhancing maintainability. Maintenance can be done by non-engineers, thanks to the natural language interface.
+*   **Speed (1/5):** Arbigent's speed is currently limited by the underlying AI technology and the need to interact with the application's UI in real-time. This makes it slower than traditional unit or integration tests. We can parallelize tests using the `--shard` option to speed up execution.
+*   **Maintainability (4/5):** Arbigent promotes maintainability through natural language test definitions and task decomposition. More significantly, the underlying AI model can adapt to minor UI changes, minimizing the need to rewrite tests for every small update, thus reducing maintenance effort.
 *   **Utilization (1/5):** Arbigent requires both device resources (emulators or physical devices) and AI resources, which can be costly.
 *   **Reliability (3/5):** Arbigent has several features to improve reliability. It automatically waits during loading screens, handles unexpected dialogs, and even attempts self-correction. However, external factors like emulator flakiness can still impact reliability.
     *   Recently I found Arbigent has retry feature and can execute the scenario from the beginning. But, even without retry, Arbigent works fine without failures thanks to the flexibility of AI.
@@ -148,6 +148,47 @@ Options:
   --os=(android|ios|web)                 Target operating system
   --project-file=<text>                 Path to the scenario YAML file
   -h, --help                             Show this message and exit
+```
+
+
+### Shard Option to Enable Parallel Tests
+
+You can run tests separately with the `--shard` option. This allows you to split your test suite and run tests in parallel, reducing overall test execution time.
+
+**Example:**
+
+`arbigent --shard=1/4`
+
+This command will run the first quarter of your test suite.
+
+**Integrating with GitHub Actions:**
+
+Here's an example of how to integrate the `--shard` option with GitHub Actions to run parallel tests on multiple Android emulators:
+
+```yaml
+  cli-e2e-android:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shardIndex: [ 1, 2, 3, 4 ]
+        shardTotal: [ 4 ]
+    steps:
+...
+      - name: CLI E2E test
+        uses: reactivecircus/android-emulator-runner@v2
+...
+          script: |
+            arbigent --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }} --os=android --project-file=sample-test/src/main/resources/projects/e2e-test-android.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-exp
+...
+
+      - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
+        if: ${{ always() }}
+        with:
+          name: cli-report-android-${{ matrix.shardIndex }}-${{ matrix.shardTotal }}
+          path: |
+            arbigent-result/*
+          retention-days: 90
 ```
 
 ### Minimal GitHub Actions CI sample
