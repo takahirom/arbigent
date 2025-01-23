@@ -144,6 +144,7 @@ public data class ArbigentShard(val current: Int, val total: Int) {
   }
 
   override fun toString(): String {
+    if (total == 1) return ""
     return "Shard($current/$total)"
   }
 }
