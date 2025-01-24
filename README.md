@@ -17,7 +17,7 @@ https://github.com/user-attachments/assets/ec582760-5d6a-4ee3-8067-87cb2b673c8d
 
 ### Make AI Agent Testing Practical for Modern Applications
 
-Traditional UI testing frameworks often struggle with modern applications because they are brittle and break easily when the UI changes. For instance, the introduction of A/B tests, updates to tutorials, or the appearance of unexpected dialogs can cause tests to fail.  
+Traditional UI testing often relies on brittle methods that are easily disrupted by even minor UI changes. A/B tests, updated tutorials, unexpected dialogs, dynamic advertising, or ever-changing user-generated content can cause tests to fail.  
 AI agents emerged as a solution, but testing with AI agents also presents challenges. AI agents often don't work as intended; for example, the agents might open other apps or click on the wrong button due to the complexity of the task.  
 To address these challenges, I created Arbigent, an AI agent testing framework that can break down complex tasks into smaller, dependent scenarios. By decomposing tasks, Arbigent enables more predictable and scalable testing of AI agents in modern applications.
 
