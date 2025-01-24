@@ -172,30 +172,31 @@ private fun NormalAiSetting(
   onAiProviderSettingChanged: (AiProviderSetting.NormalAiProviderSetting) -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  val openAiApiKey =
-    rememberSaveable(saver = TextFieldState.Saver, inputs = arrayOf(aiProviderSetting.id)) {
-      TextFieldState(aiProviderSetting.apiKey, TextRange(aiProviderSetting.apiKey.length))
-    }
+  val updatedAiProviderSetting by rememberUpdatedState(aiProviderSetting)
   val updatedOnAiProviderSettingChanged by rememberUpdatedState(onAiProviderSettingChanged)
+  val openAiApiKey =
+    rememberSaveable(saver = TextFieldState.Saver, inputs = arrayOf(updatedAiProviderSetting.id)) {
+      TextFieldState(updatedAiProviderSetting.apiKey, TextRange(updatedAiProviderSetting.apiKey.length))
+    }
   LaunchedEffect(Unit) {
     snapshotFlow { openAiApiKey.text }
       .collect({
-        updatedOnAiProviderSettingChanged(aiProviderSetting.updatedApiKey(apiKey = it.toString()))
+        updatedOnAiProviderSettingChanged(updatedAiProviderSetting.updatedApiKey(apiKey = it.toString()))
       })
   }
   val modelName =
-    rememberSaveable(saver = TextFieldState.Saver, inputs = arrayOf(aiProviderSetting.id)) {
-      TextFieldState(aiProviderSetting.modelName, TextRange(aiProviderSetting.modelName.length))
+    rememberSaveable(saver = TextFieldState.Saver, inputs = arrayOf(updatedAiProviderSetting.id)) {
+      TextFieldState(updatedAiProviderSetting.modelName, TextRange(updatedAiProviderSetting.modelName.length))
     }
   LaunchedEffect(Unit) {
     snapshotFlow { modelName.text }
       .collect {
-        updatedOnAiProviderSettingChanged(aiProviderSetting.updatedModelName(modelName = it.toString()))
+        updatedOnAiProviderSettingChanged(updatedAiProviderSetting.updatedModelName(modelName = it.toString()))
       }
   }
-  val providerName = aiProviderSetting.name
+  val providerName = updatedAiProviderSetting.name
   Column(modifier = modifier) {
-    if (aiProviderSetting.isApiKeyRequired) {
+    if (updatedAiProviderSetting.isApiKeyRequired) {
       Text("$providerName API Key(Saved in Keychain on Mac)")
       BasicSecureTextField(
         modifier = Modifier.padding(8.dp),
@@ -228,38 +229,39 @@ private fun CustomOpenAiApiBasedAiSetting(
   onAiProviderSettingChanged: (AiProviderSetting.CustomOpenAiApiBasedAi) -> Unit,
   modifier: Modifier = Modifier,
 ) {
+  val updatedAiProviderSetting by rememberUpdatedState(aiProviderSetting)
   val apiKey =
-    rememberSaveable(saver = TextFieldState.Saver, inputs = arrayOf(aiProviderSetting.id)) {
-      TextFieldState(aiProviderSetting.apiKey, TextRange(aiProviderSetting.apiKey.length))
+    rememberSaveable(saver = TextFieldState.Saver, inputs = arrayOf(updatedAiProviderSetting.id)) {
+      TextFieldState(updatedAiProviderSetting.apiKey, TextRange(updatedAiProviderSetting.apiKey.length))
     }
   val updatedOnAiProviderSettingChanged by rememberUpdatedState(onAiProviderSettingChanged)
   LaunchedEffect(Unit) {
     snapshotFlow { apiKey.text }
       .collect({
-        updatedOnAiProviderSettingChanged(aiProviderSetting.updatedApiKey(apiKey = it.toString()))
+        updatedOnAiProviderSettingChanged(updatedAiProviderSetting.updatedApiKey(apiKey = it.toString()))
       })
   }
   val modelName =
-    rememberSaveable(saver = TextFieldState.Saver, inputs = arrayOf(aiProviderSetting.id)) {
-      TextFieldState(aiProviderSetting.modelName, TextRange(aiProviderSetting.modelName.length))
+    rememberSaveable(saver = TextFieldState.Saver, inputs = arrayOf(updatedAiProviderSetting.id)) {
+      TextFieldState(updatedAiProviderSetting.modelName, TextRange(updatedAiProviderSetting.modelName.length))
     }
   LaunchedEffect(Unit) {
     snapshotFlow { modelName.text }
       .collect {
-        updatedOnAiProviderSettingChanged(aiProviderSetting.updatedModelName(modelName = it.toString()))
+        updatedOnAiProviderSettingChanged(updatedAiProviderSetting.updatedModelName(modelName = it.toString()))
       }
   }
   val endpoint =
-    rememberSaveable(saver = TextFieldState.Saver, inputs = arrayOf(aiProviderSetting.id)) {
-      TextFieldState(aiProviderSetting.baseUrl, TextRange(aiProviderSetting.baseUrl.length))
+    rememberSaveable(saver = TextFieldState.Saver, inputs = arrayOf(updatedAiProviderSetting.id)) {
+      TextFieldState(updatedAiProviderSetting.baseUrl, TextRange(updatedAiProviderSetting.baseUrl.length))
     }
   LaunchedEffect(Unit) {
     snapshotFlow { endpoint.text }
       .collect {
-        updatedOnAiProviderSettingChanged(aiProviderSetting.updatedBaseUrl(baseUrl = it.toString()))
+        updatedOnAiProviderSettingChanged(updatedAiProviderSetting.updatedBaseUrl(baseUrl = it.toString()))
       }
   }
-  val providerName = aiProviderSetting.name
+  val providerName = updatedAiProviderSetting.name
   Column(modifier = modifier) {
     Text("$providerName API Key(Saved in Keychain on Mac)")
     BasicSecureTextField(
@@ -297,48 +299,49 @@ private fun AzureOpenAiSetting(
   onAiProviderSettingChanged: (AiProviderSetting.AzureOpenAi) -> Unit,
   modifier: Modifier = Modifier,
 ) {
+  val updatedAiProviderSetting by rememberUpdatedState(aiProviderSetting)
   val apiKey =
-    rememberSaveable(saver = TextFieldState.Saver, inputs = arrayOf(aiProviderSetting.id)) {
-      TextFieldState(aiProviderSetting.apiKey, TextRange(aiProviderSetting.apiKey.length))
+    rememberSaveable(saver = TextFieldState.Saver, inputs = arrayOf(updatedAiProviderSetting.id)) {
+      TextFieldState(updatedAiProviderSetting.apiKey, TextRange(updatedAiProviderSetting.apiKey.length))
     }
   val updatedOnAiProviderSettingChanged by rememberUpdatedState(onAiProviderSettingChanged)
   LaunchedEffect(Unit) {
     snapshotFlow { apiKey.text }
       .collect({
-        updatedOnAiProviderSettingChanged(aiProviderSetting.updatedApiKey(apiKey = it.toString()))
+        updatedOnAiProviderSettingChanged(updatedAiProviderSetting.updatedApiKey(apiKey = it.toString()))
       })
   }
   val modelName =
-    rememberSaveable(saver = TextFieldState.Saver, inputs = arrayOf(aiProviderSetting.id)) {
-      TextFieldState(aiProviderSetting.modelName, TextRange(aiProviderSetting.modelName.length))
+    rememberSaveable(saver = TextFieldState.Saver, inputs = arrayOf(updatedAiProviderSetting.id)) {
+      TextFieldState(updatedAiProviderSetting.modelName, TextRange(updatedAiProviderSetting.modelName.length))
     }
   LaunchedEffect(Unit) {
     snapshotFlow { modelName.text }
       .collect {
-        updatedOnAiProviderSettingChanged(aiProviderSetting.updatedModelName(modelName = it.toString()))
+        updatedOnAiProviderSettingChanged(updatedAiProviderSetting.updatedModelName(modelName = it.toString()))
       }
   }
   val endpoint =
-    rememberSaveable(saver = TextFieldState.Saver, inputs = arrayOf(aiProviderSetting.id)) {
-      TextFieldState(aiProviderSetting.endpoint, TextRange(aiProviderSetting.endpoint.length))
+    rememberSaveable(saver = TextFieldState.Saver, inputs = arrayOf(updatedAiProviderSetting.id)) {
+      TextFieldState(updatedAiProviderSetting.endpoint, TextRange(updatedAiProviderSetting.endpoint.length))
     }
   LaunchedEffect(Unit) {
     snapshotFlow { endpoint.text }
       .collect {
-        updatedOnAiProviderSettingChanged(aiProviderSetting.updatedEndpoint(endpoint = it.toString()))
+        updatedOnAiProviderSettingChanged(updatedAiProviderSetting.updatedEndpoint(endpoint = it.toString()))
       }
   }
   val apiVersion =
-    rememberSaveable(saver = TextFieldState.Saver, inputs = arrayOf(aiProviderSetting.id)) {
-      TextFieldState(aiProviderSetting.apiVersion, TextRange(aiProviderSetting.apiVersion.length))
+    rememberSaveable(saver = TextFieldState.Saver, inputs = arrayOf(updatedAiProviderSetting.id)) {
+      TextFieldState(updatedAiProviderSetting.apiVersion, TextRange(updatedAiProviderSetting.apiVersion.length))
     }
   LaunchedEffect(Unit) {
     snapshotFlow { apiVersion.text }
       .collect {
-        updatedOnAiProviderSettingChanged(aiProviderSetting.updatedApiVersion(apiVersion = it.toString()))
+        updatedOnAiProviderSettingChanged(updatedAiProviderSetting.updatedApiVersion(apiVersion = it.toString()))
       }
   }
-  val providerName = aiProviderSetting.name
+  val providerName = updatedAiProviderSetting.name
   Column(modifier = modifier) {
     Text("$providerName API Key(Saved in Keychain on Mac)")
     BasicSecureTextField(
