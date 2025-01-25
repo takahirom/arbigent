@@ -14,14 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -369,6 +362,18 @@ private fun ScenarioOptions(
   }
 }
 
+enum class InitializationMethodMenu(
+  val type: String,
+  val defaultContent: ArbigentScenarioContent.InitializationMethod
+) {
+  Noop("NoOp", ArbigentScenarioContent.InitializationMethod.Noop),
+  Wait("Wait", ArbigentScenarioContent.InitializationMethod.Wait(0)),
+  CleanupData("Cleanup app data", ArbigentScenarioContent.InitializationMethod.CleanupData("")),
+  Back("Back", ArbigentScenarioContent.InitializationMethod.Back(1)),
+  OpenLink("Open link", ArbigentScenarioContent.InitializationMethod.OpenLink("")),
+  LaunchApp("Launch app", ArbigentScenarioContent.InitializationMethod.LaunchApp("", emptyMap()))
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun InitializationOptions(
@@ -378,17 +383,14 @@ private fun InitializationOptions(
   index: Int
 ) {
   Column(
-    modifier = Modifier.padding(8.dp).width(200.dp)
+    modifier = Modifier.padding(8.dp).width(240.dp)
   ) {
     GroupHeader {
       Text("Initialization method ${index + 1}")
       IconActionButton(
         key = AllIconsKeys.General.Delete,
         onClick = {
-          scenarioStateHolder.initializationMethodStateFlow.value =
-            initializeMethods.toMutableList().apply {
-              removeAt(index)
-            }
+          scenarioStateHolder.onRemoveInitializationMethod(index)
         },
         contentDescription = "Remove initialization method",
         hint = Size(16),
@@ -398,175 +400,273 @@ private fun InitializationOptions(
         )
       }
     }
-    Row(
-      verticalAlignment = Alignment.CenterVertically
-    ) {
-      RadioButtonRow(
-        selected = initializeMethod is ArbigentScenarioContent.InitializationMethod.CleanupData,
-        onClick = {
-          scenarioStateHolder.initializationMethodStateFlow.value =
-            initializeMethods.toMutableList().apply {
-              set(
-                index,
-                ArbigentScenarioContent.InitializationMethod.CleanupData(
-                  (initializeMethod as? ArbigentScenarioContent.InitializationMethod.CleanupData)?.packageName
-                    ?: ""
-                )
-              )
+    Dropdown(
+      modifier = Modifier.padding(4.dp),
+      menuContent = {
+        InitializationMethodMenu.values().forEach { menu ->
+          selectableItem(
+            selected = initializeMethod::class.simpleName == menu.type,
+            onClick = {
+              val newInitializeMethods = initializeMethods.toMutableList()
+              newInitializeMethods[index] = menu.defaultContent
+              scenarioStateHolder.onInitializationMethodChanged(index, menu.defaultContent)
             }
-        }
-      ) {
-        Column {
-          Text(modifier = Modifier.padding(top = 4.dp), text = "Cleanup app data")
-          if (initializeMethod is ArbigentScenarioContent.InitializationMethod.CleanupData) {
-            TextField(
-              modifier = Modifier
-                .padding(4.dp),
-              value = (initializeMethod as? ArbigentScenarioContent.InitializationMethod.CleanupData)?.packageName
-                ?: "",
-              onValueChange = {
-                scenarioStateHolder.initializationMethodStateFlow.value =
-                  initializeMethods.toMutableList().apply {
-                    set(
-                      index,
-                      ArbigentScenarioContent.InitializationMethod.CleanupData(it)
-                    )
-                  }
-              },
-            )
+          ) {
+            Text(menu.type)
           }
         }
       }
+    ) {
+      Text(initializeMethod::class.simpleName ?: "Select type")
     }
-
     Row(
       verticalAlignment = Alignment.CenterVertically
     ) {
-      var editingText by remember(initializeMethod) {
-        mutableStateOf(
-          (initializeMethod as? ArbigentScenarioContent.InitializationMethod.Back)?.times.toString()
+      if (initializeMethod is ArbigentScenarioContent.InitializationMethod.CleanupData) {
+        TextField(
+          modifier = Modifier
+            .padding(4.dp),
+          value = (initializeMethod as? ArbigentScenarioContent.InitializationMethod.CleanupData)?.packageName
+            ?: "",
+          onValueChange = {
+            scenarioStateHolder.onInitializationMethodChanged(
+              index,
+              ArbigentScenarioContent.InitializationMethod.CleanupData(it)
+            )
+          },
         )
       }
-      RadioButtonRow(
-        selected = initializeMethod is ArbigentScenarioContent.InitializationMethod.Back,
-        onClick = {
-          scenarioStateHolder.initializationMethodStateFlow.value =
-            initializeMethods.toMutableList().apply {
-              set(
-                index,
-                ArbigentScenarioContent.InitializationMethod.Back(
-                  (initializeMethod as? ArbigentScenarioContent.InitializationMethod.Back)?.times
-                    ?: 1
-                )
-              )
-            }
-        }
-      ) {
-        Column {
-          Text(modifier = Modifier.padding(top = 4.dp), text = "Back")
-          if (initializeMethod is ArbigentScenarioContent.InitializationMethod.Back) {
-            TextField(
-              modifier = Modifier
-                .padding(4.dp),
-              value = editingText,
-              placeholder = { Text("Times") },
-              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-              onValueChange = {
-                editingText = it
-                scenarioStateHolder.initializationMethodStateFlow.value =
-                  initializeMethods.toMutableList().apply {
-                    set(
-                      index,
-                      ArbigentScenarioContent.InitializationMethod.Back(it.toIntOrNull() ?: 1)
-                    )
-                  }
-              },
+      Column {
+        if (initializeMethod is ArbigentScenarioContent.InitializationMethod.Back) {
+          var editingText by remember(initializeMethod) {
+            mutableStateOf(
+              (initializeMethod as? ArbigentScenarioContent.InitializationMethod.Back)?.times.toString()
             )
           }
+          TextField(
+            modifier = Modifier
+              .padding(4.dp),
+            value = editingText,
+            placeholder = { Text("Times") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            onValueChange = {
+              editingText = it
+              scenarioStateHolder.onInitializationMethodChanged(
+                index,
+                ArbigentScenarioContent.InitializationMethod.Back(it.toIntOrNull() ?: 1)
+              )
+            },
+          )
         }
       }
-    }
-    Row(
-      verticalAlignment = Alignment.CenterVertically
-    ) {
-      RadioButtonRow(
-        selected = initializeMethod is ArbigentScenarioContent.InitializationMethod.OpenLink,
-        onClick = {
-          scenarioStateHolder.initializationMethodStateFlow.value =
-            initializeMethods.toMutableList().apply {
-              set(
-                index,
-                ArbigentScenarioContent.InitializationMethod.OpenLink(
-                  (initializeMethod as? ArbigentScenarioContent.InitializationMethod.OpenLink)?.link
-                    ?: ""
-                )
-              )
-            }
-        }
-      ) {
-        Column {
-          Text(modifier = Modifier.padding(top = 4.dp), text = "Open link")
-          if (initializeMethod is ArbigentScenarioContent.InitializationMethod.OpenLink) {
-            TextField(
-              modifier = Modifier
-                .padding(4.dp),
-              value = (initializeMethod as? ArbigentScenarioContent.InitializationMethod.OpenLink)?.link
-                ?: "",
-              onValueChange = {
-                scenarioStateHolder.initializationMethodStateFlow.value =
-                  initializeMethods.toMutableList().apply {
-                    set(
-                      index,
-                      ArbigentScenarioContent.InitializationMethod.OpenLink(it)
-                    )
-                  }
-              },
+      Row {
+        if (initializeMethod is ArbigentScenarioContent.InitializationMethod.Wait) {
+          var editingText by remember(initializeMethod) {
+            mutableStateOf(
+              (initializeMethod as? ArbigentScenarioContent.InitializationMethod.Wait)?.durationMs.toString()
             )
           }
+          TextField(
+            modifier = Modifier
+              .padding(4.dp),
+            value = editingText,
+            placeholder = { Text("Duration(ms)") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            onValueChange = {
+              editingText = it
+              scenarioStateHolder.onInitializationMethodChanged(
+                index,
+                ArbigentScenarioContent.InitializationMethod.Wait(it.toLongOrNull() ?: 0)
+              )
+            },
+          )
+          Text(
+            "ms",
+            modifier = Modifier.align(Alignment.CenterVertically)
+          )
         }
       }
-    }
-    Row(
-      verticalAlignment = Alignment.CenterVertically
-    ) {
+      Column {
+        if (initializeMethod is ArbigentScenarioContent.InitializationMethod.OpenLink) {
+          TextField(
+            modifier = Modifier
+              .padding(4.dp),
+            value = (initializeMethod as? ArbigentScenarioContent.InitializationMethod.OpenLink)?.link
+              ?: "",
+            onValueChange = {
+              scenarioStateHolder.onInitializationMethodChanged(
+                index,
+                ArbigentScenarioContent.InitializationMethod.OpenLink(it)
+              )
+            },
+          )
+        }
+      }
       var editingText by remember(initializeMethod) {
         mutableStateOf(
           (initializeMethod as? ArbigentScenarioContent.InitializationMethod.LaunchApp)?.packageName
             ?: ""
         )
       }
-      RadioButtonRow(
-        selected = initializeMethod is ArbigentScenarioContent.InitializationMethod.LaunchApp,
-        onClick = {
-          scenarioStateHolder.initializationMethodStateFlow.value =
-            initializeMethods.toMutableList().apply {
-              set(
-                index,
-                ArbigentScenarioContent.InitializationMethod.LaunchApp(editingText)
-              )
-            }
+      LaunchAppInitializationSetting(
+        initializeMethod = initializeMethod,
+        editingText = editingText,
+        onPackageChange = {
+          editingText = it
+          scenarioStateHolder.onInitializationMethodChanged(
+            index,
+            ArbigentScenarioContent.InitializationMethod.LaunchApp(
+              packageName = it,
+              launchArguments = (initializeMethod as? ArbigentScenarioContent.InitializationMethod.LaunchApp)?.launchArguments
+                ?: emptyMap()
+            )
+          )
+        },
+        onArgumentsChange = { newArguments ->
+          scenarioStateHolder.onInitializationMethodChanged(
+            index,
+            ArbigentScenarioContent.InitializationMethod.LaunchApp(
+              packageName = editingText,
+              launchArguments = newArguments
+            )
+          )
+        },
+        onArgumentRemove = { key ->
+          val newArguments =
+            (initializeMethod as? ArbigentScenarioContent.InitializationMethod.LaunchApp)?.launchArguments
+              ?.toMutableMap() ?: mutableMapOf()
+          newArguments.remove(key)
+          scenarioStateHolder.onInitializationMethodChanged(
+            index,
+            ArbigentScenarioContent.InitializationMethod.LaunchApp(
+              packageName = editingText,
+              launchArguments = newArguments
+            )
+          )
         }
-      ) {
-        Column {
-          Text(modifier = Modifier.padding(top = 4.dp), text = "Launch app")
-          if (initializeMethod is ArbigentScenarioContent.InitializationMethod.LaunchApp) {
-            TextField(
-              modifier = Modifier
-                .padding(4.dp),
-              value = editingText,
-              onValueChange = {
-                editingText = it
-                scenarioStateHolder.initializationMethodStateFlow.value =
-                  initializeMethods.toMutableList().apply {
-                    set(
-                      index,
-                      ArbigentScenarioContent.InitializationMethod.LaunchApp(it)
-                    )
+      )
+    }
+  }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun LaunchAppInitializationSetting(
+  initializeMethod: ArbigentScenarioContent.InitializationMethod,
+  editingText: String,
+  onPackageChange: (String) -> Unit,
+  onArgumentsChange: (Map<String, ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue>) -> Unit,
+  onArgumentRemove: (String) -> Unit
+) {
+  Column {
+    if (initializeMethod is ArbigentScenarioContent.InitializationMethod.LaunchApp) {
+      TextField(
+        modifier = Modifier.padding(4.dp),
+        value = editingText,
+        placeholder = { Text("Package name") },
+        onValueChange = onPackageChange
+      )
+      val arguments by rememberUpdatedState(
+        (initializeMethod as? ArbigentScenarioContent.InitializationMethod.LaunchApp)?.launchArguments ?: emptyMap()
+      )
+      arguments.forEach { (key, value: ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue) ->
+        Row {
+          TextField(
+            modifier = Modifier.weight(1f).padding(4.dp),
+            value = key,
+            placeholder = { Text("key") },
+            onValueChange = { newKey ->
+              val newArguments = arguments.toMutableMap()
+              newArguments.remove(key)
+              newArguments[newKey] = value
+              onArgumentsChange(newArguments)
+            }
+          )
+          Dropdown(
+            modifier = Modifier.weight(1f).padding(4.dp),
+            menuContent = {
+              listOf("String", "Boolean", "Int").forEach { type ->
+                selectableItem(
+                  selected = value::class.simpleName == type,
+                  onClick = {
+                    val newArguments = arguments.toMutableMap()
+                    newArguments[key] = when (type) {
+                      "String" -> ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue.StringVal(
+                        ""
+                      )
+
+                      "Boolean" -> ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue.BooleanVal(
+                        false
+                      )
+
+                      "Int" -> ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue.IntVal(0)
+                      else -> value
+                    }
+                    onArgumentsChange(newArguments)
                   }
-              },
+                ) {
+                  Text(type)
+                }
+              }
+            }
+          ) {
+            Text(value.value::class.simpleName ?: "Select type")
+          }
+          if (value is ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue.BooleanVal) {
+            CheckboxRow(
+              text = "Value",
+              checked = value.value,
+              onCheckedChange = {
+                val newArguments = arguments.toMutableMap()
+                newArguments[key] = ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue.BooleanVal(it)
+                onArgumentsChange(newArguments)
+              }
+            )
+          } else {
+            TextField(
+              modifier = Modifier.weight(1f).padding(4.dp),
+              value = value.value.toString(),
+              placeholder = { Text("value") },
+              onValueChange = { newValue ->
+                val newArguments = arguments.toMutableMap()
+                newArguments[key] = when (value) {
+                  is ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue.StringVal -> ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue.StringVal(
+                    newValue
+                  )
+
+                  is ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue.IntVal -> ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue.IntVal(
+                    newValue.toIntOrNull() ?: 0
+                  )
+
+                  else -> value
+                }
+                onArgumentsChange(newArguments)
+              }
             )
           }
+          IconActionButton(
+            key = AllIconsKeys.General.Delete,
+            onClick = {
+              onArgumentRemove(key)
+            },
+            contentDescription = "Remove argument",
+            hint = Size(16)
+          ) {
+            Text("Remove argument")
+          }
         }
+      }
+      IconActionButton(
+        key = AllIconsKeys.General.Add,
+        onClick = {
+          val newArguments = arguments.toMutableMap()
+          newArguments[""] = ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue.StringVal("")
+          onArgumentsChange(newArguments)
+        },
+        contentDescription = "Add argument",
+        hint = Size(16)
+      ) {
+        Text("Add argument")
       }
     }
   }
