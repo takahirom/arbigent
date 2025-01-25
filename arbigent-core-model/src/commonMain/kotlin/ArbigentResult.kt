@@ -52,7 +52,7 @@ public data class ArbigentAgentResult(
   public val goal: String,
   public val maxStep: Int = 10,
   public val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Mobile,
-  public val isGoalArchived: Boolean,
+  public val isGoalAchieved: Boolean,
   public val steps: List<ArbigentAgentTaskStepResult>,
   public val deviceName: String,
   public val startTimestamp: Long? = null,

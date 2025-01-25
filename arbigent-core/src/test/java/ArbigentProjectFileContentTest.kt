@@ -43,7 +43,7 @@ class ArbigentProjectFileContentTest {
       val executor = ArbigentScenarioExecutor()
       executor.execute(executorScenario)
       assertTrue {
-        executor.isGoalArchived()
+        executor.isGoalAchieved()
       }
     }
   }

@@ -167,7 +167,7 @@ public data class ArbigentElementList(
       }
       elements.addAll(optimizedTree?.toElementList() ?: emptyList())
 
-      arbigentDebugLog("ArbigentDevice: widthGrid:${deviceInfo.widthGrid} widthPixels:${deviceInfo.widthPixels}")
+      arbigentDebugLog("Element loaded size:${elements.size} ArbigentDevice: widthGrid:${deviceInfo.widthGrid} widthPixels:${deviceInfo.widthPixels}")
 
       return ArbigentElementList(
         elements = elements,
@@ -179,7 +179,7 @@ public data class ArbigentElementList(
 
 public class MaestroDevice(
   private val maestro: Maestro,
-  screenshotsDir: File = ArbigentDir.screenshotsDir
+  screenshotsDir: File = ArbigentFiles.screenshotsDir
 ) : ArbigentDevice, ArbigentTvCompatDevice {
   private val orchestra = Orchestra(
     maestro = maestro,

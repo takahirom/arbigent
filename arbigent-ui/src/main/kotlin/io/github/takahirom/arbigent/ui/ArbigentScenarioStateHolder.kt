@@ -45,7 +45,7 @@ constructor(
   private val coroutineScope = CoroutineScope(
     ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob()
   )
-  val isArchived = arbigentScenarioExecutorStateFlow
+  val isAchieved = arbigentScenarioExecutorStateFlow
     .flatMapLatest { it?.isSuccessFlow ?: flowOf() }
     .stateIn(
       scope = coroutineScope,

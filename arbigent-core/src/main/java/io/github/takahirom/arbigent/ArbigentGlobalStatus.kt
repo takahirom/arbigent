@@ -1,15 +1,26 @@
 package io.github.takahirom.arbigent
 
 import kotlinx.coroutines.flow.*
+import java.time.Instant
 
 // Just for showing the status of the global status
 public object ArbigentGlobalStatus {
   private val statusFlow: MutableStateFlow<String> = MutableStateFlow("Device Not connected")
   public val status: Flow<String> = statusFlow.asStateFlow()
   public fun status(): String = statusFlow.value
+  private val consoleFlow: MutableStateFlow<List<Pair<Instant,String>>> = MutableStateFlow(listOf())
+  public val console: Flow<List<Pair<Instant,String>>> = consoleFlow.asStateFlow()
+  public fun console(): List<Pair<Instant,String>> = consoleFlow.value
   private fun set(value: String) {
-    arbigentDebugLog("status: $value")
+    arbigentInfoLog("Status: $value")
     statusFlow.value = value
+  }
+
+  public fun log(value: String) {
+    consoleFlow.value += (Instant.now() to value)
+    if (consoleFlow.value.size > 1000) {
+      consoleFlow.value = consoleFlow.value.drop(1)
+    }
   }
 
   public fun<T : Any> onConnect(block: () -> T): T {

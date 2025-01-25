@@ -122,7 +122,7 @@ public class ArbigentAgent(
   private val currentGoalStateFlow = MutableStateFlow<String?>(null)
 
   @OptIn(ExperimentalCoroutinesApi::class)
-  public val isGoalArchivedFlow: Flow<Boolean> = arbigentContextHolderStateFlow
+  public val isGoalAchievedFlow: Flow<Boolean> = arbigentContextHolderStateFlow
     .flatMapLatest {
       it?.stepsFlow ?: flowOf()
     }
@@ -131,7 +131,7 @@ public class ArbigentAgent(
     }
     .shareIn(coroutineScope, SharingStarted.WhileSubscribed(), 1)
 
-  public fun isGoalArchived(): Boolean = arbigentContextHolderStateFlow
+  public fun isGoalAchieved(): Boolean = arbigentContextHolderStateFlow
     .value
     ?.steps()
     ?.any { it.agentCommand is GoalAchievedAgentCommand }
@@ -170,7 +170,7 @@ public class ArbigentAgent(
         initializerChain(device)
       }
       var stepRemain = maxStep
-      while (stepRemain-- > 0 && isGoalArchived().not()) {
+      while (stepRemain-- > 0 && isGoalAchieved().not()) {
         val stepInput = StepInput(
           arbigentContextHolder = arbigentContextHolder,
           agentCommandTypes = supportedAgentCommandTypes,
@@ -184,7 +184,7 @@ public class ArbigentAgent(
         )
         when (stepChain(stepInput)) {
           StepResult.GoalAchieved -> {
-            isGoalArchivedFlow.first { it }
+            isGoalAchievedFlow.first { it }
             arbigentDebugLog("Goal achieved: $goal stepRemain:$stepRemain")
             break
           }
@@ -257,7 +257,7 @@ public class ArbigentAgent(
       endTimestamp = context?.steps()?.lastOrNull()?.timestamp,
       deviceName = device.deviceName(),
       deviceFormFactor = deviceFormFactor,
-      isGoalArchived = isGoalArchived(),
+      isGoalAchieved = isGoalAchieved(),
       steps = context?.steps()?.map {
         it.getResult()
       } ?: emptyList(),
@@ -619,6 +619,7 @@ private fun step(
   stepInput: StepInput
 ): StepResult {
   val contextHolder = stepInput.arbigentContextHolder
+  arbigentDebugLog("step start: ${contextHolder.prompt()}")
   val commandTypes = stepInput.agentCommandTypes
   val device = stepInput.device
   val deviceFormFactor = stepInput.deviceFormFactor
@@ -647,9 +648,8 @@ private fun step(
     }
   }
   val uiTreeStrings = device.viewTreeString()
-  arbigentDebugLog("Arbigent step(): ${contextHolder.prompt()}")
   val screenshotFilePath =
-    ArbigentDir.screenshotsDir.absolutePath + File.separator + "$screenshotFileID.png"
+    ArbigentFiles.screenshotsDir.absolutePath + File.separator + "$screenshotFileID.png"
   val lastScreenshot = contextHolder.steps().lastOrNull()?.screenshotFilePath
   val newScreenshot = File(screenshotFilePath)
   if (detectStuckScreen(lastScreenshot, newScreenshot)) {
@@ -718,11 +718,9 @@ private fun step(
     contextHolder.addStep(decisionOutput.step)
   }
   if (contextHolder.steps().last().agentCommand is GoalAchievedAgentCommand) {
-    arbigentDebugLog("Goal achieved: ${decisionInput.contextHolder.goal}")
     return StepResult.GoalAchieved
   }
   if (contextHolder.steps().last().agentCommand is FailedAgentCommand) {
-    arbigentDebugLog("Failed to achieve the goal: ${decisionInput.contextHolder.goal}")
     return StepResult.Failed
   }
   executeCommandChain(

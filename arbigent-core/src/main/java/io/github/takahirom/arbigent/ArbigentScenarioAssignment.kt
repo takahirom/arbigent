@@ -13,7 +13,7 @@ public data class ArbigentScenarioAssignment(
       id = scenario.id,
       goal = scenario.goal(),
       executionStatus = scenarioExecutor.runningInfo()?.toString(),
-      isSuccess = taskAssignmentsHistory.lastOrNull()?.all { it.agent.isGoalArchived() } ?: false,
+      isSuccess = taskAssignmentsHistory.lastOrNull()?.all { it.agent.isGoalAchieved() } ?: false,
       histories = taskAssignmentsHistory.mapIndexed { index, taskAssignments ->
         ArbigentAgentResults(
           status = "History ${index + 1} / " + taskAssignmentsHistory.size,

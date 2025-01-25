@@ -182,7 +182,7 @@ private fun AgentResultView(taskIndex: Int, agentResult: ArbigentAgentResult) {
       Text("Device(Form Factor): ${agentResult.deviceName}(${agentResult.deviceFormFactor})")
     }
     Div {
-      Text("Goal Archived: ${agentResult.isGoalArchived}")
+      Text("Goal Achieved: ${agentResult.isGoalAchieved}")
     }
     val startTimestamp = agentResult.startTimestamp
     val endTimestamp = agentResult.endTimestamp

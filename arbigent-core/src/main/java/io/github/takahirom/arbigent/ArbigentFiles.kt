@@ -2,7 +2,8 @@ package io.github.takahirom.arbigent
 
 import java.io.File
 
-public object ArbigentDir {
+public object ArbigentFiles {
   public var screenshotsDir: File =
     File(System.getProperty("java.io.tmpdir") + File.separator + "arbigent" + File.separator + "screenshots")
+  public var logFile: File? = File(System.getProperty("java.io.tmpdir") + File.separator + "arbigent" + File.separator + "arbigent.log")
 }

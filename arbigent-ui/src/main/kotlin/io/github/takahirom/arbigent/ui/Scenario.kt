@@ -669,13 +669,13 @@ fun LaunchAppInitializationSetting(
 }
 
 data class ScenarioSection(val goal: String, val isRunning: Boolean, val steps: List<StepItem>) {
-  fun isArchived(): Boolean {
-    return steps.any { it.isArchived() }
+  fun isAchieved(): Boolean {
+    return steps.any { it.isAchieved() }
   }
 }
 
 data class StepItem(val step: ArbigentContextHolder.Step) {
-  fun isArchived(): Boolean {
+  fun isAchieved(): Boolean {
     return step.agentCommand is GoalAchievedAgentCommand
   }
 }
@@ -748,7 +748,7 @@ private fun ContentPanel(tasksToAgentHistory: List<List<ArbigentTaskAssignment>>
                   .weight(1F),
                 text = prefix + section.goal + "(" + (index + 1) + "/" + tasksToAgent.size + ")",
               )
-              if (section.isArchived()) {
+              if (section.isAchieved()) {
                 PassedMark(
                   modifier = Modifier.align(Alignment.CenterVertically)
                     .padding(8.dp)
@@ -782,7 +782,7 @@ private fun ContentPanel(tasksToAgentHistory: List<List<ArbigentTaskAssignment>>
                     modifier = Modifier.padding(4.dp).align(Alignment.CenterVertically),
                     hint = Size(12)
                   )
-                } else if (item.isArchived()) {
+                } else if (item.isAchieved()) {
                   PassedMark(
                     modifier = Modifier.padding(4.dp).size(12.dp)
                       .align(Alignment.CenterVertically)
@@ -923,7 +923,7 @@ private fun ContentPanel(tasksToAgentHistory: List<List<ArbigentTaskAssignment>>
 fun PassedMark(modifier: Modifier = Modifier) {
   Icon(
     key = AllIconsKeys.Actions.Checked,
-    contentDescription = "Archived",
+    contentDescription = "Achieved",
     modifier = modifier
       .size(32.dp)
       .clip(
