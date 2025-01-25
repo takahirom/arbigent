@@ -113,10 +113,11 @@ fun BottomConsole() {
         ) {
           items(histories) { (instant, status) ->
             Row(Modifier.padding(2.dp)) {
+              val timeText = instant.atZone(ZoneId.systemDefault()).format(
+                arbigentLogFormatter
+              )
               Text(
-                text = instant.atZone(ZoneId.systemDefault()).format(
-                  arbigentLogFormatter
-                ),
+                text = timeText,
               )
               Text(
                 text = "$status",
@@ -125,7 +126,7 @@ fun BottomConsole() {
                   .clickable {
                     clipboardManager.setText(
                       buildAnnotatedString {
-                        append(instant.atZone(ZoneId.systemDefault()).format(formatter))
+                        append(timeText)
                         append(" ")
                         append(status)
                       }
