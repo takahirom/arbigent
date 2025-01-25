@@ -71,9 +71,7 @@ class ArbigentAppStateHolder(
 
   fun addSubScenario(parent: ArbigentScenarioStateHolder) {
     val scenarioStateHolder = ArbigentScenarioStateHolder().apply {
-      dependencyScenarioStateHolderStateFlow.value = parent
-      initializationMethodStateFlow.value = listOf()
-      deviceFormFactorStateFlow.value = parent.deviceFormFactor()
+      onAddAsSubScenario(parent)
     }
     allScenarioStateHoldersStateFlow.value += scenarioStateHolder
     selectedScenarioIndex.value =
@@ -245,18 +243,7 @@ class ArbigentAppStateHolder(
     val scenarios = projectFile.scenarioContents
     val arbigentScenarioStateHolders = scenarios.map { scenarioContent ->
       ArbigentScenarioStateHolder(id = scenarioContent.id).apply {
-        onGoalChanged(scenarioContent.goal)
-        initializationMethodStateFlow.value =
-          scenarioContent.initializationMethods.ifEmpty { listOf(scenarioContent.initializeMethods) }
-        maxRetryState.edit {
-          replace(0, length, scenarioContent.maxRetry.toString())
-        }
-        maxStepState.edit {
-          replace(0, length, scenarioContent.maxStep.toString())
-        }
-        deviceFormFactorStateFlow.value = scenarioContent.deviceFormFactor
-        cleanupDataStateFlow.value = scenarioContent.cleanupData
-        imageAssertionsStateFlow.value = scenarioContent.imageAssertions
+        load(scenarioContent)
       }
     }
     scenarios.forEachIndexed { index, scenario ->

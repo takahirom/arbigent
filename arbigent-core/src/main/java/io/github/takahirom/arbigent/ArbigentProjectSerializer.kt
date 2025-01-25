@@ -5,8 +5,12 @@ import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
 import io.github.takahirom.arbigent.result.ArbigentProjectExecutionResult
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.polymorphic
+import kotlinx.serialization.modules.subclass
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
@@ -125,12 +129,38 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
     ) : InitializationMethod
 
     @Serializable
+    @SerialName("Wait")
+    public data class Wait(
+      val durationMs: Long
+    ) : InitializationMethod
+
+    @Serializable
     @SerialName("Noop")
     public data object Noop : InitializationMethod
 
     @Serializable
     @SerialName("LaunchApp")
-    public data class LaunchApp(val packageName: String) : InitializationMethod
+    public data class LaunchApp(
+      val packageName: String,
+      val launchArguments: Map<String, @Contextual ArgumentValue> = emptyMap()
+    ) : InitializationMethod {
+      @Serializable
+      public sealed interface ArgumentValue {
+        public val value: Any
+        @Serializable
+        @SerialName("String")
+        public data class StringVal(override val value: String) : ArgumentValue
+
+        @Serializable
+        @SerialName("Int")
+        public data class IntVal(override val value: Int) : ArgumentValue
+
+        @Serializable
+        @SerialName("Boolean")
+        public data class BooleanVal(override val value: Boolean) : ArgumentValue
+      }
+    }
+
 
     @Serializable
     @SerialName("CleanupData")
@@ -151,7 +181,14 @@ public class ArbigentProjectSerializer(
       strictMode = false,
       encodeDefaults = false,
       polymorphismStyle = PolymorphismStyle.Property
-    )
+    ),
+    serializersModule = SerializersModule {
+      polymorphic(Any::class) {
+        subclass(String::class)
+        subclass(Int::class)
+        subclass(Boolean::class)
+      }
+    }
   )
 
   public fun save(projectFileContent: ArbigentProjectFileContent, file: File) {

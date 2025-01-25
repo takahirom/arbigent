@@ -32,8 +32,10 @@ constructor(
     )
   val imageAssertionsStateFlow: MutableStateFlow<List<ArbigentImageAssertion>> =
     MutableStateFlow(emptyList())
-  val initializationMethodStateFlow: MutableStateFlow<List<ArbigentScenarioContent.InitializationMethod>> =
+  private val _initializationMethodStateFlow: MutableStateFlow<List<ArbigentScenarioContent.InitializationMethod>> =
     MutableStateFlow(listOf(ArbigentScenarioContent.InitializationMethod.Back()))
+  val initializationMethodStateFlow: StateFlow<List<ArbigentScenarioContent.InitializationMethod>> =
+    _initializationMethodStateFlow
   val deviceFormFactorStateFlow: MutableStateFlow<ArbigentScenarioDeviceFormFactor> =
     MutableStateFlow(ArbigentScenarioDeviceFormFactor.Mobile)
   fun deviceFormFactor() = deviceFormFactorStateFlow.value
@@ -89,6 +91,12 @@ constructor(
     }
   }
 
+  fun onInitializationMethodChanged(index: Int, method: ArbigentScenarioContent.InitializationMethod) {
+    _initializationMethodStateFlow.value = initializationMethodStateFlow.value.toMutableList().apply {
+      set(index, method)
+    }
+  }
+
   fun createArbigentScenarioContent(): ArbigentScenarioContent {
     return ArbigentScenarioContent(
       id = id,
@@ -109,6 +117,33 @@ constructor(
   }
 
   fun onAddInitializationMethod() {
-    initializationMethodStateFlow.value += ArbigentScenarioContent.InitializationMethod.Noop
+    _initializationMethodStateFlow.value += ArbigentScenarioContent.InitializationMethod.Noop
+  }
+
+  fun onAddAsSubScenario(parent: ArbigentScenarioStateHolder) {
+    dependencyScenarioStateHolderStateFlow.value = parent
+    _initializationMethodStateFlow.value = listOf()
+    deviceFormFactorStateFlow.value = parent.deviceFormFactor()
+  }
+
+  fun load(scenarioContent: ArbigentScenarioContent) {
+    _id.value = scenarioContent.id
+    onGoalChanged(scenarioContent.goal)
+    maxRetryState.edit {
+      replace(0, length, scenarioContent.maxRetry.toString())
+    }
+    maxStepState.edit {
+      replace(0, length, scenarioContent.maxStep.toString())
+    }
+    cleanupDataStateFlow.value = scenarioContent.cleanupData
+    imageAssertionsStateFlow.value = scenarioContent.imageAssertions.toMutableList()
+    _initializationMethodStateFlow.value = scenarioContent.initializationMethods.toMutableList()
+    deviceFormFactorStateFlow.value = scenarioContent.deviceFormFactor
+  }
+
+  fun onRemoveInitializationMethod(index: Int) {
+    _initializationMethodStateFlow.value = initializationMethodStateFlow.value.toMutableList().apply {
+      removeAt(index)
+    }
   }
 }

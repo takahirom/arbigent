@@ -370,6 +370,22 @@ public fun AgentConfigBuilder(
         })
       }
 
+      is ArbigentScenarioContent.InitializationMethod.Wait -> {
+        addInterceptor(object : ArbigentInitializerInterceptor {
+          override fun intercept(
+            device: ArbigentDevice,
+            chain: ArbigentInitializerInterceptor.Chain
+          ) {
+            try {
+              Thread.sleep(initializeMethod.durationMs)
+            } catch (e: Exception) {
+              arbigentDebugLog("Failed to wait: $e")
+            }
+            chain.proceed(device)
+          }
+        })
+      }
+
       ArbigentScenarioContent.InitializationMethod.Noop -> {
       }
 
@@ -383,7 +399,10 @@ public fun AgentConfigBuilder(
               listOf(
                 MaestroCommand(
                   launchAppCommand = LaunchAppCommand(
-                    appId = initializeMethod.packageName
+                    appId = initializeMethod.packageName,
+                    launchArguments = initializeMethod.launchArguments.mapValues { (_, value) ->
+                      value.value
+                    }
                   )
                 )
               )
