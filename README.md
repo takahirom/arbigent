@@ -97,6 +97,16 @@ I believe that many of its current limitations, such as speed, maintainability, 
 Install the Arbigent UI binary from the [Release page](https://github.com/takahirom/arbigent/releases).
 <img width="632" alt="image" src="https://github.com/user-attachments/assets/499da604-4a43-4eb8-b27f-325a83caa013" />
 
+### Installation for macOS Users
+
+If you encounter security warnings when opening the app:
+Refer to [Apple's guide on opening apps from unidentified developers](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac).
+<img src="https://github.com/user-attachments/assets/44372fa0-1f58-4eea-9fff-a7cc672a0f86" width="300" />
+
+<img 
+  src="https://github.com/user-attachments/assets/b8249cd6-3a40-4863-827c-78e63fdbfd87" 
+  width="400" 
+/>
 
 ### Device Connection and AI API Key Entry
 
