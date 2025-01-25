@@ -459,7 +459,7 @@ private fun InitializationOptions(
           )
         }
       }
-      Column {
+      Row {
         if (initializeMethod is ArbigentScenarioContent.InitializationMethod.Wait) {
           var editingText by remember(initializeMethod) {
             mutableStateOf(
@@ -479,6 +479,10 @@ private fun InitializationOptions(
                 ArbigentScenarioContent.InitializationMethod.Wait(it.toLongOrNull() ?: 0)
               )
             },
+          )
+          Text(
+            "ms",
+            modifier = Modifier.align(Alignment.CenterVertically)
           )
         }
       }
