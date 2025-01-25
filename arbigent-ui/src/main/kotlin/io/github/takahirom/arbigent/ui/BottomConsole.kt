@@ -16,20 +16,19 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.unit.dp
 import io.github.takahirom.arbigent.ArbigentFiles
 import io.github.takahirom.arbigent.ArbigentGlobalStatus
+import io.github.takahirom.arbigent.ArbigentInternalApi
+import io.github.takahirom.arbigent.arbigentLogFormatter
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.Orientation
 import org.jetbrains.jewel.ui.component.Divider
-import org.jetbrains.jewel.ui.component.Icon
 import org.jetbrains.jewel.ui.component.IconActionButton
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
 import java.awt.Desktop
-import java.io.File
 import java.time.ZoneId
-import java.time.format.DateTimeFormatterBuilder
-import java.time.temporal.ChronoField
 
+@OptIn(ArbigentInternalApi::class)
 @Composable
 fun BottomConsole() {
   Row(
@@ -112,21 +111,11 @@ fun BottomConsole() {
           state = lazyColumnState,
           modifier = Modifier.fillMaxSize()
         ) {
-          val formatter = DateTimeFormatterBuilder()
-            .appendValue(ChronoField.HOUR_OF_DAY, 2)
-            .appendLiteral(':')
-            .appendValue(ChronoField.MINUTE_OF_HOUR, 2)
-            .optionalStart()
-            .appendLiteral(':')
-            .appendValue(ChronoField.SECOND_OF_MINUTE, 2)
-            .optionalStart()
-            .appendFraction(ChronoField.NANO_OF_SECOND, 3, 3, true)
-            .toFormatter()
           items(histories) { (instant, status) ->
             Row(Modifier.padding(2.dp)) {
               Text(
                 text = instant.atZone(ZoneId.systemDefault()).format(
-                  formatter
+                  arbigentLogFormatter
                 ),
               )
               Text(

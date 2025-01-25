@@ -1,5 +1,11 @@
 package io.github.takahirom.arbigent
 
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeFormatterBuilder
+import java.time.temporal.ChronoField
+
 public enum class ArbigentLogLevel {
   DEBUG,
   INFO,
@@ -62,6 +68,22 @@ public fun arbigentErrorLog(log: String) {
   }
 }
 
+@ArbigentInternalApi
+public val arbigentLogFormatter: DateTimeFormatter = DateTimeFormatterBuilder()
+  .appendValue(ChronoField.MONTH_OF_YEAR, 2)
+  .appendLiteral('/')
+  .appendValue(ChronoField.DAY_OF_MONTH, 2)
+  .appendLiteral(' ')
+  .appendValue(ChronoField.HOUR_OF_DAY, 2)
+  .appendLiteral(':')
+  .appendValue(ChronoField.MINUTE_OF_HOUR, 2)
+  .optionalStart()
+  .appendLiteral(':')
+  .appendValue(ChronoField.SECOND_OF_MINUTE, 2)
+  .optionalStart()
+  .appendFraction(ChronoField.NANO_OF_SECOND, 3, 3, true)
+  .toFormatter()
+
 private fun printLog(level: ArbigentLogLevel, log: String, instance: Any? = null) {
   val logContent =
     if (instance != null) {
@@ -71,7 +93,8 @@ private fun printLog(level: ArbigentLogLevel, log: String, instance: Any? = null
     }
   println("Arbigent: $logContent")
   ArbigentFiles.logFile?.parentFile?.mkdirs()
-  ArbigentFiles.logFile?.appendText("$logContent\n")
+  val date = arbigentLogFormatter.format(Instant.now().atZone(ZoneId.systemDefault()))
+  ArbigentFiles.logFile?.appendText("$date $logContent\n")
 
   ArbigentGlobalStatus.log(logContent)
 }
