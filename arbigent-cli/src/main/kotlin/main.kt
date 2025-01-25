@@ -59,6 +59,7 @@ class AzureOpenAiConfig : AiConfig("Options for Azure OpenAI") {
   val azureOpenAIModelName by option(help = "Model name (default: gpt-4o-mini)")
     .default("gpt-4o-mini")
 }
+private const val defaultResultPath = "arbigent-result"
 
 class ArbigentCli : CliktCommand() {
   private val aiType by option(help = "Type of AI to use")
@@ -79,6 +80,9 @@ class ArbigentCli : CliktCommand() {
   private val logLevel by option(help = "Log level")
     .choice("debug", "info", "warn", "error")
     .default("info")
+
+  private val logFile by option(help = "Log file path")
+    .default("$defaultResultPath/arbigent.log")
 
   private val shard by option("--shard", help = "Shard specification (e.g., 1/5)")
     .convert { input ->
@@ -104,9 +108,10 @@ class ArbigentCli : CliktCommand() {
 
   @OptIn(ArbigentInternalApi::class)
   override fun run() {
-    val resultDir = File("arbigent-result")
+    val resultDir = File(defaultResultPath)
     resultDir.mkdirs()
-    ArbigentDir.screenshotsDir = File(resultDir, "screenshots")
+    ArbigentFiles.screenshotsDir = File(resultDir, "screenshots")
+    ArbigentFiles.logFile = File(logFile)
     val resultFile = File(resultDir, "result.yml")
     val ai: ArbigentAi = aiType.let { aiType ->
       when (aiType) {

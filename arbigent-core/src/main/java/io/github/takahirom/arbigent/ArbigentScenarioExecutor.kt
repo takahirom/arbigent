@@ -71,7 +71,7 @@ public class ArbigentScenarioExecutor {
 
   public val isSuccessFlow: Flow<Boolean> = taskAssignmentsFlow.flatMapLatest { taskToAgents ->
     val flows: List<Flow<Boolean>> = taskToAgents.map { taskToAgent ->
-      taskToAgent.agent.isGoalArchivedFlow
+      taskToAgent.agent.isGoalAchievedFlow
     }
     combine(flows) { booleans ->
       booleans.all { it }
@@ -87,19 +87,19 @@ public class ArbigentScenarioExecutor {
     if (taskAssignments().isEmpty()) {
       return false
     }
-    return taskAssignments().all { it.agent.isGoalArchived() }
+    return taskAssignments().all { it.agent.isGoalAchieved() }
   }
 
   private val _isFailedToArchiveFlow = MutableStateFlow(false)
   public val isFailedToArchiveFlow: Flow<Boolean> = _isFailedToArchiveFlow.asSharedFlow()
   public fun isFailedToArchive(): Boolean = _isFailedToArchiveFlow.value
 
-  // isArchivedStateFlow is WhileSubscribed so we can't use it in waitUntilFinished
-  public fun isGoalArchived(): Boolean {
+  // isAchievedStateFlow is WhileSubscribed so we can't use it in waitUntilFinished
+  public fun isGoalAchieved(): Boolean {
     if (taskAssignments().isEmpty()) {
       return false
     }
-    return taskAssignments().all { it.agent.isGoalArchived() }
+    return taskAssignments().all { it.agent.isGoalAchieved() }
   }
 
   public val isRunningFlow: Flow<Boolean> = taskAssignmentsFlow.flatMapLatest { taskToAgents ->
@@ -138,12 +138,12 @@ public class ArbigentScenarioExecutor {
   public val scenarioStateFlow: Flow<ArbigentScenarioExecutorState> = _stateFlow
   public fun scenarioState(): ArbigentScenarioExecutorState {
     val isRunning = isRunning()
-    val isArchived = isSuccessful()
+    val isAchieved = isSuccessful()
     val isFailedToArchive = isFailedToArchive()
     return when {
       isFailedToArchive -> ArbigentScenarioExecutorState.Failed
       isRunning -> ArbigentScenarioExecutorState.Running
-      isArchived -> ArbigentScenarioExecutorState.Success
+      isAchieved -> ArbigentScenarioExecutorState.Success
       else -> ArbigentScenarioExecutorState.Idle
     }
   }
@@ -197,12 +197,12 @@ public class ArbigentScenarioExecutor {
               agentTask = task,
             )
           }
-          if (!agent.isGoalArchived()) {
-            arbigentDebugLog("Arbigent.execute break because agent is not archived")
+          if (!agent.isGoalAchieved()) {
+            arbigentDebugLog("Arbigent.execute break because agent is not achieved")
             break
           }
           if (index == taskAssignments().size - 1) {
-            arbigentDebugLog("Arbigent.execute all agents are archived")
+            arbigentDebugLog("Arbigent.execute all agents are achieved")
             finishedSuccessfully = true
           }
           yield()
@@ -219,7 +219,7 @@ public class ArbigentScenarioExecutor {
         it.agent.cancel()
       }
     }
-    if (!isGoalArchived()) {
+    if (!isGoalAchieved()) {
       _isFailedToArchiveFlow.value = true
       throw FailedToArchiveException(
         "Failed to archive scenario:" + statusText() + " retryRemain:$retryRemain"
@@ -241,7 +241,7 @@ public class ArbigentScenarioExecutor {
         buildString {
           append(task.goal)
           appendLine(":")
-          appendLine("  isArchived:" + agent.isGoalArchived())
+          appendLine("  isAchieved:" + agent.isGoalAchieved())
           agent.latestArbigentContext()?.let {
             appendLine("  context:")
             it.steps().forEachIndexed { index, step ->

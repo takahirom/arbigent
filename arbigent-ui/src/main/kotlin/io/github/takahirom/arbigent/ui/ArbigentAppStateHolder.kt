@@ -185,8 +185,6 @@ class ArbigentAppStateHolder(
     rootScenarios.forEach {
       dfs(it, 0)
     }
-
-    arbigentDebugLog("Sorted scenarios and depths: $result")
     return result
   }
 

@@ -4,17 +4,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -27,21 +17,13 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.takahirom.arbigent.ArbigentDeviceOs
-import io.github.takahirom.arbigent.ArbigentGlobalStatus
 import io.github.takahirom.arbigent.arbigentDebugLog
 import io.github.takahirom.arbigent.ui.ArbigentAppStateHolder.DeviceConnectionState
 import io.github.takahirom.arbigent.ui.ArbigentAppStateHolder.ProjectDialogState
 import kotlinx.coroutines.launch
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.Orientation
-import org.jetbrains.jewel.ui.component.CircularProgressIndicator
-import org.jetbrains.jewel.ui.component.ComboBox
-import org.jetbrains.jewel.ui.component.DefaultButton
-import org.jetbrains.jewel.ui.component.Divider
-import org.jetbrains.jewel.ui.component.IconActionButton
-import org.jetbrains.jewel.ui.component.ListItemState
-import org.jetbrains.jewel.ui.component.SimpleListItem
-import org.jetbrains.jewel.ui.component.Text
+import org.jetbrains.jewel.ui.component.*
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
 import org.jetbrains.jewel.ui.theme.colorPalette
@@ -66,12 +48,7 @@ fun App(
         modifier = Modifier.weight(1F)
       )
     }
-    Row(
-      modifier = Modifier.padding(8.dp).fillMaxWidth()
-    ) {
-      val globalStatus by ArbigentGlobalStatus.status.collectAsState(ArbigentGlobalStatus.status())
-      Text(globalStatus)
-    }
+    BottomConsole()
   }
 }
 
@@ -244,8 +221,8 @@ private fun LeftScenariosPanel(
               modifier = Modifier.weight(1f),
               text = "Goal: " + goal + "\n" + runningInfo?.toString().orEmpty()
             )
-            val isArchived by scenarioStateHolder.isArchived.collectAsState()
-            if (isArchived) {
+            val isAchieved by scenarioStateHolder.isAchieved.collectAsState()
+            if (isAchieved) {
               PassedMark(
                 Modifier.padding(8.dp)
               )

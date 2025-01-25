@@ -1,6 +1,7 @@
 package io.github.takahirom.arbigent.ui
 
 import io.github.takahirom.arbigent.ArbigentInternalApi
+import io.github.takahirom.arbigent.arbigentErrorLog
 import io.github.takahirom.arbigent.errorHandler
 import java.awt.FlowLayout
 import java.awt.Toolkit
@@ -15,7 +16,7 @@ fun plantErrorDialog() {
     thread {
       showErrorDialog(e)
     }
-    e.printStackTrace()
+    arbigentErrorLog(e.stackTraceToString())
   }
   Thread.setDefaultUncaughtExceptionHandler { t, e ->
     showErrorDialog(e)
