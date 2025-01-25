@@ -101,6 +101,7 @@ Install the Arbigent UI binary from the [Release page](https://github.com/takahi
 
 If you encounter security warnings when opening the app:
 Refer to [Apple's guide on opening apps from unidentified developers](https://support.apple.com/guide/mac-help/open-a-mac-app-from-an-unknown-developer-mh40616/mac).
+
 <img src="https://github.com/user-attachments/assets/44372fa0-1f58-4eea-9fff-a7cc672a0f86" width="300" />
 
 <img 
