@@ -32,7 +32,7 @@ public object ArbigentGlobalStatus {
   }
 
   public fun<T : Any> onAi(block: () -> T): T {
-    return on("Ai..", block)
+    return on("AI processing...", block)
   }
 
   public fun<T : Any> onInitializing(block: () -> T): T {
@@ -40,11 +40,11 @@ public object ArbigentGlobalStatus {
   }
 
   public fun<T : Any> onDevice(command:String, block: () -> T): T {
-    return on("Device..  command:$command", block)
+    return on("Processing device command: $command", block)
   }
 
   public fun<T : Any> onImageAssertion(block: () -> T): T {
-    return on("Image assertion..", block)
+    return on("Running image assertion...", block)
   }
 
   private fun<T : Any> on(text:String, block: () -> T, afterText: String = "Arbigent..."): T {
@@ -59,16 +59,16 @@ public object ArbigentGlobalStatus {
     }
   }
 
-  public fun<T: Any> onRateLimitWait(waitSec: Long, block: () -> T): T {
-    return on("Rate limit wait. $waitSec s", block, "Ai..")
+  public fun<T: Any> onAiRateLimitWait(waitSec: Long, block: () -> T): T {
+    return on("AI rate limit exceeded. Waiting $waitSec s", block, "AI processing...")
   }
 
   public fun onFinished() {
-    set("Finished")
+    set("Operation completed successfully")
   }
 
   public fun onCanceled() {
-    set("Canceled")
+    set("Operation canceled by user")
   }
 
   public fun onError(e: Throwable) {
