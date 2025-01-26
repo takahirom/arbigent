@@ -403,9 +403,9 @@ private fun InitializationOptions(
     Dropdown(
       modifier = Modifier.padding(4.dp),
       menuContent = {
-        InitializationMethodMenu.values().forEach { menu ->
+        InitializationMethodMenu.entries.forEach { menu ->
           selectableItem(
-            selected = initializeMethod::class.simpleName == menu.type,
+            selected = initializeMethod::class == menu.defaultContent::class,
             onClick = {
               val newInitializeMethods = initializeMethods.toMutableList()
               newInitializeMethods[index] = menu.defaultContent
@@ -417,7 +417,7 @@ private fun InitializationOptions(
         }
       }
     ) {
-      Text(initializeMethod::class.simpleName ?: "Select type")
+      Text(InitializationMethodMenu.entries.firstOrNull { it.defaultContent::class == initializeMethod::class }?.type ?: "Select type")
     }
     Row(
       verticalAlignment = Alignment.CenterVertically
@@ -425,6 +425,7 @@ private fun InitializationOptions(
       if (initializeMethod is ArbigentScenarioContent.InitializationMethod.CleanupData) {
         TextField(
           modifier = Modifier
+            .testTag("cleanup_pacakge")
             .padding(4.dp),
           value = (initializeMethod as? ArbigentScenarioContent.InitializationMethod.CleanupData)?.packageName
             ?: "",
@@ -561,7 +562,7 @@ fun LaunchAppInitializationSetting(
   Column {
     if (initializeMethod is ArbigentScenarioContent.InitializationMethod.LaunchApp) {
       TextField(
-        modifier = Modifier.padding(4.dp),
+        modifier = Modifier.padding(4.dp).testTag("launch_app_package"),
         value = editingText,
         placeholder = { Text("Package name") },
         onValueChange = onPackageChange

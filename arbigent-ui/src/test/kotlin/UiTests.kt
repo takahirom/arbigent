@@ -7,20 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.test.ComposeUiTest
-import androidx.compose.ui.test.ExperimentalTestApi
-import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.filterToOne
-import androidx.compose.ui.test.hasContentDescription
-import androidx.compose.ui.test.hasTestTag
-import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.isRoot
-import androidx.compose.ui.test.onLast
-import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.test.*
 import androidx.compose.ui.unit.dp
 import io.github.takahirom.arbigent.*
 import io.github.takahirom.arbigent.result.ArbigentUiTreeStrings
@@ -38,6 +25,7 @@ import maestro.orchestra.MaestroCommand
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
+import kotlin.test.assertEquals
 
 @OptIn(ExperimentalTestApi::class)
 @RunWith(Parameterized::class)
@@ -72,10 +60,6 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
           describe("when clicks the Connect to device") {
             doIt {
               clickConnectToDeviceButton()
-            }
-            itShould("show the Add scenario") {
-              capture(it)
-              assertAddScenarioButtonExists()
             }
             describe("when clicks the Add scenario") {
               doIt {
@@ -132,6 +116,19 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
                     capture(it)
                     assertGoalAchieved()
                   }
+                }
+              }
+              describe("when add multiple methods and run") {
+                doIt {
+                  enterGoal("launch the app")
+                  expandOptions()
+                  addCleanupDataInitializationMethod()
+                  addLaunchAppInitializationMethod()
+                  clickRunButton()
+                }
+                itShould("run methods correctly") {
+                  capture(it)
+                  assertRunInitializeAndLaunch()
                 }
               }
               describeEnterDependencyGoal(
@@ -270,6 +267,20 @@ class TestRobot(
     composeUiTest.onNode(hasText("Goal achieved", true), useUnmergedTree = true).assertExists()
   }
 
+  fun assertRunInitializeAndLaunch() {
+    val commands = fakeDevice.getCommandHistory()
+    val firstLaunch = commands.indexOfFirst {
+      it.launchAppCommand != null
+    }
+    assertEquals(1, commands.count { it.launchAppCommand != null })
+    val firstCleanup = commands.indexOfFirst {
+      it.clearStateCommand != null
+    }
+    assertEquals(1, commands.count { it.clearStateCommand != null })
+
+    assert(firstCleanup < firstLaunch)
+  }
+
   fun assertGoalNotAchievedByImageAssertion() {
     composeUiTest.onNode(hasTestTag("scenario_running")).assertDoesNotExist()
     composeUiTest.onAllNodes(hasText("Failed to reach the goal", true), useUnmergedTree = true)
@@ -284,10 +295,6 @@ class TestRobot(
 
   fun assertConnectToDeviceButtonExists() {
     composeUiTest.onNode(hasText("Connect to device")).assertExists()
-  }
-
-  fun assertAddScenarioButtonExists() {
-    composeUiTest.onNode(hasContentDescription("Add")).assertExists()
   }
 
   fun assertGoalInputExists() {
@@ -350,11 +357,43 @@ class TestRobot(
       }
     }
   }
+
+  fun addCleanupDataInitializationMethod() {
+    composeUiTest.onNode(hasContentDescription("Add initialization method")).performClick()
+    waitALittle()
+    composeUiTest.onAllNodes(hasText(InitializationMethodMenu.Noop.type), useUnmergedTree = true)
+      .onFirst()
+      .performClick()
+    composeUiTest.onAllNodes(hasText(InitializationMethodMenu.CleanupData.type), useUnmergedTree = true)
+      .onFirst()
+      .performClick()
+    composeUiTest.onNode(hasTestTag("cleanup_pacakge"))
+      .performTextInput("com.example")
+  }
+
+  fun addLaunchAppInitializationMethod() {
+    composeUiTest.onNode(hasContentDescription("Add initialization method")).performClick()
+    waitALittle()
+    composeUiTest.onAllNodes(hasText(InitializationMethodMenu.Noop.type), useUnmergedTree = true)
+      .onFirst()
+      .performClick()
+    composeUiTest.onAllNodes(hasText(InitializationMethodMenu.LaunchApp.type), useUnmergedTree = true)
+      .onFirst()
+      .performClick()
+    composeUiTest.onNode(hasTestTag("launch_app_package"))
+      .performTextInput("com.example")
+  }
 }
 
 class FakeDevice : ArbigentDevice {
+  private val commandHistory = mutableListOf<MaestroCommand>()
   override fun executeCommands(commands: List<MaestroCommand>) {
     arbigentDebugLog("FakeDevice.executeCommands: $commands")
+    commandHistory.addAll(commands)
+  }
+
+  fun getCommandHistory(): List<MaestroCommand> {
+    return commandHistory
   }
 
   override fun os(): ArbigentDeviceOs {
