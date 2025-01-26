@@ -339,7 +339,6 @@ public fun AgentConfigBuilder(
   prompt: ArbigentPrompt,
   deviceFormFactor: ArbigentScenarioDeviceFormFactor,
   initializationMethods: List<ArbigentScenarioContent.InitializationMethod>,
-  cleanupData: ArbigentScenarioContent.CleanupData,
   imageAssertions: List<ArbigentImageAssertion>
 ): AgentConfig.Builder = AgentConfigBuilder {
   deviceFormFactor(deviceFormFactor)
@@ -452,31 +451,6 @@ public fun AgentConfigBuilder(
           }
         })
       }
-    }
-  }
-  when (val cleanupData = cleanupData) {
-    is ArbigentScenarioContent.CleanupData.Cleanup -> {
-      addInterceptor(object : ArbigentInitializerInterceptor {
-        override fun intercept(
-          device: ArbigentDevice,
-          chain: ArbigentInitializerInterceptor.Chain
-        ) {
-          device.executeCommands(
-            listOf(
-              MaestroCommand(
-                clearStateCommand = ClearStateCommand(
-                  appId = cleanupData.packageName
-                )
-              )
-            )
-          )
-          chain.proceed(device)
-        }
-      })
-    }
-
-    else -> {
-      // do nothing
     }
   }
   if (imageAssertions.isNotEmpty()) {

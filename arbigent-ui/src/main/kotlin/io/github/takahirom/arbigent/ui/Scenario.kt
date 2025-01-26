@@ -221,7 +221,6 @@ private fun ScenarioOptions(
     Column(
       modifier = Modifier.padding(8.dp).width(200.dp)
     ) {
-      val cleanupData by scenarioStateHolder.cleanupDataStateFlow.collectAsState()
       GroupHeader {
         Text("Initialization methods")
         // Add button
@@ -238,30 +237,6 @@ private fun ScenarioOptions(
           )
         }
       }
-      CheckboxRow(
-        text = "Cleanup app data(Deprecated. Add initialization method instead)",
-        checked = cleanupData is ArbigentScenarioContent.CleanupData.Cleanup,
-        onCheckedChange = {
-          scenarioStateHolder.cleanupDataStateFlow.value = if (it) {
-            ArbigentScenarioContent.CleanupData.Cleanup(
-              (cleanupData as? ArbigentScenarioContent.CleanupData.Cleanup)?.packageName ?: ""
-            )
-          } else {
-            ArbigentScenarioContent.CleanupData.Noop
-          }
-        }
-      )
-      TextField(
-        modifier = Modifier
-          .padding(4.dp),
-        placeholder = { Text("Package name") },
-        enabled = cleanupData is ArbigentScenarioContent.CleanupData.Cleanup,
-        value = (cleanupData as? ArbigentScenarioContent.CleanupData.Cleanup)?.packageName ?: "",
-        onValueChange = {
-          scenarioStateHolder.cleanupDataStateFlow.value =
-            ArbigentScenarioContent.CleanupData.Cleanup(it)
-        },
-      )
     }
     val initializeMethods by scenarioStateHolder.initializationMethodStateFlow.collectAsState()
     initializeMethods.forEachIndexed { index, initializeMethod ->

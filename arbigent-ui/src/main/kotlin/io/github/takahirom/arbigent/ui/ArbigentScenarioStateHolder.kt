@@ -26,7 +26,7 @@ constructor(
   val goal get() = goalState.text.toString()
   val maxRetryState: TextFieldState = TextFieldState("3")
   val maxStepState: TextFieldState = TextFieldState("10")
-  val cleanupDataStateFlow: MutableStateFlow<ArbigentScenarioContent.CleanupData> =
+  private val cleanupDataStateFlow: MutableStateFlow<ArbigentScenarioContent.CleanupData> =
     MutableStateFlow(
       ArbigentScenarioContent.CleanupData.Noop
     )
@@ -107,7 +107,8 @@ constructor(
       maxRetry = maxRetryState.text.toString().toIntOrNull() ?: 3,
       maxStep = maxStepState.text.toString().toIntOrNull() ?: 10,
       deviceFormFactor = deviceFormFactorStateFlow.value,
-      cleanupData = cleanupDataStateFlow.value,
+      // This is no longer used.
+      cleanupData = ArbigentScenarioContent.CleanupData.Noop,
       imageAssertions = imageAssertionsStateFlow.value.filter { it.assertionPrompt.isNotBlank() }
     )
   }
@@ -135,7 +136,8 @@ constructor(
     maxStepState.edit {
       replace(0, length, scenarioContent.maxStep.toString())
     }
-    cleanupDataStateFlow.value = scenarioContent.cleanupData
+    // This is no longer used.
+    cleanupDataStateFlow.value = ArbigentScenarioContent.CleanupData.Noop
     imageAssertionsStateFlow.value = scenarioContent.imageAssertions.toMutableList()
     _initializationMethodStateFlow.value = scenarioContent.initializationMethods.toMutableList()
     deviceFormFactorStateFlow.value = scenarioContent.deviceFormFactor
