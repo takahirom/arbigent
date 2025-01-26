@@ -73,7 +73,6 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
           prompt = projectSettings.prompt,
           deviceFormFactor = nodeScenario.deviceFormFactor,
           initializationMethods = nodeScenario.initializationMethods.ifEmpty { listOf(nodeScenario.initializeMethods) },
-          cleanupData = nodeScenario.cleanupData,
           imageAssertions = nodeScenario.imageAssertions
         ).apply {
           ai(aiFactory())
@@ -106,6 +105,7 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
   public val maxRetry: Int = 3,
   public val maxStep: Int = 10,
   public val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Mobile,
+  // This is no longer used and will be removed in the future.
   public val cleanupData: CleanupData = CleanupData.Noop,
   public val imageAssertions: List<ArbigentImageAssertion> = emptyList()
 ) {
