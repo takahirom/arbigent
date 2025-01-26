@@ -156,25 +156,11 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
       }
     }
 
-    val os =
-      ArbigentDeviceOs.entries.find { it.name.toLowerCasePreservingASCIIRules() == os.toLowerCasePreservingASCIIRules() }
-        ?: throw IllegalArgumentException(
-          "Invalid OS. The OS should be one of ${
-            ArbigentDeviceOs.values().joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
-          }")
-    val device = fetchAvailableDevicesByOs(os).firstOrNull()?.connectToDevice()
-      ?: throw IllegalArgumentException("No available device found")
-    arbigentLogLevel =
-      ArbigentLogLevel.entries.find { it.name.toLowerCasePreservingASCIIRules() == logLevel.toLowerCasePreservingASCIIRules() }
-        ?: throw IllegalArgumentException(
-          "Invalid log level. The log level should be one of ${
-            ArbigentLogLevel.values().joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
-          }")
-
+    var device: ArbigentDevice? = null
     val arbigentProject = ArbigentProject(
       file = File(projectFile),
       aiFactory = { ai },
-      deviceFactory = { device }
+      deviceFactory = { device!! }
     )
     val nonShardedScenarios = if (scenarioIds.isNotEmpty()) {
       val scenarioIdsSet = scenarioIds.flatten().toSet()
@@ -188,28 +174,44 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
     arbigentDebugLog("[Sharding Configuration] Active shard: $shard")
     arbigentInfoLog("[Execution Plan] Selected scenarios for execution: ${scenarios.map { it.id }}")
     val scenarioIdSet = scenarios.map { it.id }.toSet()
+    if (dryRun) {
+      arbigentInfoLog("Dry run mode is enabled. Exiting without executing scenarios.")
+      exitProcess(0)
+    }
+
+    val os =
+      ArbigentDeviceOs.entries.find { it.name.toLowerCasePreservingASCIIRules() == os.toLowerCasePreservingASCIIRules() }
+        ?: throw IllegalArgumentException(
+          "Invalid OS. The OS should be one of ${
+            ArbigentDeviceOs.values().joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
+          }")
+    device = fetchAvailableDevicesByOs(os).firstOrNull()?.connectToDevice()
+      ?: throw IllegalArgumentException("No available device found")
+    arbigentLogLevel =
+      ArbigentLogLevel.entries.find { it.name.toLowerCasePreservingASCIIRules() == logLevel.toLowerCasePreservingASCIIRules() }
+        ?: throw IllegalArgumentException(
+          "Invalid log level. The log level should be one of ${
+            ArbigentLogLevel.values().joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
+          }")
     Runtime.getRuntime().addShutdownHook(object : Thread() {
       override fun run() {
         arbigentProject.cancel()
         ArbigentProjectSerializer().save(arbigentProject.getResult(scenarios), resultFile)
-        ArbigentHtmlReport().saveReportHtml(resultDir.absolutePath, arbigentProject.getResult(scenarios), needCopy = false)
+        ArbigentHtmlReport().saveReportHtml(
+          resultDir.absolutePath,
+          arbigentProject.getResult(scenarios),
+          needCopy = false
+        )
         device.close()
       }
     })
 
     runNoRawMosaicBlocking {
       LaunchedEffect(Unit) {
-        if (dryRun) {
-          arbigentInfoLog("Dry run mode is enabled. No scenarios will be executed.")
-        } else {
-          arbigentProject.executeScenarios(scenarios)
-        }
+        arbigentProject.executeScenarios(scenarios)
         // Show the result
         delay(100)
-        if (dryRun) {
-          arbigentInfoLog("Dry run mode is enabled. Exiting without executing scenarios.")
-          exitProcess(0)
-        } else if (arbigentProject.isScenariosSuccessful(scenarios)) {
+        if (arbigentProject.isScenariosSuccessful(scenarios)) {
           arbigentInfoLog("All scenarios are succeeded. Executed scenarios:${scenarios.map { it.id }}")
           exitProcess(0)
         } else {
