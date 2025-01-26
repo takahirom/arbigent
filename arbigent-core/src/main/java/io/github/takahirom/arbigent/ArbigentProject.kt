@@ -76,7 +76,9 @@ public class ArbigentProject(
 
   public fun isScenariosSuccessful(scenarios: List<ArbigentScenario>): Boolean {
     return scenarios
-      .map { scenarioAssignments().first { it.scenario.id == it.scenario.id }.scenarioExecutor }
+      .map { selectedScenario ->
+        scenarioAssignments().first { it.scenario.id == selectedScenario.id }.scenarioExecutor
+      }
       .all { it.isSuccessful() }
   }
 
