@@ -41,6 +41,8 @@ class OpenAIAiConfig : AiConfig("Options for OpenAI API AI") {
     .default(defaultEndpoint, defaultForHelp = defaultEndpoint)
   val openAiModelName by option(help = "Model name (default: gpt-4o-mini)")
     .default("gpt-4o-mini", "gpt-4o-mini")
+  val openAiApiKey by option(envvar = "OPENAI_API_KEY", help = "API key")
+    .prompt("API key")
 }
 
 class GeminiAiConfig : AiConfig("Options for Gemini API AI") {
@@ -49,6 +51,8 @@ class GeminiAiConfig : AiConfig("Options for Gemini API AI") {
     .default(defaultEndpoint, defaultForHelp = defaultEndpoint)
   val geminiModelName by option(help = "Model name (default: gemini-1.5-flash)")
     .default("gemini-1.5-flash", "gemini-1.5-flash")
+  val geminiApiKey by option(envvar = "GEMINI_API_KEY", help = "API key")
+    .prompt("API key")
 }
 
 class AzureOpenAiConfig : AiConfig("Options for Azure OpenAI") {
@@ -58,10 +62,13 @@ class AzureOpenAiConfig : AiConfig("Options for Azure OpenAI") {
     .default("2024-10-21")
   val azureOpenAIModelName by option(help = "Model name (default: gpt-4o-mini)")
     .default("gpt-4o-mini")
+  val azureOpenAIKey by option(envvar = "AZURE_OPENAI_API_KEY", help = "API key")
+    .prompt("API key")
 }
+
 private const val defaultResultPath = "arbigent-result"
 
-class ArbigentCli : CliktCommand() {
+class ArbigentCli : CliktCommand(name = "arbigent") {
   private val aiType by option(help = "Type of AI to use")
     .groupChoice(
       "openai" to OpenAIAiConfig(),
@@ -83,6 +90,16 @@ class ArbigentCli : CliktCommand() {
 
   private val logFile by option(help = "Log file path")
     .default("$defaultResultPath/arbigent.log")
+
+  private val scenarioIds by option(
+    "--scenario-id",
+    help = "Scenario IDs to execute (comma-separated or multiple flags)"
+  )
+    .split(",")
+    .multiple()
+
+  private val dryRun by option("--dry-run", help = "Dry run mode")
+    .flag()
 
   private val shard by option("--shard", help = "Shard specification (e.g., 1/5)")
     .convert { input ->
@@ -116,22 +133,19 @@ class ArbigentCli : CliktCommand() {
     val ai: ArbigentAi = aiType.let { aiType ->
       when (aiType) {
         is OpenAIAiConfig -> OpenAIAi(
-          apiKey = System.getenv("OPENAI_API_KEY")
-            ?: throw IllegalArgumentException("Environment variable OPENAI_API_KEY is not set"),
+          apiKey = aiType.openAiApiKey,
           baseUrl = aiType.openAiEndpoint,
           modelName = aiType.openAiModelName,
         )
 
         is GeminiAiConfig -> OpenAIAi(
-          apiKey = System.getenv("GEMINI_API_KEY")
-            ?: throw IllegalArgumentException("Environment variable GEMINI_API_KEY is not set"),
+          apiKey = aiType.geminiApiKey,
           baseUrl = aiType.geminiEndpoint,
           modelName = aiType.geminiModelName,
         )
 
         is AzureOpenAiConfig -> OpenAIAi(
-          apiKey = System.getenv("AZURE_OPENAI_API_KEY")
-            ?: throw IllegalArgumentException("Environment variable AZURE_OPENAI_API_KEY is not set"),
+          apiKey = aiType.azureOpenAIKey,
           baseUrl = aiType.azureOpenAIEndpoint,
           modelName = aiType.azureOpenAIModelName,
           requestBuilderModifier = {
@@ -142,13 +156,36 @@ class ArbigentCli : CliktCommand() {
       }
     }
 
+    var device: ArbigentDevice? = null
+    val arbigentProject = ArbigentProject(
+      file = File(projectFile),
+      aiFactory = { ai },
+      deviceFactory = { device!! }
+    )
+    val nonShardedScenarios = if (scenarioIds.isNotEmpty()) {
+      val scenarioIdsSet = scenarioIds.flatten().toSet()
+      arbigentProject.scenarios.filter { it.id in scenarioIdsSet }
+    } else {
+      val leafScenarios = arbigentProject.leafScenarioAssignments()
+      leafScenarios.map { it.scenario }
+    }
+    val scenarios = nonShardedScenarios.shard(shard)
+    arbigentDebugLog("[Scenario Selection] Unsharded candidates: ${nonShardedScenarios.map { it.id }}")
+    arbigentDebugLog("[Sharding Configuration] Active shard: $shard")
+    arbigentInfoLog("[Execution Plan] Selected scenarios for execution: ${scenarios.map { it.id }}")
+    val scenarioIdSet = scenarios.map { it.id }.toSet()
+    if (dryRun) {
+      arbigentInfoLog("Dry run mode is enabled. Exiting without executing scenarios.")
+      exitProcess(0)
+    }
+
     val os =
       ArbigentDeviceOs.entries.find { it.name.toLowerCasePreservingASCIIRules() == os.toLowerCasePreservingASCIIRules() }
         ?: throw IllegalArgumentException(
           "Invalid OS. The OS should be one of ${
             ArbigentDeviceOs.values().joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
           }")
-    val device = fetchAvailableDevicesByOs(os).firstOrNull()?.connectToDevice()
+    device = fetchAvailableDevicesByOs(os).firstOrNull()?.connectToDevice()
       ?: throw IllegalArgumentException("No available device found")
     arbigentLogLevel =
       ArbigentLogLevel.entries.find { it.name.toLowerCasePreservingASCIIRules() == logLevel.toLowerCasePreservingASCIIRules() }
@@ -156,38 +193,36 @@ class ArbigentCli : CliktCommand() {
           "Invalid log level. The log level should be one of ${
             ArbigentLogLevel.values().joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
           }")
-
-    val arbigentProject = ArbigentProject(
-      file = File(projectFile),
-      aiFactory = { ai },
-      deviceFactory = { device }
-    )
     Runtime.getRuntime().addShutdownHook(object : Thread() {
       override fun run() {
         arbigentProject.cancel()
-        ArbigentProjectSerializer().save(arbigentProject.getResult(shard), resultFile)
-        ArbigentHtmlReport().saveReportHtml(resultDir.absolutePath, arbigentProject.getResult(shard), needCopy = false)
+        ArbigentProjectSerializer().save(arbigentProject.getResult(scenarios), resultFile)
+        ArbigentHtmlReport().saveReportHtml(
+          resultDir.absolutePath,
+          arbigentProject.getResult(scenarios),
+          needCopy = false
+        )
         device.close()
       }
     })
 
     runNoRawMosaicBlocking {
       LaunchedEffect(Unit) {
-        arbigentProject.executeShard(shard)
+        arbigentProject.executeScenarios(scenarios)
         // Show the result
         delay(100)
-        if (arbigentProject.isAllLeafScenariosSuccessful(shard)) {
-          arbigentInfoLog("All scenarios are succeeded. $shard")
+        if (arbigentProject.isScenariosSuccessful(scenarios)) {
+          arbigentInfoLog("All scenarios are succeeded. Executed scenarios:${scenarios.map { it.id }}")
           exitProcess(0)
         } else {
-          arbigentInfoLog("Some scenarios are failed. $shard")
+          arbigentInfoLog("Some scenarios are failed. Executed scenarios:${scenarios.map { it.id }}")
           exitProcess(1)
         }
       }
       Column {
         val assignments by arbigentProject.scenarioAssignmentsFlow.collectAsState(arbigentProject.scenarioAssignments())
         assignments
-          .filter { it.scenario.isLeaf }
+          .filter { it.scenario.id in scenarioIdSet }
           .shard(shard)
           .forEach { (scenario, scenarioExecutor) ->
             // Show only leaf scenarios

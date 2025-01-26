@@ -44,11 +44,10 @@ public class ArbigentProject(
       }
   }
 
-  public suspend fun executeShard(shard: ArbigentShard) {
-    val leafScenarios = leafScenarioAssignments()
-    val shardScenarios = leafScenarios.shard(shard)
-    shardScenarios.forEach { (scenario, scenarioExecutor) ->
+  public suspend fun executeScenarios(scenarios: List<ArbigentScenario>) {
+    scenarios.forEach { scenario ->
       arbigentInfoLog("Start scenario: $scenario")
+      val scenarioExecutor = scenarioAssignments().first { it.scenario.id == scenario.id }.scenarioExecutor
       try {
         scenarioExecutor.execute(scenario)
       } catch (e: FailedToArchiveException) {
@@ -58,7 +57,7 @@ public class ArbigentProject(
     }
   }
 
-  private fun leafScenarioAssignments() = scenarioAssignments()
+  public fun leafScenarioAssignments(): List<ArbigentScenarioAssignment> = scenarioAssignments()
     .filter { it.scenario.isLeaf }
 
   public suspend fun execute(scenario: ArbigentScenario) {
@@ -75,17 +74,19 @@ public class ArbigentProject(
     }
   }
 
-  public fun isAllLeafScenariosSuccessful(shard: ArbigentShard): Boolean {
-    return leafScenarioAssignments()
-      .shard(shard)
-      .all { it.scenarioExecutor.isSuccessful() }
+  public fun isScenariosSuccessful(scenarios: List<ArbigentScenario>): Boolean {
+    return scenarios
+      .map { selectedScenario ->
+        scenarioAssignments().first { it.scenario.id == selectedScenario.id }.scenarioExecutor
+      }
+      .all { it.isSuccessful() }
   }
 
-  public fun getResult(shard: ArbigentShard = ArbigentShard(1, 1)): ArbigentProjectExecutionResult {
+  public fun getResult(scenarios: List<ArbigentScenario> = scenarioAssignments().map { it.scenario }): ArbigentProjectExecutionResult {
     return ArbigentProjectExecutionResult(
-      leafScenarioAssignments()
-        .shard(shard)
-        .map { it.getResult() }
+      scenarios.map {
+        scenarioAssignments().first { it.scenario.id == it.scenario.id }.getResult()
+      }
     )
   }
 }
