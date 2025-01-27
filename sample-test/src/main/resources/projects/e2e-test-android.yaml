@@ -4,6 +4,8 @@ scenarios:
     \ do not click \"Device name\". Your goal is to reach the \"About emulated device\"\
     \ page."
   initializationMethods:
+  - type: "Back"
+    times: 5
   - type: "LaunchApp"
     packageName: "com.android.settings"
   imageAssertions:
