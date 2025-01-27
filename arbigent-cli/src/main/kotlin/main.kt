@@ -160,7 +160,7 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
     val arbigentProject = ArbigentProject(
       file = File(projectFile),
       aiFactory = { ai },
-      deviceFactory = { device!! }
+      deviceFactory = { device!! },
     )
     val nonShardedScenarios = if (scenarioIds.isNotEmpty()) {
       val scenarioIdsSet = scenarioIds.flatten().toSet()

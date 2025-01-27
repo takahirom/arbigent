@@ -16,7 +16,11 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
 import maestro.MaestroException
 import maestro.orchestra.*
+import org.mobilenativefoundation.store.cache5.Cache
+import org.mobilenativefoundation.store.cache5.CacheBuilder
 import java.io.File
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
 
 public class ArbigentAgent(
   agentConfig: AgentConfig
@@ -341,12 +345,41 @@ public fun AgentConfigBuilder(block: AgentConfig.Builder.() -> Unit): AgentConfi
   return builder
 }
 
+public sealed interface ArbigentAiDecisionCache {
+  public class Enabled private constructor(
+    private val cache: Cache<String, ArbigentAi.DecisionOutput>
+  ) : ArbigentAiDecisionCache {
+
+    public operator fun get(key: String): ArbigentAi.DecisionOutput? = cache.getIfPresent(key)
+
+    public operator fun set(key: String, value: ArbigentAi.DecisionOutput) {
+      cache.put(key, value)
+    }
+
+    public companion object {
+      public fun create(
+        maxSize: Long = 100,
+        expireAfterAccess: Duration = 24.hours
+      ): Enabled {
+        val cache = CacheBuilder<String, ArbigentAi.DecisionOutput>()
+          .maximumSize(maxSize)
+          .expireAfterAccess(expireAfterAccess)
+          .build()
+
+        return Enabled(cache)
+      }
+    }
+  }
+
+  public object Disabled : ArbigentAiDecisionCache
+}
 
 public fun AgentConfigBuilder(
   prompt: ArbigentPrompt,
   deviceFormFactor: ArbigentScenarioDeviceFormFactor,
   initializationMethods: List<ArbigentScenarioContent.InitializationMethod>,
-  imageAssertions: List<ArbigentImageAssertion>
+  imageAssertions: List<ArbigentImageAssertion>,
+  aiDecisionCache: ArbigentAiDecisionCache = ArbigentAiDecisionCache.Disabled
 ): AgentConfig.Builder = AgentConfigBuilder {
   deviceFormFactor(deviceFormFactor)
   prompt(prompt)
@@ -459,6 +492,25 @@ public fun AgentConfigBuilder(
         })
       }
     }
+  }
+  if (aiDecisionCache is ArbigentAiDecisionCache.Enabled) {
+    addInterceptor(object : ArbigentDecisionInterceptor {
+      override fun intercept(
+        decisionInput: ArbigentAi.DecisionInput,
+        chain: ArbigentDecisionInterceptor.Chain
+      ): ArbigentAi.DecisionOutput {
+        val key = decisionInput.uiTreeStrings.optimizedTreeString + decisionInput.contextHolder.prompt()
+        val cached = aiDecisionCache[key]
+        if (cached != null) {
+          arbigentInfoLog("AI-decision cache hit with view tree and prompt")
+          return cached
+        }
+        arbigentDebugLog("AI-decision cache miss with view tree and prompt")
+        val output = chain.proceed(decisionInput)
+        aiDecisionCache[key] = output
+        return output
+      }
+    })
   }
   if (imageAssertions.isNotEmpty()) {
     addInterceptor(object : ArbigentImageAssertionInterceptor {

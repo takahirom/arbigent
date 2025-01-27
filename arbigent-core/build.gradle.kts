@@ -24,6 +24,7 @@ dependencies {
 
   api(project(":arbigent-core-model"))
   implementation("com.charleskorn.kaml:kaml:0.67.0")
+  api("org.mobilenativefoundation.store:cache5:5.1.0-alpha05")
 
   // To expose requestBuilderModifier
   api(libs.ktor.client.core)

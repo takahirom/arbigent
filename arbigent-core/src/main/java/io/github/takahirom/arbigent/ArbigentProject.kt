@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import java.io.File
 import kotlin.math.min
+import kotlin.time.Duration.Companion.milliseconds
 
 public class FailedToArchiveException(message: String) : RuntimeException(message)
 
@@ -94,7 +95,7 @@ public class ArbigentProject(
 public fun ArbigentProject(
   projectFileContent: ArbigentProjectFileContent,
   aiFactory: () -> ArbigentAi,
-  deviceFactory: () -> ArbigentDevice
+  deviceFactory: () -> ArbigentDevice,
 ): ArbigentProject {
   return ArbigentProject(
     settings = projectFileContent.settings,
@@ -103,7 +104,8 @@ public fun ArbigentProject(
         projectSettings = projectFileContent.settings,
         scenario = it,
         aiFactory = aiFactory,
-        deviceFactory = deviceFactory
+        deviceFactory = deviceFactory,
+        aiDecisionCache = projectFileContent.settings.cacheStrategy.aiDecisionCacheStrategy.toCache()
       )
     },
   )
@@ -112,7 +114,7 @@ public fun ArbigentProject(
 public fun ArbigentProject(
   file: File,
   aiFactory: () -> ArbigentAi,
-  deviceFactory: () -> ArbigentDevice
+  deviceFactory: () -> ArbigentDevice,
 ): ArbigentProject {
   val projectContentFileContent = ArbigentProjectSerializer().load(file)
   return ArbigentProject(projectContentFileContent, aiFactory, deviceFactory)
@@ -182,3 +184,18 @@ public fun <T> List<T>.shard(
 
   return subList(start, adjustedEnd)
 }
+
+@ArbigentInternalApi
+public fun AiDecisionCacheStrategy.toCache(): ArbigentAiDecisionCache =
+  when (val decisionStrategy = this) {
+    is AiDecisionCacheStrategy.Disabled -> {
+      ArbigentAiDecisionCache.Disabled
+    }
+
+    is AiDecisionCacheStrategy.InMemory -> {
+      ArbigentAiDecisionCache.Enabled.create(
+        decisionStrategy.maxCacheSize,
+        decisionStrategy.expireAfterWriteMs.milliseconds
+      )
+    }
+  }
