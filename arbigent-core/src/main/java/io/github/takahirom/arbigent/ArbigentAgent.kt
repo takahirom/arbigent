@@ -21,7 +21,6 @@ import kotlinx.coroutines.flow.shareIn
 import maestro.MaestroException
 import maestro.orchestra.*
 import java.io.File
-import javax.imageio.ImageIO
 
 public class ArbigentAgent(
   agentConfig: AgentConfig
@@ -46,14 +45,16 @@ public class ArbigentAgent(
   )
   private val stepInterceptors: List<ArbigentStepInterceptor> = interceptors
     .filterIsInstance<ArbigentStepInterceptor>()
-  private val stepChain: (StepInput) -> StepResult = stepInterceptors.foldRight(
-    { input: StepInput -> step(input) },
-    { interceptor, acc ->
-      { input ->
-        interceptor.intercept(input) { stepInput -> acc(stepInput) }
+  private val stepChain: suspend (StepInput) -> StepResult = { input ->
+    var chain: suspend (StepInput) -> StepResult = { stepInput -> step(stepInput) }
+    stepInterceptors.reversed().forEach { interceptor ->
+      val previousChain = chain
+      chain = { currentInput ->
+        interceptor.intercept(currentInput) { previousChain(it) }
       }
     }
-  )
+    chain(input)
+  }
   private val decisionInterceptors: List<ArbigentDecisionInterceptor> = interceptors
     .filterIsInstance<ArbigentDecisionInterceptor>()
   private val decisionChain: (ArbigentAi.DecisionInput) -> ArbigentAi.DecisionOutput =
@@ -513,9 +514,9 @@ public interface ArbigentExecuteCommandsInterceptor : ArbigentInterceptor {
 }
 
 public interface ArbigentStepInterceptor : ArbigentInterceptor {
-  public fun intercept(stepInput: StepInput, chain: Chain): StepResult
+  public suspend fun intercept(stepInput: StepInput, chain: Chain): StepResult
   public fun interface Chain {
-    public fun proceed(stepInput: StepInput): StepResult
+    public suspend fun proceed(stepInput: StepInput): StepResult
   }
 }
 
@@ -589,7 +590,7 @@ private fun executeCommands(
   return ExecuteCommandsOutput()
 }
 
-private fun step(
+private suspend fun step(
   stepInput: StepInput
 ): StepResult {
   val contextHolder = stepInput.arbigentContextHolder
