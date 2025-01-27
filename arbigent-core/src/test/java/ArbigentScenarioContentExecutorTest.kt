@@ -35,9 +35,9 @@ class ArbigentScenarioContentExecutorTest {
 
   @OptIn(ExperimentalStdlibApi::class)
   @Test
-  fun lastInterceptorCalledFirst() = runTest {
+  fun lastInitializerInterceptorCalledFirst() = runTest {
     ArbigentCoroutinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
-    val order = mutableListOf<Int>()
+    val order = mutableListOf<String>()
     val agentConfig = AgentConfig {
       deviceFactory { FakeDevice() }
       ai(FakeAi())
@@ -47,9 +47,9 @@ class ArbigentScenarioContentExecutorTest {
             device: ArbigentDevice,
             chain: ArbigentInitializerInterceptor.Chain
           ) {
-            order.add(200)
+            order.add("initializer interceptor1 start")
             chain.proceed(device)
-            order.add(300)
+            order.add("initializer interceptor1 end")
           }
         }
       )
@@ -59,9 +59,9 @@ class ArbigentScenarioContentExecutorTest {
             device: ArbigentDevice,
             chain: ArbigentInitializerInterceptor.Chain
           ) {
-            order.add(100)
+            order.add("initializer interceptor2 start")
             chain.proceed(device)
-            order.add(400)
+            order.add("initializer interceptor2 end")
           }
         }
       )
@@ -81,6 +81,93 @@ class ArbigentScenarioContentExecutorTest {
       arbigentScenario
     )
     advanceUntilIdle()
-    assertEquals(listOf(100, 200, 300, 400, 100, 200, 300, 400), order)
+    fun List<String>.repeat(times: Int): List<String> {
+      return buildList {
+        repeat(times) {
+          addAll(this@repeat)
+        }
+      }
+    }
+    assertEquals(
+      listOf(
+        "initializer interceptor2 start",
+        "initializer interceptor1 start",
+        "initializer interceptor1 end",
+        "initializer interceptor2 end",
+      ).repeat(2),
+      order
+    )
+  }
+
+  @OptIn(ExperimentalStdlibApi::class)
+  @Test
+  fun lastStepInterceptorCalledFirst() = runTest {
+    ArbigentCoroutinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
+    val order = mutableListOf<String>()
+    val agentConfig = AgentConfig {
+      deviceFactory { FakeDevice() }
+      ai(FakeAi())
+      addInterceptor(
+        object : ArbigentStepInterceptor {
+          override suspend fun intercept(
+            stepInput: ArbigentAgent.StepInput,
+            chain: ArbigentStepInterceptor.Chain
+          ): ArbigentAgent.StepResult {
+            order.add("step interceptor3 start")
+            val result = chain.proceed(stepInput)
+            order.add("step interceptor3 end")
+            return result
+          }
+        }
+      )
+      addInterceptor(
+        object : ArbigentStepInterceptor {
+          override suspend fun intercept(
+            stepInput: ArbigentAgent.StepInput,
+            chain: ArbigentStepInterceptor.Chain
+          ): ArbigentAgent.StepResult {
+            order.add("step interceptor4 start")
+            val result = chain.proceed(stepInput)
+            order.add("step interceptor4 end")
+            return result
+          }
+        }
+      )
+    }
+    val arbigentScenarioExecutor = ArbigentScenarioExecutor {
+    }
+    val arbigentScenario = ArbigentScenario(
+      id = "id2",
+      listOf(
+        ArbigentAgentTask("id1", "goal1", agentConfig),
+        ArbigentAgentTask("id2", "goal2", agentConfig)
+      ),
+      maxStepCount = 10,
+      isLeaf = true
+    )
+    arbigentScenarioExecutor.execute(
+      arbigentScenario
+    )
+    advanceUntilIdle()
+    fun List<String>.repeat(times: Int): List<String> {
+      return buildList {
+        repeat(times) {
+          addAll(this@repeat)
+        }
+      }
+    }
+    assertEquals(
+      listOf(
+        "step interceptor4 start",
+        "step interceptor3 start",
+        "step interceptor3 end",
+        "step interceptor4 end",
+        "step interceptor4 start",
+        "step interceptor3 start",
+        "step interceptor3 end",
+        "step interceptor4 end",
+      ).repeat(2),
+      order
+    )
   }
 }
