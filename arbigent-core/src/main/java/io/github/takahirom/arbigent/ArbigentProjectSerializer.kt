@@ -14,6 +14,7 @@ import kotlinx.serialization.modules.subclass
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
+import kotlin.time.Duration.Companion.hours
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -36,7 +37,8 @@ public class ArbigentProjectFileContent(
 
 @Serializable
 public data class ArbigentProjectSettings(
-  public val prompt: ArbigentPrompt = ArbigentPrompt()
+  public val prompt: ArbigentPrompt = ArbigentPrompt(),
+  public val cacheStrategy: CacheStrategy = CacheStrategy()
 )
 
 @Serializable
@@ -46,11 +48,31 @@ public data class ArbigentPrompt(
   public val additionalSystemPrompts: List<String> = listOf()
 )
 
+@Serializable
+public data class CacheStrategy(
+  public val aiDecisionCacheStrategy: AiDecisionCacheStrategy = AiDecisionCacheStrategy.Disabled
+)
+
+@Serializable
+public sealed interface AiDecisionCacheStrategy {
+  @Serializable
+  @SerialName("Disabled")
+  public data object Disabled : AiDecisionCacheStrategy
+
+  @Serializable
+  @SerialName("InMemory")
+  public data class InMemory(
+    val maxCacheSize: Long = 100,
+    val expireAfterWriteMs: Long = 24.hours.inWholeMilliseconds
+  ) : AiDecisionCacheStrategy
+}
+
 public fun List<ArbigentScenarioContent>.createArbigentScenario(
   projectSettings: ArbigentProjectSettings,
   scenario: ArbigentScenarioContent,
   aiFactory: () -> ArbigentAi,
   deviceFactory: () -> ArbigentDevice,
+  aiDecisionCache: ArbigentAiDecisionCache
 ): ArbigentScenario {
   val visited = mutableSetOf<ArbigentScenarioContent>()
   val result = mutableListOf<ArbigentAgentTask>()
@@ -73,7 +95,8 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
           prompt = projectSettings.prompt,
           deviceFormFactor = nodeScenario.deviceFormFactor,
           initializationMethods = nodeScenario.initializationMethods.ifEmpty { listOf(nodeScenario.initializeMethods) },
-          imageAssertions = nodeScenario.imageAssertions
+          imageAssertions = nodeScenario.imageAssertions,
+          aiDecisionCache = aiDecisionCache
         ).apply {
           ai(aiFactory())
           deviceFactory(deviceFactory)

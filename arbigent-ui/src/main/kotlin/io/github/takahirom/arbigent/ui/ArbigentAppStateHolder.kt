@@ -62,6 +62,17 @@ class ArbigentAppStateHolder(
         initialValue = emptyList()
       )
   val promptFlow = MutableStateFlow(ArbigentPrompt())
+  val cacheStrategyFlow = MutableStateFlow(CacheStrategy())
+  val decisionCache = cacheStrategyFlow
+    .map {
+      val decisionCacheStrategy = it.aiDecisionCacheStrategy
+      decisionCacheStrategy.toCache()
+    }
+    .stateIn(
+      scope = CoroutineScope(ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob()),
+      started = SharingStarted.Eagerly,
+      initialValue = ArbigentAiDecisionCache.Disabled
+    )
 
   fun sortedScenariosAndDepths() = sortedScenarioAndDepth(allScenarioStateHoldersStateFlow.value)
 
@@ -118,7 +129,10 @@ class ArbigentAppStateHolder(
   private fun recreateProject() {
     projectStateFlow.value?.cancel()
     val arbigentProject = ArbigentProject(
-      settings = ArbigentProjectSettings(promptFlow.value),
+      settings = ArbigentProjectSettings(
+        prompt = promptFlow.value,
+        cacheStrategy = cacheStrategyFlow.value
+      ),
       initialScenarios = allScenarioStateHoldersStateFlow.value.map { scenario ->
         scenario.createScenario(allScenarioStateHoldersStateFlow.value)
       },
@@ -139,7 +153,10 @@ class ArbigentAppStateHolder(
   private fun ArbigentScenarioStateHolder.createScenario(allScenarioStateHolder: List<ArbigentScenarioStateHolder>) =
     allScenarioStateHolder.map { it.createArbigentScenarioContent() }
       .createArbigentScenario(
-        projectSettings = ArbigentProjectSettings(promptFlow.value),
+        projectSettings = ArbigentProjectSettings(
+          promptFlow.value,
+          cacheStrategyFlow.value
+        ),
         scenario = createArbigentScenarioContent(),
         aiFactory = aiFactory,
         deviceFactory = {
@@ -147,7 +164,8 @@ class ArbigentAppStateHolder(
           deviceCache.getOrPut(selectedDevice) {
             this@ArbigentAppStateHolder.deviceFactory(selectedDevice)
           }
-        }
+        },
+        aiDecisionCache = decisionCache.value
       )
 
   private fun sortedScenarioAndDepth(allScenarios: List<ArbigentScenarioStateHolder>): List<Pair<ArbigentScenarioStateHolder, Int>> {
@@ -224,7 +242,10 @@ class ArbigentAppStateHolder(
     val sortedScenarios = sortedScenariosAndDepthsStateFlow.value.map { it.first }
     arbigentProjectSerializer.save(
       projectFileContent = ArbigentProjectFileContent(
-        settings = ArbigentProjectSettings(promptFlow.value),
+        settings = ArbigentProjectSettings(
+          promptFlow.value,
+          cacheStrategyFlow.value
+        ),
         scenarioContents = sortedScenarios.map {
           it.createArbigentScenarioContent()
         },
@@ -251,6 +272,7 @@ class ArbigentAppStateHolder(
         }
     }
     promptFlow.value = projectFile.settings.prompt
+    cacheStrategyFlow.value = projectFile.settings.cacheStrategy
     projectStateFlow.value = ArbigentProject(
       settings = projectFile.settings,
       initialScenarios = arbigentScenarioStateHolders.map {
@@ -322,5 +344,9 @@ class ArbigentAppStateHolder(
 
   fun onPromptChanged(prompt: ArbigentPrompt) {
     promptFlow.value = prompt
+  }
+
+  fun onCacheStrategyChanged(strategy: CacheStrategy) {
+    cacheStrategyFlow.value = strategy
   }
 }

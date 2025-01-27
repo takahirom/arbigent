@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,6 +24,7 @@ import org.jetbrains.jewel.ui.Orientation
 import org.jetbrains.jewel.ui.component.Divider
 import org.jetbrains.jewel.ui.component.IconActionButton
 import org.jetbrains.jewel.ui.component.Text
+import org.jetbrains.jewel.ui.component.TextField
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
 import java.awt.Desktop
@@ -62,11 +64,17 @@ fun BottomConsole() {
               }
             }
         )
+        val queryState = rememberTextFieldState()
         Row {
           Text(
             "Console",
             modifier = Modifier.weight(1f)
               .align(Alignment.CenterVertically)
+          )
+          TextField(
+            state = queryState,
+            modifier = Modifier.padding(4.dp)
+              .width(200.dp)
           )
           IconActionButton(
             key = AllIconsKeys.Actions.Download,
@@ -102,10 +110,16 @@ fun BottomConsole() {
             hint = Size(28)
           )
         }
-        val histories by ArbigentGlobalStatus.console.collectAsState(ArbigentGlobalStatus.console())
+        val rawHistories by ArbigentGlobalStatus.console.collectAsState(ArbigentGlobalStatus.console())
+        val histories by derivedStateOf {
+          val hasFilter = queryState.text.isNotEmpty()
+          rawHistories.filter {
+            !hasFilter || it.second.contains(queryState.text)
+          }
+        }
         val lazyColumnState = rememberLazyListState()
         LaunchedEffect(histories) {
-          lazyColumnState.scrollToItem(histories.size - 1)
+          lazyColumnState.scrollToItem(maxOf(histories.size - 1, 0))
         }
         LazyColumn(
           state = lazyColumnState,

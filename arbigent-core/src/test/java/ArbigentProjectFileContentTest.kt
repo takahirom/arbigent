@@ -38,7 +38,8 @@ class ArbigentProjectFileContentTest {
         projectSettings = ArbigentProjectSettings(),
         scenario = scenarioContent,
         aiFactory = { FakeAi() },
-        deviceFactory = { FakeDevice() }
+        deviceFactory = { FakeDevice() },
+        aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
       )
       val executor = ArbigentScenarioExecutor()
       executor.execute(executorScenario)
@@ -55,7 +56,8 @@ class ArbigentProjectFileContentTest {
       projectSettings = ArbigentProjectSettings(),
       scenario = basicProject.scenarioContents[0],
       aiFactory = { FakeAi() },
-      deviceFactory = { FakeDevice() }
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
     ).agentTasks
     assertEquals(1, firstTask.size)
 
@@ -63,7 +65,8 @@ class ArbigentProjectFileContentTest {
       projectSettings = ArbigentProjectSettings(),
       scenario = basicProject.scenarioContents[1],
       aiFactory = { FakeAi() },
-      deviceFactory = { FakeDevice() }
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
     ).agentTasks
     assertEquals(2, secondTask.size)
 
@@ -95,13 +98,14 @@ class ArbigentProjectFileContentTest {
       projectSettings = ArbigentProjectSettings(),
       scenario = oldInitializeProject.scenarioContents[0],
       aiFactory = { FakeAi() },
-      deviceFactory = { FakeDevice() }
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
     ).agentTasks
     assertEquals(1, firstTask.size)
 
     val interceptors = firstTask[0].agentConfig
       .interceptors
-    assertEquals(1, interceptors.size)
+    assertEquals(2, interceptors.size)
     assertTrue(interceptors.any {
         it is ArbigentInitializerInterceptor
       })

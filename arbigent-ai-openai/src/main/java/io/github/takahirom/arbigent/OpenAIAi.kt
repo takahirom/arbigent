@@ -97,6 +97,9 @@ public class OpenAIAi(
     }
   },
 ) : ArbigentAi {
+  init {
+    ConfidentialInfo.addStringToBeRemoved(apiKey)
+  }
   private var retried = 0
 
   @OptIn(ExperimentalSerializationApi::class)

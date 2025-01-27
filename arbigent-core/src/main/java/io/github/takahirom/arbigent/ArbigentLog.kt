@@ -84,10 +84,13 @@ public val arbigentLogFormatter: DateTimeFormatter = DateTimeFormatterBuilder()
   .appendFraction(ChronoField.NANO_OF_SECOND, 3, 3, true)
   .toFormatter()
 
-private fun printLog(level: ArbigentLogLevel, log: String, instance: Any? = null) {
+private fun printLog(level: ArbigentLogLevel, rawLog: String, instance: Any? = null) {
+  val log = ConfidentialInfo.shouldBeRemovedStrings.fold(rawLog) { acc, s ->
+    acc.replace(s, "****")
+  }
   val logContent =
     if (instance != null) {
-      "${level.shortName()}: $log ($instance)"
+      "${level.shortName()}: $log (${instance::class.simpleName})"
     } else {
       "${level.shortName()}: $log"
     }
@@ -97,4 +100,17 @@ private fun printLog(level: ArbigentLogLevel, log: String, instance: Any? = null
   ArbigentFiles.logFile?.appendText("$date $logContent\n")
 
   ArbigentGlobalStatus.log(logContent)
+}
+
+public object ConfidentialInfo {
+  @ArbigentInternalApi
+  private val _shouldBeRemovedStrings: MutableSet<String> = mutableSetOf()
+  public val shouldBeRemovedStrings: Set<String> get() = _shouldBeRemovedStrings
+
+  public fun addStringToBeRemoved(string: String) {
+    if (string.isBlank()) {
+      return
+    }
+    _shouldBeRemovedStrings.add(string)
+  }
 }

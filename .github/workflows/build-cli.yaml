@@ -73,8 +73,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shardIndex: [ 1, 2, 3, 4 ]
-        shardTotal: [ 4 ]
+        shardIndex: [ 1, 2 ]
+        shardTotal: [ 2 ]
     steps:
       - name: Delete unnecessary tools 🔧
         uses: jlumbroso/free-disk-space@v1.3.1
@@ -128,7 +128,12 @@ jobs:
           heap-size: 600M
           script: |
             arbigent-cli/build/install/arbigent/bin/arbigent --os=android --project-file=sample-test/src/main/resources/projects/e2e-test-android.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-exp --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
-
+      - name: Check API key leakage
+        run: |
+          if grep -R --quiet "${{ secrets.GEMINI_FREE_API_KEY }}" arbigent-result/; then
+            echo "::error::API key leaked in results!"
+            exit 1
+          fi
       - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
         if: ${{ always() }}
         with:
@@ -204,6 +209,12 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_FREE_API_KEY }}
         run: |
           arbigent-cli/build/install/arbigent/bin/arbigent --os=ios --project-file=sample-test/src/main/resources/projects/e2e-test-ios.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-exp
+      - name: Check API key leakage
+        run: |
+          if grep -R --quiet "${{ secrets.GEMINI_FREE_API_KEY }}" arbigent-result/; then
+            echo "::error::API key leaked in results!"
+            exit 1
+          fi
       - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
         if: ${{ always() }}
         with:

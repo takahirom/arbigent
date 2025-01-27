@@ -24,14 +24,19 @@ fun plantErrorDialog() {
   }
 }
 
+private var lastErrorString = ""
+
 internal fun showErrorDialog(e: Throwable) {
-  val errorText = """
-            An unexpected error occurred.
-            
-            ${e.message}
-            
-            ${e.stackTraceToString()}
-        """.trimIndent()
+  val errorString = e.stackTraceToString()
+  if (errorString == lastErrorString) {
+    return
+  }
+  lastErrorString = errorString
+  val errorText = """An unexpected error occurred.
+
+${e.message}
+
+${e.stackTraceToString()}"""
 
   SwingUtilities.invokeLater {
     val dialog = JDialog(null as JFrame?, "Error", true)
