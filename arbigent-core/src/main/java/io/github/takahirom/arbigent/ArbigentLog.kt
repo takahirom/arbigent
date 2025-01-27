@@ -90,7 +90,7 @@ private fun printLog(level: ArbigentLogLevel, rawLog: String, instance: Any? = n
   }
   val logContent =
     if (instance != null) {
-      "${level.shortName()}: $log ($instance)"
+      "${level.shortName()}: $log (${instance::class.simpleName})"
     } else {
       "${level.shortName()}: $log"
     }
