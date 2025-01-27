@@ -51,6 +51,9 @@ public class ArbigentContextHolder(
 
   private val _steps = MutableStateFlow<List<Step>>(listOf())
   public val stepsFlow: Flow<List<Step>> = _steps.asSharedFlow()
+  public fun isGoalAchieved(): Boolean =
+    steps().any { it.agentCommand is GoalAchievedAgentCommand }
+
   public fun steps(): List<Step> = _steps.value
   public fun addStep(step: Step) {
     _steps.value = steps().toMutableList() + step

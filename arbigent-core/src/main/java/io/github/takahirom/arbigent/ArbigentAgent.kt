@@ -1,9 +1,6 @@
 package io.github.takahirom.arbigent
 
-import io.github.takahirom.arbigent.ArbigentAgent.ExecuteCommandsInput
-import io.github.takahirom.arbigent.ArbigentAgent.ExecuteCommandsOutput
-import io.github.takahirom.arbigent.ArbigentAgent.StepInput
-import io.github.takahirom.arbigent.ArbigentAgent.StepResult
+import io.github.takahirom.arbigent.ArbigentAgent.*
 import io.github.takahirom.arbigent.result.ArbigentAgentResult
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import io.grpc.StatusRuntimeException
@@ -13,7 +10,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -30,6 +26,21 @@ public class ArbigentAgent(
   private val interceptors: List<ArbigentInterceptor> = agentConfig.interceptors
   private val deviceFormFactor = agentConfig.deviceFormFactor
   private val prompt = agentConfig.prompt
+
+  private val executeInterceptors: List<ArbigentExecuteInterceptor> = interceptors
+    .filterIsInstance<ArbigentExecuteInterceptor>()
+
+  private val executeChain: suspend (ExecuteInput) -> ExecuteResult = { input ->
+    var chain: suspend (ExecuteInput) -> ExecuteResult = { executeInput -> executeDefault(executeInput) }
+    executeInterceptors.reversed().forEach { interceptor ->
+      val previousChain = chain
+      chain = { currentInput ->
+        interceptor.intercept(currentInput) { previousChain(it) }
+      }
+    }
+    chain(input)
+  }
+
 
   private val initializerInterceptors: List<ArbigentInitializerInterceptor> = interceptors
     .filterIsInstance<ArbigentInitializerInterceptor>()
@@ -157,63 +168,58 @@ public class ArbigentAgent(
     maxStep: Int = 10,
     agentCommandTypes: List<AgentCommandType> = defaultAgentCommandTypesForVisualMode()
   ) {
-    arbigentDebugLog("Arbigent.execute agent.execute start $goal")
-    try {
-      _isRunningStateFlow.value = true
-      currentGoalStateFlow.value = goal
-      val arbigentContextHolder = ArbigentContextHolder(goal, maxStep)
-      arbigentDebugLog("Setting new ArbigentContextHolder: $arbigentContextHolder")
-      arbigentContextHolderStateFlow.value = arbigentContextHolder
-      arbigentContextHistoryStateFlow.value += arbigentContextHolder
-      val supportedAgentCommandTypes = agentCommandTypes.filter { it.isSupported(device.os()) }
+    val executeInput = ExecuteInput(
+      goal = goal,
+      maxStep = maxStep,
+      agentCommandTypes = agentCommandTypes,
+      deviceFormFactor = deviceFormFactor,
+      prompt = prompt,
+      device = device,
+      ai = ai,
+      createContextHolder = { g, m -> ArbigentContextHolder(g, m) },
+      addContextHolder = { holder ->
+        arbigentContextHolderStateFlow.value = holder
+        arbigentContextHistoryStateFlow.value += holder
+      },
+      updateIsRunning = { value -> _isRunningStateFlow.value = value },
+      updateCurrentGoal = { value -> currentGoalStateFlow.value = value },
+      initializerChain = initializerChain,
+      stepChain = stepChain,
+      decisionChain = decisionChain,
+      imageAssertionChain = imageAssertionChain,
+      executeCommandChain = executeCommandChain
+    )
 
-      ArbigentGlobalStatus.onInitializing {
-        initializerChain(device)
-      }
-      var stepRemain = maxStep
-      while (stepRemain-- > 0 && isGoalAchieved().not()) {
-        val stepInput = StepInput(
-          arbigentContextHolder = arbigentContextHolder,
-          agentCommandTypes = supportedAgentCommandTypes,
-          device = device,
-          deviceFormFactor = deviceFormFactor,
-          ai = ai,
-          decisionChain = decisionChain,
-          imageAssertionChain = imageAssertionChain,
-          executeCommandChain = executeCommandChain,
-          prompt = prompt
-        )
-        when (stepChain(stepInput)) {
-          StepResult.GoalAchieved -> {
-            isGoalAchievedFlow.first { it }
-            arbigentDebugLog("Goal achieved: $goal stepRemain:$stepRemain")
-            break
-          }
-
-          StepResult.Failed -> {
-            arbigentDebugLog("Failed to run agent: $goal stepRemain:$stepRemain")
-            break
-          }
-
-          StepResult.Continue -> {
-            // Continue
-          }
-        }
-        yield()
-      }
-      ArbigentGlobalStatus.onFinished()
-    } catch (e: CancellationException) {
-      arbigentDebugLog("Cancelled to run agent: $e")
-      ArbigentGlobalStatus.onCanceled()
-    } catch (e: Exception) {
-      arbigentDebugLog("Failed to run agent: $e")
-      errorHandler(e)
-      ArbigentGlobalStatus.onError(e)
-    } finally {
-      _isRunningStateFlow.value = false
-      arbigentDebugLog("Arbigent.execute agent.execute end $goal")
-      ArbigentGlobalStatus.onFinished()
+    when (executeChain(executeInput)) {
+      ExecuteResult.Success -> arbigentDebugLog("Execution succeeded.")
+      ExecuteResult.Failed -> arbigentDebugLog("Execution failed.")
+      ExecuteResult.Cancelled -> arbigentDebugLog("Execution cancelled.")
     }
+  }
+
+  public data class ExecuteInput(
+    val goal: String,
+    val maxStep: Int,
+    val agentCommandTypes: List<AgentCommandType>,
+    val deviceFormFactor: ArbigentScenarioDeviceFormFactor,
+    val prompt: ArbigentPrompt,
+    val device: ArbigentDevice,
+    val ai: ArbigentAi,
+    val createContextHolder: (String, Int) -> ArbigentContextHolder,
+    val addContextHolder: (ArbigentContextHolder) -> Unit,
+    val updateIsRunning: (Boolean) -> Unit,
+    val updateCurrentGoal: (String?) -> Unit,
+    val initializerChain: (ArbigentDevice) -> Unit,
+    val stepChain: suspend (StepInput) -> StepResult,
+    val decisionChain: (ArbigentAi.DecisionInput) -> ArbigentAi.DecisionOutput,
+    val imageAssertionChain: (ArbigentAi.ImageAssertionInput) -> ArbigentAi.ImageAssertionOutput,
+    val executeCommandChain: (ExecuteCommandsInput) -> ExecuteCommandsOutput,
+  )
+
+  public sealed interface ExecuteResult {
+    public object Success : ExecuteResult
+    public object Failed : ExecuteResult
+    public object Cancelled : ExecuteResult
   }
 
   public data class StepInput(
@@ -513,6 +519,17 @@ public interface ArbigentExecuteCommandsInterceptor : ArbigentInterceptor {
   }
 }
 
+public interface ArbigentExecuteInterceptor : ArbigentInterceptor {
+  public suspend fun intercept(
+    executeInput: ExecuteInput,
+    chain: Chain
+  ): ExecuteResult
+
+  public fun interface Chain {
+    public suspend fun proceed(executeInput: ExecuteInput): ExecuteResult
+  }
+}
+
 public interface ArbigentStepInterceptor : ArbigentInterceptor {
   public suspend fun intercept(stepInput: StepInput, chain: Chain): StepResult
   public fun interface Chain {
@@ -588,6 +605,57 @@ private fun executeCommands(
     }
   }
   return ExecuteCommandsOutput()
+}
+
+private suspend fun executeDefault(input: ExecuteInput): ExecuteResult {
+  try {
+    input.updateIsRunning(true)
+    input.updateCurrentGoal(input.goal)
+    val contextHolder = input.createContextHolder(input.goal, input.maxStep)
+    input.addContextHolder(contextHolder)
+
+    ArbigentGlobalStatus.onInitializing {
+      input.initializerChain(input.device)
+    }
+
+    var stepRemain = input.maxStep
+    while (stepRemain-- > 0 && !contextHolder.isGoalAchieved()) {
+      val stepInput = StepInput(
+        arbigentContextHolder = contextHolder,
+        agentCommandTypes = input.agentCommandTypes,
+        device = input.device,
+        deviceFormFactor = input.deviceFormFactor,
+        ai = input.ai,
+        decisionChain = input.decisionChain,
+        imageAssertionChain = input.imageAssertionChain,
+        executeCommandChain = input.executeCommandChain,
+        prompt = input.prompt
+      )
+      when (input.stepChain(stepInput)) {
+        StepResult.GoalAchieved -> break
+        StepResult.Failed -> return ExecuteResult.Failed
+        StepResult.Continue -> {}
+      }
+      yield()
+    }
+
+    ArbigentGlobalStatus.onFinished()
+    return if (contextHolder.isGoalAchieved()) {
+      ExecuteResult.Success
+    } else {
+      ExecuteResult.Failed
+    }
+  } catch (e: CancellationException) {
+    ArbigentGlobalStatus.onCanceled()
+    return ExecuteResult.Cancelled
+  } catch (e: Exception) {
+    errorHandler(e)
+    ArbigentGlobalStatus.onError(e)
+    return ExecuteResult.Failed
+  } finally {
+    input.updateIsRunning(false)
+    ArbigentGlobalStatus.onFinished()
+  }
 }
 
 private suspend fun step(
