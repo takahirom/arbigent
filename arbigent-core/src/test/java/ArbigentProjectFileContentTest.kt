@@ -105,7 +105,7 @@ class ArbigentProjectFileContentTest {
 
     val interceptors = firstTask[0].agentConfig
       .interceptors
-    assertEquals(1, interceptors.size)
+    assertEquals(2, interceptors.size)
     assertTrue(interceptors.any {
         it is ArbigentInitializerInterceptor
       })
