@@ -83,10 +83,10 @@ public class ArbigentProject(
       .all { it.isSuccessful() }
   }
 
-  public fun getResult(scenarios: List<ArbigentScenario> = scenarioAssignments().map { it.scenario }): ArbigentProjectExecutionResult {
+  public fun getResult(selectedScenarios: List<ArbigentScenario> = scenarioAssignments().map { it.scenario }): ArbigentProjectExecutionResult {
     return ArbigentProjectExecutionResult(
-      scenarios.map {
-        scenarioAssignments().first { it.scenario.id == it.scenario.id }.getResult()
+      selectedScenarios.map { selectedScenario ->
+        scenarioAssignments().first { selectedScenario.id == it.scenario.id }.getResult()
       }
     )
   }
