@@ -62,6 +62,7 @@ compose.desktop {
       }
       windows {
         iconFile.set(project.file("icons/icon.ico"))
+        perUserInstall = true
       }
       linux {
         iconFile.set(project.file("icons/icon.png"))
