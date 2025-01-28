@@ -336,7 +336,7 @@ public data class DpadAutoFocusWithIdAgentCommand(val id: String) : ArbigentAgen
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
-    return "Focus on id: $id"
+    return "Try to focus by id: $id"
   }
 
   override fun runDeviceCommand(device: ArbigentDevice) {
@@ -345,7 +345,7 @@ public data class DpadAutoFocusWithIdAgentCommand(val id: String) : ArbigentAgen
   }
 
   public companion object : AgentCommandType {
-    override val actionName: String = "DpadAutoFocusWithId"
+    override val actionName: String = "DpadTryAutoFocusById"
 
     override fun templateForAI(): String {
       return """
@@ -365,7 +365,7 @@ public data class DpadAutoFocusWithTextAgentCommand(val text: String) : Arbigent
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
-    return "Focus on text: $text"
+    return "Try to focus by text: $text"
   }
 
   override fun runDeviceCommand(device: ArbigentDevice) {
@@ -374,7 +374,7 @@ public data class DpadAutoFocusWithTextAgentCommand(val text: String) : Arbigent
   }
 
   public companion object : AgentCommandType {
-    override val actionName: String = "DpadAutoFocusWithText"
+    override val actionName: String = "DpadTryAutoFocusByText"
 
     override fun templateForAI(): String {
       return """
@@ -394,7 +394,7 @@ public data class DpadAutoFocusWithIndexAgentCommand(val index: Int, val element
   override val actionName: String = Companion.actionName
 
   public override fun stepLogText(): String {
-    return "Focus on index: $index"
+    return "Try to focus by index: $index"
   }
 
   public override fun runDeviceCommand(device: ArbigentDevice) {
@@ -403,7 +403,7 @@ public data class DpadAutoFocusWithIndexAgentCommand(val index: Int, val element
   }
 
   public companion object : AgentCommandType {
-    override val actionName: String = "DpadAutoFocusWithIndex"
+    override val actionName: String = "DPadTryAutoFocusByIndex"
 
     override fun templateForAI(): String {
       return """

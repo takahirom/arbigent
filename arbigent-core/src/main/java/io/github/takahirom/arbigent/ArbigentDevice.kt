@@ -330,17 +330,19 @@ public class MaestroDevice(
     fetchTarget: () -> Bounds
   ) {
     var remainCount = 15
-    var lastBounds: Bounds? = null
+    var lastCurrentBounds: Bounds? = null
+    var lastTargetBounds: Bounds? = null
     while (remainCount-- > 0) {
       val currentFocus = findCurrentFocus()
         ?: throw IllegalStateException("No focused node")
+      val targetBounds = fetchTarget()
       val currentBounds = currentFocus.toUiElement().bounds
-      if (lastBounds == currentBounds) {
+      if (lastCurrentBounds == currentBounds && lastTargetBounds == targetBounds) {
         arbigentDebugLog("Same bounds detected. Might be stuck or scrollable view. Breaking loop.")
         break
       }
-      lastBounds = currentBounds
-      val targetBounds = fetchTarget()
+      lastCurrentBounds = currentBounds
+      lastTargetBounds = targetBounds
 
       // Helper functions to calculate the center X and Y of a Bounds object.
       fun Bounds.centerY(): Int {
