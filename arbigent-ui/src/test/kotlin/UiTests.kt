@@ -116,6 +116,10 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
                     capture(it)
                     assertGoalAchieved()
                   }
+                  itShould("not run imageAssertion") {
+                    capture(it)
+                    assertDontRunImageAssertion()
+                  }
                 }
               }
               describe("when add multiple methods and run") {
@@ -383,6 +387,10 @@ class TestRobot(
     composeUiTest.onNode(hasTestTag("launch_app_package"))
       .performTextInput("com.example")
   }
+
+  fun assertDontRunImageAssertion() {
+    assertEquals(0, (fakeAi.status as FakeAi.AiStatus.Normal).imageAssertionCount)
+  }
 }
 
 class FakeDevice : ArbigentDevice {
@@ -458,7 +466,10 @@ internal class TestKeyStoreFactory : () -> KeyStore {
 class FakeAi : ArbigentAi {
   sealed interface AiStatus : ArbigentAi {
     class Normal() : AiStatus {
-      private var count = 0
+      private var decisionCount = 0
+      var imageAssertionCount = 0
+        private set
+
       private fun createDecisionOutput(
         agentCommand: ArbigentAgentCommand = ClickWithTextAgentCommand("text")
       ): ArbigentAi.DecisionOutput {
@@ -474,11 +485,11 @@ class FakeAi : ArbigentAi {
 
       override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
         arbigentDebugLog("FakeAi.decideWhatToDo")
-        if (count == 0) {
-          count++
+        if (decisionCount == 0) {
+          decisionCount++
           return createDecisionOutput()
-        } else if (count == 1) {
-          count++
+        } else if (decisionCount == 1) {
+          decisionCount++
           return createDecisionOutput()
         } else {
           return createDecisionOutput(
@@ -488,6 +499,7 @@ class FakeAi : ArbigentAi {
       }
 
       override fun assertImage(imageAssertionInput: ArbigentAi.ImageAssertionInput): ArbigentAi.ImageAssertionOutput {
+        imageAssertionCount++
         arbigentDebugLog("FakeAi.assertImage")
         return ArbigentAi.ImageAssertionOutput(
           listOf(

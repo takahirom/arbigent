@@ -93,7 +93,11 @@ public class ArbigentAgent(
   private val imageAssertionChain: (ArbigentAi.ImageAssertionInput) -> ArbigentAi.ImageAssertionOutput =
     imageAssertionInterceptors.foldRight(
       { input: ArbigentAi.ImageAssertionInput ->
-        ArbigentGlobalStatus.onImageAssertion {
+        val assertions = input.assertions
+        if (assertions.isEmpty()) {
+          return@foldRight ArbigentAi.ImageAssertionOutput(emptyList())
+        }
+        ArbigentGlobalStatus.onImageAssertion(assertions.map { it.assertionPrompt }.joinToString()) {
           input.ai.assertImage(input)
         }
       },

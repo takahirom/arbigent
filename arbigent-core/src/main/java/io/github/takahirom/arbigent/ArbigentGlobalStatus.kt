@@ -43,8 +43,8 @@ public object ArbigentGlobalStatus {
     return on("Processing device command: $command", block)
   }
 
-  public fun<T : Any> onImageAssertion(block: () -> T): T {
-    return on("Running image assertion...", block)
+  public fun<T : Any> onImageAssertion(assertionPrompt: String, block: () -> T): T {
+    return on("Running image assertion...:$assertionPrompt", block)
   }
 
   private fun<T : Any> on(text:String, block: () -> T, afterText: String = "Arbigent..."): T {
