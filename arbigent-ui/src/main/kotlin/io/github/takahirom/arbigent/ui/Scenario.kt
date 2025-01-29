@@ -13,6 +13,7 @@ import androidx.compose.foundation.onClick
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -173,6 +174,18 @@ private fun ScenarioOptions(
   dependencyScenarioMenu: MenuScope.() -> Unit
 ) {
   FlowRow(modifier = Modifier.padding(4.dp).height(320.dp).verticalScroll(rememberScrollState())) {
+    Column(
+      modifier = Modifier.padding(8.dp).width(200.dp)
+    ) {
+      GroupHeader("Note for humans")
+      TextField(
+        modifier = Modifier
+          .padding(4.dp)
+          .testTag("note_for_humans"),
+        state = scenarioStateHolder.noteForHumans,
+        placeholder = { Text("Note for humans") },
+      )
+    }
     Column(
       modifier = Modifier.padding(8.dp).width(200.dp)
     ) {
@@ -392,7 +405,10 @@ private fun InitializationOptions(
         }
       }
     ) {
-      Text(InitializationMethodMenu.entries.firstOrNull { it.defaultContent::class == initializeMethod::class }?.type ?: "Select type")
+      Text(
+        InitializationMethodMenu.entries.firstOrNull { it.defaultContent::class == initializeMethod::class }?.type
+          ?: "Select type"
+      )
     }
     Row(
       verticalAlignment = Alignment.CenterVertically
