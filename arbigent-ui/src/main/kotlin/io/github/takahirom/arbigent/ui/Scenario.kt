@@ -58,6 +58,7 @@ fun Scenario(
   scenarioStateHolder: ArbigentScenarioStateHolder,
   dependencyScenarioMenu: MenuScope.() -> Unit,
   onAddSubScenario: (ArbigentScenarioStateHolder) -> Unit,
+  scenarioCountById: (String) -> Int,
   onExecute: (ArbigentScenarioStateHolder) -> Unit,
   onCancel: (ArbigentScenarioStateHolder) -> Unit,
   onRemove: (ArbigentScenarioStateHolder) -> Unit,
@@ -154,7 +155,7 @@ fun Scenario(
       }
     }
     ExpandableSection(title = "Options", modifier = Modifier.fillMaxWidth()) {
-      ScenarioOptions(scenarioStateHolder, dependencyScenarioMenu)
+      ScenarioOptions(scenarioStateHolder, scenarioCountById, dependencyScenarioMenu)
     }
     arbigentScenarioExecutor?.let { arbigentScenarioExecutor ->
       val taskToAgents: List<List<ArbigentTaskAssignment>> by arbigentScenarioExecutor.taskAssignmentsHistoryFlow.collectAsState(
@@ -171,26 +172,63 @@ fun Scenario(
 @Composable
 private fun ScenarioOptions(
   scenarioStateHolder: ArbigentScenarioStateHolder,
+  scenarioCountById: (String) -> Int,
   dependencyScenarioMenu: MenuScope.() -> Unit
 ) {
+  val updatedScenarioStateHolder by rememberUpdatedState(scenarioStateHolder)
   FlowRow(modifier = Modifier.padding(4.dp).height(320.dp).verticalScroll(rememberScrollState())) {
     Column(
-      modifier = Modifier.padding(8.dp).width(200.dp)
+      modifier = Modifier.padding(8.dp).widthIn(min = 80.dp, max = 400.dp).width(IntrinsicSize.Min)
+    ) {
+      GroupHeader("Scenario ID")
+      val idTextFieldState = rememberTextFieldState(updatedScenarioStateHolder.id)
+      var duplicated by remember { mutableStateOf(false) }
+      LaunchedEffect(updatedScenarioStateHolder.id) {
+        idTextFieldState.edit {
+          replace(0, idTextFieldState.text.length, updatedScenarioStateHolder.id)
+        }
+      }
+      LaunchedEffect(Unit) {
+        snapshotFlow { idTextFieldState.text.toString() }.collect { textFieldScenarioId ->
+          if (updatedScenarioStateHolder.id == textFieldScenarioId) {
+            duplicated = false
+          } else if (scenarioCountById(textFieldScenarioId) == 0 && textFieldScenarioId.isNotBlank()) {
+            updatedScenarioStateHolder.onScenarioIdChanged(textFieldScenarioId)
+            duplicated = false
+          } else {
+            duplicated = true
+          }
+        }
+      }
+      TextField(
+        state = idTextFieldState,
+        modifier = Modifier.padding(4.dp).testTag("scenario_id"),
+        placeholder = { Text("Scenario ID") },
+      )
+      if (duplicated) {
+        Text(
+          text = "This id is already used.",
+          color = Color.Red
+        )
+      }
+    }
+    Column(
+      modifier = Modifier.padding(8.dp).widthIn(min = 80.dp, max = 400.dp).width(IntrinsicSize.Min)
     ) {
       GroupHeader("Note for humans")
       TextField(
         modifier = Modifier
           .padding(4.dp)
           .testTag("note_for_humans"),
-        state = scenarioStateHolder.noteForHumans,
+        state = updatedScenarioStateHolder.noteForHumans,
         placeholder = { Text("Note for humans") },
       )
     }
     Column(
-      modifier = Modifier.padding(8.dp).width(200.dp)
+      modifier = Modifier.padding(8.dp).width(160.dp)
     ) {
       GroupHeader("Scenario dependency")
-      val dependency by scenarioStateHolder.dependencyScenarioStateHolderStateFlow.collectAsState()
+      val dependency by updatedScenarioStateHolder.dependencyScenarioStateHolderStateFlow.collectAsState()
 
       Dropdown(
         modifier = Modifier
@@ -202,9 +240,9 @@ private fun ScenarioOptions(
       }
     }
     Column(
-      modifier = Modifier.padding(8.dp).width(200.dp)
+      modifier = Modifier.padding(8.dp).width(160.dp)
     ) {
-      val inputCommandType by scenarioStateHolder.deviceFormFactorStateFlow.collectAsState()
+      val inputCommandType by updatedScenarioStateHolder.deviceFormFactorStateFlow.collectAsState()
       GroupHeader("Device form factors")
       Row(
         verticalAlignment = Alignment.CenterVertically
@@ -213,7 +251,7 @@ private fun ScenarioOptions(
           text = "Mobile",
           selected = inputCommandType.isMobile(),
           onClick = {
-            scenarioStateHolder.deviceFormFactorStateFlow.value =
+            updatedScenarioStateHolder.deviceFormFactorStateFlow.value =
               ArbigentScenarioDeviceFormFactor.Mobile
           }
         )
@@ -225,14 +263,14 @@ private fun ScenarioOptions(
           text = "TV",
           selected = inputCommandType.isTv(),
           onClick = {
-            scenarioStateHolder.deviceFormFactorStateFlow.value =
+            updatedScenarioStateHolder.deviceFormFactorStateFlow.value =
               ArbigentScenarioDeviceFormFactor.Tv
           }
         )
       }
     }
     Column(
-      modifier = Modifier.padding(8.dp).width(200.dp)
+      modifier = Modifier.padding(8.dp).width(240.dp)
     ) {
       GroupHeader {
         Text("Initialization methods")
@@ -240,7 +278,7 @@ private fun ScenarioOptions(
         IconActionButton(
           key = AllIconsKeys.General.Add,
           onClick = {
-            scenarioStateHolder.onAddInitializationMethod()
+            updatedScenarioStateHolder.onAddInitializationMethod()
           },
           contentDescription = "Add initialization method",
           hint = Size(16),
@@ -251,12 +289,12 @@ private fun ScenarioOptions(
         }
       }
     }
-    val initializeMethods by scenarioStateHolder.initializationMethodStateFlow.collectAsState()
+    val initializeMethods by updatedScenarioStateHolder.initializationMethodStateFlow.collectAsState()
     initializeMethods.forEachIndexed { index, initializeMethod ->
-      InitializationOptions(initializeMethod, scenarioStateHolder, initializeMethods, index)
+      InitializationOptions(initializeMethod, updatedScenarioStateHolder, initializeMethods, index)
     }
     Column(
-      modifier = Modifier.padding(8.dp).width(200.dp)
+      modifier = Modifier.padding(8.dp).width(80.dp)
     ) {
       GroupHeader("Max retry count")
       Row(
@@ -264,7 +302,7 @@ private fun ScenarioOptions(
       ) {
         // Retry count
         TextField(
-          state = scenarioStateHolder.maxRetryState,
+          state = updatedScenarioStateHolder.maxRetryState,
           keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
           modifier = Modifier
             .padding(4.dp),
@@ -278,13 +316,13 @@ private fun ScenarioOptions(
         TextField(
           modifier = Modifier
             .padding(4.dp),
-          state = scenarioStateHolder.maxStepState,
+          state = updatedScenarioStateHolder.maxStepState,
           keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         )
       }
     }
     Column(
-      modifier = Modifier.padding(8.dp).width(250.dp)
+      modifier = Modifier.padding(8.dp).width(320.dp)
     ) {
       GroupHeader {
         Text("Image assertion")
@@ -292,7 +330,7 @@ private fun ScenarioOptions(
         IconActionButton(
           key = AllIconsKeys.General.Add,
           onClick = {
-            scenarioStateHolder.onAddImageAssertion()
+            updatedScenarioStateHolder.onAddImageAssertion()
           },
           contentDescription = "Add image assertion",
           hint = Size(16),
@@ -312,7 +350,7 @@ private fun ScenarioOptions(
           )
         }
       }
-      val imageAssertions by scenarioStateHolder.imageAssertionsStateFlow.collectAsState()
+      val imageAssertions by updatedScenarioStateHolder.imageAssertionsStateFlow.collectAsState()
       imageAssertions.forEachIndexed { index, imageAssertion: ArbigentImageAssertion ->
         Row(
           verticalAlignment = Alignment.CenterVertically
@@ -327,7 +365,7 @@ private fun ScenarioOptions(
             onValueChange = {
               val newImageAssertions = imageAssertions.toMutableList()
               newImageAssertions[index] = imageAssertion.copy(assertionPrompt = it)
-              scenarioStateHolder.imageAssertionsStateFlow.value = newImageAssertions
+              updatedScenarioStateHolder.imageAssertionsStateFlow.value = newImageAssertions
             },
           )
           IconActionButton(
@@ -335,7 +373,7 @@ private fun ScenarioOptions(
             onClick = {
               val newImageAssertions = imageAssertions.toMutableList()
               newImageAssertions.removeAt(index)
-              scenarioStateHolder.imageAssertionsStateFlow.value = newImageAssertions
+              updatedScenarioStateHolder.imageAssertionsStateFlow.value = newImageAssertions
             },
             contentDescription = "Remove",
             hint = Size(16),

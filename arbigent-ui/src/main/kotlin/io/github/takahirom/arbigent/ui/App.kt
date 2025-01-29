@@ -141,6 +141,9 @@ private fun MainScreen(
                 )
               }
           },
+          scenarioCountById = {
+            appStateHolder.scenarioCountById(it)
+          },
           onAddSubScenario = {
             appStateHolder.addSubScenario(parent = it)
           },

@@ -21,7 +21,7 @@ constructor(
   id: String = Uuid.random().toString()
 ) {
   private val _id = MutableStateFlow(id)
-  val id:String = _id.value
+  val id:String get() = _id.value
   val goalState = TextFieldState("")
   val goal get() = goalState.text.toString()
   val noteForHumans = TextFieldState("")
@@ -110,6 +110,10 @@ constructor(
     dependencyScenarioStateHolderStateFlow.value = parent
     _initializationMethodStateFlow.value = listOf()
     deviceFormFactorStateFlow.value = parent.deviceFormFactor()
+  }
+
+  fun onScenarioIdChanged(id: String) {
+    _id.value = id
   }
 
   fun createArbigentScenarioContent(): ArbigentScenarioContent {
