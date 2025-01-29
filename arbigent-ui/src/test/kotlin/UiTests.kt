@@ -192,6 +192,26 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
             }
           }
         }
+        describe("when add dependency and change dependency id and run") {
+          doIt {
+            expandOptions()
+            clickDependencyDropDown()
+            selectDependencyDropDown(firstGoal)
+            openScenario(firstGoal)
+            changeId("newId")
+            collapseOptions()
+            clickRunAllButton()
+          }
+          describe("when finish the scenario") {
+            doIt {
+              waitUntilScenarioRunning()
+            }
+            itShould("show goal achieved") {
+              capture(it)
+              assertTwoGoalAchieved()
+            }
+          }
+        }
       }
     }
 
@@ -321,6 +341,17 @@ class TestRobot(
     composeUiTest.onAllNodes(hasText(text), useUnmergedTree = true)
       .filterToOne(hasTestTag("dependency_scenario"))
       .performClick()
+  }
+
+  fun openScenario(goal: String) {
+    composeUiTest.onAllNodes(hasText(goal), useUnmergedTree = true)
+      .onFirst()
+      .performClick()
+  }
+
+  fun changeId(id: String) {
+    composeUiTest.onNode(hasTestTag("scenario_id"))
+      .performTextInput(id)
   }
 
   fun capture(describedBehavior: DescribedBehavior<TestRobot>) {

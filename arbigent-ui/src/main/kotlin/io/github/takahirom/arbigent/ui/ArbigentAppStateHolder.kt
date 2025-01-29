@@ -349,4 +349,8 @@ class ArbigentAppStateHolder(
   fun onCacheStrategyChanged(strategy: CacheStrategy) {
     cacheStrategyFlow.value = strategy
   }
+
+  fun scenarioCountById(newScenarioId: String): Int {
+    return allScenarioStateHoldersStateFlow.value.count { it.id == newScenarioId }
+  }
 }
