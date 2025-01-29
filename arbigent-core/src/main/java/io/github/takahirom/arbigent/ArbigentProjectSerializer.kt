@@ -125,6 +125,7 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
   public val initializationMethods: List<InitializationMethod> = listOf(),
   @Deprecated("use initializationMethods")
   public val initializeMethods: InitializationMethod = InitializationMethod.Noop,
+  public val noteForHumans: String = "",
   public val maxRetry: Int = 3,
   public val maxStep: Int = 10,
   public val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Mobile,

@@ -24,6 +24,7 @@ constructor(
   val id:String = _id.value
   val goalState = TextFieldState("")
   val goal get() = goalState.text.toString()
+  val noteForHumans = TextFieldState("")
   val maxRetryState: TextFieldState = TextFieldState("3")
   val maxStepState: TextFieldState = TextFieldState("10")
   private val cleanupDataStateFlow: MutableStateFlow<ArbigentScenarioContent.CleanupData> =
@@ -97,22 +98,6 @@ constructor(
     }
   }
 
-  fun createArbigentScenarioContent(): ArbigentScenarioContent {
-    return ArbigentScenarioContent(
-      id = id,
-      goal = goal,
-      dependencyId = dependencyScenarioStateHolderStateFlow.value?.id,
-      initializationMethods = initializationMethodStateFlow.value
-        .filter { it !is ArbigentScenarioContent.InitializationMethod.Noop },
-      maxRetry = maxRetryState.text.toString().toIntOrNull() ?: 3,
-      maxStep = maxStepState.text.toString().toIntOrNull() ?: 10,
-      deviceFormFactor = deviceFormFactorStateFlow.value,
-      // This is no longer used.
-      cleanupData = ArbigentScenarioContent.CleanupData.Noop,
-      imageAssertions = imageAssertionsStateFlow.value.filter { it.assertionPrompt.isNotBlank() }
-    )
-  }
-
   fun onAddImageAssertion() {
     imageAssertionsStateFlow.value += ArbigentImageAssertion("")
   }
@@ -127,6 +112,23 @@ constructor(
     deviceFormFactorStateFlow.value = parent.deviceFormFactor()
   }
 
+  fun createArbigentScenarioContent(): ArbigentScenarioContent {
+    return ArbigentScenarioContent(
+      id = id,
+      goal = goal,
+      dependencyId = dependencyScenarioStateHolderStateFlow.value?.id,
+      initializationMethods = initializationMethodStateFlow.value
+        .filter { it !is ArbigentScenarioContent.InitializationMethod.Noop },
+      noteForHumans = noteForHumans.text.toString(),
+      maxRetry = maxRetryState.text.toString().toIntOrNull() ?: 3,
+      maxStep = maxStepState.text.toString().toIntOrNull() ?: 10,
+      deviceFormFactor = deviceFormFactorStateFlow.value,
+      // This is no longer used.
+      cleanupData = ArbigentScenarioContent.CleanupData.Noop,
+      imageAssertions = imageAssertionsStateFlow.value.filter { it.assertionPrompt.isNotBlank() }
+    )
+  }
+
   fun load(scenarioContent: ArbigentScenarioContent) {
     _id.value = scenarioContent.id
     onGoalChanged(scenarioContent.goal)
@@ -135,6 +137,9 @@ constructor(
     }
     maxStepState.edit {
       replace(0, length, scenarioContent.maxStep.toString())
+    }
+    noteForHumans.edit {
+      replace(0, length, scenarioContent.noteForHumans)
     }
     // This is no longer used.
     cleanupDataStateFlow.value = ArbigentScenarioContent.CleanupData.Noop
