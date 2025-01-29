@@ -198,7 +198,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
             clickDependencyDropDown()
             selectDependencyDropDown(firstGoal)
             openScenario(firstGoal)
-            changeId("newId")
+            changeScenarioId("newId")
             collapseOptions()
             clickRunAllButton()
           }
@@ -349,7 +349,7 @@ class TestRobot(
       .performClick()
   }
 
-  fun changeId(id: String) {
+  fun changeScenarioId(id: String) {
     composeUiTest.onNode(hasTestTag("scenario_id"))
       .performTextInput(id)
   }
