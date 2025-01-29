@@ -180,7 +180,7 @@ private fun ScenarioOptions(
     Column(
       modifier = Modifier.padding(8.dp).widthIn(min = 80.dp, max = 400.dp).width(IntrinsicSize.Min)
     ) {
-      GroupHeader("Scenario id")
+      GroupHeader("Scenario ID")
       val idTextFieldState = rememberTextFieldState(updatedScenarioStateHolder.id)
       var duplicated by remember { mutableStateOf(false) }
       LaunchedEffect(updatedScenarioStateHolder.id) {
@@ -203,7 +203,7 @@ private fun ScenarioOptions(
       TextField(
         state = idTextFieldState,
         modifier = Modifier.padding(4.dp).testTag("scenario_id"),
-        placeholder = { Text("Scenario id") },
+        placeholder = { Text("Scenario ID") },
       )
       if (duplicated) {
         Text(
