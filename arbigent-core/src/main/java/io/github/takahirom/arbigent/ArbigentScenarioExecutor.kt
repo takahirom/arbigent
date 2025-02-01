@@ -1,8 +1,9 @@
 package io.github.takahirom.arbigent
 
+import io.github.takahirom.arbigent.coroutines.buildSingleSourceStateFlow
+import io.github.takahirom.arbigent.coroutines.buildFlatMapLatestSingleSourceStateFlow
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.Serializable
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -63,31 +64,34 @@ public class ArbigentScenarioExecutor {
     CoroutineScope(ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob())
   private val _arbigentScenarioRunningInfoStateFlow: MutableStateFlow<ArbigentScenarioRunningInfo?> =
     MutableStateFlow(null)
-  public val runningInfoFlow: Flow<ArbigentScenarioRunningInfo?> =
-    _arbigentScenarioRunningInfoStateFlow.asSharedFlow()
+  public val runningInfoFlow: StateFlow<ArbigentScenarioRunningInfo?> =
+    coroutineScope.buildSingleSourceStateFlow(_arbigentScenarioRunningInfoStateFlow) {
+      it
+    }
 
   public fun runningInfo(): ArbigentScenarioRunningInfo? =
-    _arbigentScenarioRunningInfoStateFlow.value
+    runningInfoFlow.value
 
-  public val isSuccessFlow: Flow<Boolean> = taskAssignmentsFlow.flatMapLatest { taskToAgents ->
-    val flows: List<Flow<Boolean>> = taskToAgents.map { taskToAgent ->
-      taskToAgent.agent.isGoalAchievedFlow
+  public val isSuccessFlow: StateFlow<Boolean> = coroutineScope.buildFlatMapLatestSingleSourceStateFlow(
+    _taskAssignmentsStateFlow,
+    transformForFlow = { taskToAgents ->
+      if (taskToAgents.isEmpty()) {
+        return@buildFlatMapLatestSingleSourceStateFlow flowOf(false)
+      }
+      combine(taskToAgents.map { it.agent.isGoalAchievedFlow }) { booleans ->
+        booleans.all { it }
+      }
+    },
+    transformForValue = { taskToAgents: List<ArbigentTaskAssignment> ->
+      if (taskToAgents.isEmpty()) {
+        return@buildFlatMapLatestSingleSourceStateFlow false
+      }
+      taskToAgents.all { it.agent.isGoalAchieved() }
     }
-    combine(flows) { booleans ->
-      booleans.all { it }
-    }
-  }
-    .shareIn(
-      scope = coroutineScope,
-      started = SharingStarted.WhileSubscribed(),
-      replay = 1
-    )
+  )
 
   public fun isSuccessful(): Boolean {
-    if (taskAssignments().isEmpty()) {
-      return false
-    }
-    return taskAssignments().all { it.agent.isGoalAchieved() }
+    return isSuccessFlow.value
   }
 
   private val _isFailedToArchiveFlow = MutableStateFlow(false)
