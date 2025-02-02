@@ -5,6 +5,7 @@ import io.github.takahirom.arbigent.result.ArbigentUiTreeStrings
 
 public interface ArbigentAi {
   public data class DecisionInput(
+    val stepId: String,
     val contextHolder: ArbigentContextHolder,
     val formFactor: ArbigentScenarioDeviceFormFactor,
     val uiTreeStrings: ArbigentUiTreeStrings,
@@ -12,6 +13,7 @@ public interface ArbigentAi {
     val focusedTreeString: String?,
     val agentCommandTypes: List<AgentCommandType>,
     val screenshotFilePath: String,
+    val apiCallJsonLFilePath: String,
     val elements: ArbigentElementList,
     val prompt: ArbigentPrompt,
   )

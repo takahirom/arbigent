@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.loadImageBitmap
@@ -29,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import io.github.takahirom.arbigent.*
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
+import io.github.takahirom.arbigent.result.StepFeedback
+import io.github.takahirom.arbigent.result.StepFeedbackEvent
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.Orientation
 import org.jetbrains.jewel.ui.component.CheckboxRow
@@ -52,13 +55,16 @@ import java.awt.Desktop
 import java.io.File
 import java.io.FileInputStream
 
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun Scenario(
   scenarioStateHolder: ArbigentScenarioStateHolder,
+  stepFeedbacks: Set<StepFeedback>,
   dependencyScenarioMenu: MenuScope.() -> Unit,
   onAddSubScenario: (ArbigentScenarioStateHolder) -> Unit,
   scenarioCountById: (String) -> Int,
+  onStepFeedback: (StepFeedbackEvent) -> Unit,
   onExecute: (ArbigentScenarioStateHolder) -> Unit,
   onCancel: (ArbigentScenarioStateHolder) -> Unit,
   onRemove: (ArbigentScenarioStateHolder) -> Unit,
@@ -162,7 +168,7 @@ fun Scenario(
         arbigentScenarioExecutor.taskAssignmentsHistory()
       )
       if (taskToAgents.isNotEmpty()) {
-        ContentPanel(taskToAgents, modifier = Modifier.weight(1f))
+        ContentPanel(taskToAgents, stepFeedbacks, onStepFeedback, modifier = Modifier.weight(1f))
       }
     }
   }
@@ -736,7 +742,12 @@ fun buildSections(tasksToAgent: List<ArbigentTaskAssignment>): List<ScenarioSect
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ContentPanel(tasksToAgentHistory: List<List<ArbigentTaskAssignment>>, modifier: Modifier) {
+private fun ContentPanel(
+  tasksToAgentHistory: List<List<ArbigentTaskAssignment>>,
+  stepFeedbacks: Set<StepFeedback>,
+  onStepFeedback: (StepFeedbackEvent) -> Unit,
+  modifier: Modifier
+) {
   Column(modifier.padding(top = 8.dp)) {
     var selectedHistory by remember(tasksToAgentHistory.size) { mutableStateOf(tasksToAgentHistory.lastIndex) }
     GroupHeader {
@@ -825,9 +836,69 @@ private fun ContentPanel(tasksToAgentHistory: List<List<ArbigentTaskAssignment>>
               }
               Text(
                 modifier = Modifier.padding(8.dp),
-
                 text = step.text()
               )
+              // AI feedback button
+              if (step.apiCallJsonLFilePath != null) {
+                Row {
+                  // Good feedback button
+                  val isGood = stepFeedbacks.any { it is StepFeedback.Good && it.stepId == step.stepId }
+                  val feedbackHintText =
+                    "Feedback data is stored locally in project result files(result.yaml). You can later use these evaluations to:\n" +
+                      "         • Fine-tune AI models\n" +
+                      "         • Optimize prompt sequences\n" +
+                      "         • Analyze response patterns \n" +
+                      "No data leaves your environment."
+                  IconActionButton(
+                      key = AllIconsKeys.Ide.Like,
+                      onClick = {
+                        onStepFeedback(
+                          if (isGood) {
+                            StepFeedbackEvent.RemoveGood(step.stepId)
+                          } else {
+                            StepFeedback.Good(step.stepId)
+                          }
+                        )
+                      },
+                      colorFilter = if (isGood) {
+                        ColorFilter.tint(JewelTheme.colorPalette.green(8))
+                      } else {
+                        null
+                      },
+                      contentDescription = feedbackHintText,
+                      hint = Size(16),
+                    ) {
+                      Text(
+                        text = feedbackHintText,
+                      )
+                    }
+                  // Bad feedback button
+                  val isBad = stepFeedbacks.any { it is StepFeedback.Bad && it.stepId == step.stepId }
+                  IconActionButton(
+                    key = AllIconsKeys.Ide.Dislike,
+                    onClick = {
+                      onStepFeedback(
+                        if (isBad) {
+                          StepFeedbackEvent.RemoveBad(step.stepId)
+                        } else {
+                          StepFeedback.Bad(step.stepId)
+                        }
+                      )
+                    },
+                    colorFilter = if (isBad) {
+                      ColorFilter.tint(JewelTheme.colorPalette.red(8))
+                    } else {
+                      null
+                    },
+                    contentDescription = feedbackHintText,
+                    hint = Size(16),
+                  ) {
+                    Text(
+                      text = feedbackHintText,
+                    )
+                  }
+                }
+              }
             }
           }
           item {

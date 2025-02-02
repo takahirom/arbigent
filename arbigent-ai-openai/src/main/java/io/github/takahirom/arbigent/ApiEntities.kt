@@ -81,3 +81,13 @@ public data class ImageUrl(
 public data class Usage(
   @SerialName("completion_tokens") val completionTokens: Int? = null,
 )
+
+@Serializable
+public class ApiCall(
+  public val requestBody: ChatCompletionRequest,
+  public val responseBody: ChatCompletionResponse,
+  public val metadata: ApiCallMetadata
+)
+
+@Serializable
+public class ApiCallMetadata

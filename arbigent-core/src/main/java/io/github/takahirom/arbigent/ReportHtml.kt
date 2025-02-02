@@ -39,19 +39,21 @@ public class ArbigentHtmlReport {
   public fun saveReportHtml(outputDir: String, projectExecutionResult: ArbigentProjectExecutionResult, needCopy:Boolean = true) {
     File(outputDir).mkdirs()
     val yaml = if (needCopy) {
-      val copiedResult = copyImagesToOutputDirAndModify(outputDir, projectExecutionResult)
-      val modifiedProjectExecutionResult = modifyScreenshotPathToRelativePath(copiedResult, File(outputDir))
+      val copiedResult = copyArtifactToOutputDirAndModify(outputDir, projectExecutionResult)
+      val modifiedProjectExecutionResult = modifyArtifactToRelativePath(copiedResult, File(outputDir))
       ArbigentProjectExecutionResult.yaml.encodeToString(modifiedProjectExecutionResult)
     } else {
-      val modifiedProjectExecutionResult = modifyScreenshotPathToRelativePath(projectExecutionResult, File(outputDir))
+      val modifiedProjectExecutionResult = modifyArtifactToRelativePath(projectExecutionResult, File(outputDir))
       ArbigentProjectExecutionResult.yaml.encodeToString(modifiedProjectExecutionResult)
     }
     writeHtmlReport(yaml, outputDir)
   }
 
-  private fun copyImagesToOutputDirAndModify(outputDir: String, projectExecutionResult: ArbigentProjectExecutionResult): ArbigentProjectExecutionResult {
+  private fun copyArtifactToOutputDirAndModify(outputDir: String, projectExecutionResult: ArbigentProjectExecutionResult): ArbigentProjectExecutionResult {
     val screenshotsDir = File(outputDir, "screenshots")
     screenshotsDir.mkdirs()
+    val jsonlsDir = File(outputDir, "jsonls")
+    jsonlsDir.mkdirs()
     return projectExecutionResult.copy(
       scenarios = projectExecutionResult.scenarios.map { scenario ->
         scenario.copy(
@@ -66,7 +68,16 @@ public class ArbigentHtmlReport {
                     screenshotFile.toAnnotatedFile().copyTo(newScreenshotFile.toAnnotatedFile(), overwrite = true)
                     step.copy(
                       screenshotFilePath = newScreenshotFile.absolutePath
-                    )
+                    ).let {
+                      step.apiCallJsonPath?.let { apiCallJsonPath ->
+                        val jsonlFile = File(apiCallJsonPath)
+                        val newJsonlFile = File(jsonlsDir, jsonlFile.name)
+                        jsonlFile.copyTo(newJsonlFile, overwrite = true)
+                        it.copy(
+                          apiCallJsonPath = newJsonlFile.absolutePath
+                        )
+                      } ?: it
+                    }
                   }
                 )
               }
@@ -76,7 +87,7 @@ public class ArbigentHtmlReport {
       }
     )
   }
-  private fun modifyScreenshotPathToRelativePath(projectResult: ArbigentProjectExecutionResult, from: File): ArbigentProjectExecutionResult {
+  private fun modifyArtifactToRelativePath(projectResult: ArbigentProjectExecutionResult, from: File): ArbigentProjectExecutionResult {
     return projectResult.copy(
       scenarios = projectResult.scenarios.map { scenario ->
         scenario.copy(
@@ -86,7 +97,10 @@ public class ArbigentHtmlReport {
                 agentResult.copy(
                   steps = agentResult.steps.map { step ->
                     step.copy(
-                      screenshotFilePath = from.toPath().relativize(File(step.screenshotFilePath).toPath()).toString()
+                      screenshotFilePath = from.toPath().relativize(File(step.screenshotFilePath).toPath()).toString(),
+                      apiCallJsonPath = step.apiCallJsonPath?.let {
+                        from.toPath().relativize(File(it).toPath()).toString()
+                      }
                     )
                   }
                 )

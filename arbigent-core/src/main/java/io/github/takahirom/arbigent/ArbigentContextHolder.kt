@@ -11,7 +11,12 @@ public class ArbigentContextHolder(
   public val maxStep: Int,
   public val startTimestamp: Long = System.currentTimeMillis(),
 ) {
+  public fun generateStepId(): String {
+    return "" + goal.hashCode() + "_" +
+      steps().size +"_" + startTimestamp + "_" + System.currentTimeMillis() .toString()
+  }
   public class Step(
+    public val stepId: String,
     public val agentCommand: ArbigentAgentCommand? = null,
     public val action: String? = null,
     public val feedback: String? = null,
@@ -21,7 +26,8 @@ public class ArbigentContextHolder(
     public val aiRequest: String? = null,
     public val aiResponse: String? = null,
     public val timestamp: Long = System.currentTimeMillis(),
-    public val screenshotFilePath: String
+    public val screenshotFilePath: String,
+    public val apiCallJsonLFilePath: String? = null,
   ) {
     public fun isFailed(): Boolean {
       return feedback?.contains("Failed") == true
@@ -38,9 +44,11 @@ public class ArbigentContextHolder(
 
     public fun getResult(): ArbigentAgentTaskStepResult {
       return ArbigentAgentTaskStepResult(
+        stepId = stepId,
         summary = text(),
         timestamp = timestamp,
         screenshotFilePath = screenshotFilePath,
+        apiCallJsonPath = apiCallJsonLFilePath,
         agentCommand = agentCommand?.stepLogText(),
 //        uiTreeStrings = uiTreeStrings,
         aiRequest = aiRequest,

@@ -249,6 +249,7 @@ public class ArbigentAgent(
   }
 
   public data class ExecuteCommandsInput(
+    val stepId: String,
     val decisionOutput: ArbigentAi.DecisionOutput,
     val arbigentContextHolder: ArbigentContextHolder,
     val screenshotFilePath: String,
@@ -630,7 +631,7 @@ public fun defaultAgentCommandTypesForTvForVisualMode(): List<AgentCommandType> 
 private fun executeCommands(
   executeCommandsInput: ExecuteCommandsInput,
 ): ExecuteCommandsOutput {
-  val (decisionOutput, arbigentContextHolder, screenshotFilePath, device) = executeCommandsInput
+  val (stepId, decisionOutput, arbigentContextHolder, screenshotFilePath, device) = executeCommandsInput
   decisionOutput.agentCommands.forEach { agentCommand ->
     try {
       agentCommand.runDeviceCommand(device)
@@ -638,6 +639,7 @@ private fun executeCommands(
       e.printStackTrace()
       arbigentContextHolder.addStep(
         ArbigentContextHolder.Step(
+          stepId = stepId,
           feedback = "Failed to perform action: ${e.message}. Please try other actions.",
           screenshotFilePath = screenshotFilePath
         )
@@ -646,6 +648,7 @@ private fun executeCommands(
       e.printStackTrace()
       arbigentContextHolder.addStep(
         ArbigentContextHolder.Step(
+          stepId = stepId,
           feedback = "Failed to perform action: ${e.message}. Please try other actions.",
           screenshotFilePath = screenshotFilePath
         )
@@ -654,6 +657,7 @@ private fun executeCommands(
       e.printStackTrace()
       arbigentContextHolder.addStep(
         ArbigentContextHolder.Step(
+          stepId = stepId,
           feedback = "Failed to perform action: ${e.message}. Please try other actions.",
           screenshotFilePath = screenshotFilePath
         )
@@ -727,7 +731,7 @@ private suspend fun step(
   val imageAssertionChain = stepInput.imageAssertionChain
   val executeCommandChain = stepInput.executeCommandChain
 
-  val screenshotFileID = System.currentTimeMillis().toString()
+  val stepId = contextHolder.generateStepId()
   val elements = device.elements()
   for (it in 0..2) {
     try {
@@ -735,7 +739,7 @@ private suspend fun step(
         commands = listOf(
           MaestroCommand(
             takeScreenshotCommand = TakeScreenshotCommand(
-              screenshotFileID
+              stepId
             )
           ),
         ),
@@ -748,23 +752,28 @@ private suspend fun step(
   }
   val uiTreeStrings = device.viewTreeString()
   val screenshotFilePath =
-    ArbigentFiles.screenshotsDir.absolutePath + File.separator + "$screenshotFileID.png"
+    ArbigentFiles.screenshotsDir.absolutePath + File.separator + "$stepId.png"
+  val decisionJsonlFilePath =
+    ArbigentFiles.jsonlsDir.absolutePath + File.separator + "$stepId.jsonl"
   val lastScreenshot = contextHolder.steps().lastOrNull()?.screenshotFilePath
   val newScreenshot = File(screenshotFilePath)
   if (detectStuckScreen(lastScreenshot, newScreenshot)) {
     arbigentDebugLog("Stuck screen detected.")
     contextHolder.addStep(
       ArbigentContextHolder.Step(
+        stepId = stepId,
         feedback = "Failed to produce the intended outcome. The current screen is identical to the previous one. Please try other actions.",
         screenshotFilePath = screenshotFilePath
       )
     )
   }
   val decisionInput = ArbigentAi.DecisionInput(
+    stepId = stepId,
     contextHolder = contextHolder,
     formFactor = deviceFormFactor,
     elements = elements,
     uiTreeStrings = uiTreeStrings,
+    apiCallJsonLFilePath = decisionJsonlFilePath,
     focusedTreeString = if (deviceFormFactor.isTv()) {
       // It is important to get focused tree string for TV form factor
       device.focusedTreeString()
@@ -789,6 +798,7 @@ private suspend fun step(
     imageAssertionOutput.results.forEach {
       contextHolder.addStep(
         ArbigentContextHolder.Step(
+          stepId = stepId,
           feedback = "Image assertion ${if (it.isPassed) "passed" else "failed"}. \nfulfillmentPercent:${it.fulfillmentPercent} \nprompt:${it.assertionPrompt} \nexplanation:${it.explanation}",
           screenshotFilePath = screenshotFilePath,
           aiRequest = decisionOutput.step.aiRequest,
@@ -805,6 +815,7 @@ private suspend fun step(
       imageAssertionOutput.results.filter { it.isPassed.not() }.forEach {
         contextHolder.addStep(
           ArbigentContextHolder.Step(
+            stepId = stepId,
             feedback = "Failed to reach the goal by image assertion. Image assertion prompt:${it.assertionPrompt}. explanation:${it.explanation}",
             screenshotFilePath = screenshotFilePath,
             aiRequest = decisionOutput.step.aiRequest,
@@ -824,6 +835,7 @@ private suspend fun step(
   }
   executeCommandChain(
     ExecuteCommandsInput(
+      stepId = stepId,
       decisionOutput = decisionOutput,
       arbigentContextHolder = contextHolder,
       screenshotFilePath = screenshotFilePath,

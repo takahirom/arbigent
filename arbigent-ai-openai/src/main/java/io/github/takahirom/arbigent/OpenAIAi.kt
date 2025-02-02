@@ -4,6 +4,7 @@ import com.github.takahirom.roborazzi.AiAssertionOptions
 import com.github.takahirom.roborazzi.AnySerializer
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.OpenAiAiAssertionModel
+import io.github.takahirom.arbigent.ConfidentialInfo.removeConfidentialInfo
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.HttpRequestRetry
@@ -28,6 +29,7 @@ import io.ktor.util.encodeBase64
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.MissingFieldException
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -100,12 +102,14 @@ public class OpenAIAi(
   init {
     ConfidentialInfo.addStringToBeRemoved(apiKey)
   }
+
   private var retried = 0
 
-  @OptIn(ExperimentalSerializationApi::class)
+  @OptIn(ExperimentalSerializationApi::class, ArbigentInternalApi::class)
   override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
     val contextHolder = decisionInput.contextHolder
     val screenshotFilePath = decisionInput.screenshotFilePath
+    val decisionJsonlFilePath = decisionInput.apiCallJsonLFilePath
     val formFactor = decisionInput.formFactor
     val uiTreeStrings = decisionInput.uiTreeStrings
     val focusedTree = decisionInput.focusedTreeString
@@ -154,10 +158,17 @@ public class OpenAIAi(
         )
       )
     )
+    val completionRequest = ChatCompletionRequest(
+      model = modelName,
+      messages = messages,
+      ResponseFormat(
+        type = "json_schema",
+        jsonSchema = buildActionSchema(agentCommandTypes = agentCommandTypes),
+      ),
+    )
     val responseText = try {
       chatCompletion(
-        agentCommandTypes = agentCommandTypes,
-        messages = messages,
+        completionRequest,
       )
     } catch (e: ArbigentAiRateLimitExceededException) {
       val waitMs = 10000L * (1 shl retried)
@@ -169,11 +180,32 @@ public class OpenAIAi(
       return decideAgentCommands(decisionInput)
     }
     retried = 0
+    val json = Json { ignoreUnknownKeys = true }
+    var responseObj: ChatCompletionResponse?
     try {
       val step = try {
-        parseResponse(responseText, messages, decisionInput)
+        responseObj = json.decodeFromString<ChatCompletionResponse>(responseText)
+        val file = File(decisionJsonlFilePath)
+        file.parentFile.mkdirs()
+        file.writeText(
+          json.encodeToString(
+            ApiCall(
+              requestBody = completionRequest,
+              responseBody = responseObj,
+              metadata = ApiCallMetadata()
+            )
+          ).removeConfidentialInfo()
+        )
+        val step = parseResponse(
+          json = json,
+          chatCompletionResponse = responseObj,
+          messages = messages,
+          decisionInput = decisionInput
+        )
+        step
       } catch (e: ArbigentAi.FailedToParseResponseException) {
         ArbigentContextHolder.Step(
+          stepId = decisionInput.stepId,
           feedback = "Failed to parse AI response: ${e.message}",
           screenshotFilePath = screenshotFilePath,
           aiRequest = messages.toHumanReadableString(),
@@ -209,7 +241,8 @@ $templates"""
   }
 
   private fun parseResponse(
-    response: String,
+    json: Json,
+    chatCompletionResponse: ChatCompletionResponse,
     messages: List<ChatMessage>,
     decisionInput: ArbigentAi.DecisionInput,
   ): ArbigentContextHolder.Step {
@@ -217,9 +250,7 @@ $templates"""
     val elements = decisionInput.elements
     val agentCommandList = decisionInput.agentCommandTypes
 
-    val json = Json { ignoreUnknownKeys = true }
-    val responseObj = json.decodeFromString<ChatCompletionResponse>(response)
-    val content = responseObj.choices.firstOrNull()?.message?.content ?: ""
+    val content = chatCompletionResponse.choices.firstOrNull()?.message?.content ?: ""
     return try {
       val jsonElement = json.parseToJsonElement(content)
       val jsonObject = jsonElement.jsonObject
@@ -320,6 +351,7 @@ $templates"""
         else -> throw IllegalArgumentException("Unsupported action: $action")
       }
       ArbigentContextHolder.Step(
+        stepId = decisionInput.stepId,
         agentCommand = agentCommand,
         action = action,
         imageDescription = jsonObject["image-description"]?.jsonPrimitive?.content ?: "",
@@ -327,6 +359,7 @@ $templates"""
         aiRequest = messages.toHumanReadableString(),
         aiResponse = content,
         screenshotFilePath = screenshotFilePath,
+        apiCallJsonLFilePath = decisionInput.apiCallJsonLFilePath,
         uiTreeStrings = decisionInput.uiTreeStrings
       )
     } catch (e: Exception) {
@@ -338,8 +371,7 @@ $templates"""
   }
 
   private fun chatCompletion(
-    agentCommandTypes: List<AgentCommandType>,
-    messages: List<ChatMessage>
+    chatCompletionRequest: ChatCompletionRequest
   ): String {
     return runBlocking {
       val response: HttpResponse =
@@ -347,14 +379,7 @@ $templates"""
           requestBuilderModifier()
           contentType(ContentType.Application.Json)
           setBody(
-            ChatCompletionRequest(
-              model = modelName,
-              messages = messages,
-              ResponseFormat(
-                type = "json_schema",
-                jsonSchema = buildActionSchema(agentCommandTypes = agentCommandTypes),
-              ),
-            )
+            chatCompletionRequest
           )
         }
       if (response.status == HttpStatusCode.TooManyRequests) {
