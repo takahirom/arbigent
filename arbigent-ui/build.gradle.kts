@@ -15,6 +15,7 @@ version = gitVersion()
 
 kotlin {
   java.toolchain {
+    vendor = JvmVendorSpec.JETBRAINS
     languageVersion.set(JavaLanguageVersion.of(17))
   }
 }
