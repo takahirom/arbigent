@@ -531,7 +531,7 @@ public fun AgentConfigBuilder(
             val output1: ExecutionResult.Failed = output as ExecutionResult.Failed
             output1.contextHolder?.let { contextHolder ->
               contextHolder.steps().forEach { step ->
-                val key = step.uiTreeStrings?.optimizedTreeString + contextHolder.prompt()
+                val key = step.uiTreeStrings?.optimizedTreeString + step.contextPrompt
                 aiDecisionCache.remove(key)
               }
             }

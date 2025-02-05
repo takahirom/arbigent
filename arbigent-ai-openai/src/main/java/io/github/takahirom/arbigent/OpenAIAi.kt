@@ -108,6 +108,7 @@ public class OpenAIAi(
   @OptIn(ExperimentalSerializationApi::class, ArbigentInternalApi::class)
   override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
     val contextHolder = decisionInput.contextHolder
+    val contextPrompt = contextHolder.prompt()
     val screenshotFilePath = decisionInput.screenshotFilePath
     val decisionJsonlFilePath = decisionInput.apiCallJsonLFilePath
     val formFactor = decisionInput.formFactor
@@ -210,7 +211,7 @@ public class OpenAIAi(
           screenshotFilePath = screenshotFilePath,
           aiRequest = messages.toHumanReadableString(),
           aiResponse = responseText,
-          contextPrompt = contextHolder.prompt(),
+          contextPrompt = contextPrompt,
           uiTreeStrings = uiTreeStrings,
         )
       }
@@ -222,13 +223,13 @@ public class OpenAIAi(
   }
 
   private fun buildPrompt(
-    arbigentContextHolder: ArbigentContextHolder,
+    contextHolder: ArbigentContextHolder,
     dumpHierarchy: String,
     focusedTree: String?,
     agentCommandTypes: List<AgentCommandType>,
     elements: ArbigentElementList
   ): String {
-    val contextPrompt = arbigentContextHolder.prompt()
+    val contextPrompt = contextHolder.prompt()
     val templates = agentCommandTypes.joinToString("\nor\n") { it.templateForAI() }
     val focusedTreeText = focusedTree?.let { "\nCurrently focused Tree:\n$it\n\n" } ?: ""
     val prompt = """
