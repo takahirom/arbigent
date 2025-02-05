@@ -526,16 +526,15 @@ public fun AgentConfigBuilder(
       ): ExecutionResult {
         val output: ExecutionResult = chain.proceed(executeInput)
         when (output) {
-          ExecutionResult.Cancelled,
           is ExecutionResult.Failed -> {
-            val output1: ExecutionResult.Failed = output as ExecutionResult.Failed
-            output1.contextHolder?.let { contextHolder ->
+            output.contextHolder?.let { contextHolder ->
               contextHolder.steps().forEach { step ->
                 val key = step.uiTreeStrings?.optimizedTreeString + step.contextPrompt
                 aiDecisionCache.remove(key)
               }
             }
           }
+          ExecutionResult.Cancelled,
           ExecutionResult.Success -> {
           }
         }
