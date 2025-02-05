@@ -128,6 +128,7 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
     val resultDir = File(defaultResultPath)
     resultDir.mkdirs()
     ArbigentFiles.screenshotsDir = File(resultDir, "screenshots")
+    ArbigentFiles.jsonlsDir = File(resultDir, "jsonls")
     ArbigentFiles.logFile = File(logFile)
     val resultFile = File(resultDir, "result.yml")
     val ai: ArbigentAi = aiType.let { aiType ->
