@@ -25,6 +25,7 @@ public class ArbigentContextHolder(
     public val uiTreeStrings: ArbigentUiTreeStrings? = null,
     public val aiRequest: String? = null,
     public val aiResponse: String? = null,
+    public val contextPrompt: String? = null,
     public val timestamp: Long = System.currentTimeMillis(),
     public val screenshotFilePath: String,
     public val apiCallJsonLFilePath: String? = null,

@@ -31,11 +31,11 @@ public class ArbigentAgent(
   private val deviceFormFactor = agentConfig.deviceFormFactor
   private val prompt = agentConfig.prompt
 
-  private val executeInterceptors: List<ArbigentExecuteInterceptor> = interceptors
-    .filterIsInstance<ArbigentExecuteInterceptor>()
+  private val executeInterceptors: List<ArbigentExecutionInterceptor> = interceptors
+    .filterIsInstance<ArbigentExecutionInterceptor>()
 
-  private val executeChain: suspend (ExecuteInput) -> ExecuteResult = { input ->
-    var chain: suspend (ExecuteInput) -> ExecuteResult = { executeInput -> executeDefault(executeInput) }
+  private val executeChain: suspend (ExecuteInput) -> ExecutionResult = { input ->
+    var chain: suspend (ExecuteInput) -> ExecutionResult = { executeInput -> executeDefault(executeInput) }
     executeInterceptors.reversed().forEach { interceptor ->
       val previousChain = chain
       chain = { currentInput ->
@@ -199,9 +199,9 @@ public class ArbigentAgent(
     )
 
     when (executeChain(executeInput)) {
-      ExecuteResult.Success -> arbigentDebugLog("Execution succeeded.")
-      ExecuteResult.Failed -> arbigentDebugLog("Execution failed.")
-      ExecuteResult.Cancelled -> arbigentDebugLog("Execution cancelled.")
+      ExecutionResult.Success -> arbigentDebugLog("Execution succeeded.")
+      is ExecutionResult.Failed -> arbigentDebugLog("Execution failed.")
+      ExecutionResult.Cancelled -> arbigentDebugLog("Execution cancelled.")
     }
   }
 
@@ -224,10 +224,10 @@ public class ArbigentAgent(
     val executeCommandChain: (ExecuteCommandsInput) -> ExecuteCommandsOutput,
   )
 
-  public sealed interface ExecuteResult {
-    public object Success : ExecuteResult
-    public object Failed : ExecuteResult
-    public object Cancelled : ExecuteResult
+  public sealed interface ExecutionResult {
+    public object Success : ExecutionResult
+    public data class Failed(val contextHolder: ArbigentContextHolder?) : ExecutionResult
+    public object Cancelled : ExecutionResult
   }
 
   public data class StepInput(
@@ -359,6 +359,10 @@ public sealed interface ArbigentAiDecisionCache {
 
     public operator fun set(key: String, value: ArbigentAi.DecisionOutput) {
       cache.put(key, value)
+    }
+
+    public fun remove(key: String) {
+      cache.invalidate(key)
     }
 
     public companion object {
@@ -499,7 +503,7 @@ public fun AgentConfigBuilder(
     }
   }
   if (aiDecisionCache is ArbigentAiDecisionCache.Enabled) {
-    addInterceptor(object : ArbigentDecisionInterceptor {
+    addInterceptor(object : ArbigentDecisionInterceptor, ArbigentExecutionInterceptor {
       override fun intercept(
         decisionInput: ArbigentAi.DecisionInput,
         chain: ArbigentDecisionInterceptor.Chain
@@ -513,6 +517,28 @@ public fun AgentConfigBuilder(
         arbigentDebugLog("AI-decision cache miss with view tree and prompt")
         val output = chain.proceed(decisionInput)
         aiDecisionCache[key] = output
+        return output
+      }
+
+      override suspend fun intercept(
+        executeInput: ExecuteInput,
+        chain: ArbigentExecutionInterceptor.Chain
+      ): ExecutionResult {
+        val output: ExecutionResult = chain.proceed(executeInput)
+        when (output) {
+          ExecutionResult.Cancelled,
+          is ExecutionResult.Failed -> {
+            val output1: ExecutionResult.Failed = output as ExecutionResult.Failed
+            output1.contextHolder?.let { contextHolder ->
+              contextHolder.steps().forEach { step ->
+                val key = step.uiTreeStrings?.optimizedTreeString + contextHolder.prompt()
+                aiDecisionCache.remove(key)
+              }
+            }
+          }
+          ExecutionResult.Success -> {
+          }
+        }
         return output
       }
     })
@@ -576,14 +602,14 @@ public interface ArbigentExecuteCommandsInterceptor : ArbigentInterceptor {
   }
 }
 
-public interface ArbigentExecuteInterceptor : ArbigentInterceptor {
+public interface ArbigentExecutionInterceptor : ArbigentInterceptor {
   public suspend fun intercept(
     executeInput: ExecuteInput,
     chain: Chain
-  ): ExecuteResult
+  ): ExecutionResult
 
   public fun interface Chain {
-    public suspend fun proceed(executeInput: ExecuteInput): ExecuteResult
+    public suspend fun proceed(executeInput: ExecuteInput): ExecutionResult
   }
 }
 
@@ -667,7 +693,7 @@ private fun executeCommands(
   return ExecuteCommandsOutput()
 }
 
-private suspend fun executeDefault(input: ExecuteInput): ExecuteResult {
+private suspend fun executeDefault(input: ExecuteInput): ExecutionResult {
   try {
     input.updateIsRunning(true)
     input.updateCurrentGoal(input.goal)
@@ -693,7 +719,7 @@ private suspend fun executeDefault(input: ExecuteInput): ExecuteResult {
       )
       when (input.stepChain(stepInput)) {
         StepResult.GoalAchieved -> break
-        StepResult.Failed -> return ExecuteResult.Failed
+        StepResult.Failed -> return ExecutionResult.Failed(contextHolder)
         StepResult.Continue -> {}
       }
       yield()
@@ -701,17 +727,17 @@ private suspend fun executeDefault(input: ExecuteInput): ExecuteResult {
 
     ArbigentGlobalStatus.onFinished()
     return if (contextHolder.isGoalAchieved()) {
-      ExecuteResult.Success
+      ExecutionResult.Success
     } else {
-      ExecuteResult.Failed
+      ExecutionResult.Failed(contextHolder)
     }
   } catch (e: CancellationException) {
     ArbigentGlobalStatus.onCanceled()
-    return ExecuteResult.Cancelled
+    return ExecutionResult.Cancelled
   } catch (e: Exception) {
     errorHandler(e)
     ArbigentGlobalStatus.onError(e)
-    return ExecuteResult.Failed
+    return ExecutionResult.Failed(null)
   } finally {
     input.updateIsRunning(false)
     ArbigentGlobalStatus.onFinished()
