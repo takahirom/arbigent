@@ -210,6 +210,7 @@ public class OpenAIAi(
           screenshotFilePath = screenshotFilePath,
           aiRequest = messages.toHumanReadableString(),
           aiResponse = responseText,
+          contextPrompt = contextHolder.prompt(),
           uiTreeStrings = uiTreeStrings,
         )
       }
