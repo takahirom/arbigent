@@ -90,6 +90,7 @@ class FakeAi : ArbigentAi {
     return ArbigentAi.DecisionOutput(
       listOf(agentCommand),
       ArbigentContextHolder.Step(
+        stepId = "stepId",
         agentCommand = agentCommand,
         memo = "memo",
         screenshotFilePath = "screenshotFileName"

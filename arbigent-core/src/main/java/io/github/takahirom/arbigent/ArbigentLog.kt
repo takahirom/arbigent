@@ -1,5 +1,6 @@
 package io.github.takahirom.arbigent
 
+import io.github.takahirom.arbigent.ConfidentialInfo.removeConfidentialInfo
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -85,9 +86,7 @@ public val arbigentLogFormatter: DateTimeFormatter = DateTimeFormatterBuilder()
   .toFormatter()
 
 private fun printLog(level: ArbigentLogLevel, rawLog: String, instance: Any? = null) {
-  val log = ConfidentialInfo.shouldBeRemovedStrings.fold(rawLog) { acc, s ->
-    acc.replace(s, "****")
-  }
+  val log = rawLog.removeConfidentialInfo()
   val logContent =
     if (instance != null) {
       "${level.shortName()}: $log (${instance::class.simpleName})"
@@ -112,5 +111,12 @@ public object ConfidentialInfo {
       return
     }
     _shouldBeRemovedStrings.add(string)
+  }
+
+  @ArbigentInternalApi
+  public fun String.removeConfidentialInfo(): String {
+    return shouldBeRemovedStrings.fold(this) { acc, s ->
+      acc.replace(s, "****")
+    }
   }
 }

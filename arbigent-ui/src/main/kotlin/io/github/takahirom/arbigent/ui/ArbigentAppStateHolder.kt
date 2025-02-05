@@ -1,6 +1,8 @@
 package io.github.takahirom.arbigent.ui
 
 import io.github.takahirom.arbigent.*
+import io.github.takahirom.arbigent.result.StepFeedback
+import io.github.takahirom.arbigent.result.StepFeedbackEvent
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.io.File
@@ -79,6 +81,8 @@ class ArbigentAppStateHolder(
   val selectedScenarioIndex: MutableStateFlow<Int> = MutableStateFlow(0)
   private val coroutineScope =
     CoroutineScope(ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob())
+
+  val stepFeedbacks: MutableStateFlow<Set<StepFeedback>> = MutableStateFlow(setOf())
 
   fun addSubScenario(parent: ArbigentScenarioStateHolder) {
     val scenarioStateHolder = ArbigentScenarioStateHolder().apply {
@@ -335,7 +339,7 @@ class ArbigentAppStateHolder(
     if (file == null) {
       return
     }
-    projectStateFlow.value?.getResult()?.let {
+    projectStateFlow.value?.getResult()?.copy(stepFeedbacks = stepFeedbacks.value.toList())?.let {
       file.mkdirs()
       arbigentProjectSerializer.save(it, File(file, "result.yml"))
       ArbigentHtmlReport().saveReportHtml(file.absolutePath, it)
@@ -352,5 +356,25 @@ class ArbigentAppStateHolder(
 
   fun scenarioCountById(newScenarioId: String): Int {
     return allScenarioStateHoldersStateFlow.value.count { it.id == newScenarioId }
+  }
+
+  fun onStepFeedback(feedback: StepFeedbackEvent) {
+    when (feedback) {
+      is StepFeedback -> {
+        stepFeedbacks.value += feedback
+      }
+
+      is StepFeedbackEvent.RemoveBad -> {
+        stepFeedbacks.value = stepFeedbacks.value.filter {
+          !(it is StepFeedback.Bad && it.stepId == feedback.stepId)
+        }.toSet()
+      }
+
+      is StepFeedbackEvent.RemoveGood -> {
+        stepFeedbacks.value = stepFeedbacks.value.filter {
+          !(it is StepFeedback.Good && it.stepId == feedback.stepId)
+        }.toSet()
+      }
+    }
   }
 }

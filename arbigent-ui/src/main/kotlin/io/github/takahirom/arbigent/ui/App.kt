@@ -108,10 +108,15 @@ private fun MainScreen(
       thickness = 8.dp
     )
     val scenarioStateHolderAndDepth = scenarioAndDepths.getOrNull(scenarioIndex)
+    val stepFeedbacks by appStateHolder.stepFeedbacks.collectAsState()
     if (scenarioStateHolderAndDepth != null) {
       Column(Modifier.weight(3f)) {
         Scenario(
           scenarioStateHolder = scenarioStateHolderAndDepth.first,
+          stepFeedbacks = stepFeedbacks,
+          onStepFeedback = {
+            appStateHolder.onStepFeedback(it)
+          },
           dependencyScenarioMenu = {
             selectableItem(
               selected = scenarioStateHolderAndDepth.first.dependencyScenarioStateHolderStateFlow.value == null,

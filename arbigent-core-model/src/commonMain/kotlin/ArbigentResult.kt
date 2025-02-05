@@ -11,6 +11,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 public data class ArbigentProjectExecutionResult(
   public val scenarios: List<ArbigentScenarioResult>,
+  public val stepFeedbacks: List<StepFeedback> = listOf(),
 ) {
   public fun startTimestamp(): Long? = scenarios.firstOrNull()?.startTimestamp()
   public fun endTimestamp(): Long? = scenarios.lastOrNull()?.endTimestamp()
@@ -24,6 +25,29 @@ public data class ArbigentProjectExecutionResult(
     )
   }
 }
+
+public sealed interface StepFeedbackEvent {
+  public data class RemoveGood(val stepId: String): StepFeedbackEvent
+  public data class RemoveBad(val stepId: String): StepFeedbackEvent
+}
+
+@Serializable
+public sealed interface StepFeedback: StepFeedbackEvent {
+  @Serializable
+  @SerialName("Good")
+  public data class Good(
+    val stepId: String,
+    val reason: String? = null
+  ): StepFeedback
+
+  @Serializable
+  @SerialName("Bad")
+  public data class Bad(
+    val stepId: String,
+    val reason: String? = null
+  ): StepFeedback
+}
+
 
 @Serializable
 public data class ArbigentScenarioResult(
@@ -61,8 +85,10 @@ public data class ArbigentAgentResult(
 
 @Serializable
 public data class ArbigentAgentTaskStepResult(
+  public val stepId: String,
   public val summary: String,
   public val screenshotFilePath: String,
+  public val apiCallJsonPath: String?,
   public val agentCommand: String?,
   // UiTree is too big to store in the yaml file.
 //  public val uiTreeStrings: ArbigentUiTreeStrings?,
