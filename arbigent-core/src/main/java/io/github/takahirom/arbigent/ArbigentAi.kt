@@ -29,8 +29,8 @@ public interface ArbigentAi {
   public data class ImageAssertionInput(
     val ai: ArbigentAi,
     val arbigentContextHolder: ArbigentContextHolder,
-    val screenshotFilePath: String,
-    val assertions: List<ArbigentImageAssertion>,
+    val screenshotFilePaths: List<String>,
+    val assertions: ArbigentImageAssertions,
   )
   public data class ImageAssertionOutput(
     val results: List<ImageAssertionResult>

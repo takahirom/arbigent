@@ -49,7 +49,7 @@ public class OpenAIAi(
   private val requestBuilderModifier: HttpRequestBuilder.() -> Unit = {
     header("Authorization", "Bearer $apiKey")
   },
-  loggingEnabled: Boolean = false,
+  loggingEnabled: Boolean = true,
   private val openAiImageAssertionModel: OpenAiAiAssertionModel = OpenAiAiAssertionModel(
     apiKey = apiKey,
     baseUrl = baseUrl,
@@ -438,12 +438,16 @@ $templates"""
     fun assert(retry: Int = 0): ArbigentAi.ImageAssertionOutput {
       try {
         val result = openAiImageAssertionModel.assert(
-          referenceImageFilePath = imageAssertionInput.screenshotFilePath,
-          comparisonImageFilePath = imageAssertionInput.screenshotFilePath,
-          actualImageFilePath = imageAssertionInput.screenshotFilePath,
+          assertionTargetImages = AiAssertionOptions.AssertionTargetImages(
+            images = imageAssertionInput.screenshotFilePaths.map { filePath ->
+              AiAssertionOptions.AssertionTargetImage(
+                filePath = filePath
+              )
+            }
+          ),
           aiAssertionOptions = AiAssertionOptions(
             openAiImageAssertionModel,
-            aiAssertions = imageAssertionInput.assertions.map { assertion ->
+            aiAssertions = imageAssertionInput.assertions.assertions.map { assertion ->
               AiAssertionOptions.AiAssertion(
                 assertionPrompt = assertion.assertionPrompt,
                 requiredFulfillmentPercent = assertion.requiredFulfillmentPercent

@@ -97,7 +97,7 @@ public class ArbigentAgent(
         if (assertions.isEmpty()) {
           return@foldRight ArbigentAi.ImageAssertionOutput(emptyList())
         }
-        ArbigentGlobalStatus.onImageAssertion(assertions.map { it.assertionPrompt }.joinToString()) {
+        ArbigentGlobalStatus.onImageAssertion(assertions.assertionPromptSummary()) {
           input.ai.assertImage(input)
         }
       },
@@ -387,7 +387,7 @@ public fun AgentConfigBuilder(
   prompt: ArbigentPrompt,
   deviceFormFactor: ArbigentScenarioDeviceFormFactor,
   initializationMethods: List<ArbigentScenarioContent.InitializationMethod>,
-  imageAssertions: List<ArbigentImageAssertion>,
+  imageAssertions: ArbigentImageAssertions,
   aiDecisionCache: ArbigentAiDecisionCache = ArbigentAiDecisionCache.Disabled
 ): AgentConfig.Builder = AgentConfigBuilder {
   deviceFormFactor(deviceFormFactor)
@@ -542,7 +542,7 @@ public fun AgentConfigBuilder(
       }
     })
   }
-  if (imageAssertions.isNotEmpty()) {
+  if (imageAssertions.assertions.isNotEmpty()) {
     addInterceptor(object : ArbigentImageAssertionInterceptor {
       override fun intercept(
         imageAssertionInput: ArbigentAi.ImageAssertionInput,
@@ -550,6 +550,17 @@ public fun AgentConfigBuilder(
       ): ArbigentAi.ImageAssertionOutput {
         val output = chain.proceed(
           imageAssertionInput.copy(
+            screenshotFilePaths = (1..imageAssertions.historyCount).mapNotNull { index ->
+              val path: String? = if (index == 1) {
+                imageAssertionInput.screenshotFilePaths.first()
+              } else {
+                imageAssertionInput.arbigentContextHolder.steps().reversed()
+                  .map { it.screenshotFilePath }
+                  .distinct()
+                  .getOrNull(index - 1)
+              }
+              path
+            },
             assertions = imageAssertionInput.assertions + imageAssertions
           )
         )
@@ -815,9 +826,9 @@ private suspend fun step(
       ArbigentAi.ImageAssertionInput(
         ai = ai,
         arbigentContextHolder = contextHolder,
-        screenshotFilePath = screenshotFilePath,
+        screenshotFilePaths = listOf(screenshotFilePath),
         // Added by interceptors
-        assertions = listOf()
+        assertions = ArbigentImageAssertions()
       )
     )
     imageAssertionOutput.results.forEach {

@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.loadImageBitmap
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -356,24 +357,47 @@ private fun ScenarioOptions(
           )
         }
       }
+      Column {
+        Text(
+          modifier = Modifier
+            .padding(4.dp),
+          text = "History count"
+        )
+        TextField(
+          modifier = Modifier
+            .padding(4.dp),
+          placeholder = { Text("History count") },
+          state = updatedScenarioStateHolder.imageAssertionsHistoryCountState,
+          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        )
+      }
       val imageAssertions by updatedScenarioStateHolder.imageAssertionsStateFlow.collectAsState()
       imageAssertions.forEachIndexed { index, imageAssertion: ArbigentImageAssertion ->
         Row(
           verticalAlignment = Alignment.CenterVertically
         ) {
-          TextField(
-            modifier = Modifier
-              .padding(4.dp)
+          Column(
+            Modifier
               .weight(1f)
-              .testTag("image_assertion"),
-            placeholder = { Text("XX button should exist") },
-            value = imageAssertion.assertionPrompt,
-            onValueChange = {
-              val newImageAssertions = imageAssertions.toMutableList()
-              newImageAssertions[index] = imageAssertion.copy(assertionPrompt = it)
-              updatedScenarioStateHolder.imageAssertionsStateFlow.value = newImageAssertions
-            },
-          )
+          ) {
+            Text(
+              modifier = Modifier.padding(4.dp),
+              text = "Image assertion ${index + 1}"
+            )
+            TextField(
+              modifier = Modifier
+                .padding(4.dp)
+                .testTag("image_assertion"),
+              placeholder = { Text("XX button should exist") },
+              value = imageAssertion.assertionPrompt,
+              onValueChange = {
+                val newImageAssertions = imageAssertions.toMutableList()
+                newImageAssertions[index] = imageAssertion.copy(assertionPrompt = it)
+                updatedScenarioStateHolder.imageAssertionsStateFlow.value = newImageAssertions
+              },
+            )
+          }
+
           IconActionButton(
             key = AllIconsKeys.General.Delete,
             onClick = {
@@ -850,28 +874,28 @@ private fun ContentPanel(
                       "         • Analyze response patterns \n" +
                       "No data leaves your environment."
                   IconActionButton(
-                      key = AllIconsKeys.Ide.Like,
-                      onClick = {
-                        onStepFeedback(
-                          if (isGood) {
-                            StepFeedbackEvent.RemoveGood(step.stepId)
-                          } else {
-                            StepFeedback.Good(step.stepId)
-                          }
-                        )
-                      },
-                      colorFilter = if (isGood) {
-                        ColorFilter.tint(JewelTheme.colorPalette.green(8))
-                      } else {
-                        null
-                      },
-                      contentDescription = feedbackHintText,
-                      hint = Size(16),
-                    ) {
-                      Text(
-                        text = feedbackHintText,
+                    key = AllIconsKeys.Ide.Like,
+                    onClick = {
+                      onStepFeedback(
+                        if (isGood) {
+                          StepFeedbackEvent.RemoveGood(step.stepId)
+                        } else {
+                          StepFeedback.Good(step.stepId)
+                        }
                       )
-                    }
+                    },
+                    colorFilter = if (isGood) {
+                      ColorFilter.tint(JewelTheme.colorPalette.green(8))
+                    } else {
+                      null
+                    },
+                    contentDescription = feedbackHintText,
+                    hint = Size(16),
+                  ) {
+                    Text(
+                      text = feedbackHintText,
+                    )
+                  }
                   // Bad feedback button
                   val isBad = stepFeedbacks.any { it is StepFeedback.Bad && it.stepId == step.stepId }
                   IconActionButton(

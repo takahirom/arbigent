@@ -38,3 +38,15 @@ include(":arbigent-cli")
 include(":arbigent-ui")
 include(":arbigent-core-web-report")
 include(":sample-test")
+
+includeBuild("../roborazzi") {
+    dependencySubstitution {
+        substitute(module("io.github.takahirom.roborazzi:roborazzi-ai-openai")).using(project(":roborazzi-ai-openai"))
+    }
+}
+
+includeBuild("../roborazzi/include-build") {
+    dependencySubstitution {
+        substitute(module("io.github.takahirom.roborazzi:roborazzi-core")).using(project(":roborazzi-core"))
+    }
+}

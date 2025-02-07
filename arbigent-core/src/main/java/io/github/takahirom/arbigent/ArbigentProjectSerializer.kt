@@ -95,7 +95,7 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
           prompt = projectSettings.prompt,
           deviceFormFactor = nodeScenario.deviceFormFactor,
           initializationMethods = nodeScenario.initializationMethods.ifEmpty { listOf(nodeScenario.initializeMethods) },
-          imageAssertions = nodeScenario.imageAssertions,
+          imageAssertions = ArbigentImageAssertions(nodeScenario.imageAssertions, nodeScenario.imageAssertionHistoryCount),
           aiDecisionCache = aiDecisionCache
         ).apply {
           ai(aiFactory())
@@ -131,6 +131,7 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
   public val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Mobile,
   // This is no longer used and will be removed in the future.
   public val cleanupData: CleanupData = CleanupData.Noop,
+  public val imageAssertionHistoryCount: Int = 1,
   public val imageAssertions: List<ArbigentImageAssertion> = emptyList()
 ) {
   @Serializable
