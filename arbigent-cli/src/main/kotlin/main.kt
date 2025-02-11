@@ -92,14 +92,14 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
     .default("$defaultResultPath/arbigent.log")
 
   private val scenarioIds by option(
-    "--scenario-id",
+    "--scenario-ids",
     help = "Scenario IDs to execute (comma-separated or multiple flags)"
   )
     .split(",")
     .multiple()
 
   private val tags by option(
-    "--tag",
+    "--tags",
     help = "Tags to filter scenarios. Use comma-separated values which supports OR operation"
   )
     .split(",")
