@@ -5,7 +5,7 @@ plugins {
   id("org.jetbrains.kotlin.jvm") version "2.0.21"
   id("org.jetbrains.compose")
   id("org.jetbrains.kotlin.plugin.compose")
-  id("io.github.takahirom.roborazzi") version "1.39.0"
+  id("io.github.takahirom.roborazzi") version "1.41.0"
   id("org.jetbrains.kotlin.plugin.serialization")
   id("com.palantir.git-version") version "0.15.0"
 }
@@ -40,7 +40,7 @@ dependencies {
   testImplementation(compose.uiTest)
   testImplementation("io.github.takahirom.robospec:robospec:0.2.0")
   // roborazzi
-  testImplementation("io.github.takahirom.roborazzi:roborazzi-compose-desktop:1.39.0")
+  testImplementation("io.github.takahirom.roborazzi:roborazzi-compose-desktop:1.41.0")
   implementation(project(":arbigent-core"))
   implementation(project(":arbigent-ai-openai"))
   implementation("io.github.takahirom.rin:rin:0.3.0")

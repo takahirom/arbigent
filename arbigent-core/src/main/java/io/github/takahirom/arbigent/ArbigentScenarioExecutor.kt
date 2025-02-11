@@ -6,6 +6,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.Serializable
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.math.max
 
 public data class ArbigentScenarioRunningInfo(
   val allTasks: Int,
@@ -21,6 +22,26 @@ public data class ArbigentScenarioRunningInfo(
         step: $currentStep/$maxStep
         retry: $retriedTasks/$maxRetry
     """.trimIndent()
+  }
+}
+
+public data class ArbigentImageAssertions(
+  val assertions: List<ArbigentImageAssertion> = listOf(),
+  val historyCount: Int = 1,
+) {
+  public operator fun plus(assertions: ArbigentImageAssertions): ArbigentImageAssertions {
+    return ArbigentImageAssertions(
+      assertions = this.assertions + assertions.assertions,
+      historyCount = maxOf(this.historyCount, assertions.historyCount)
+    )
+  }
+
+  public fun isEmpty(): Boolean {
+    return assertions.isEmpty()
+  }
+
+  public fun assertionPromptSummary(): String {
+    return assertions.joinToString("\n") { it.assertionPrompt }
   }
 }
 

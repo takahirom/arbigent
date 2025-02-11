@@ -33,6 +33,7 @@ constructor(
     )
   val imageAssertionsStateFlow: MutableStateFlow<List<ArbigentImageAssertion>> =
     MutableStateFlow(emptyList())
+  val imageAssertionsHistoryCountState: TextFieldState = TextFieldState("1")
   private val _initializationMethodStateFlow: MutableStateFlow<List<ArbigentScenarioContent.InitializationMethod>> =
     MutableStateFlow(listOf(ArbigentScenarioContent.InitializationMethod.Back()))
   val initializationMethodStateFlow: StateFlow<List<ArbigentScenarioContent.InitializationMethod>> =
@@ -129,6 +130,7 @@ constructor(
       deviceFormFactor = deviceFormFactorStateFlow.value,
       // This is no longer used.
       cleanupData = ArbigentScenarioContent.CleanupData.Noop,
+      imageAssertionHistoryCount = imageAssertionsHistoryCountState.text.toString().toIntOrNull() ?: 1,
       imageAssertions = imageAssertionsStateFlow.value.filter { it.assertionPrompt.isNotBlank() }
     )
   }
@@ -148,6 +150,9 @@ constructor(
     // This is no longer used.
     cleanupDataStateFlow.value = ArbigentScenarioContent.CleanupData.Noop
     imageAssertionsStateFlow.value = scenarioContent.imageAssertions.toMutableList()
+    imageAssertionsHistoryCountState.edit {
+      replace(0, length, scenarioContent.imageAssertionHistoryCount.toString())
+    }
     _initializationMethodStateFlow.value = scenarioContent.initializationMethods.toMutableList()
     deviceFormFactorStateFlow.value = scenarioContent.deviceFormFactor
   }

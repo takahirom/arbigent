@@ -1,6 +1,8 @@
 package io.github.takahirom.arbigent
 
 import com.github.takahirom.roborazzi.AiAssertionOptions
+import com.github.takahirom.roborazzi.AiAssertionOptions.AiAssertionModel.TargetImage
+import com.github.takahirom.roborazzi.AiAssertionOptions.AiAssertionModel.TargetImages
 import com.github.takahirom.roborazzi.AnySerializer
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.OpenAiAiAssertionModel
@@ -49,7 +51,7 @@ public class OpenAIAi(
   private val requestBuilderModifier: HttpRequestBuilder.() -> Unit = {
     header("Authorization", "Bearer $apiKey")
   },
-  loggingEnabled: Boolean = false,
+  loggingEnabled: Boolean = true,
   private val openAiImageAssertionModel: OpenAiAiAssertionModel = OpenAiAiAssertionModel(
     apiKey = apiKey,
     baseUrl = baseUrl,
@@ -438,12 +440,16 @@ $templates"""
     fun assert(retry: Int = 0): ArbigentAi.ImageAssertionOutput {
       try {
         val result = openAiImageAssertionModel.assert(
-          referenceImageFilePath = imageAssertionInput.screenshotFilePath,
-          comparisonImageFilePath = imageAssertionInput.screenshotFilePath,
-          actualImageFilePath = imageAssertionInput.screenshotFilePath,
+          targetImages = TargetImages(
+            images = imageAssertionInput.screenshotFilePaths.map { filePath ->
+              TargetImage(
+                filePath = filePath
+              )
+            }
+          ),
           aiAssertionOptions = AiAssertionOptions(
             openAiImageAssertionModel,
-            aiAssertions = imageAssertionInput.assertions.map { assertion ->
+            aiAssertions = imageAssertionInput.assertions.assertions.map { assertion ->
               AiAssertionOptions.AiAssertion(
                 assertionPrompt = assertion.assertionPrompt,
                 requiredFulfillmentPercent = assertion.requiredFulfillmentPercent
