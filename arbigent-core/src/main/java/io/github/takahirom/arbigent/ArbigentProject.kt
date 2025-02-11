@@ -33,16 +33,7 @@ public class ArbigentProject(
 
 
   public suspend fun execute() {
-    leafScenarioAssignments()
-      .forEach { (scenario, scenarioExecutor) ->
-        arbigentInfoLog("Start scenario: $scenario")
-        try {
-          scenarioExecutor.execute(scenario)
-        } catch (e: FailedToArchiveException) {
-          arbigentErrorLog("Failed to archive: $scenario" + e.stackTraceToString())
-        }
-        arbigentDebugLog(scenarioExecutor.statusText())
-      }
+    executeScenarios(leafScenarioAssignments().map { it.scenario })
   }
 
   public suspend fun executeScenarios(scenarios: List<ArbigentScenario>) {
