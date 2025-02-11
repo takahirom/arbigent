@@ -363,7 +363,7 @@ public class MaestroDevice(
 
       // Function to check if two ranges overlap
       fun isOverlapping(start1: Int, end1: Int, start2: Int, end2: Int): Boolean {
-        return maxOf(start1, start2) <= minOf(end1, end2)
+        return maxOf(start1, start2) < minOf(end1, end2)
       }
 
       arbigentDebugLog("currentBounds: $currentBounds")
