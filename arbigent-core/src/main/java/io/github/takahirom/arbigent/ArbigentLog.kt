@@ -85,6 +85,9 @@ public val arbigentLogFormatter: DateTimeFormatter = DateTimeFormatterBuilder()
   .appendFraction(ChronoField.NANO_OF_SECOND, 3, 3, true)
   .toFormatter()
 
+@ArbigentInternalApi
+public var printLogger: (String) -> Unit = { println(it) }
+
 private fun printLog(level: ArbigentLogLevel, rawLog: String, instance: Any? = null) {
   val log = rawLog.removeConfidentialInfo()
   val logContent =
@@ -93,7 +96,7 @@ private fun printLog(level: ArbigentLogLevel, rawLog: String, instance: Any? = n
     } else {
       "${level.shortName()}: $log"
     }
-  println("Arbigent: $logContent")
+  printLogger("Arbigent: $logContent")
   ArbigentFiles.logFile?.parentFile?.mkdirs()
   val date = arbigentLogFormatter.format(Instant.now().atZone(ZoneId.systemDefault()))
   ArbigentFiles.logFile?.appendText("$date $logContent\n")

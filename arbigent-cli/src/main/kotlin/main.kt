@@ -132,6 +132,9 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
 
   @OptIn(ArbigentInternalApi::class)
   override fun run() {
+    printLogger = {
+      echo(it)
+    }
     val resultDir = File(defaultResultPath)
     resultDir.mkdirs()
     ArbigentFiles.screenshotsDir = File(resultDir, "screenshots")
@@ -197,7 +200,7 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
     val scenarioIdSet = scenarios.map { it.id }.toSet()
     if (dryRun) {
       arbigentInfoLog("Dry run mode is enabled. Exiting without executing scenarios.")
-      exitProcess(0)
+      return
     }
 
     val os =

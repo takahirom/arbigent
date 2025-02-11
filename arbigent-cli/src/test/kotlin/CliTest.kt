@@ -8,6 +8,7 @@ import kotlin.test.assertContains
 
 class CliTest {
   private val yaml = File("build/arbigent/arbigent-project.yaml")
+
   @BeforeTest
   fun setup() {
     yaml.parentFile.mkdirs()
@@ -75,13 +76,12 @@ scenarios:
   fun `when run scenario specifying tags and shard it should run specified scenarios`() {
     val command = ArbigentCli()
     val projectFileOption = "--project-file=${yaml.absolutePath}"
-    val option = "--shard=2/2 --tags=Settings"
+    val option = "--shard=1/2 --tags=Settings"
 
     val test = command.test(
       "$projectFileOption --dry-run $option",
       envvars = mapOf("OPENAI_API_KEY" to "key")
     )
-
     assertContains(
       test.output,
       "Selected scenarios for execution: [7c325428-4e0b-4756-ada5-4f53bdc433a2]"
