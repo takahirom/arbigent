@@ -25,6 +25,7 @@ class ArbigentScenarioContentExecutorTest {
         ArbigentAgentTask("id2", "goal2", agentConfig)
       ),
       maxStepCount = 10,
+      tags = setOf(ArbigentContentTag("tag1"), ArbigentContentTag("tag2")),
       isLeaf = true,
     )
     arbigentScenarioExecutor.execute(
@@ -75,6 +76,7 @@ class ArbigentScenarioContentExecutorTest {
         ArbigentAgentTask("id2", "goal2", agentConfig)
       ),
       maxStepCount = 10,
+      tags = setOf(ArbigentContentTag("tag1"), ArbigentContentTag("tag2")),
       isLeaf = true
     )
     arbigentScenarioExecutor.execute(
@@ -143,6 +145,7 @@ class ArbigentScenarioContentExecutorTest {
         ArbigentAgentTask("id2", "goal2", agentConfig)
       ),
       maxStepCount = 10,
+      tags = setOf(ArbigentContentTag("tag1"), ArbigentContentTag("tag2")),
       isLeaf = true
     )
     arbigentScenarioExecutor.execute(
