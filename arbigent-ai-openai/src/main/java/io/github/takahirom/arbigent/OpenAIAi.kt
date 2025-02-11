@@ -1,6 +1,8 @@
 package io.github.takahirom.arbigent
 
 import com.github.takahirom.roborazzi.AiAssertionOptions
+import com.github.takahirom.roborazzi.AiAssertionOptions.AiAssertionModel.TargetImage
+import com.github.takahirom.roborazzi.AiAssertionOptions.AiAssertionModel.TargetImages
 import com.github.takahirom.roborazzi.AnySerializer
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.OpenAiAiAssertionModel
@@ -438,9 +440,9 @@ $templates"""
     fun assert(retry: Int = 0): ArbigentAi.ImageAssertionOutput {
       try {
         val result = openAiImageAssertionModel.assert(
-          assertionTargetImages = AiAssertionOptions.AssertionTargetImages(
+          targetImages = TargetImages(
             images = imageAssertionInput.screenshotFilePaths.map { filePath ->
-              AiAssertionOptions.AssertionTargetImage(
+              TargetImage(
                 filePath = filePath
               )
             }
