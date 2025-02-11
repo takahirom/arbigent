@@ -35,6 +35,13 @@ public class ArbigentProjectFileContent(
   public val settings: ArbigentProjectSettings = ArbigentProjectSettings()
 )
 
+public typealias ArbigentContentTags = Set<ArbigentContentTag>
+
+@Serializable
+public data class ArbigentContentTag(
+  public val name: String
+)
+
 @Serializable
 public data class ArbigentProjectSettings(
   public val prompt: ArbigentPrompt = ArbigentPrompt(),
@@ -95,7 +102,10 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
           prompt = projectSettings.prompt,
           deviceFormFactor = nodeScenario.deviceFormFactor,
           initializationMethods = nodeScenario.initializationMethods.ifEmpty { listOf(nodeScenario.initializeMethods) },
-          imageAssertions = ArbigentImageAssertions(nodeScenario.imageAssertions, nodeScenario.imageAssertionHistoryCount),
+          imageAssertions = ArbigentImageAssertions(
+            nodeScenario.imageAssertions,
+            nodeScenario.imageAssertionHistoryCount
+          ),
           aiDecisionCache = aiDecisionCache
         ).apply {
           ai(aiFactory())
@@ -111,6 +121,7 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
     agentTasks = result,
     maxRetry = scenario.maxRetry,
     maxStepCount = scenario.maxStep,
+    tags = scenario.tags,
     deviceFormFactor = scenario.deviceFormFactor,
     isLeaf = this.none { it.dependencyId == scenario.id }
   )
@@ -128,6 +139,7 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
   public val noteForHumans: String = "",
   public val maxRetry: Int = 3,
   public val maxStep: Int = 10,
+  public val tags: ArbigentContentTags = setOf(),
   public val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Mobile,
   // This is no longer used and will be removed in the future.
   public val cleanupData: CleanupData = CleanupData.Noop,
@@ -172,6 +184,7 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
       @Serializable
       public sealed interface ArgumentValue {
         public val value: Any
+
         @Serializable
         @SerialName("String")
         public data class StringVal(override val value: String) : ArgumentValue
@@ -221,7 +234,8 @@ public class ArbigentProjectSerializer(
   }
 
   private fun save(projectFileContent: ArbigentProjectFileContent, outputStream: OutputStream) {
-    val jsonString = yaml.encodeToString(ArbigentProjectFileContent.serializer(), projectFileContent)
+    val jsonString =
+      yaml.encodeToString(ArbigentProjectFileContent.serializer(), projectFileContent)
     fileSystem.writeText(outputStream, jsonString)
   }
 
@@ -243,7 +257,10 @@ public class ArbigentProjectSerializer(
   public fun save(projectResult: ArbigentProjectExecutionResult, file: File) {
     val outputStream = file.outputStream()
     val jsonString =
-      ArbigentProjectExecutionResult.yaml.encodeToString(ArbigentProjectExecutionResult.serializer(), projectResult)
+      ArbigentProjectExecutionResult.yaml.encodeToString(
+        ArbigentProjectExecutionResult.serializer(),
+        projectResult
+      )
     fileSystem.writeText(outputStream, jsonString)
   }
 }

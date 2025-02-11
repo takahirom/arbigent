@@ -2,6 +2,7 @@ package io.github.takahirom.arbigent.ui
 
 import androidx.compose.foundation.text.input.TextFieldState
 import io.github.takahirom.arbigent.*
+import io.github.takahirom.arbigent.coroutines.buildSingleSourceStateFlow
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -18,10 +19,11 @@ import kotlin.uuid.Uuid
 class ArbigentScenarioStateHolder
 @OptIn(ExperimentalUuidApi::class)
 constructor(
-  id: String = Uuid.random().toString()
+  id: String = Uuid.random().toString(),
+  private val tagManager: ArbigentTagManager
 ) {
   private val _id = MutableStateFlow(id)
-  val id:String get() = _id.value
+  val id: String get() = _id.value
   val goalState = TextFieldState("")
   val goal get() = goalState.text.toString()
   val noteForHumans = TextFieldState("")
@@ -40,6 +42,7 @@ constructor(
     _initializationMethodStateFlow
   val deviceFormFactorStateFlow: MutableStateFlow<ArbigentScenarioDeviceFormFactor> =
     MutableStateFlow(ArbigentScenarioDeviceFormFactor.Mobile)
+
   fun deviceFormFactor() = deviceFormFactorStateFlow.value
 
   val dependencyScenarioStateHolderStateFlow = MutableStateFlow<ArbigentScenarioStateHolder?>(null)
@@ -47,6 +50,10 @@ constructor(
   private val coroutineScope = CoroutineScope(
     ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob()
   )
+  @OptIn(ArbigentInternalApi::class)
+  val tags = coroutineScope.buildSingleSourceStateFlow(tagManager.scenarioToTagsStateFlow) {
+    it[this] ?: mutableSetOf()
+  }
   val isAchieved = arbigentScenarioExecutorStateFlow
     .flatMapLatest { it?.isSuccessFlow ?: flowOf() }
     .stateIn(
@@ -93,10 +100,14 @@ constructor(
     }
   }
 
-  fun onInitializationMethodChanged(index: Int, method: ArbigentScenarioContent.InitializationMethod) {
-    _initializationMethodStateFlow.value = initializationMethodStateFlow.value.toMutableList().apply {
-      set(index, method)
-    }
+  fun onInitializationMethodChanged(
+    index: Int,
+    method: ArbigentScenarioContent.InitializationMethod
+  ) {
+    _initializationMethodStateFlow.value =
+      initializationMethodStateFlow.value.toMutableList().apply {
+        set(index, method)
+      }
   }
 
   fun onAddImageAssertion() {
@@ -127,10 +138,12 @@ constructor(
       noteForHumans = noteForHumans.text.toString(),
       maxRetry = maxRetryState.text.toString().toIntOrNull() ?: 3,
       maxStep = maxStepState.text.toString().toIntOrNull() ?: 10,
+      tags = tagManager.tagsForScenario(this),
       deviceFormFactor = deviceFormFactorStateFlow.value,
       // This is no longer used.
       cleanupData = ArbigentScenarioContent.CleanupData.Noop,
-      imageAssertionHistoryCount = imageAssertionsHistoryCountState.text.toString().toIntOrNull() ?: 1,
+      imageAssertionHistoryCount = imageAssertionsHistoryCountState.text.toString().toIntOrNull()
+        ?: 1,
       imageAssertions = imageAssertionsStateFlow.value.filter { it.assertionPrompt.isNotBlank() }
     )
   }
@@ -147,6 +160,7 @@ constructor(
     noteForHumans.edit {
       replace(0, length, scenarioContent.noteForHumans)
     }
+    tagManager.loadTagsForScenario(this, scenarioContent.tags.map { it.name }.toSet())
     // This is no longer used.
     cleanupDataStateFlow.value = ArbigentScenarioContent.CleanupData.Noop
     imageAssertionsStateFlow.value = scenarioContent.imageAssertions.toMutableList()
@@ -158,8 +172,21 @@ constructor(
   }
 
   fun onRemoveInitializationMethod(index: Int) {
-    _initializationMethodStateFlow.value = initializationMethodStateFlow.value.toMutableList().apply {
-      removeAt(index)
-    }
+    _initializationMethodStateFlow.value =
+      initializationMethodStateFlow.value.toMutableList().apply {
+        removeAt(index)
+      }
+  }
+
+  fun addTag() {
+    tagManager.addTagForScenario(this, "New Tag")
+  }
+
+  fun removeTag(tagName: String) {
+    tagManager.removeTagForScenario(this, tagName)
+  }
+
+  fun onTagChanged(oldName: String, newTagName: String) {
+    tagManager.changeTagForScenario(this, oldName, newTagName)
   }
 }

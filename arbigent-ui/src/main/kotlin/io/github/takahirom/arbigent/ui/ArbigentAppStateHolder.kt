@@ -64,6 +64,7 @@ class ArbigentAppStateHolder(
         initialValue = emptyList()
       )
   val promptFlow = MutableStateFlow(ArbigentPrompt())
+  val tagManager = ArbigentTagManager()
   val cacheStrategyFlow = MutableStateFlow(CacheStrategy())
   val decisionCache = cacheStrategyFlow
     .map {
@@ -85,7 +86,7 @@ class ArbigentAppStateHolder(
   val stepFeedbacks: MutableStateFlow<Set<StepFeedback>> = MutableStateFlow(setOf())
 
   fun addSubScenario(parent: ArbigentScenarioStateHolder) {
-    val scenarioStateHolder = ArbigentScenarioStateHolder().apply {
+    val scenarioStateHolder = ArbigentScenarioStateHolder(tagManager = tagManager).apply {
       onAddAsSubScenario(parent)
     }
     allScenarioStateHoldersStateFlow.value += scenarioStateHolder
@@ -94,7 +95,7 @@ class ArbigentAppStateHolder(
   }
 
   fun addScenario() {
-    val scenarioStateHolder = ArbigentScenarioStateHolder()
+    val scenarioStateHolder = ArbigentScenarioStateHolder(tagManager = tagManager)
     allScenarioStateHoldersStateFlow.value += scenarioStateHolder
     selectedScenarioIndex.value =
       sortedScenariosAndDepths().indexOfFirst { it.first.id == scenarioStateHolder.id }
@@ -265,7 +266,10 @@ class ArbigentAppStateHolder(
     val projectFile = ArbigentProjectSerializer().load(file)
     val scenarios = projectFile.scenarioContents
     val arbigentScenarioStateHolders = scenarios.map { scenarioContent ->
-      ArbigentScenarioStateHolder(id = scenarioContent.id).apply {
+      ArbigentScenarioStateHolder(
+        id = scenarioContent.id,
+        tagManager = tagManager,
+      ).apply {
         load(scenarioContent)
       }
     }
