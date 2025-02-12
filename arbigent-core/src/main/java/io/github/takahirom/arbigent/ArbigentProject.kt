@@ -33,22 +33,14 @@ public class ArbigentProject(
 
 
   public suspend fun execute() {
-    leafScenarioAssignments()
-      .forEach { (scenario, scenarioExecutor) ->
-        arbigentInfoLog("Start scenario: $scenario")
-        try {
-          scenarioExecutor.execute(scenario)
-        } catch (e: FailedToArchiveException) {
-          arbigentErrorLog("Failed to archive: $scenario" + e.stackTraceToString())
-        }
-        arbigentDebugLog(scenarioExecutor.statusText())
-      }
+    executeScenarios(leafScenarioAssignments().map { it.scenario })
   }
 
   public suspend fun executeScenarios(scenarios: List<ArbigentScenario>) {
     scenarios.forEach { scenario ->
       arbigentInfoLog("Start scenario: $scenario")
-      val scenarioExecutor = scenarioAssignments().first { it.scenario.id == scenario.id }.scenarioExecutor
+      val scenarioExecutor =
+        scenarioAssignments().first { it.scenario.id == scenario.id }.scenarioExecutor
       try {
         scenarioExecutor.execute(scenario)
       } catch (e: FailedToArchiveException) {
@@ -62,7 +54,7 @@ public class ArbigentProject(
     .filter { it.scenario.isLeaf }
 
   public suspend fun execute(scenario: ArbigentScenario) {
-    arbigentInfoLog("Start scenario: ${scenario}")
+    arbigentInfoLog("Start scenario: $scenario")
     val scenarioExecutor =
       scenarioAssignments().first { it.scenario.id == scenario.id }.scenarioExecutor
     scenarioExecutor.execute(scenario)
@@ -99,7 +91,7 @@ public fun ArbigentProject(
 ): ArbigentProject {
   return ArbigentProject(
     settings = projectFileContent.settings,
-    projectFileContent.scenarioContents.map {
+    initialScenarios = projectFileContent.scenarioContents.map {
       projectFileContent.scenarioContents.createArbigentScenario(
         projectSettings = projectFileContent.settings,
         scenario = it,
@@ -125,6 +117,7 @@ public data class ArbigentScenario(
   val agentTasks: List<ArbigentAgentTask>,
   val maxRetry: Int = 0,
   val maxStepCount: Int,
+  val tags: ArbigentContentTags,
   val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Mobile,
   // Leaf means that the scenario does not have any dependant scenarios.
   // Even if we only run leaf scenarios, we can run all scenarios.

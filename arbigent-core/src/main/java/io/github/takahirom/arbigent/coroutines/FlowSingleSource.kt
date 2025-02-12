@@ -1,9 +1,11 @@
 package io.github.takahirom.arbigent.coroutines
 
+import io.github.takahirom.arbigent.ArbigentInternalApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.*
 
-inline internal fun <reified T, R> CoroutineScope.buildSingleSourceStateFlow(
+@ArbigentInternalApi
+public inline fun <reified T, R> CoroutineScope.buildSingleSourceStateFlow(
   sourceStateFlow: StateFlow<T>,
   crossinline buildBlock: (T) -> R
 ): StateFlow<R> {
@@ -27,7 +29,8 @@ inline internal fun <reified T, R> CoroutineScope.buildSingleSourceStateFlow(
   )
 }
 
-internal fun <R> buildStateFlow(
+@ArbigentInternalApi
+public fun <R> buildStateFlow(
   callBuildBlockByCurrentSource: () -> R,
   getSourceValueArray: () -> Array<*>,
   convertedStateFlow: StateFlow<Pair<Array<*>, R>>

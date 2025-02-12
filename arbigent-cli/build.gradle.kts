@@ -91,6 +91,9 @@ tasks.withType<KotlinJvmCompile>().configureEach {
   )
 }
 
+tasks.test {
+  useJUnitPlatform()
+}
 
 dependencies {
   implementation("com.github.ajalt.clikt:clikt:5.0.2")
@@ -98,6 +101,7 @@ dependencies {
   implementation(project(":arbigent-core"))
   implementation(project(":arbigent-ai-openai"))
   testImplementation(kotlin("test"))
+
   // coroutine test
   testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.5.2")
 }

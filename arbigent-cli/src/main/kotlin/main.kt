@@ -92,8 +92,15 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
     .default("$defaultResultPath/arbigent.log")
 
   private val scenarioIds by option(
-    "--scenario-id",
+    "--scenario-ids",
     help = "Scenario IDs to execute (comma-separated or multiple flags)"
+  )
+    .split(",")
+    .multiple()
+
+  private val tags by option(
+    "--tags",
+    help = "Tags to filter scenarios. Use comma-separated values which supports OR operation"
   )
     .split(",")
     .multiple()
@@ -125,6 +132,9 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
 
   @OptIn(ArbigentInternalApi::class)
   override fun run() {
+    printLogger = {
+      echo(it)
+    }
     val resultDir = File(defaultResultPath)
     resultDir.mkdirs()
     ArbigentFiles.screenshotsDir = File(resultDir, "screenshots")
@@ -163,9 +173,22 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
       aiFactory = { ai },
       deviceFactory = { device!! },
     )
+    if (scenarioIds.isNotEmpty() && tags.isNotEmpty()) {
+      throw IllegalArgumentException("Cannot specify both scenario IDs and tags. Please create an issue if you need this feature.")
+    }
     val nonShardedScenarios = if (scenarioIds.isNotEmpty()) {
       val scenarioIdsSet = scenarioIds.flatten().toSet()
       arbigentProject.scenarios.filter { it.id in scenarioIdsSet }
+    } else if (tags.isNotEmpty()) {
+      val tagSet = tags.flatten().toSet()
+      val candidates = arbigentProject.scenarios
+        .filter {
+          it.tags.any { scenarioTag -> tagSet.contains(scenarioTag.name) }
+        }
+      val excludedIds = candidates.flatMap { scenario ->
+        scenario.agentTasks.dropLast(1).map { it.scenarioId }
+      }.toSet()
+      candidates.filterNot { it.id in excludedIds }
     } else {
       val leafScenarios = arbigentProject.leafScenarioAssignments()
       leafScenarios.map { it.scenario }
@@ -177,14 +200,15 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
     val scenarioIdSet = scenarios.map { it.id }.toSet()
     if (dryRun) {
       arbigentInfoLog("Dry run mode is enabled. Exiting without executing scenarios.")
-      exitProcess(0)
+      return
     }
 
     val os =
       ArbigentDeviceOs.entries.find { it.name.toLowerCasePreservingASCIIRules() == os.toLowerCasePreservingASCIIRules() }
         ?: throw IllegalArgumentException(
           "Invalid OS. The OS should be one of ${
-            ArbigentDeviceOs.values().joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
+            ArbigentDeviceOs.values()
+              .joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
           }")
     device = fetchAvailableDevicesByOs(os).firstOrNull()?.connectToDevice()
       ?: throw IllegalArgumentException("No available device found")
@@ -192,7 +216,8 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
       ArbigentLogLevel.entries.find { it.name.toLowerCasePreservingASCIIRules() == logLevel.toLowerCasePreservingASCIIRules() }
         ?: throw IllegalArgumentException(
           "Invalid log level. The log level should be one of ${
-            ArbigentLogLevel.values().joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
+            ArbigentLogLevel.values()
+              .joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
           }")
     Runtime.getRuntime().addShutdownHook(object : Thread() {
       override fun run() {
