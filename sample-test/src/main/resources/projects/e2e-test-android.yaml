@@ -8,15 +8,22 @@ scenarios:
     times: 5
   - type: "LaunchApp"
     packageName: "com.android.settings"
+  tags:
+  - name: "Settings"
+  - name: "Search"
   imageAssertions:
   - assertionPrompt: "The screen should display the \"About emulated device\" page."
 - id: "7c325428-4e0b-4756-ada5-4f53bdc433a2"
   goal: "Scroll and open \"Model\" page in \"About emulated device\" page. Be careful\
     \ not to open other pages"
   dependency: "f9c17741-093e-49f0-ad45-8311ba68c1a6"
+  tags:
+  - name: "Settings"
 - id: "5f221744-6a45-4ff2-a980-eaba77049dc6"
   goal: "Just open Legal information"
   dependency: "f9c17741-093e-49f0-ad45-8311ba68c1a6"
+  tags:
+  - name: "Settings"
 - id: "16c24dfc-cbc7-4e17-af68-c97ad0a2aa3f"
   goal: "Just open camera app"
   initializationMethods:
@@ -24,6 +31,8 @@ scenarios:
     packageName: "com.android.camera2"
   - type: "LaunchApp"
     packageName: "com.android.camera2"
+  tags:
+  - name: "Camera"
 settings:
   cacheStrategy:
     aiDecisionCacheStrategy:
