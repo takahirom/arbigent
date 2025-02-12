@@ -51,7 +51,8 @@ public class OpenAIAi(
   private val requestBuilderModifier: HttpRequestBuilder.() -> Unit = {
     header("Authorization", "Bearer $apiKey")
   },
-  loggingEnabled: Boolean = true,
+  @property:ArbigentInternalApi
+  public val loggingEnabled: Boolean = false,
   private val openAiImageAssertionModel: OpenAiAiAssertionModel = OpenAiAiAssertionModel(
     apiKey = apiKey,
     baseUrl = baseUrl,
