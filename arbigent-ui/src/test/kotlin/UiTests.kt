@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.*
 import androidx.compose.ui.unit.dp
@@ -383,22 +384,26 @@ class TestRobot(
       },
     )
     setContent {
-      AppTheme {
-        Column {
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-          ) {
-            Box(Modifier.padding(8.dp)) {
-              ProjectFileControls(appStateHolder)
+      CompositionLocalProvider(
+        LocalIsUiTest provides true,
+      ) {
+        AppTheme {
+          Column {
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+              Box(Modifier.padding(8.dp)) {
+                ProjectFileControls(appStateHolder)
+              }
+              Box(Modifier.padding(8.dp)) {
+                ScenarioControls(appStateHolder)
+              }
             }
-            Box(Modifier.padding(8.dp)) {
-              ScenarioControls(appStateHolder)
-            }
+            App(
+              appStateHolder = appStateHolder,
+            )
           }
-          App(
-            appStateHolder = appStateHolder,
-          )
         }
       }
     }
