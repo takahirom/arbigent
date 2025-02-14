@@ -222,7 +222,7 @@ fun ProjectFileControls(appStateHolder: ArbigentAppStateHolder) {
       onClick = {
         appStateHolder.projectDialogState.value = ProjectDialogState.ShowProjectSettings
       },
-      contentDescription = "Settings",
+      contentDescription = "Project Settings",
       hint = Size(28)
     ) {
       Text("Settings")

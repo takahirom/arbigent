@@ -60,6 +60,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
           describe("when clicks the Connect to device") {
             doIt {
               clickConnectToDeviceButton()
+              enableCache()
             }
             describe("when clicks the Add scenario") {
               doIt {
@@ -132,7 +133,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
                 }
                 itShould("run methods correctly") {
                   capture(it)
-                  assertRunInitializeAndLaunch()
+                  assertRunInitializeAndLaunchTwice()
                 }
               }
               describeEnterDependencyGoal(
@@ -291,16 +292,17 @@ class TestRobot(
     composeUiTest.onNode(hasText("Goal achieved", true), useUnmergedTree = true).assertExists()
   }
 
-  fun assertRunInitializeAndLaunch() {
+  fun assertRunInitializeAndLaunchTwice() {
     val commands = fakeDevice.getCommandHistory()
     val firstLaunch = commands.indexOfFirst {
       it.launchAppCommand != null
     }
-    assertEquals(1, commands.count { it.launchAppCommand != null })
+    // The first command is failed so it runs twice
+    assertEquals(3, commands.count { it.launchAppCommand != null })
     val firstCleanup = commands.indexOfFirst {
       it.clearStateCommand != null
     }
-    assertEquals(1, commands.count { it.clearStateCommand != null })
+    assertEquals(3, commands.count { it.clearStateCommand != null })
 
     assert(firstCleanup < firstLaunch)
   }
@@ -335,6 +337,15 @@ class TestRobot(
 
   fun clickDependencyDropDown() {
     composeUiTest.onNode(hasTestTag("dependency_dropdown")).performClick()
+  }
+
+  fun enableCache() {
+    composeUiTest.onNode(hasContentDescription("Project Settings")).performClick()
+    composeUiTest.waitUntilAtLeastOneExists(hasText("Disabled"), timeoutMillis = 1000)
+    composeUiTest.onNode(hasText("Disabled")).performClick()
+    composeUiTest.waitUntilAtLeastOneExists(hasText("InMemory"), timeoutMillis = 1000)
+    composeUiTest.onNode(hasText("InMemory"), useUnmergedTree = true).performClick()
+    composeUiTest.onNode(hasText("Close")).performClick()
   }
 
   fun selectDependencyDropDown(text: String) {
@@ -399,7 +410,10 @@ class TestRobot(
     composeUiTest.onAllNodes(hasText(InitializationMethodMenu.Noop.type), useUnmergedTree = true)
       .onFirst()
       .performClick()
-    composeUiTest.onAllNodes(hasText(InitializationMethodMenu.CleanupData.type), useUnmergedTree = true)
+    composeUiTest.onAllNodes(
+      hasText(InitializationMethodMenu.CleanupData.type),
+      useUnmergedTree = true
+    )
       .onFirst()
       .performClick()
     composeUiTest.onNode(hasTestTag("cleanup_pacakge"))
@@ -412,7 +426,10 @@ class TestRobot(
     composeUiTest.onAllNodes(hasText(InitializationMethodMenu.Noop.type), useUnmergedTree = true)
       .onFirst()
       .performClick()
-    composeUiTest.onAllNodes(hasText(InitializationMethodMenu.LaunchApp.type), useUnmergedTree = true)
+    composeUiTest.onAllNodes(
+      hasText(InitializationMethodMenu.LaunchApp.type),
+      useUnmergedTree = true
+    )
       .onFirst()
       .performClick()
     composeUiTest.onNode(hasTestTag("launch_app_package"))
@@ -502,7 +519,8 @@ class FakeAi : ArbigentAi {
         private set
 
       private fun createDecisionOutput(
-        agentCommand: ArbigentAgentCommand = ClickWithTextAgentCommand("text")
+        agentCommand: ArbigentAgentCommand = ClickWithTextAgentCommand("text"),
+        decisionInput: ArbigentAi.DecisionInput
       ): ArbigentAi.DecisionOutput {
         return ArbigentAi.DecisionOutput(
           listOf(agentCommand),
@@ -510,22 +528,30 @@ class FakeAi : ArbigentAi {
             stepId = "stepId1",
             agentCommand = agentCommand,
             memo = "memo",
-            screenshotFilePath = "screenshotFileName"
+            screenshotFilePath = "screenshotFileName",
+            uiTreeStrings = decisionInput.uiTreeStrings,
+            contextPrompt = decisionInput.contextHolder.prompt()
           )
         )
       }
 
       override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
         arbigentDebugLog("FakeAi.decideWhatToDo")
-        if (decisionCount == 0) {
+        if (decisionCount < 10) {
           decisionCount++
-          return createDecisionOutput()
-        } else if (decisionCount == 1) {
+          return createDecisionOutput(
+            decisionInput = decisionInput,
+          )
+        } else if (decisionCount == 10) {
           decisionCount++
-          return createDecisionOutput()
+          return createDecisionOutput(
+            decisionInput = decisionInput,
+            agentCommand = FailedAgentCommand()
+          )
         } else {
           return createDecisionOutput(
-            agentCommand = GoalAchievedAgentCommand()
+            agentCommand = GoalAchievedAgentCommand(),
+            decisionInput = decisionInput,
           )
         }
       }

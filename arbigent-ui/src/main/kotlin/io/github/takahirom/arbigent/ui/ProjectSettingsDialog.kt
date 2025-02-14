@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
 import io.github.takahirom.arbigent.AiDecisionCacheStrategy
+import org.jetbrains.jewel.ui.component.ActionButton
 import org.jetbrains.jewel.ui.component.Dropdown
 import org.jetbrains.jewel.ui.component.GroupHeader
 import org.jetbrains.jewel.ui.component.Text
@@ -75,6 +76,13 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
               is AiDecisionCacheStrategy.InMemory -> "InMemory"
             }
           )
+        }
+        // Close Button
+        ActionButton(
+          onClick = onCloseRequest,
+          modifier = Modifier.padding(8.dp)
+        ) {
+          Text("Close")
         }
       }
     }
