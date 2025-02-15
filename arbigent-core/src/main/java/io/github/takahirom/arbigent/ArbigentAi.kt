@@ -16,6 +16,7 @@ public interface ArbigentAi {
     val apiCallJsonLFilePath: String,
     val elements: ArbigentElementList,
     val prompt: ArbigentPrompt,
+    val cacheKey: String,
   )
   public data class DecisionOutput(
     val agentCommands: List<ArbigentAgentCommand>,
