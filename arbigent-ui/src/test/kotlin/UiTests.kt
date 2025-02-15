@@ -535,7 +535,7 @@ class FakeAi : ArbigentAi {
             memo = "memo",
             screenshotFilePath = "screenshotFileName",
             uiTreeStrings = decisionInput.uiTreeStrings,
-            contextPrompt = decisionInput.contextHolder.prompt()
+            cacheKey = decisionInput.cacheKey
           )
         )
       }
@@ -585,7 +585,8 @@ class FakeAi : ArbigentAi {
             stepId = "stepId1",
             agentCommand = GoalAchievedAgentCommand(),
             memo = "memo",
-            screenshotFilePath = "screenshotFileName"
+            screenshotFilePath = "screenshotFileName",
+            cacheKey = decisionInput.cacheKey
           )
         )
       }

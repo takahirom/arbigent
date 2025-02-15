@@ -111,7 +111,6 @@ public class OpenAIAi(
   @OptIn(ExperimentalSerializationApi::class, ArbigentInternalApi::class)
   override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
     val contextHolder = decisionInput.contextHolder
-    val contextPrompt = contextHolder.prompt()
     val screenshotFilePath = decisionInput.screenshotFilePath
     val decisionJsonlFilePath = decisionInput.apiCallJsonLFilePath
     val formFactor = decisionInput.formFactor
@@ -214,8 +213,8 @@ public class OpenAIAi(
           screenshotFilePath = screenshotFilePath,
           aiRequest = messages.toHumanReadableString(),
           aiResponse = responseText,
-          contextPrompt = contextPrompt,
           uiTreeStrings = uiTreeStrings,
+          cacheKey = decisionInput.cacheKey,
         )
       }
       return ArbigentAi.DecisionOutput(listOfNotNull(step.agentCommand), step)
@@ -365,7 +364,8 @@ $templates"""
         aiResponse = content,
         screenshotFilePath = screenshotFilePath,
         apiCallJsonLFilePath = decisionInput.apiCallJsonLFilePath,
-        uiTreeStrings = decisionInput.uiTreeStrings
+        uiTreeStrings = decisionInput.uiTreeStrings,
+        cacheKey = decisionInput.cacheKey,
       )
     } catch (e: Exception) {
       throw ArbigentAi.FailedToParseResponseException(

@@ -254,6 +254,7 @@ public class ArbigentAgent(
     val arbigentContextHolder: ArbigentContextHolder,
     val screenshotFilePath: String,
     val device: ArbigentDevice,
+    val cacheKey: String,
   )
 
   public class ExecuteCommandsOutput
@@ -358,19 +359,19 @@ public sealed interface ArbigentAiDecisionCache {
 
     public operator fun get(key: String): ArbigentAi.DecisionOutput? {
       val hash = key.hashCode()
-      arbigentInfoLog("AI-decision cache get with key: $hash")
+      arbigentInfoLog("AI-decision cache get with key: $key ($hash)")
       return cache.getIfPresent(hash.toString())
     }
 
     public operator fun set(key: String, value: ArbigentAi.DecisionOutput) {
       val hash = key.hashCode()
-      arbigentInfoLog("AI-decision cache put with key: $hash")
+      arbigentInfoLog("AI-decision cache put with key: $key ($hash)")
       cache.put(hash.toString(), value)
     }
 
     public fun remove(key: String) {
       val hash = key.hashCode()
-      arbigentInfoLog("AI-decision cache remove with key: $hash")
+      arbigentInfoLog("AI-decision cache remove with key: $key ($hash)")
       cache.invalidate(hash.toString())
     }
 
@@ -517,15 +518,14 @@ public fun AgentConfigBuilder(
         decisionInput: ArbigentAi.DecisionInput,
         chain: ArbigentDecisionInterceptor.Chain
       ): ArbigentAi.DecisionOutput {
-        val key = decisionInput.uiTreeStrings.optimizedTreeString + decisionInput.contextHolder.prompt()
-        val cached = aiDecisionCache[key]
+        val cached = aiDecisionCache[decisionInput.cacheKey]
         if (cached != null) {
           arbigentInfoLog("AI-decision cache hit with view tree and prompt")
           return cached
         }
         arbigentDebugLog("AI-decision cache miss with view tree and prompt")
         val output = chain.proceed(decisionInput)
-        aiDecisionCache[key] = output
+        aiDecisionCache[decisionInput.cacheKey] = output
         return output
       }
 
@@ -538,8 +538,7 @@ public fun AgentConfigBuilder(
           is ExecutionResult.Failed -> {
             output.contextHolder?.let { contextHolder ->
               contextHolder.steps().forEach { step ->
-                val key = step.uiTreeStrings?.optimizedTreeString + step.contextPrompt
-                aiDecisionCache.remove(key)
+                aiDecisionCache.remove(step.cacheKey)
               }
             }
           }
@@ -686,6 +685,7 @@ private fun executeCommands(
         ArbigentContextHolder.Step(
           stepId = stepId,
           feedback = "Failed to perform action: ${e.message}. Please try other actions.",
+          cacheKey = executeCommandsInput.cacheKey,
           screenshotFilePath = screenshotFilePath
         )
       )
@@ -695,6 +695,7 @@ private fun executeCommands(
         ArbigentContextHolder.Step(
           stepId = stepId,
           feedback = "Failed to perform action: ${e.message}. Please try other actions.",
+          cacheKey = executeCommandsInput.cacheKey,
           screenshotFilePath = screenshotFilePath
         )
       )
@@ -704,6 +705,7 @@ private fun executeCommands(
         ArbigentContextHolder.Step(
           stepId = stepId,
           feedback = "Failed to perform action: ${e.message}. Please try other actions.",
+          cacheKey = executeCommandsInput.cacheKey,
           screenshotFilePath = screenshotFilePath
         )
       )
@@ -796,6 +798,7 @@ private suspend fun step(
     }
   }
   val uiTreeStrings = device.viewTreeString()
+  val cacheKey = (contextHolder.prompt() + uiTreeStrings.optimizedTreeString).hashCode().toString()
   val screenshotFilePath =
     ArbigentFiles.screenshotsDir.absolutePath + File.separator + "$stepId.png"
   val decisionJsonlFilePath =
@@ -808,6 +811,7 @@ private suspend fun step(
       ArbigentContextHolder.Step(
         stepId = stepId,
         feedback = "Failed to produce the intended outcome. The current screen is identical to the previous one. Please try other actions.",
+        cacheKey = cacheKey,
         screenshotFilePath = screenshotFilePath
       )
     )
@@ -828,6 +832,7 @@ private suspend fun step(
     agentCommandTypes = commandTypes,
     screenshotFilePath = screenshotFilePath,
     prompt = stepInput.prompt,
+    cacheKey = cacheKey
   )
   val decisionOutput = decisionChain(decisionInput)
   if (decisionOutput.agentCommands.any { it is GoalAchievedAgentCommand }) {
@@ -847,6 +852,7 @@ private suspend fun step(
           feedback = "Image assertion ${if (it.isPassed) "passed" else "failed"}. \nfulfillmentPercent:${it.fulfillmentPercent} \nprompt:${it.assertionPrompt} \nexplanation:${it.explanation}",
           screenshotFilePath = screenshotFilePath,
           aiRequest = decisionOutput.step.aiRequest,
+          cacheKey = cacheKey,
           aiResponse = decisionOutput.step.aiResponse
         )
       )
@@ -864,6 +870,7 @@ private suspend fun step(
             feedback = "Failed to reach the goal by image assertion. Image assertion prompt:${it.assertionPrompt}. explanation:${it.explanation}",
             screenshotFilePath = screenshotFilePath,
             aiRequest = decisionOutput.step.aiRequest,
+            cacheKey = cacheKey,
             aiResponse = decisionOutput.step.aiResponse
           )
         )
@@ -884,7 +891,8 @@ private suspend fun step(
       decisionOutput = decisionOutput,
       arbigentContextHolder = contextHolder,
       screenshotFilePath = screenshotFilePath,
-      device = device
+      device = device,
+      cacheKey = cacheKey,
     )
   )
   return StepResult.Continue
