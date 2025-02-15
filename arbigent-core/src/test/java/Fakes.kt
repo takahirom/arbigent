@@ -93,7 +93,8 @@ class FakeAi : ArbigentAi {
         stepId = "stepId",
         agentCommand = agentCommand,
         memo = "memo",
-        screenshotFilePath = "screenshotFileName"
+        screenshotFilePath = "screenshotFileName",
+        cacheKey = "cacheKey",
       )
     )
   }
