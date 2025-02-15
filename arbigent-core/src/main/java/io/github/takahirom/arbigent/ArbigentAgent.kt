@@ -358,19 +358,19 @@ public sealed interface ArbigentAiDecisionCache {
 
     public operator fun get(key: String): ArbigentAi.DecisionOutput? {
       val hash = key.hashCode()
-      arbigentInfoLog("AI-decision cache get with key: $hash")
+      arbigentInfoLog("AI-decision cache get with key: $key ($hash)")
       return cache.getIfPresent(hash.toString())
     }
 
     public operator fun set(key: String, value: ArbigentAi.DecisionOutput) {
       val hash = key.hashCode()
-      arbigentInfoLog("AI-decision cache put with key: $hash")
+      arbigentInfoLog("AI-decision cache put with key: $key ($hash)")
       cache.put(hash.toString(), value)
     }
 
     public fun remove(key: String) {
       val hash = key.hashCode()
-      arbigentInfoLog("AI-decision cache remove with key: $hash")
+      arbigentInfoLog("AI-decision cache remove with key: $key ($hash)")
       cache.invalidate(hash.toString())
     }
 
@@ -686,6 +686,7 @@ private fun executeCommands(
         ArbigentContextHolder.Step(
           stepId = stepId,
           feedback = "Failed to perform action: ${e.message}. Please try other actions.",
+          contextPrompt = executeCommandsInput.arbigentContextHolder.prompt(),
           screenshotFilePath = screenshotFilePath
         )
       )
@@ -695,6 +696,7 @@ private fun executeCommands(
         ArbigentContextHolder.Step(
           stepId = stepId,
           feedback = "Failed to perform action: ${e.message}. Please try other actions.",
+          contextPrompt = executeCommandsInput.arbigentContextHolder.prompt(),
           screenshotFilePath = screenshotFilePath
         )
       )
@@ -704,6 +706,7 @@ private fun executeCommands(
         ArbigentContextHolder.Step(
           stepId = stepId,
           feedback = "Failed to perform action: ${e.message}. Please try other actions.",
+          contextPrompt = executeCommandsInput.arbigentContextHolder.prompt(),
           screenshotFilePath = screenshotFilePath
         )
       )
@@ -808,6 +811,7 @@ private suspend fun step(
       ArbigentContextHolder.Step(
         stepId = stepId,
         feedback = "Failed to produce the intended outcome. The current screen is identical to the previous one. Please try other actions.",
+        contextPrompt = contextHolder.prompt(),
         screenshotFilePath = screenshotFilePath
       )
     )
@@ -847,6 +851,7 @@ private suspend fun step(
           feedback = "Image assertion ${if (it.isPassed) "passed" else "failed"}. \nfulfillmentPercent:${it.fulfillmentPercent} \nprompt:${it.assertionPrompt} \nexplanation:${it.explanation}",
           screenshotFilePath = screenshotFilePath,
           aiRequest = decisionOutput.step.aiRequest,
+          contextPrompt = contextHolder.prompt(),
           aiResponse = decisionOutput.step.aiResponse
         )
       )
@@ -864,6 +869,7 @@ private suspend fun step(
             feedback = "Failed to reach the goal by image assertion. Image assertion prompt:${it.assertionPrompt}. explanation:${it.explanation}",
             screenshotFilePath = screenshotFilePath,
             aiRequest = decisionOutput.step.aiRequest,
+            contextPrompt = contextHolder.prompt(),
             aiResponse = decisionOutput.step.aiResponse
           )
         )
