@@ -358,19 +358,19 @@ public sealed interface ArbigentAiDecisionCache {
 
     public operator fun get(key: String): ArbigentAi.DecisionOutput? {
       val hash = key.hashCode()
-      arbigentInfoLog("AI-decision cache get with key: $hash")
+      arbigentInfoLog("AI-decision cache get with key: $key ($hash)")
       return cache.getIfPresent(hash.toString())
     }
 
     public operator fun set(key: String, value: ArbigentAi.DecisionOutput) {
       val hash = key.hashCode()
-      arbigentInfoLog("AI-decision cache put with key: $hash")
+      arbigentInfoLog("AI-decision cache put with key: $key ($hash)")
       cache.put(hash.toString(), value)
     }
 
     public fun remove(key: String) {
       val hash = key.hashCode()
-      arbigentInfoLog("AI-decision cache remove with key: $hash")
+      arbigentInfoLog("AI-decision cache remove with key: $key ($hash)")
       cache.invalidate(hash.toString())
     }
 
