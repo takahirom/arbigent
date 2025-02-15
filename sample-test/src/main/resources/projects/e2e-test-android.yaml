@@ -1,6 +1,8 @@
 scenarios:
 - id: "f9c17741-093e-49f0-ad45-8311ba68c1a6"
-  goal: "Search for the \"iOS setting\" item in the OS Settings. Please find iOS setting page in settings app. If you can't find please make it fail"
+  goal: "Search for the \"About emulated device\" item in the OS Settings. Please\
+    \ do not click \"Device name\". Your goal is to reach the \"About emulated device\"\
+    \ page."
   initializationMethods:
   - type: "Back"
     times: 5
