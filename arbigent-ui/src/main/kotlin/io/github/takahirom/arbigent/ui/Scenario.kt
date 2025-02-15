@@ -46,6 +46,7 @@ import org.jetbrains.jewel.ui.component.MenuScope
 import org.jetbrains.jewel.ui.component.OutlinedButton
 import org.jetbrains.jewel.ui.component.RadioButtonRow
 import org.jetbrains.jewel.ui.component.Text
+import org.jetbrains.jewel.ui.component.TextArea
 import org.jetbrains.jewel.ui.component.TextField
 import org.jetbrains.jewel.ui.component.styling.GroupHeaderStyle
 import org.jetbrains.jewel.ui.component.styling.LocalGroupHeaderStyle
@@ -223,12 +224,15 @@ private fun ScenarioOptions(
       modifier = Modifier.padding(8.dp).widthIn(min = 80.dp, max = 400.dp).width(IntrinsicSize.Min)
     ) {
       GroupHeader("Note for humans")
-      TextField(
+      TextArea(
         modifier = Modifier
           .padding(4.dp)
+          .height(80.dp)
           .testTag("note_for_humans"),
+        textStyle = JewelTheme.editorTextStyle,
         state = updatedScenarioStateHolder.noteForHumans,
         placeholder = { Text("Note for humans") },
+        decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
       )
     }
     Column(
@@ -627,7 +631,8 @@ fun LaunchAppInitializationSetting(
         onValueChange = onPackageChange
       )
       val arguments by rememberUpdatedState(
-        (initializeMethod as? ArbigentScenarioContent.InitializationMethod.LaunchApp)?.launchArguments ?: emptyMap()
+        (initializeMethod as? ArbigentScenarioContent.InitializationMethod.LaunchApp)?.launchArguments
+          ?: emptyMap()
       )
       arguments.forEach { (key, value: ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue) ->
         Row {
@@ -659,7 +664,10 @@ fun LaunchAppInitializationSetting(
                         false
                       )
 
-                      "Int" -> ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue.IntVal(0)
+                      "Int" -> ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue.IntVal(
+                        0
+                      )
+
                       else -> value
                     }
                     onArgumentsChange(newArguments)
@@ -678,7 +686,8 @@ fun LaunchAppInitializationSetting(
               checked = value.value,
               onCheckedChange = {
                 val newArguments = arguments.toMutableMap()
-                newArguments[key] = ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue.BooleanVal(it)
+                newArguments[key] =
+                  ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue.BooleanVal(it)
                 onArgumentsChange(newArguments)
               }
             )
@@ -720,7 +729,8 @@ fun LaunchAppInitializationSetting(
         key = AllIconsKeys.General.Add,
         onClick = {
           val newArguments = arguments.toMutableMap()
-          newArguments[""] = ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue.StringVal("")
+          newArguments[""] =
+            ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue.StringVal("")
           onArgumentsChange(newArguments)
         },
         contentDescription = "Add argument",
@@ -866,7 +876,8 @@ private fun ContentPanel(
               if (step.apiCallJsonLFilePath != null) {
                 Row {
                   // Good feedback button
-                  val isGood = stepFeedbacks.any { it is StepFeedback.Good && it.stepId == step.stepId }
+                  val isGood =
+                    stepFeedbacks.any { it is StepFeedback.Good && it.stepId == step.stepId }
                   val feedbackHintText =
                     "Feedback data is stored locally in project result files(result.yaml). You can later use these evaluations to:\n" +
                       "         • Fine-tune AI models\n" +
@@ -897,7 +908,8 @@ private fun ContentPanel(
                     )
                   }
                   // Bad feedback button
-                  val isBad = stepFeedbacks.any { it is StepFeedback.Bad && it.stepId == step.stepId }
+                  val isBad =
+                    stepFeedbacks.any { it is StepFeedback.Bad && it.stepId == step.stepId }
                   IconActionButton(
                     key = AllIconsKeys.Ide.Dislike,
                     onClick = {
@@ -946,7 +958,10 @@ private fun ContentPanel(
         ) {
           step.uiTreeStrings?.let {
             val clipboardManager = LocalClipboardManager.current
-            ExpandableSection("All UI Tree(length=${it.allTreeString.length})", modifier = Modifier.fillMaxWidth()) {
+            ExpandableSection(
+              "All UI Tree(length=${it.allTreeString.length})",
+              modifier = Modifier.fillMaxWidth()
+            ) {
               Text(
                 modifier = Modifier
                   .padding(8.dp)
