@@ -365,7 +365,6 @@ $templates"""
         aiResponse = content,
         screenshotFilePath = screenshotFilePath,
         apiCallJsonLFilePath = decisionInput.apiCallJsonLFilePath,
-        contextPrompt = decisionInput.contextHolder.prompt(),
         uiTreeStrings = decisionInput.uiTreeStrings
       )
     } catch (e: Exception) {
