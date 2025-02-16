@@ -158,7 +158,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
       firstGoal: String,
       secondGoal: String,
     ) {
-      describe("when add scenarios") {
+      describe("when add scenarios with goal $secondGoal") {
         doIt {
           enterGoal(firstGoal)
           clickAddScenarioButton()
