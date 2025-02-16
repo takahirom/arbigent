@@ -82,7 +82,7 @@ fun Scenario(
       TextField(
         modifier = Modifier.weight(1f).padding(4.dp).testTag("goal"),
         state = goal,
-        placeholder = { Text("Goal") },
+        placeholder = { Text("Goal2") },
       )
       IconActionButton(
         key = AllIconsKeys.RunConfigurations.TestState.Run,
