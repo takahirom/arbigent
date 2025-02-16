@@ -66,7 +66,7 @@ jobs:
           # Check for invalid file names and add only valid ones
           exist_valid_files="false"
           for file in "${files_to_add[@]}"; do
-            if [[ $file =~ ^[a-zA-Z0-9_./-]+$ ]]; then
+            if [[ $file =~ ^([-0-9A-Z_a-z.\ \/]|\[|\])+$ ]]; then
               exist_valid_files="true"
               break
             fi
@@ -83,7 +83,7 @@ jobs:
           
           # Check for invalid file names and add only valid ones
           for file in $files_to_add; do
-            if [[ "$file" =~ ^[a-zA-Z0-9_./-]+$ ]]; then
+            if [[ "$file" =~ ^([-0-9A-Z_a-z.\ \/]|\[|\])+$ ]]; then
               git add "$file"
             fi
           done
@@ -99,7 +99,7 @@ jobs:
         shell: bash
         run: |
           # Find all the files ending with _compare.png in roborazzi folder
-          files=$(find . -type f -name "*_compare.*" | grep "roborazzi/" | grep -E "^[a-zA-Z0-9_./-]+$")
+          files=$(find . -type f -name "*_compare.*" | grep "roborazzi/" | grep -E "^([-0-9A-Z_a-z.\ \/]|\[|\])+$")
           delimiter="$(openssl rand -hex 8)"
           {
             echo "reports<<${delimiter}"
