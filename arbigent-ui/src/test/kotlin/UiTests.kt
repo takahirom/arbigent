@@ -75,6 +75,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
                 doIt {
                   enterGoal("launch the app")
                   expandOptions()
+                  changeScenarioId("scenario1")
                   enterImageAssertion("The screen should show the app")
                 }
                 describe("when run") {
@@ -128,6 +129,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
                 doIt {
                   enterGoal("launch the app")
                   expandOptions()
+                  changeScenarioId("scenario1")
                   addCleanupDataInitializationMethod()
                   addLaunchAppInitializationMethod()
                   clickRunButton()
@@ -156,7 +158,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
       firstGoal: String,
       secondGoal: String,
     ) {
-      describe("when add scenarios") {
+      describe("when add scenarios with goal $secondGoal") {
         doIt {
           enterGoal(firstGoal)
           clickAddScenarioButton()
@@ -179,6 +181,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
         describe("when add dependency and run") {
           doIt {
             expandOptions()
+            changeScenarioId("scenario1")
             clickDependencyDropDown()
             selectDependencyDropDown(firstGoal)
             collapseOptions()
