@@ -82,7 +82,7 @@ jobs:
           mapfile -d '' -t files_to_add < <(find . -type f -name "*_compare.png" -path "*outputs/roborazzi*" -print0)
           
           # Check for invalid file names and add only valid ones
-          for file in $files_to_add; do
+          for file in "${files_to_add[@]}"; do
             if [[ "$file" =~ ^([-0-9A-Z_a-z.\ \/]|\[|\])+$ ]]; then
               git add "$file"
             fi
