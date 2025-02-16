@@ -368,6 +368,8 @@ class TestRobot(
 
   fun changeScenarioId(id: String) {
     composeUiTest.onNode(hasTestTag("scenario_id"))
+      .performTextClearance()
+    composeUiTest.onNode(hasTestTag("scenario_id"))
       .performTextInput(id)
   }
 
