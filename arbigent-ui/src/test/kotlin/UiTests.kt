@@ -63,93 +63,95 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
               clickConnectToDeviceButton()
               enableCache()
             }
-            describe("when clicks the Add scenario") {
-              doIt {
-                clickAddScenarioButton()
-              }
-              itShould("show goal input") {
-                capture(it)
-                assertGoalInputExists()
-              }
-              describe("when enter goals and image assertion") {
+          }
+        }
+        describe("when add scenario") {
+          doIt {
+            clickConnectToDeviceButton()
+            enableCache()
+            clickAddScenarioButton()
+          }
+          itShould("show goal input") {
+            capture(it)
+            assertGoalInputExists()
+          }
+          describe("when enter goals and image assertion") {
+            doIt {
+              enterGoal("launch the app")
+              expandOptions()
+              changeScenarioId("scenario1")
+              enterImageAssertion("The screen should show the app")
+            }
+            describe("when run") {
+              describe("should finish the scenario") {
                 doIt {
-                  enterGoal("launch the app")
-                  expandOptions()
-                  changeScenarioId("scenario1")
-                  enterImageAssertion("The screen should show the app")
-                }
-                describe("when run") {
-                  describe("should finish the scenario") {
-                    doIt {
-                      clickRunButton()
-                      waitUntilScenarioRunning()
-                    }
-                    itShould("show goal achieved") {
-                      capture(it)
-                      assertGoalAchieved()
-                    }
-                  }
-                }
-                describe("when ai fail with image and run") {
-                  doIt {
-                    setupAiStatus(FakeAi.AiStatus.ImageAssertionFailed())
-                    clickRunButton()
-                  }
-                  describe("should finish the scenario") {
-                    doIt {
-                      waitUntilScenarioRunning()
-                    }
-                    itShould("show goal not achieved") {
-                      capture(it)
-                      assertGoalNotAchievedByImageAssertion()
-                    }
-                  }
-                }
-              }
-              describe("when enter goals and run") {
-                doIt {
-                  enterGoal("launch the app")
                   clickRunButton()
+                  waitUntilScenarioRunning()
                 }
-                describe("should finish the scenario") {
-                  doIt {
-                    waitUntilScenarioRunning()
-                  }
-                  itShould("show goal achieved") {
-                    capture(it)
-                    assertGoalAchieved()
-                  }
-                  itShould("not run imageAssertion") {
-                    capture(it)
-                    assertDontRunImageAssertion()
-                  }
-                }
-              }
-              describe("when add multiple methods and run") {
-                doIt {
-                  enterGoal("launch the app")
-                  expandOptions()
-                  changeScenarioId("scenario1")
-                  addCleanupDataInitializationMethod()
-                  addLaunchAppInitializationMethod()
-                  clickRunButton()
-                }
-                itShould("run methods correctly") {
+                itShould("show goal achieved") {
                   capture(it)
-                  assertRunInitializeAndLaunchTwice()
+                  assertGoalAchieved()
                 }
               }
-              describeEnterDependencyGoal(
-                firstGoal = "launch the app",
-                secondGoal = "launch the app2"
-              )
-              // Same goal
-              describeEnterDependencyGoal(
-                firstGoal = "launch the app",
-                secondGoal = "launch the app"
-              )
+            }
+            describe("when ai fail with image and run") {
+              doIt {
+                setupAiStatus(FakeAi.AiStatus.ImageAssertionFailed())
+                clickRunButton()
+              }
+              describe("should finish the scenario") {
+                doIt {
+                  waitUntilScenarioRunning()
+                }
+                itShould("show goal not achieved") {
+                  capture(it)
+                  assertGoalNotAchievedByImageAssertion()
+                }
+              }
             }
           }
+          describe("when enter goals and run") {
+            doIt {
+              enterGoal("launch the app")
+              clickRunButton()
+            }
+            describe("should finish the scenario") {
+              doIt {
+                waitUntilScenarioRunning()
+              }
+              itShould("show goal achieved") {
+                capture(it)
+                assertGoalAchieved()
+              }
+              itShould("not run imageAssertion") {
+                capture(it)
+                assertDontRunImageAssertion()
+              }
+            }
+          }
+          describe("when add multiple methods and run") {
+            doIt {
+              enterGoal("launch the app")
+              expandOptions()
+              changeScenarioId("scenario1")
+              addCleanupDataInitializationMethod()
+              addLaunchAppInitializationMethod()
+              clickRunButton()
+            }
+            itShould("run methods correctly") {
+              capture(it)
+              assertRunInitializeAndLaunchTwice()
+            }
+          }
+          describeEnterDependencyGoal(
+            firstGoal = "g1",
+            secondGoal = "g2"
+          )
+          // Same goal
+          describeEnterDependencyGoal(
+            firstGoal = "g1",
+            secondGoal = "g1"
+          )
         }
       }
     }
@@ -158,7 +160,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
       firstGoal: String,
       secondGoal: String,
     ) {
-      describe("when add scenarios with goal $secondGoal") {
+      describe("when add scenarios $secondGoal") {
         doIt {
           enterGoal(firstGoal)
           clickAddScenarioButton()
