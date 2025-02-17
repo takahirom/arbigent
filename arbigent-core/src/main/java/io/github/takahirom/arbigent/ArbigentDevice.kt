@@ -320,6 +320,7 @@ public class MaestroDevice(
     moveFocusToElement(
       fetchTarget = {
         val newElement = maestro.viewHierarchy().refreshedElement(element.treeNode)
+        arbigentInfoLog("Element(${element.treeNode.getIdentifierDataForFocus()}) refreshed to Element(${newElement?.getIdentifierDataForFocus()})")
         newElement?.toUiElement()?.bounds ?: run {
           arbigentInfoLog("Element(${newElement?.getIdentifierDataForFocus()}) not found in current ViewHierarchy. Using the original bounds.")
           element.treeNode.toUiElement().bounds
@@ -342,7 +343,9 @@ public class MaestroDevice(
     return matches[0]
   }
 
-  private fun TreeNode.getIdentifierDataForFocus(): Any = (attributes - "bounds" - "focused" - "selected")
+  private fun TreeNode.getIdentifierDataForFocus(): List<Any> {
+    return listOf((attributes - "bounds" - "focused" - "selected")) + children.map { it.getIdentifierDataForFocus() }
+  }
 
   private fun moveFocusToElement(
     fetchTarget: () -> Bounds
