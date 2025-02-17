@@ -342,7 +342,9 @@ public class MaestroDevice(
     return matches[0]
   }
 
-  private fun TreeNode.getIdentifierDataForFocus(): Any = (attributes - "bounds" - "focused" - "selected")
+  private fun TreeNode.getIdentifierDataForFocus(): List<Any> {
+    return listOf((attributes - "bounds" - "focused" - "selected")) + children.map { it.getIdentifierDataForFocus() }
+  }
 
   private fun moveFocusToElement(
     fetchTarget: () -> Bounds
