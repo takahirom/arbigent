@@ -319,12 +319,30 @@ public class MaestroDevice(
   override fun moveFocusToElement(element: ArbigentElement) {
     moveFocusToElement(
       fetchTarget = {
-        val newElement = maestro.viewHierarchy().refreshElement(element.treeNode)
-        newElement?.toUiElement()?.bounds ?: element.treeNode.toUiElement().bounds
+        val newElement = maestro.viewHierarchy().refreshedElement(element.treeNode)
+        newElement?.toUiElement()?.bounds ?: run {
+          arbigentInfoLog("Element(${newElement?.getIdentifierDataForFocus()}) not found in current ViewHierarchy. Using the original bounds.")
+          element.treeNode.toUiElement().bounds
+        }
       }
     )
   }
 
+
+  private fun ViewHierarchy.refreshedElement(node: TreeNode): TreeNode? {
+    val matches = root.aggregate()
+      .filter {
+        it.getIdentifierDataForFocus() == node.getIdentifierDataForFocus()
+      }
+
+    if (matches.size != 1) {
+      return null
+    }
+
+    return matches[0]
+  }
+
+  private fun TreeNode.getIdentifierDataForFocus(): Any = (attributes - "bounds" - "focused" - "selected")
 
   private fun moveFocusToElement(
     fetchTarget: () -> Bounds
