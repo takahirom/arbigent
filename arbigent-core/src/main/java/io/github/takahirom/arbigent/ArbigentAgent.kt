@@ -874,6 +874,7 @@ private suspend fun step(
   arbigentInfoLog("  BuildConfig.VERSION_NAME: ${BuildConfig.VERSION_NAME}")
   arbigentInfoLog("  prompt: ${contextHolder.prompt()}")
   arbigentInfoLog("  uiTreeStrings.optimizedTreeString: ${uiTreeStrings.optimizedTreeString}")
+  arbigentInfoLog("  uiTreeStrings.allTreeString: ${uiTreeStrings.allTreeString}")
   val screenshotFilePath =
     ArbigentFiles.screenshotsDir.absolutePath + File.separator + "$stepId.png"
   val decisionJsonlFilePath =
