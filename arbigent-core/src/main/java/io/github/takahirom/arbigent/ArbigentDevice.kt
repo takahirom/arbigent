@@ -649,10 +649,11 @@ public fun TreeNode.optimizeTree(
   // Optimize children
   val childResults = children
     .filter {
-      it.attributes["resource-id"]?.contains("status_bar_container").let {
-        if (it != null) !it
-        else true
-      } &&
+      val isOkView = run {
+        val resourceId = it.attributes["resource-id"] ?: return@run true
+        !resourceId.contains("status_bar_container") && !resourceId.contains("status_bar_launch_animation_container")
+      }
+      isOkView &&
         (it.toUiElementOrNull()?.bounds?.let {
           it.width > 0 && it.height > 0
         }) ?: true
