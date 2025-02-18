@@ -5,8 +5,13 @@ plugins {
   alias(libs.plugins.buildconfig)
 }
 
-val gitVersion: groovy.lang.Closure<String> by extra
-version = gitVersion()
+val versionDetails: groovy.lang.Closure<com.palantir.gradle.gitversion.VersionDetails> by extra
+val details = versionDetails()
+version = if(details.isCleanTag) {
+  details.lastTag
+} else {
+  details.lastTag + "-SNAPSHOT"
+}
 
 kotlin {
   explicitApi()
