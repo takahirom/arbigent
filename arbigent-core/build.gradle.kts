@@ -1,16 +1,13 @@
 plugins {
   id("org.jetbrains.kotlin.jvm") version "2.0.21"
   id("org.jetbrains.kotlin.plugin.serialization") version libs.versions.kotlin
-  id("com.palantir.git-version") version "0.15.0"
+  id("com.javiersc.semver") version "0.8.0"
   alias(libs.plugins.buildconfig)
 }
 
-val versionDetails: groovy.lang.Closure<com.palantir.gradle.gitversion.VersionDetails> by extra
-val details = versionDetails()
-version = if(details.isCleanTag) {
-  details.lastTag
-} else {
-  details.lastTag + "-SNAPSHOT"
+semver {
+  isEnabled.set(true)
+  tagPrefix.set("")
 }
 
 kotlin {
