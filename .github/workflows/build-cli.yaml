@@ -93,7 +93,8 @@ jobs:
       - name: Cache arbigent
         uses: actions/cache@v4
         with:
-          key: arbigent-${{ matrix.shardIndex }}-${{ matrix.shardTotal }}
+          key: arbigent-${{ matrix.shardIndex }}-${{ matrix.shardTotal }}-${{ github.sha }}
+          restore-keys: arbigent-${{ matrix.shardIndex }}-${{ matrix.shardTotal }}-
           path: arbigent-cache
 
       - name: Enable KVM group perms
