@@ -125,6 +125,7 @@ jobs:
       - name: Cache arbigent
         uses: actions/cache@v4
         with:
+          # Caution: If we use the same cache key without GitHub SHA, the cache will not be updated.
           key: arbigent-${{ matrix.shardIndex }}-${{ matrix.shardTotal }}-${{ github.sha }}
           restore-keys: arbigent-${{ matrix.shardIndex }}-${{ matrix.shardTotal }}-
           path: arbigent-cache
