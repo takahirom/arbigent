@@ -14,6 +14,9 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import maestro.MaestroException
 import maestro.orchestra.*
 import org.mobilenativefoundation.store.cache5.Cache
@@ -255,6 +258,7 @@ public class ArbigentAgent(
     val screenshotFilePath: String,
     val device: ArbigentDevice,
     val cacheKey: String,
+    val elements: ArbigentElementList,
   )
 
   public class ExecuteCommandsOutput
@@ -353,26 +357,32 @@ public fun AgentConfigBuilder(block: AgentConfig.Builder.() -> Unit): AgentConfi
 
 public sealed interface ArbigentAiDecisionCache {
   public class Enabled private constructor(
-    private val cache: Cache<String, ArbigentAi.DecisionOutput>
+    private val cache: Cache<String, String>
   ) : ArbigentAiDecisionCache {
+    private val json: Json = Json {
+      ignoreUnknownKeys = true
+      useArrayPolymorphism = true
+    }
     // This feature is experimental so we are logging the cache operations.
 
     public operator fun get(key: String): ArbigentAi.DecisionOutput? {
-      val hash = key.hashCode()
-      arbigentInfoLog("AI-decision cache get with key: $key ($hash)")
-      return cache.getIfPresent(hash.toString())
+      val cache = cache.getIfPresent(key)
+      arbigentInfoLog("AI-decision cache get with key: $key")
+      if (cache == null) {
+        arbigentInfoLog("AI-decision cache miss with key: $key")
+        return null
+      }
+      return json.decodeFromString(cache)
     }
 
     public operator fun set(key: String, value: ArbigentAi.DecisionOutput) {
-      val hash = key.hashCode()
-      arbigentInfoLog("AI-decision cache put with key: $key ($hash)")
-      cache.put(hash.toString(), value)
+      arbigentInfoLog("AI-decision cache put with key: $key")
+      cache.put(key, json.encodeToString(value))
     }
 
     public fun remove(key: String) {
-      val hash = key.hashCode()
-      arbigentInfoLog("AI-decision cache remove with key: $key ($hash)")
-      cache.invalidate(hash.toString())
+      arbigentInfoLog("AI-decision cache remove with key: $key")
+      cache.invalidate(key)
     }
 
     public companion object {
@@ -380,7 +390,7 @@ public sealed interface ArbigentAiDecisionCache {
         maxSize: Long = 100,
         expireAfterAccess: Duration = 24.hours
       ): Enabled {
-        val cache = CacheBuilder<String, ArbigentAi.DecisionOutput>()
+        val cache = CacheBuilder<String, String>()
           .maximumSize(maxSize)
           .expireAfterAccess(expireAfterAccess)
           .build()
@@ -542,6 +552,7 @@ public fun AgentConfigBuilder(
               }
             }
           }
+
           ExecutionResult.Cancelled,
           ExecutionResult.Success -> {
           }
@@ -678,7 +689,12 @@ private fun executeCommands(
   val (stepId, decisionOutput, arbigentContextHolder, screenshotFilePath, device) = executeCommandsInput
   decisionOutput.agentCommands.forEach { agentCommand ->
     try {
-      agentCommand.runDeviceCommand(device)
+      agentCommand.runDeviceCommand(
+        ArbigentAgentCommand.RunInput(
+          device = device,
+          elements = executeCommandsInput.elements,
+        )
+      )
     } catch (e: MaestroException) {
       e.printStackTrace()
       arbigentContextHolder.addStep(
@@ -798,7 +814,8 @@ private suspend fun step(
     }
   }
   val uiTreeStrings = device.viewTreeString()
-  val cacheKey = (contextHolder.prompt() + uiTreeStrings.optimizedTreeString).hashCode().toString()
+  val cacheKey =
+    (BuildConfig.VERSION_NAME + contextHolder.prompt() + uiTreeStrings.optimizedTreeString).hashCode().toString()
   val screenshotFilePath =
     ArbigentFiles.screenshotsDir.absolutePath + File.separator + "$stepId.png"
   val decisionJsonlFilePath =
@@ -889,6 +906,7 @@ private suspend fun step(
     ExecuteCommandsInput(
       stepId = stepId,
       decisionOutput = decisionOutput,
+      elements = elements,
       arbigentContextHolder = contextHolder,
       screenshotFilePath = screenshotFilePath,
       device = device,

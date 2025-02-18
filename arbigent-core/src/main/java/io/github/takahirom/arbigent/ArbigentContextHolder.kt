@@ -5,6 +5,7 @@ import io.github.takahirom.arbigent.result.ArbigentUiTreeStrings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.serialization.Serializable
 
 public class ArbigentContextHolder(
   public val goal: String,
@@ -15,6 +16,7 @@ public class ArbigentContextHolder(
     return "" + goal.hashCode() + "_" +
       steps().size +"_" + startTimestamp + "_" + System.currentTimeMillis() .toString()
   }
+  @Serializable
   public class Step(
     public val stepId: String,
     public val agentCommand: ArbigentAgentCommand? = null,

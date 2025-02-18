@@ -2,6 +2,7 @@ package io.github.takahirom.arbigent
 
 import io.github.takahirom.arbigent.MaestroDevice.OptimizationResult
 import io.github.takahirom.arbigent.result.ArbigentUiTreeStrings
+import kotlinx.serialization.Serializable
 import maestro.*
 import maestro.UiElement.Companion.toUiElement
 import maestro.UiElement.Companion.toUiElementOrNull
