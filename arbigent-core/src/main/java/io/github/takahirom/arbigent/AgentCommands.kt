@@ -437,6 +437,7 @@ public data class DpadAutoFocusWithIndexAgentCommand(val index: Int): ArbigentAg
   }
 }
 
+@Serializable
 public data class InputTextAgentCommand(val text: String) : ArbigentAgentCommand {
   override val actionName: String = Companion.actionName
 
