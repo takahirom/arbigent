@@ -1,7 +1,12 @@
 plugins {
   id("org.jetbrains.kotlin.jvm") version "2.0.21"
   id("org.jetbrains.kotlin.plugin.serialization") version libs.versions.kotlin
+  id("com.palantir.git-version") version "0.15.0"
+  alias(libs.plugins.buildconfig)
 }
+
+val gitVersion: groovy.lang.Closure<String> by extra
+version = gitVersion()
 
 kotlin {
   explicitApi()
@@ -13,6 +18,12 @@ kotlin {
       languageSettings.optIn("io.github.takahirom.arbigent.ArbigentInternalApi")
     }
   }
+}
+
+buildConfig {
+  packageName("io.github.takahirom.arbigent")
+  buildConfigField("VERSION_NAME", version.toString())
+  useKotlinOutput { internalVisibility = false }
 }
 
 dependencies {

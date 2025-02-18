@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
 import io.github.takahirom.arbigent.AiDecisionCacheStrategy
+import io.github.takahirom.arbigent.BuildConfig
 import org.jetbrains.jewel.ui.component.ActionButton
 import org.jetbrains.jewel.ui.component.Dropdown
 import org.jetbrains.jewel.ui.component.GroupHeader
@@ -42,6 +43,11 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
             }
           }
         }
+        GroupHeader("Version")
+        Text(
+          text = BuildConfig.VERSION_NAME,
+          modifier = Modifier.padding(8.dp)
+        )
         GroupHeader("Additional System Prompt")
         TextField(
           state = additionalSystemPrompt,
