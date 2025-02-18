@@ -90,8 +90,8 @@ jobs:
       - name: Cache arbigent
         uses: actions/cache@v4
         with:
-        key: arbigent
-        path: arbigent-cache
+          key: arbigent
+          path: arbigent-cache
 
       - name: Enable KVM group perms
         run: |
