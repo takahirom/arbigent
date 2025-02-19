@@ -2,7 +2,6 @@ package io.github.takahirom.arbigent
 
 import io.github.takahirom.arbigent.MaestroDevice.OptimizationResult
 import io.github.takahirom.arbigent.result.ArbigentUiTreeStrings
-import kotlinx.serialization.Serializable
 import maestro.*
 import maestro.UiElement.Companion.toUiElement
 import maestro.UiElement.Companion.toUiElementOrNull
@@ -117,7 +116,7 @@ public data class ArbigentElementList(
         width = deviceInfo.widthPixels,
         height = deviceInfo.heightPixels
       ) ?: throw NodeInBoundsNotFoundException()
-      val result = treeNode.optimizeTree(
+      val result = treeNode.optimizeTree2(
         isRoot = true,
         viewHierarchy = viewHierarchy,
       )
@@ -300,7 +299,7 @@ public class MaestroDevice(
       width = deviceInfo.widthPixels,
       height = deviceInfo.heightPixels
     ) ?: throw ArbigentElementList.NodeInBoundsNotFoundException()
-    val result = nodes.optimizeTree(
+    val result = nodes.optimizeTree2(
       isRoot = true,
       viewHierarchy = this,
     )
@@ -638,6 +637,67 @@ private fun StringBuilder.appendUiElementContents(
   }
   if (treeNode.selected != null && treeNode.selected!!) {
     append("selected=${treeNode.selected}, ")
+  }
+}
+
+public fun TreeNode.optimizeTree2(
+  isRoot: Boolean = false,
+  viewHierarchy: ViewHierarchy
+): OptimizationResult {
+  fun isIncludeView(node: TreeNode): Boolean {
+    val isOkResourceId = run {
+      val resourceId = node.attributes["resource-id"] ?: return@run true
+      val hasNotNeededId = resourceId.contains("status_bar_container") || resourceId.contains("status_bar_launch_animation_container")
+      !hasNotNeededId
+    }
+    val isVisibleRectView = node.toUiElementOrNull()?.bounds?.let {
+      it.width > 0 && it.height > 0
+    } ?: true
+    return isOkResourceId && isVisibleRectView
+  }
+  fun isMeaningfulViewDfs(node: TreeNode): Boolean {
+    if (node.attributes.keys.any { it in meaningfulAttributes } && attributes.keys.isNotEmpty()) {
+      return true
+    }
+    return node.children.any { isMeaningfulViewDfs(it) }
+  }
+
+  val childResults = children
+    .filter { isIncludeView(it) && isMeaningfulViewDfs(it) }
+    .map { it.optimizeTree2(false, viewHierarchy) }
+  val optimizedChildren = childResults.flatMap {
+    it.node?.let { node -> listOf(node) } ?: it.promotedChildren
+  }
+  if (isRoot) {
+    return OptimizationResult(
+      node = this.copy(children = optimizedChildren),
+      promotedChildren = emptyList()
+    )
+  }
+  val hasContentInThisNode = (attributes.keys.any { it in meaningfulAttributes } && attributes.keys.isNotEmpty())
+  if (hasContentInThisNode) {
+    return OptimizationResult(
+      node = this.copy(children = optimizedChildren),
+      promotedChildren = emptyList()
+    )
+  }
+  if (optimizedChildren.isEmpty()) {
+    return OptimizationResult(
+      node = null,
+      promotedChildren = emptyList()
+    )
+  }
+  val isSingleChild = optimizedChildren.size == 1
+  return if (isSingleChild) {
+    OptimizationResult(
+      node = optimizedChildren.single(),
+      promotedChildren = emptyList()
+    )
+  } else {
+    OptimizationResult(
+      node = null,
+      promotedChildren = optimizedChildren
+    )
   }
 }
 
