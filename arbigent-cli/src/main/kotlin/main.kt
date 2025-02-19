@@ -67,6 +67,7 @@ class AzureOpenAiConfig : AiConfig("Options for Azure OpenAI") {
 }
 
 private const val defaultResultPath = "arbigent-result"
+private const val defaultCachePath = "arbigent-cache"
 
 class ArbigentCli : CliktCommand(name = "arbigent") {
   private val aiType by option(help = "Type of AI to use")
@@ -140,6 +141,8 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
     ArbigentFiles.screenshotsDir = File(resultDir, "screenshots")
     ArbigentFiles.jsonlsDir = File(resultDir, "jsonls")
     ArbigentFiles.logFile = File(logFile)
+    ArbigentFiles.cacheDir = File(defaultCachePath + File.separator + BuildConfig.VERSION_NAME)
+    ArbigentFiles.cacheDir.mkdirs()
     val resultFile = File(resultDir, "result.yml")
     val ai: ArbigentAi = aiType.let { aiType ->
       when (aiType) {

@@ -36,4 +36,4 @@ scenarios:
 settings:
   cacheStrategy:
     aiDecisionCacheStrategy:
-      type: "InMemory"
+      type: "Disk"

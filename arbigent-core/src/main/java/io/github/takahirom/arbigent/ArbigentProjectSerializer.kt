@@ -72,6 +72,13 @@ public sealed interface AiDecisionCacheStrategy {
     val maxCacheSize: Long = 100,
     val expireAfterWriteMs: Long = 24.hours.inWholeMilliseconds
   ) : AiDecisionCacheStrategy
+
+  @Serializable
+  @SerialName("Disk")
+  public data class Disk(
+    val maxCacheSize: Long = 500 * 1024 * 1024, // 500MB
+  ) : AiDecisionCacheStrategy
+
 }
 
 public fun List<ArbigentScenarioContent>.createArbigentScenario(

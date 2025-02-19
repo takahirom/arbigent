@@ -17,7 +17,7 @@ public class ArbigentContextHolder(
       steps().size +"_" + startTimestamp + "_" + System.currentTimeMillis() .toString()
   }
   @Serializable
-  public class Step(
+  public data class Step(
     public val stepId: String,
     public val agentCommand: ArbigentAgentCommand? = null,
     public val action: String? = null,
@@ -31,6 +31,7 @@ public class ArbigentContextHolder(
     public val timestamp: Long = System.currentTimeMillis(),
     public val screenshotFilePath: String,
     public val apiCallJsonLFilePath: String? = null,
+    public val cacheHit: Boolean = false,
   ) {
     public fun isFailed(): Boolean {
       return feedback?.contains("Failed") == true
@@ -56,6 +57,7 @@ public class ArbigentContextHolder(
 //        uiTreeStrings = uiTreeStrings,
         aiRequest = aiRequest,
         aiResponse = aiResponse,
+        cacheHit = cacheHit
       )
     }
   }

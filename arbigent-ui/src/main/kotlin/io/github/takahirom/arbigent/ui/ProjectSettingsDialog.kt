@@ -78,12 +78,23 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
             ) {
               Text("InMemory")
             }
+            selectableItem(
+              cacheStrategy.aiDecisionCacheStrategy is AiDecisionCacheStrategy.Disk,
+              onClick = {
+                appStateHolder.onCacheStrategyChanged(
+                  appStateHolder.cacheStrategyFlow.value.copy(aiDecisionCacheStrategy = AiDecisionCacheStrategy.Disk())
+                )
+              }
+            ) {
+              Text("Disk")
+            }
           }
         ) {
           Text(
             when (cacheStrategy.aiDecisionCacheStrategy) {
               is AiDecisionCacheStrategy.Disabled -> "Disabled"
               is AiDecisionCacheStrategy.InMemory -> "InMemory"
+              is AiDecisionCacheStrategy.Disk -> "Disk"
             }
           )
         }

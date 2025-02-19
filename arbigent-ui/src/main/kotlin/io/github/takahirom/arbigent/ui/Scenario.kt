@@ -35,19 +35,8 @@ import io.github.takahirom.arbigent.result.StepFeedback
 import io.github.takahirom.arbigent.result.StepFeedbackEvent
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.Orientation
-import org.jetbrains.jewel.ui.component.CheckboxRow
-import org.jetbrains.jewel.ui.component.CircularProgressIndicator
-import org.jetbrains.jewel.ui.component.Divider
-import org.jetbrains.jewel.ui.component.Dropdown
-import org.jetbrains.jewel.ui.component.GroupHeader
-import org.jetbrains.jewel.ui.component.Icon
-import org.jetbrains.jewel.ui.component.IconActionButton
-import org.jetbrains.jewel.ui.component.MenuScope
-import org.jetbrains.jewel.ui.component.OutlinedButton
-import org.jetbrains.jewel.ui.component.RadioButtonRow
-import org.jetbrains.jewel.ui.component.Text
-import org.jetbrains.jewel.ui.component.TextArea
-import org.jetbrains.jewel.ui.component.TextField
+import org.jetbrains.jewel.ui.component.*
+import org.jetbrains.jewel.ui.component.styling.ChipStyle
 import org.jetbrains.jewel.ui.component.styling.GroupHeaderStyle
 import org.jetbrains.jewel.ui.component.styling.LocalGroupHeaderStyle
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
@@ -854,6 +843,13 @@ private fun ContentPanel(
                 Text(
                   text = "Step ${stepIndex + 1}",
                 )
+                if (step.cacheHit) {
+                  Text(
+                    "Cache hit",
+                    modifier = Modifier.padding(4.dp)
+                      .background(JewelTheme.colorPalette.purple(8))
+                  )
+                }
                 if (step.isFailed()) {
                   Icon(
                     key = AllIconsKeys.General.Error,

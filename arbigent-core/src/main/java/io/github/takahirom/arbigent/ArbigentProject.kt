@@ -186,9 +186,15 @@ public fun AiDecisionCacheStrategy.toCache(): ArbigentAiDecisionCache =
     }
 
     is AiDecisionCacheStrategy.InMemory -> {
-      ArbigentAiDecisionCache.Enabled.create(
+      ArbigentAiDecisionCache.Memory.create(
         decisionStrategy.maxCacheSize,
         decisionStrategy.expireAfterWriteMs.milliseconds
+      )
+    }
+
+    is AiDecisionCacheStrategy.Disk -> {
+      ArbigentAiDecisionCache.Disk.create(
+        maxSize = decisionStrategy.maxCacheSize
       )
     }
   }
