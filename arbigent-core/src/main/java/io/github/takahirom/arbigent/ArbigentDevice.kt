@@ -322,11 +322,11 @@ public class MaestroDevice(
 
   private fun ViewHierarchy.refreshedElement(targtNode: TreeNode): TreeNode? {
     val targetNodeIdentifierData = targtNode.getIdentifierDataForFocus()
-    println("targetNode: $targetNodeIdentifierData")
+    arbigentDebugLog("targetNode: $targetNodeIdentifierData")
     val matches = root.optimizeTree2(isRoot = true, viewHierarchy = this).node!!
       .aggregate()
       .filter {
-        println("candidateNode: ${it.getIdentifierDataForFocus()}")
+        arbigentDebugLog("candidateNode: ${it.getIdentifierDataForFocus()}")
         it.getIdentifierDataForFocus().take(targetNodeIdentifierData.size) == targetNodeIdentifierData
       }
 
