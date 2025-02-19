@@ -276,7 +276,7 @@ private fun StepView(step: ArbigentAgentTaskStepResult) {
       }
     }) {
       if (step.screenshotFilePath.isNotEmpty()) {
-        ExpandableSection("Annotated Screenshot", defaultExpanded = true) {
+        ExpandableSection("Annotated Screenshot", defaultExpanded = !step.cacheHit) {
           AsyncImage(
             path = step.screenshotFilePath.substringBeforeLast(".") + "_annotated." + step.screenshotFilePath.substringAfterLast(
               "."
@@ -284,7 +284,7 @@ private fun StepView(step: ArbigentAgentTaskStepResult) {
             contentDescription = "Annotated Screenshot for step: ${step.summary}"
           )
         }
-        ExpandableSection("Screenshot", defaultExpanded = false) {
+        ExpandableSection("Screenshot", defaultExpanded = step.cacheHit) {
           AsyncImage(
             path = step.screenshotFilePath,
             contentDescription = "Screenshot for step: ${step.summary}"
