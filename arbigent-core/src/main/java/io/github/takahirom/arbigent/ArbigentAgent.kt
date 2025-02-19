@@ -379,13 +379,28 @@ public sealed interface ArbigentAiDecisionCache {
         arbigentInfoLog("AI-decision cache miss with key: $key")
         return null
       }
-      return json.decodeFromString(file.readText())
+      return json.decodeFromString<ArbigentAi.DecisionOutput>(file.readText())
+        .let{ output ->
+          output.copy(
+            step = output.step.copy(
+              cacheHit = true
+            )
+          )
+        }
     }
 
     public override suspend fun set(key: String, value: ArbigentAi.DecisionOutput) {
       arbigentInfoLog("AI-decision cache put with key: $key")
       cache.put(key, { file ->
-        file.writeText(json.encodeToString(value))
+        file.writeText(json.encodeToString(value
+          .let {
+            it.copy(
+              step = it.step.copy(
+                cacheHit = false
+              )
+            )
+          }
+        ))
         true
       })
     }

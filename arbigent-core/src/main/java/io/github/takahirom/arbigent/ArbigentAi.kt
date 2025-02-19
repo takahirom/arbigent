@@ -22,7 +22,7 @@ public interface ArbigentAi {
   @Serializable
   public data class DecisionOutput(
     val agentCommands: List<ArbigentAgentCommand>,
-    val step: ArbigentContextHolder.Step
+    val step: ArbigentContextHolder.Step,
   )
   public class FailedToParseResponseException(message: String, cause: Throwable) : Exception(message, cause)
   public fun decideAgentCommands(
