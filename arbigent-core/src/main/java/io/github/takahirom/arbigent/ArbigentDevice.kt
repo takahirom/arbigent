@@ -641,7 +641,6 @@ private val meaningfulAttributes: Set<String> = setOf(
 )
 
 private val meaningfulIfTrueAttributes: Set<String> = setOf(
-  "enabled",
   "focused",
   "checked",
   "selected",
