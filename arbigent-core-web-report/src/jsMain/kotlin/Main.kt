@@ -219,6 +219,16 @@ private fun StepView(step: ArbigentAgentTaskStepResult) {
         }
       }
     ) {
+      if (step.cacheHit) {
+        Pre({
+          style {
+            whiteSpace("pre-wrap")
+            backgroundColor(Color.lightgreen)
+          }
+        }) {
+          Text("Cache Hit")
+        }
+      }
       Pre({
         style {
           whiteSpace("pre-wrap")

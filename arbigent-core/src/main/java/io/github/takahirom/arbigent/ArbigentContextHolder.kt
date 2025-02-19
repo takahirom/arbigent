@@ -57,6 +57,7 @@ public class ArbigentContextHolder(
 //        uiTreeStrings = uiTreeStrings,
         aiRequest = aiRequest,
         aiResponse = aiResponse,
+        cacheHit = cacheHit
       )
     }
   }
