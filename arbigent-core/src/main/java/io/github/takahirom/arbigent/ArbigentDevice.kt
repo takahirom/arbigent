@@ -313,7 +313,9 @@ public class MaestroDevice(
       fetchTarget = {
         val newElement = maestro.viewHierarchy().refreshedElement(element.treeNode)
         val bounds = newElement?.toUiElement()?.bounds
-        arbigentInfoLog("Element(${element.treeNode.getIdentifierDataForFocus()}) not found in current ViewHierarchy.")
+        if (bounds == null) {
+          arbigentInfoLog("Element(${element.treeNode.getIdentifierDataForFocus()}) not found in current ViewHierarchy.")
+        }
         bounds
       }
     )
