@@ -18,7 +18,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
       - name: Setup JBR 17
         uses: gmitch215/setup-java@main
         with:
@@ -94,7 +97,10 @@ jobs:
           sudo udevadm trigger --name-match=kvm
           ls /dev/kvm
 
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
       - name: Setup JBR 17
         uses: gmitch215/setup-java@main
         with:
@@ -115,6 +121,14 @@ jobs:
         id: build
         run: |
           ./gradlew arbigent-cli:installDist --stacktrace
+
+      - name: Cache arbigent
+        uses: actions/cache@v4
+        with:
+          # Caution: If we use the same cache key without GitHub SHA, the cache will not be updated.
+          key: arbigent-${{ matrix.shardIndex }}-${{ matrix.shardTotal }}-${{ github.sha }}
+          restore-keys: arbigent-${{ matrix.shardIndex }}-${{ matrix.shardTotal }}-
+          path: arbigent-cache
 
       - name: CLI E2E test
         uses: reactivecircus/android-emulator-runner@v2
@@ -145,7 +159,10 @@ jobs:
   cli-e2e-ios:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
       - name: Setup JBR 17
         uses: gmitch215/setup-java@main
         with:

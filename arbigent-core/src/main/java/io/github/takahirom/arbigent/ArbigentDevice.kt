@@ -45,14 +45,6 @@ public interface ArbigentTvCompatDevice {
 }
 
 
-private val meaningfulAttributes: Set<String> = setOf(
-  "text",
-  "title",
-  "accessibilityText",
-  "content description",
-  "hintText"
-)
-
 public interface ArbigentDevice {
   public fun deviceName(): String = "ArbigentDevice"
   public fun executeCommands(commands: List<MaestroCommand>)
@@ -116,7 +108,7 @@ public data class ArbigentElementList(
         width = deviceInfo.widthPixels,
         height = deviceInfo.heightPixels
       ) ?: throw NodeInBoundsNotFoundException()
-      val result = treeNode.optimizeTree(
+      val result = treeNode.optimizeTree2(
         isRoot = true,
         viewHierarchy = viewHierarchy,
       )
@@ -153,7 +145,7 @@ public data class ArbigentElementList(
             || attributes["focused"] == "true"
             || attributes["focusable"] == "true")
         } else {
-          meaningfulAttributes.any { attributes[it]?.isNotBlank() == true }
+          isMeaningfulView()
         }
         if (shouldAddElement
         ) {
@@ -299,7 +291,7 @@ public class MaestroDevice(
       width = deviceInfo.widthPixels,
       height = deviceInfo.heightPixels
     ) ?: throw ArbigentElementList.NodeInBoundsNotFoundException()
-    val result = nodes.optimizeTree(
+    val result = nodes.optimizeTree2(
       isRoot = true,
       viewHierarchy = this,
     )
@@ -640,6 +632,89 @@ private fun StringBuilder.appendUiElementContents(
   }
 }
 
+private val meaningfulAttributes: Set<String> = setOf(
+  "text",
+  "title",
+  "accessibilityText",
+  "content description",
+  "hintText"
+)
+
+private val meaningfulIfTrueAttributes: Set<String> = setOf(
+  "focused",
+  "checked",
+  "selected",
+  "clickable",
+  "focusable",
+  "selectable",
+)
+
+private fun TreeNode.isMeaningfulView(): Boolean {
+  return meaningfulAttributes.any { attributes[it]?.isNotBlank() == true }
+    || meaningfulIfTrueAttributes.any { attributes[it] == "true" }
+}
+
+public fun TreeNode.optimizeTree2(
+  isRoot: Boolean = false,
+  viewHierarchy: ViewHierarchy
+): OptimizationResult {
+  fun isIncludeView(node: TreeNode): Boolean {
+    val isOkResourceId = run {
+      val resourceId = node.attributes["resource-id"] ?: return@run true
+      val hasNotNeededId = resourceId.contains("status_bar_container") || resourceId.contains("status_bar_launch_animation_container")
+      !hasNotNeededId
+    }
+    val isVisibleRectView = node.toUiElementOrNull()?.bounds?.let {
+      it.width > 0 && it.height > 0
+    } ?: true
+    return isOkResourceId && isVisibleRectView
+  }
+  fun isMeaningfulViewDfs(node: TreeNode): Boolean {
+    if (node.isMeaningfulView()) {
+      return true
+    }
+    return node.children.any { isMeaningfulViewDfs(it) }
+  }
+
+  val childResults = children
+    .filter { isIncludeView(it) && isMeaningfulViewDfs(it) }
+    .map { it.optimizeTree2(false, viewHierarchy) }
+  val optimizedChildren = childResults.flatMap {
+    it.node?.let { node -> listOf(node) } ?: it.promotedChildren
+  }
+  if (isRoot) {
+    return OptimizationResult(
+      node = this.copy(children = optimizedChildren),
+      promotedChildren = emptyList()
+    )
+  }
+  val hasContentInThisNode = this.isMeaningfulView()
+  if (hasContentInThisNode) {
+    return OptimizationResult(
+      node = this.copy(children = optimizedChildren),
+      promotedChildren = emptyList()
+    )
+  }
+  if (optimizedChildren.isEmpty()) {
+    return OptimizationResult(
+      node = null,
+      promotedChildren = emptyList()
+    )
+  }
+  val isSingleChild = optimizedChildren.size == 1
+  return if (isSingleChild) {
+    OptimizationResult(
+      node = optimizedChildren.single(),
+      promotedChildren = emptyList()
+    )
+  } else {
+    OptimizationResult(
+      node = null,
+      promotedChildren = optimizedChildren
+    )
+  }
+}
+
 
 public fun TreeNode.optimizeTree(
   isRoot: Boolean = false,
@@ -648,10 +723,11 @@ public fun TreeNode.optimizeTree(
   // Optimize children
   val childResults = children
     .filter {
-      it.attributes["resource-id"]?.contains("status_bar_container").let {
-        if (it != null) !it
-        else true
-      } &&
+      val isOkView = run {
+        val resourceId = it.attributes["resource-id"] ?: return@run true
+        !resourceId.contains("status_bar_container") && !resourceId.contains("status_bar_launch_animation_container")
+      }
+      isOkView &&
         (it.toUiElementOrNull()?.bounds?.let {
           it.width > 0 && it.height > 0
         }) ?: true

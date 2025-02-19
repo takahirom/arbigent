@@ -5,6 +5,7 @@ import io.github.takahirom.arbigent.result.ArbigentUiTreeStrings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.serialization.Serializable
 
 public class ArbigentContextHolder(
   public val goal: String,
@@ -15,7 +16,8 @@ public class ArbigentContextHolder(
     return "" + goal.hashCode() + "_" +
       steps().size +"_" + startTimestamp + "_" + System.currentTimeMillis() .toString()
   }
-  public class Step(
+  @Serializable
+  public data class Step(
     public val stepId: String,
     public val agentCommand: ArbigentAgentCommand? = null,
     public val action: String? = null,
@@ -29,6 +31,7 @@ public class ArbigentContextHolder(
     public val timestamp: Long = System.currentTimeMillis(),
     public val screenshotFilePath: String,
     public val apiCallJsonLFilePath: String? = null,
+    public val cacheHit: Boolean = false,
   ) {
     public fun isFailed(): Boolean {
       return feedback?.contains("Failed") == true
@@ -54,6 +57,7 @@ public class ArbigentContextHolder(
 //        uiTreeStrings = uiTreeStrings,
         aiRequest = aiRequest,
         aiResponse = aiResponse,
+        cacheHit = cacheHit
       )
     }
   }

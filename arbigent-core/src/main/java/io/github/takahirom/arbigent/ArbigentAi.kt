@@ -2,6 +2,7 @@ package io.github.takahirom.arbigent
 
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import io.github.takahirom.arbigent.result.ArbigentUiTreeStrings
+import kotlinx.serialization.Serializable
 
 public interface ArbigentAi {
   public data class DecisionInput(
@@ -18,9 +19,10 @@ public interface ArbigentAi {
     val prompt: ArbigentPrompt,
     val cacheKey: String,
   )
+  @Serializable
   public data class DecisionOutput(
     val agentCommands: List<ArbigentAgentCommand>,
-    val step: ArbigentContextHolder.Step
+    val step: ArbigentContextHolder.Step,
   )
   public class FailedToParseResponseException(message: String, cause: Throwable) : Exception(message, cause)
   public fun decideAgentCommands(

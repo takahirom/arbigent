@@ -94,7 +94,8 @@ public data class ArbigentAgentTaskStepResult(
 //  public val uiTreeStrings: ArbigentUiTreeStrings?,
   public val aiRequest: String?,
   public val aiResponse: String?,
-  public val timestamp: Long
+  public val timestamp: Long,
+  public val cacheHit: Boolean
 )
 
 @Serializable

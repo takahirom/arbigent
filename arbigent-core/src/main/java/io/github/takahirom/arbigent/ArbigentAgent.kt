@@ -1,5 +1,7 @@
 package io.github.takahirom.arbigent
 
+import com.mayakapps.kache.JavaFileKache
+import com.mayakapps.kache.KacheStrategy
 import io.github.takahirom.arbigent.ArbigentAgent.*
 import io.github.takahirom.arbigent.result.ArbigentAgentResult
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
@@ -14,9 +16,10 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import maestro.MaestroException
 import maestro.orchestra.*
-import org.mobilenativefoundation.store.cache5.Cache
 import org.mobilenativefoundation.store.cache5.CacheBuilder
 import java.io.File
 import kotlin.time.Duration
@@ -70,24 +73,25 @@ public class ArbigentAgent(
     }
     chain(input)
   }
+
   private val decisionInterceptors: List<ArbigentDecisionInterceptor> = interceptors
     .filterIsInstance<ArbigentDecisionInterceptor>()
-  private val decisionChain: (ArbigentAi.DecisionInput) -> ArbigentAi.DecisionOutput =
-    decisionInterceptors.foldRight(
-      { input: ArbigentAi.DecisionInput ->
-        ArbigentGlobalStatus.onAi {
-          ai.decideAgentCommands(input)
-        }
-      },
-      { interceptor, acc ->
-        { input ->
-          interceptor.intercept(
-            decisionInput = input,
-            chain = { decisionInput -> acc(decisionInput) }
-          )
-        }
+  private val decisionChain: suspend (ArbigentAi.DecisionInput) -> ArbigentAi.DecisionOutput = { input ->
+    var chain: suspend (ArbigentAi.DecisionInput) -> ArbigentAi.DecisionOutput = { decisionInput ->
+      ArbigentGlobalStatus.onAi {
+        ai.decideAgentCommands(decisionInput)
       }
-    )
+    }
+    decisionInterceptors.reversed().forEach { interceptor ->
+      val previousChain = chain
+      chain = { currentInput ->
+        interceptor.intercept(currentInput) { previousChain(it) }
+      }
+    }
+    chain(input)
+  }
+
+
   private val imageAssertionInterceptors: List<ArbigentImageAssertionInterceptor> = interceptors
     .filterIsInstance<ArbigentImageAssertionInterceptor>()
   private val imageAssertionChain: (ArbigentAi.ImageAssertionInput) -> ArbigentAi.ImageAssertionOutput =
@@ -219,7 +223,7 @@ public class ArbigentAgent(
     val updateCurrentGoal: (String?) -> Unit,
     val initializerChain: (ArbigentDevice) -> Unit,
     val stepChain: suspend (StepInput) -> StepResult,
-    val decisionChain: (ArbigentAi.DecisionInput) -> ArbigentAi.DecisionOutput,
+    val decisionChain: suspend (ArbigentAi.DecisionInput) -> ArbigentAi.DecisionOutput,
     val imageAssertionChain: (ArbigentAi.ImageAssertionInput) -> ArbigentAi.ImageAssertionOutput,
     val executeCommandChain: (ExecuteCommandsInput) -> ExecuteCommandsOutput,
   )
@@ -236,7 +240,7 @@ public class ArbigentAgent(
     val device: ArbigentDevice,
     val deviceFormFactor: ArbigentScenarioDeviceFormFactor,
     val ai: ArbigentAi,
-    val decisionChain: (ArbigentAi.DecisionInput) -> ArbigentAi.DecisionOutput,
+    val decisionChain: suspend (ArbigentAi.DecisionInput) -> ArbigentAi.DecisionOutput,
     val imageAssertionChain: (ArbigentAi.ImageAssertionInput) -> ArbigentAi.ImageAssertionOutput,
     val executeCommandChain: (ExecuteCommandsInput) -> ExecuteCommandsOutput,
     val prompt: ArbigentPrompt,
@@ -255,6 +259,7 @@ public class ArbigentAgent(
     val screenshotFilePath: String,
     val device: ArbigentDevice,
     val cacheKey: String,
+    val elements: ArbigentElementList,
   )
 
   public class ExecuteCommandsOutput
@@ -352,40 +357,114 @@ public fun AgentConfigBuilder(block: AgentConfig.Builder.() -> Unit): AgentConfi
 }
 
 public sealed interface ArbigentAiDecisionCache {
-  public class Enabled private constructor(
-    private val cache: Cache<String, ArbigentAi.DecisionOutput>
-  ) : ArbigentAiDecisionCache {
+  public sealed interface Enabled : ArbigentAiDecisionCache {
+    public suspend fun get(key: String): ArbigentAi.DecisionOutput?
+    public suspend fun set(key: String, value: ArbigentAi.DecisionOutput)
+    public suspend fun remove(key: String)
+  }
+
+  // FileCache
+  public class Disk private constructor(
+    private val cache: JavaFileKache
+  ) : Enabled {
+    private val json: Json = Json {
+      ignoreUnknownKeys = true
+      useArrayPolymorphism = true
+    }
+
+    public override suspend fun get(key: String): ArbigentAi.DecisionOutput? {
+      val file = cache.get(key)
+      arbigentInfoLog("AI-decision cache get with key: $key")
+      if (file == null) {
+        arbigentInfoLog("AI-decision cache miss with key: $key")
+        return null
+      }
+      return json.decodeFromString<ArbigentAi.DecisionOutput>(file.readText())
+        .let{ output ->
+          output.copy(
+            step = output.step.copy(
+              cacheHit = true
+            )
+          )
+        }
+    }
+
+    public override suspend fun set(key: String, value: ArbigentAi.DecisionOutput) {
+      arbigentInfoLog("AI-decision cache put with key: $key")
+      cache.put(key, { file ->
+        file.writeText(json.encodeToString(value
+          .let {
+            it.copy(
+              step = it.step.copy(
+                cacheHit = false
+              )
+            )
+          }
+        ))
+        true
+      })
+    }
+
+    public override suspend fun remove(key: String) {
+      arbigentInfoLog("AI-decision cache remove with key: $key")
+      cache.remove(key)
+    }
+
+    public companion object {
+      public fun create(
+        maxSize: Long = 500 * 1024 * 1024, // 500MB
+      ): Disk {
+        return runBlocking {
+          val cache = JavaFileKache(directory = ArbigentFiles.cacheDir, maxSize = maxSize) {
+            strategy = KacheStrategy.LRU
+            this.maxSize = maxSize
+          }
+          Disk(cache)
+        }
+      }
+    }
+  }
+
+  public class Memory private constructor(
+    private val cache: org.mobilenativefoundation.store.cache5.Cache<String, String>
+  ) : Enabled {
+    private val json: Json = Json {
+      ignoreUnknownKeys = true
+      useArrayPolymorphism = true
+    }
     // This feature is experimental so we are logging the cache operations.
 
-    public operator fun get(key: String): ArbigentAi.DecisionOutput? {
-      val hash = key.hashCode()
-      arbigentInfoLog("AI-decision cache get with key: $key ($hash)")
-      return cache.getIfPresent(hash.toString())
+    public override suspend fun get(key: String): ArbigentAi.DecisionOutput? {
+      val cache = cache.getIfPresent(key)
+      arbigentInfoLog("AI-decision cache get with key: $key")
+      if (cache == null) {
+        arbigentInfoLog("AI-decision cache miss with key: $key")
+        return null
+      }
+      return json.decodeFromString(cache)
     }
 
-    public operator fun set(key: String, value: ArbigentAi.DecisionOutput) {
-      val hash = key.hashCode()
-      arbigentInfoLog("AI-decision cache put with key: $key ($hash)")
-      cache.put(hash.toString(), value)
+    public override suspend fun set(key: String, value: ArbigentAi.DecisionOutput) {
+      arbigentInfoLog("AI-decision cache put with key: $key")
+      cache.put(key, json.encodeToString(value))
     }
 
-    public fun remove(key: String) {
-      val hash = key.hashCode()
-      arbigentInfoLog("AI-decision cache remove with key: $key ($hash)")
-      cache.invalidate(hash.toString())
+    public override suspend fun remove(key: String) {
+      arbigentInfoLog("AI-decision cache remove with key: $key")
+      cache.invalidate(key)
     }
 
     public companion object {
       public fun create(
         maxSize: Long = 100,
         expireAfterAccess: Duration = 24.hours
-      ): Enabled {
-        val cache = CacheBuilder<String, ArbigentAi.DecisionOutput>()
+      ): Memory {
+        val cache = CacheBuilder<String, String>()
           .maximumSize(maxSize)
           .expireAfterAccess(expireAfterAccess)
           .build()
 
-        return Enabled(cache)
+        return Memory(cache)
       }
     }
   }
@@ -514,18 +593,22 @@ public fun AgentConfigBuilder(
   }
   if (aiDecisionCache is ArbigentAiDecisionCache.Enabled) {
     addInterceptor(object : ArbigentDecisionInterceptor, ArbigentExecutionInterceptor {
-      override fun intercept(
+      override suspend fun intercept(
         decisionInput: ArbigentAi.DecisionInput,
         chain: ArbigentDecisionInterceptor.Chain
       ): ArbigentAi.DecisionOutput {
-        val cached = aiDecisionCache[decisionInput.cacheKey]
+        val cached = aiDecisionCache.get(decisionInput.cacheKey)
         if (cached != null) {
           arbigentInfoLog("AI-decision cache hit with view tree and prompt")
-          return cached
+          return cached.copy(
+            step = cached.step.copy(
+              screenshotFilePath = decisionInput.screenshotFilePath
+            )
+          )
         }
         arbigentDebugLog("AI-decision cache miss with view tree and prompt")
         val output = chain.proceed(decisionInput)
-        aiDecisionCache[decisionInput.cacheKey] = output
+        aiDecisionCache.set(decisionInput.cacheKey, output)
         return output
       }
 
@@ -542,6 +625,7 @@ public fun AgentConfigBuilder(
               }
             }
           }
+
           ExecutionResult.Cancelled,
           ExecutionResult.Success -> {
           }
@@ -588,13 +672,13 @@ public interface ArbigentInitializerInterceptor : ArbigentInterceptor {
 }
 
 public interface ArbigentDecisionInterceptor : ArbigentInterceptor {
-  public fun intercept(
+  public suspend fun intercept(
     decisionInput: ArbigentAi.DecisionInput,
     chain: Chain
   ): ArbigentAi.DecisionOutput
 
   public fun interface Chain {
-    public fun proceed(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput
+    public suspend fun proceed(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput
   }
 }
 
@@ -678,7 +762,12 @@ private fun executeCommands(
   val (stepId, decisionOutput, arbigentContextHolder, screenshotFilePath, device) = executeCommandsInput
   decisionOutput.agentCommands.forEach { agentCommand ->
     try {
-      agentCommand.runDeviceCommand(device)
+      agentCommand.runDeviceCommand(
+        ArbigentAgentCommand.RunInput(
+          device = device,
+          elements = executeCommandsInput.elements,
+        )
+      )
     } catch (e: MaestroException) {
       e.printStackTrace()
       arbigentContextHolder.addStep(
@@ -798,7 +887,12 @@ private suspend fun step(
     }
   }
   val uiTreeStrings = device.viewTreeString()
-  val cacheKey = (contextHolder.prompt() + uiTreeStrings.optimizedTreeString).hashCode().toString()
+  val cacheKey =
+    (BuildConfig.VERSION_NAME + contextHolder.prompt() + uiTreeStrings.optimizedTreeString).hashCode().toString()
+  arbigentInfoLog("cacheKey: $cacheKey")
+  arbigentInfoLog("  BuildConfig.VERSION_NAME: ${BuildConfig.VERSION_NAME}")
+  arbigentInfoLog("  prompt: ${contextHolder.prompt()}")
+  arbigentInfoLog("  uiTreeStrings.optimizedTreeString: ${uiTreeStrings.optimizedTreeString}")
   val screenshotFilePath =
     ArbigentFiles.screenshotsDir.absolutePath + File.separator + "$stepId.png"
   val decisionJsonlFilePath =
@@ -889,6 +983,7 @@ private suspend fun step(
     ExecuteCommandsInput(
       stepId = stepId,
       decisionOutput = decisionOutput,
+      elements = elements,
       arbigentContextHolder = contextHolder,
       screenshotFilePath = screenshotFilePath,
       device = device,

@@ -317,7 +317,7 @@ $templates"""
           if (elements.elements.size <= index) {
             throw IllegalArgumentException("Index out of bounds: $index")
           }
-          DpadAutoFocusWithIndexAgentCommand(index, elements)
+          DpadAutoFocusWithIndexAgentCommand(index)
         }
 
         InputTextAgentCommand -> {
@@ -334,7 +334,6 @@ $templates"""
           }
           ClickWithIndex(
             index = index,
-            elements = elements
           )
         }
 

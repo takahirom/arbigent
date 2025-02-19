@@ -1,12 +1,14 @@
 plugins {
   id("org.jetbrains.kotlin.jvm") version "2.0.21"
   id("org.jetbrains.kotlin.plugin.serialization") version libs.versions.kotlin
-  id("com.palantir.git-version") version "0.15.0"
+  id("com.javiersc.semver") version "0.8.0"
   alias(libs.plugins.buildconfig)
 }
 
-val gitVersion: groovy.lang.Closure<String> by extra
-version = gitVersion()
+semver {
+  isEnabled.set(true)
+  tagPrefix.set("")
+}
 
 kotlin {
   explicitApi()
@@ -37,6 +39,7 @@ dependencies {
   api(project(":arbigent-core-model"))
   implementation("com.charleskorn.kaml:kaml:0.67.0")
   api("org.mobilenativefoundation.store:cache5:5.1.0-alpha05")
+  api("com.mayakapps.kache:file-kache:2.1.1")
 
   // To expose requestBuilderModifier
   api(libs.ktor.client.core)
