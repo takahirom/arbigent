@@ -611,7 +611,6 @@ public fun AgentConfigBuilder(
           arbigentInfoLog("AI-decision cache hit with view tree and prompt")
           return cached.copy(
             step = cached.step.copy(
-              cacheHit = true,
               screenshotFilePath = decisionInput.screenshotFilePath
             )
           )
@@ -620,7 +619,7 @@ public fun AgentConfigBuilder(
         val output = chain.proceed(decisionInput)
         aiDecisionCache.set(decisionInput.cacheKey, output.copy(
           step = output.step.copy(
-            cacheHit = false,
+            cacheHit = true,
           )
         ))
         return output
