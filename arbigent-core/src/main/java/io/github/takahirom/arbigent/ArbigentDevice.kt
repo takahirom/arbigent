@@ -312,10 +312,9 @@ public class MaestroDevice(
     moveFocusToElement(
       fetchTarget = {
         val newElement = maestro.viewHierarchy().refreshedElement(element.treeNode)
-        newElement?.toUiElement()?.bounds ?: run {
-          arbigentInfoLog("Element(${element.treeNode.getIdentifierDataForFocus()}) not found in current ViewHierarchy. Using the original bounds.")
-          element.treeNode.toUiElement().bounds
-        }
+        val bounds = newElement?.toUiElement()?.bounds
+        arbigentInfoLog("Element(${element.treeNode.getIdentifierDataForFocus()}) not found in current ViewHierarchy.")
+        bounds
       }
     )
   }
@@ -339,22 +338,14 @@ public class MaestroDevice(
   }
 
   private fun moveFocusToElement(
-    fetchTarget: () -> Bounds
+    fetchTarget: () -> Bounds?
   ) {
     var remainCount = 15
-    var lastCurrentBounds: Bounds? = null
-    var lastTargetBounds: Bounds? = null
     while (remainCount-- > 0) {
       val currentFocus = findCurrentFocus()
         ?: throw IllegalStateException("No focused node")
-      val targetBounds = fetchTarget()
+      val targetBounds = fetchTarget() ?: throw IllegalStateException("Attempted to move to element but missed the target bounds")
       val currentBounds = currentFocus.toUiElement().bounds
-      if (lastCurrentBounds == currentBounds && lastTargetBounds == targetBounds) {
-        arbigentDebugLog("Same bounds detected. Might be stuck or scrollable view. Breaking loop.")
-        break
-      }
-      lastCurrentBounds = currentBounds
-      lastTargetBounds = targetBounds
 
       // Helper functions to calculate the center X and Y of a Bounds object.
       fun Bounds.centerY(): Int {
