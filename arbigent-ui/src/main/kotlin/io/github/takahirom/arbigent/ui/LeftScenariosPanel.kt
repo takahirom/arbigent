@@ -103,7 +103,11 @@ internal fun LeftScenariosPanel(
             val runningInfo by scenarioStateHolder.arbigentScenarioRunningInfo.collectAsState()
             Text(
               modifier = Modifier.weight(1f),
-              text = "Goal: " + goal + "\n" + runningInfo?.toString().orEmpty()
+              text = if (scenarioStateHolder.scenarioType().isScenario()) {
+                "Goal: $goal"
+              } else {
+                "Execution"
+              } + "\n" + runningInfo?.toString().orEmpty()
             )
             val isAchieved by scenarioStateHolder.isAchieved.collectAsState()
             if (isAchieved) {
@@ -202,8 +206,7 @@ fun Tag(
             } else {
               false
             }
-          }
-        ,
+          },
         onKeyboardAction = {
           onTagChanged(tagName, textFieldState.text.toString())
           isEditingMode = false

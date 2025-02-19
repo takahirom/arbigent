@@ -380,26 +380,14 @@ public sealed interface ArbigentAiDecisionCache {
         return null
       }
       return json.decodeFromString<ArbigentAi.DecisionOutput>(file.readText())
-        .let{ output ->
-          output.copy(
-            step = output.step.copy(
-              cacheHit = true
-            )
-          )
-        }
     }
 
     public override suspend fun set(key: String, value: ArbigentAi.DecisionOutput) {
       arbigentInfoLog("AI-decision cache put with key: $key")
       cache.put(key, { file ->
-        file.writeText(json.encodeToString(value
-          .let {
-            it.copy(
-              step = it.step.copy(
-                cacheHit = false
-              )
-            )
-          }
+        file.writeText(
+          json.encodeToString(
+          value
         ))
         true
       })
@@ -474,13 +462,34 @@ public sealed interface ArbigentAiDecisionCache {
 
 public fun AgentConfigBuilder(
   prompt: ArbigentPrompt,
+  scenarioType: ArbigentScenarioType,
   deviceFormFactor: ArbigentScenarioDeviceFormFactor,
   initializationMethods: List<ArbigentScenarioContent.InitializationMethod>,
   imageAssertions: ArbigentImageAssertions,
-  aiDecisionCache: ArbigentAiDecisionCache = ArbigentAiDecisionCache.Disabled
+  aiDecisionCache: ArbigentAiDecisionCache = ArbigentAiDecisionCache.Disabled,
 ): AgentConfig.Builder = AgentConfigBuilder {
   deviceFormFactor(deviceFormFactor)
   prompt(prompt)
+  if (scenarioType.isExecution()) {
+    addInterceptor(object : ArbigentDecisionInterceptor {
+      override suspend fun intercept(
+        decisionInput: ArbigentAi.DecisionInput,
+        chain: ArbigentDecisionInterceptor.Chain
+      ): ArbigentAi.DecisionOutput {
+        return ArbigentAi.DecisionOutput(
+          agentCommands = listOf(
+            GoalAchievedAgentCommand()
+          ),
+          step = ArbigentContextHolder.Step(
+            stepId = decisionInput.stepId,
+            agentCommand = GoalAchievedAgentCommand(),
+            screenshotFilePath = decisionInput.screenshotFilePath,
+            cacheKey = decisionInput.cacheKey
+          )
+        )
+      }
+    })
+  }
   initializationMethods.reversed().forEach { initializeMethod ->
     when (initializeMethod) {
       is ArbigentScenarioContent.InitializationMethod.Back -> {
@@ -602,13 +611,18 @@ public fun AgentConfigBuilder(
           arbigentInfoLog("AI-decision cache hit with view tree and prompt")
           return cached.copy(
             step = cached.step.copy(
+              cacheHit = true,
               screenshotFilePath = decisionInput.screenshotFilePath
             )
           )
         }
         arbigentDebugLog("AI-decision cache miss with view tree and prompt")
         val output = chain.proceed(decisionInput)
-        aiDecisionCache.set(decisionInput.cacheKey, output)
+        aiDecisionCache.set(decisionInput.cacheKey, output.copy(
+          step = output.step.copy(
+            cacheHit = false,
+          )
+        ))
         return output
       }
 

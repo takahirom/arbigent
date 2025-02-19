@@ -42,8 +42,10 @@ constructor(
     _initializationMethodStateFlow
   val deviceFormFactorStateFlow: MutableStateFlow<ArbigentScenarioDeviceFormFactor> =
     MutableStateFlow(ArbigentScenarioDeviceFormFactor.Mobile)
-
   fun deviceFormFactor() = deviceFormFactorStateFlow.value
+  val scenarioTypeStateFlow: MutableStateFlow<ArbigentScenarioType> =
+    MutableStateFlow(ArbigentScenarioType.Scenario)
+  fun scenarioType() = scenarioTypeStateFlow.value
 
   val dependencyScenarioStateHolderStateFlow = MutableStateFlow<ArbigentScenarioStateHolder?>(null)
   val arbigentScenarioExecutorStateFlow = MutableStateFlow<ArbigentScenarioExecutor?>(null)
@@ -132,6 +134,7 @@ constructor(
     return ArbigentScenarioContent(
       id = id,
       goal = goal,
+      type = scenarioType(),
       dependencyId = dependencyScenarioStateHolderStateFlow.value?.id,
       initializationMethods = initializationMethodStateFlow.value
         .filter { it !is ArbigentScenarioContent.InitializationMethod.Noop },
@@ -169,6 +172,7 @@ constructor(
     }
     _initializationMethodStateFlow.value = scenarioContent.initializationMethods.toMutableList()
     deviceFormFactorStateFlow.value = scenarioContent.deviceFormFactor
+    scenarioTypeStateFlow.value = scenarioContent.type
   }
 
   fun onRemoveInitializationMethod(index: Int) {
