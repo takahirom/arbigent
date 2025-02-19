@@ -379,13 +379,28 @@ public sealed interface ArbigentAiDecisionCache {
         arbigentInfoLog("AI-decision cache miss with key: $key")
         return null
       }
-      return json.decodeFromString(file.readText())
+      return json.decodeFromString<ArbigentAi.DecisionOutput>(file.readText())
+        .let{ output ->
+          output.copy(
+            step = output.step.copy(
+              cacheHit = true
+            )
+          )
+        }
     }
 
     public override suspend fun set(key: String, value: ArbigentAi.DecisionOutput) {
       arbigentInfoLog("AI-decision cache put with key: $key")
       cache.put(key, { file ->
-        file.writeText(json.encodeToString(value))
+        file.writeText(json.encodeToString(value
+          .let {
+            it.copy(
+              step = it.step.copy(
+                cacheHit = false
+              )
+            )
+          }
+        ))
         true
       })
     }
@@ -585,7 +600,11 @@ public fun AgentConfigBuilder(
         val cached = aiDecisionCache.get(decisionInput.cacheKey)
         if (cached != null) {
           arbigentInfoLog("AI-decision cache hit with view tree and prompt")
-          return cached
+          return cached.copy(
+            step = cached.step.copy(
+              screenshotFilePath = decisionInput.screenshotFilePath
+            )
+          )
         }
         arbigentDebugLog("AI-decision cache miss with view tree and prompt")
         val output = chain.proceed(decisionInput)
@@ -870,6 +889,10 @@ private suspend fun step(
   val uiTreeStrings = device.viewTreeString()
   val cacheKey =
     (BuildConfig.VERSION_NAME + contextHolder.prompt() + uiTreeStrings.optimizedTreeString).hashCode().toString()
+  arbigentInfoLog("cacheKey: $cacheKey")
+  arbigentInfoLog("  BuildConfig.VERSION_NAME: ${BuildConfig.VERSION_NAME}")
+  arbigentInfoLog("  prompt: ${contextHolder.prompt()}")
+  arbigentInfoLog("  uiTreeStrings.optimizedTreeString: ${uiTreeStrings.optimizedTreeString}")
   val screenshotFilePath =
     ArbigentFiles.screenshotsDir.absolutePath + File.separator + "$stepId.png"
   val decisionJsonlFilePath =
