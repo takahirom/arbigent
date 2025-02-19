@@ -45,14 +45,6 @@ public interface ArbigentTvCompatDevice {
 }
 
 
-private val meaningfulAttributes: Set<String> = setOf(
-  "text",
-  "title",
-  "accessibilityText",
-  "content description",
-  "hintText"
-)
-
 public interface ArbigentDevice {
   public fun deviceName(): String = "ArbigentDevice"
   public fun executeCommands(commands: List<MaestroCommand>)
@@ -153,7 +145,7 @@ public data class ArbigentElementList(
             || attributes["focused"] == "true"
             || attributes["focusable"] == "true")
         } else {
-          meaningfulAttributes.any { attributes[it]?.isNotBlank() == true }
+          isMeaningfulView()
         }
         if (shouldAddElement
         ) {
@@ -640,6 +632,29 @@ private fun StringBuilder.appendUiElementContents(
   }
 }
 
+private val meaningfulAttributes: Set<String> = setOf(
+  "text",
+  "title",
+  "accessibilityText",
+  "content description",
+  "hintText"
+)
+
+private val meaningfulIfTrueAttributes: Set<String> = setOf(
+  "enabled",
+  "focused",
+  "checked",
+  "selected",
+  "clickable",
+  "focusable",
+  "selectable",
+)
+
+private fun TreeNode.isMeaningfulView(): Boolean {
+  return meaningfulAttributes.any { attributes[it]?.isNotBlank() == true }
+    || meaningfulIfTrueAttributes.any { attributes[it] == "true" }
+}
+
 public fun TreeNode.optimizeTree2(
   isRoot: Boolean = false,
   viewHierarchy: ViewHierarchy
@@ -656,7 +671,7 @@ public fun TreeNode.optimizeTree2(
     return isOkResourceId && isVisibleRectView
   }
   fun isMeaningfulViewDfs(node: TreeNode): Boolean {
-    if (node.attributes.keys.any { it in meaningfulAttributes } && node.attributes.keys.isNotEmpty()) {
+    if (node.isMeaningfulView()) {
       return true
     }
     return node.children.any { isMeaningfulViewDfs(it) }
@@ -674,7 +689,7 @@ public fun TreeNode.optimizeTree2(
       promotedChildren = emptyList()
     )
   }
-  val hasContentInThisNode = (attributes.keys.any { it in meaningfulAttributes } && attributes.keys.isNotEmpty())
+  val hasContentInThisNode = this.isMeaningfulView()
   if (hasContentInThisNode) {
     return OptimizationResult(
       node = this.copy(children = optimizedChildren),
