@@ -470,26 +470,6 @@ public fun AgentConfigBuilder(
 ): AgentConfig.Builder = AgentConfigBuilder {
   deviceFormFactor(deviceFormFactor)
   prompt(prompt)
-  if (scenarioType.isExecution()) {
-    addInterceptor(object : ArbigentDecisionInterceptor {
-      override suspend fun intercept(
-        decisionInput: ArbigentAi.DecisionInput,
-        chain: ArbigentDecisionInterceptor.Chain
-      ): ArbigentAi.DecisionOutput {
-        return ArbigentAi.DecisionOutput(
-          agentCommands = listOf(
-            GoalAchievedAgentCommand()
-          ),
-          step = ArbigentContextHolder.Step(
-            stepId = decisionInput.stepId,
-            agentCommand = GoalAchievedAgentCommand(),
-            screenshotFilePath = decisionInput.screenshotFilePath,
-            cacheKey = decisionInput.cacheKey
-          )
-        )
-      }
-    })
-  }
   initializationMethods.reversed().forEach { initializeMethod ->
     when (initializeMethod) {
       is ArbigentScenarioContent.InitializationMethod.Back -> {
@@ -670,6 +650,27 @@ public fun AgentConfigBuilder(
           )
         )
         return output
+      }
+    })
+  }
+
+  if (scenarioType.isExecution()) {
+    addInterceptor(object : ArbigentDecisionInterceptor {
+      override suspend fun intercept(
+        decisionInput: ArbigentAi.DecisionInput,
+        chain: ArbigentDecisionInterceptor.Chain
+      ): ArbigentAi.DecisionOutput {
+        return ArbigentAi.DecisionOutput(
+          agentCommands = listOf(
+            GoalAchievedAgentCommand()
+          ),
+          step = ArbigentContextHolder.Step(
+            stepId = decisionInput.stepId,
+            agentCommand = GoalAchievedAgentCommand(),
+            screenshotFilePath = decisionInput.screenshotFilePath,
+            cacheKey = decisionInput.cacheKey
+          )
+        )
       }
     })
   }
