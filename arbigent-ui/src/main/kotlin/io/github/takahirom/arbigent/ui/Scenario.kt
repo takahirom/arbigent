@@ -254,7 +254,7 @@ private fun ScenarioOptions(
         ) {
           Text(
             text = "Scenario: The agent will try to achieve the goal. \n" +
-              "Execution: Just execute the initialization and image assertions.",
+              "Execution: Just execute the initializations and image assertions.",
           )
         }
       }

@@ -23,6 +23,7 @@ constructor(
   private val tagManager: ArbigentTagManager
 ) {
   private val _id = MutableStateFlow(id)
+  val idStateFlow: StateFlow<String> = _id
   val id: String get() = _id.value
   val goalState = TextFieldState("")
   val goal get() = goalState.text.toString()

@@ -107,7 +107,8 @@ internal fun LeftScenariosPanel(
               text = if (scenarioType.isScenario()) {
                 "Goal: $goal"
               } else {
-                "Execution"
+                val scenarioId by scenarioStateHolder.idStateFlow.collectAsState()
+                "Execution: $scenarioId"
               } + "\n" + runningInfo?.toString().orEmpty()
             )
             val isAchieved by scenarioStateHolder.isAchieved.collectAsState()
