@@ -101,9 +101,10 @@ internal fun LeftScenariosPanel(
             verticalAlignment = Alignment.CenterVertically
           ) {
             val runningInfo by scenarioStateHolder.arbigentScenarioRunningInfo.collectAsState()
+            val scenarioType by scenarioStateHolder.scenarioTypeStateFlow.collectAsState()
             Text(
               modifier = Modifier.weight(1f),
-              text = if (scenarioStateHolder.scenarioType().isScenario()) {
+              text = if (scenarioType.isScenario()) {
                 "Goal: $goal"
               } else {
                 "Execution"
