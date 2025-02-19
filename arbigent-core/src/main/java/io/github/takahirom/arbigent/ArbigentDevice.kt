@@ -656,7 +656,7 @@ public fun TreeNode.optimizeTree2(
     return isOkResourceId && isVisibleRectView
   }
   fun isMeaningfulViewDfs(node: TreeNode): Boolean {
-    if (node.attributes.keys.any { it in meaningfulAttributes } && attributes.keys.isNotEmpty()) {
+    if (node.attributes.keys.any { it in meaningfulAttributes } && node.attributes.keys.isNotEmpty()) {
       return true
     }
     return node.children.any { isMeaningfulViewDfs(it) }
