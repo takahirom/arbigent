@@ -61,6 +61,7 @@ fun Scenario(
   onRemove: (ArbigentScenarioStateHolder) -> Unit,
 ) {
   val arbigentScenarioExecutor: ArbigentScenarioExecutor? by scenarioStateHolder.arbigentScenarioExecutorStateFlow.collectAsState()
+  val scenarioType by scenarioStateHolder.scenarioTypeStateFlow.collectAsState()
   val goal = scenarioStateHolder.goalState
   Column(
     modifier = Modifier.padding(8.dp)
@@ -70,6 +71,7 @@ fun Scenario(
     ) {
       TextField(
         modifier = Modifier.weight(1f).padding(4.dp).testTag("goal"),
+        enabled = scenarioType.isScenario(),
         state = goal,
         placeholder = { Text("Goal") },
       )
@@ -239,6 +241,48 @@ private fun ScenarioOptions(
         Text(dependency?.goal ?: "Select dependency")
       }
     }
+    Column(
+      modifier = Modifier.padding(8.dp).width(160.dp)
+    ) {
+      GroupHeader {
+        Text("Scenario type")
+        IconActionButton(
+          key = AllIconsKeys.General.Information,
+          onClick = {},
+          contentDescription = "Scenario type",
+          hint = Size(16),
+        ) {
+          Text(
+            text = "Scenario: The agent will try to achieve the goal. \n" +
+              "Execution: Just execute the initializations and image assertions.",
+          )
+        }
+      }
+      val inputCommandType by updatedScenarioStateHolder.scenarioTypeStateFlow.collectAsState()
+      Row(
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        RadioButtonRow(
+          text = "Scenario",
+          selected = inputCommandType == ArbigentScenarioType.Scenario,
+          onClick = {
+            updatedScenarioStateHolder.scenarioTypeStateFlow.value = ArbigentScenarioType.Scenario
+          }
+        )
+      }
+      Row(
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        RadioButtonRow(
+          text = "Execution",
+          selected = inputCommandType == ArbigentScenarioType.Execution,
+          onClick = {
+            updatedScenarioStateHolder.scenarioTypeStateFlow.value = ArbigentScenarioType.Execution
+          }
+        )
+      }
+    }
+
     Column(
       modifier = Modifier.padding(8.dp).width(160.dp)
     ) {
@@ -1019,22 +1063,24 @@ private fun ContentPanel(
             .padding(8.dp),
           verticalArrangement = Arrangement.Center,
         ) {
-          ExpandableSection(
-            title = "Annotated Screenshot",
-            defaultExpanded = true,
-            modifier = Modifier.fillMaxWidth()
-          ) {
-            val filePath = File(step.screenshotFilePath).getAnnotatedFilePath()
-            Image(
-              bitmap = loadImageBitmap(FileInputStream(filePath)),
-              contentDescription = "screenshot",
-            )
-            Text(
-              modifier = Modifier.onClick {
-                Desktop.getDesktop().open(File(filePath))
-              },
-              text = "Screenshot($filePath)"
-            )
+          val filePath = File(step.screenshotFilePath).getAnnotatedFilePath()
+          if (File(filePath).exists()) {
+            ExpandableSection(
+              title = "Annotated Screenshot",
+              defaultExpanded = true,
+              modifier = Modifier.fillMaxWidth()
+            ) {
+              Image(
+                bitmap = loadImageBitmap(FileInputStream(filePath)),
+                contentDescription = "screenshot",
+              )
+              Text(
+                modifier = Modifier.onClick {
+                  Desktop.getDesktop().open(File(filePath))
+                },
+                text = "Screenshot($filePath)"
+              )
+            }
           }
           ExpandableSection(
             title = "Screenshot",

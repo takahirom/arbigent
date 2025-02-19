@@ -101,9 +101,15 @@ internal fun LeftScenariosPanel(
             verticalAlignment = Alignment.CenterVertically
           ) {
             val runningInfo by scenarioStateHolder.arbigentScenarioRunningInfo.collectAsState()
+            val scenarioType by scenarioStateHolder.scenarioTypeStateFlow.collectAsState()
             Text(
               modifier = Modifier.weight(1f),
-              text = "Goal: " + goal + "\n" + runningInfo?.toString().orEmpty()
+              text = if (scenarioType.isScenario()) {
+                "Goal: $goal"
+              } else {
+                val scenarioId by scenarioStateHolder.idStateFlow.collectAsState()
+                "Execution: $scenarioId"
+              } + "\n" + runningInfo?.toString().orEmpty()
             )
             val isAchieved by scenarioStateHolder.isAchieved.collectAsState()
             if (isAchieved) {
@@ -202,8 +208,7 @@ fun Tag(
             } else {
               false
             }
-          }
-        ,
+          },
         onKeyboardAction = {
           onTagChanged(tagName, textFieldState.text.toString())
           isEditingMode = false

@@ -107,6 +107,7 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
         deviceFormFactor = nodeScenario.deviceFormFactor,
         agentConfig = AgentConfigBuilder(
           prompt = projectSettings.prompt,
+          scenarioType = nodeScenario.type,
           deviceFormFactor = nodeScenario.deviceFormFactor,
           initializationMethods = nodeScenario.initializationMethods.ifEmpty { listOf(nodeScenario.initializeMethods) },
           imageAssertions = ArbigentImageAssertions(
@@ -135,9 +136,24 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
 }
 
 @Serializable
+public sealed interface ArbigentScenarioType {
+  @Serializable
+  @SerialName("Scenario")
+  public data object Scenario : ArbigentScenarioType
+
+  @Serializable
+  @SerialName("Execution")
+  public data object Execution : ArbigentScenarioType
+
+  public fun isScenario(): Boolean = this is Scenario
+  public fun isExecution(): Boolean = this is Execution
+}
+
+@Serializable
 public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) constructor(
   public val id: String = Uuid.random().toString(),
   public val goal: String,
+  public val type: ArbigentScenarioType = ArbigentScenarioType.Scenario,
   @SerialName("dependency")
   public val dependencyId: String? = null,
   public val initializationMethods: List<InitializationMethod> = listOf(),
