@@ -62,6 +62,7 @@ class FakeDevice : ArbigentDevice {
             checked = true,
             selected = true
           ),
+          identifierData = ArbigentElement.IdentifierData(listOf(), 0),
           x = 0,
           y = 0,
           width = 100,
