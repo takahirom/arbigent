@@ -61,6 +61,7 @@ public data class ArbigentElement(
   val index: Int,
   val textForAI: String,
   val rawText: String,
+  val identifierData: IdentifierData,
   val treeNode: TreeNode,
   val x: Int,
   val y: Int,
@@ -79,6 +80,10 @@ public data class ArbigentElement(
     public fun centerX(): Int = (left + right) / 2
     public fun centerY(): Int = (top + bottom) / 2
   }
+  public data class IdentifierData(
+    val identifier: List<Any>,
+    val index: Int
+  )
 
   val rect: Rect
     get() = Rect(x, y, x + width, y + height)
@@ -112,10 +117,19 @@ public data class ArbigentElementList(
         isRoot = true,
         viewHierarchy = viewHierarchy,
       )
-      val optimizedTree = result.node ?: result.promotedChildren.firstOrNull()
+      val optimizedTree = (result.node ?: result.promotedChildren.firstOrNull())!!
       val elements = mutableListOf<ArbigentElement>()
       fun TreeNode.toElement(): ArbigentElement {
         val bounds = toUiElementOrNull()?.bounds
+        val identifierData = this.getIdentifierDataForFocus()
+        val saveIdentifierIndex = optimizedTree.aggregate()
+          .map {
+            (it.toUiElementOrNull()?.bounds == bounds) to (it.getIdentifierDataForFocus() == identifierData)
+          }
+          .filter {
+            it.second
+          }
+          .indexOfFirst { it.first }
         return ArbigentElement(
           index = index++,
           textForAI = buildString {
@@ -126,6 +140,10 @@ public data class ArbigentElementList(
             append(")")
           },
           rawText = attributes.toString(),
+          identifierData = ArbigentElement.IdentifierData(
+            identifier = identifierData,
+            index = saveIdentifierIndex
+          ),
           treeNode = this,
           x = bounds?.x ?: 0,
           y = bounds?.y ?: 0,
@@ -311,23 +329,33 @@ public class MaestroDevice(
   override fun moveFocusToElement(element: ArbigentElement) {
     moveFocusToElement(
       fetchTarget = {
-        val newElement = maestro.viewHierarchy().refreshedElement(element.treeNode)
+        val newElement = maestro.viewHierarchy().refreshedElement(element.identifierData)
         val bounds = newElement?.toUiElement()?.bounds
-        arbigentInfoLog("Element(${element.treeNode.getIdentifierDataForFocus()}) not found in current ViewHierarchy.")
+        if (bounds == null) {
+          arbigentInfoLog("Element(${element.treeNode.getIdentifierDataForFocus()}) not found in current ViewHierarchy.")
+        }
         bounds
       }
     )
   }
 
 
-  private fun ViewHierarchy.refreshedElement(targtNode: TreeNode): TreeNode? {
-    val targetNodeIdentifierData = targtNode.getIdentifierDataForFocus()
-    arbigentDebugLog("targetNode: $targetNodeIdentifierData")
+  private fun ViewHierarchy.refreshedElement(identifierData: ArbigentElement.IdentifierData): TreeNode? {
+    val targetNodeIdentifierData = identifierData.identifier
+    arbigentDebugLog("targetNode: $targetNodeIdentifierData index:${identifierData.index}")
+    val identifierCounter = mutableMapOf<String, Int>()
     val matches = root.optimizeTree2(isRoot = true, viewHierarchy = this).node!!
       .aggregate()
       .filter {
-        arbigentDebugLog("candidateNode: ${it.getIdentifierDataForFocus()}")
-        it.getIdentifierDataForFocus().take(targetNodeIdentifierData.size) == targetNodeIdentifierData
+        val identifierDataForFocus = it.getIdentifierDataForFocus()
+        val index = identifierCounter.getOrPut(identifierDataForFocus.toString()) {
+          0
+        }
+        arbigentDebugLog("candidateNode: $identifierDataForFocus index:$index")
+        val isMatchIdentifier = identifierDataForFocus == targetNodeIdentifierData
+        val isMatchIndex = (index) == identifierData.index
+        identifierCounter[identifierDataForFocus.toString()] = index + 1
+        isMatchIdentifier && isMatchIndex
       }
 
     if (matches.size != 1) {
@@ -335,10 +363,6 @@ public class MaestroDevice(
     }
 
     return matches[0]
-  }
-
-  private fun TreeNode.getIdentifierDataForFocus(): List<Any> {
-    return listOf((attributes - "bounds" - "focused" - "selected")) + children.map { it.getIdentifierDataForFocus() }
   }
 
   private fun moveFocusToElement(
@@ -636,9 +660,7 @@ private val meaningfulAttributes: Set<String> = setOf(
 )
 
 private val meaningfulIfTrueAttributes: Set<String> = setOf(
-  "focused",
   "checked",
-  "selected",
   "clickable",
   "focusable",
   "selectable",
@@ -777,4 +799,8 @@ public fun TreeNode.optimizeTree(
       )
     }
   }
+}
+
+private fun TreeNode.getIdentifierDataForFocus(): List<Any> {
+  return listOf((attributes - "bounds" - "focused" - "selected")) + children.map { it.getIdentifierDataForFocus() }
 }
