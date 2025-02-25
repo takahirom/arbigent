@@ -11,6 +11,7 @@ public class ArbigentContextHolder(
   public val goal: String,
   public val maxStep: Int,
   public val startTimestamp: Long = System.currentTimeMillis(),
+  public val promptTemplate: PromptTemplate = PromptTemplate(PromptTemplate.DEFAULT_TEMPLATE),
 ) {
   public fun generateStepId(): String {
     return "" + goal.hashCode() + "_" +
@@ -73,19 +74,15 @@ public class ArbigentContextHolder(
   }
 
   public fun prompt(): String {
-    return """
-Goal:"$goal"
+    val stepsText = steps().mapIndexed { index, turn ->
+      "Step:${index + 1}. \n" + turn.text()
+    }.joinToString("\n")
 
-Your step:${steps().size + 1}
-Max step:$maxStep
-
-What you did so far:
-${
-      steps().mapIndexed { index, turn ->
-        "Step:${index + 1}. \n" +
-          turn.text()
-      }.joinToString("\n")
-    }
-    """.trimIndent()
+    return promptTemplate.format(
+      goal = goal,
+      currentStep = steps().size + 1,
+      maxStep = maxStep,
+      steps = stepsText
+    )
   }
 }

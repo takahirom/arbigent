@@ -229,6 +229,53 @@ private fun ScenarioOptions(
       )
     }
     Column(
+      modifier = Modifier.padding(8.dp).widthIn(min = 80.dp, max = 400.dp).width(IntrinsicSize.Min)
+    ) {
+      GroupHeader {
+        Text("Prompt Template")
+        IconActionButton(
+          key = AllIconsKeys.General.Information,
+          onClick = {},
+          contentDescription = "Prompt Template Info",
+          hint = Size(16),
+        ) {
+          Text(
+            text = "Available placeholders:\n" +
+              "{{USER_INPUT_GOAL}} - The goal of the scenario\n" +
+              "{{CURRENT_STEP}} - Current step number\n" +
+              "{{MAX_STEP}} - Maximum steps allowed\n" +
+              "{{STEPS}} - Steps completed so far"
+          )
+        }
+      }
+      var isValidTemplate by remember { mutableStateOf(true) }
+      TextArea(
+        modifier = Modifier
+          .padding(4.dp)
+          .height(120.dp)
+          .testTag("prompt_template"),
+        textStyle = JewelTheme.editorTextStyle,
+        state = updatedScenarioStateHolder.promptTemplateState,
+        placeholder = { Text("Prompt Template") },
+        decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
+      )
+      if (!isValidTemplate) {
+        Text(
+          text = "Template must contain all required placeholders: {{USER_INPUT_GOAL}}, {{CURRENT_STEP}}, {{MAX_STEP}}, {{STEPS}}",
+          color = Color.Red,
+          modifier = Modifier.padding(4.dp)
+        )
+      }
+      LaunchedEffect(updatedScenarioStateHolder.promptTemplateState.text) {
+        isValidTemplate = try {
+          PromptTemplate(updatedScenarioStateHolder.promptTemplateState.text.toString())
+          true
+        } catch (e: IllegalArgumentException) {
+          false
+        }
+      }
+    }
+    Column(
       modifier = Modifier.padding(8.dp).width(160.dp)
     ) {
       GroupHeader("Scenario dependency")

@@ -188,7 +188,7 @@ public class ArbigentAgent(
       prompt = prompt,
       device = device,
       ai = ai,
-      createContextHolder = { g, m -> ArbigentContextHolder(g, m) },
+      createContextHolder = { g, m -> ArbigentContextHolder(g, m, promptTemplate = PromptTemplate(prompt.promptTemplate)) },
       addContextHolder = { holder ->
         arbigentContextHolderStateFlow.value = holder
         arbigentContextHistoryStateFlow.value += holder
