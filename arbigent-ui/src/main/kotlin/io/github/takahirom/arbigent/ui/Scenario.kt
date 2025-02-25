@@ -70,7 +70,7 @@ fun Scenario(
       verticalAlignment = Alignment.CenterVertically
     ) {
       TextArea(
-        modifier = Modifier.weight(1f).padding(4.dp).testTag("goal").height(100.dp),
+        modifier = Modifier.weight(1f).padding(4.dp).testTag("goal").height(40.dp),
         enabled = scenarioType.isScenario(),
         state = goal,
         placeholder = { Text("Goal") },
