@@ -24,7 +24,6 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.loadImageBitmap
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -35,8 +34,19 @@ import io.github.takahirom.arbigent.result.StepFeedback
 import io.github.takahirom.arbigent.result.StepFeedbackEvent
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.Orientation
-import org.jetbrains.jewel.ui.component.*
-import org.jetbrains.jewel.ui.component.styling.ChipStyle
+import org.jetbrains.jewel.ui.component.CheckboxRow
+import org.jetbrains.jewel.ui.component.CircularProgressIndicator
+import org.jetbrains.jewel.ui.component.Divider
+import org.jetbrains.jewel.ui.component.Dropdown
+import org.jetbrains.jewel.ui.component.GroupHeader
+import org.jetbrains.jewel.ui.component.Icon
+import org.jetbrains.jewel.ui.component.IconActionButton
+import org.jetbrains.jewel.ui.component.MenuScope
+import org.jetbrains.jewel.ui.component.OutlinedButton
+import org.jetbrains.jewel.ui.component.RadioButtonRow
+import org.jetbrains.jewel.ui.component.Text
+import org.jetbrains.jewel.ui.component.TextArea
+import org.jetbrains.jewel.ui.component.TextField
 import org.jetbrains.jewel.ui.component.styling.GroupHeaderStyle
 import org.jetbrains.jewel.ui.component.styling.LocalGroupHeaderStyle
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
@@ -201,10 +211,15 @@ private fun ScenarioOptions(
           }
         }
       }
-      TextField(
+      TextArea(
         state = idTextFieldState,
-        modifier = Modifier.padding(4.dp).testTag("scenario_id"),
+        modifier = Modifier
+          .padding(4.dp)
+          .height(40.dp)
+          .testTag("scenario_id"),
+        textStyle = JewelTheme.editorTextStyle,
         placeholder = { Text("Scenario ID") },
+        decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
       )
       if (duplicated) {
         Text(
@@ -246,32 +261,6 @@ private fun ScenarioOptions(
               "{{MAX_STEP}} - Maximum steps allowed\n" +
               "{{STEPS}} - Steps completed so far"
           )
-        }
-      }
-      var isValidTemplate by remember { mutableStateOf(true) }
-      TextArea(
-        modifier = Modifier
-          .padding(4.dp)
-          .height(120.dp)
-          .testTag("prompt_template"),
-        textStyle = JewelTheme.editorTextStyle,
-        state = updatedScenarioStateHolder.promptTemplateState,
-        placeholder = { Text("Prompt Template") },
-        decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
-      )
-      if (!isValidTemplate) {
-        Text(
-          text = "Template must contain all required placeholders: {{USER_INPUT_GOAL}}, {{CURRENT_STEP}}, {{MAX_STEP}}, {{STEPS}}",
-          color = Color.Red,
-          modifier = Modifier.padding(4.dp)
-        )
-      }
-      LaunchedEffect(updatedScenarioStateHolder.promptTemplateState.text) {
-        isValidTemplate = try {
-          PromptTemplate(updatedScenarioStateHolder.promptTemplateState.text.toString())
-          true
-        } catch (e: IllegalArgumentException) {
-          false
         }
       }
     }
@@ -579,7 +568,7 @@ private fun InitializationOptions(
               index,
               ArbigentScenarioContent.InitializationMethod.CleanupData(it)
             )
-          },
+          }
         )
       }
       Column {

@@ -28,7 +28,7 @@ constructor(
   val goalState = TextFieldState("")
   val goal get() = goalState.text.toString()
   val noteForHumans = TextFieldState("")
-  val promptTemplateState = TextFieldState(PromptTemplate.DEFAULT_TEMPLATE)
+  val userUserPromptTemplateState = TextFieldState(UserPromptTemplate.DEFAULT_TEMPLATE)
   val maxRetryState: TextFieldState = TextFieldState("3")
   val maxStepState: TextFieldState = TextFieldState("10")
   private val cleanupDataStateFlow: MutableStateFlow<ArbigentScenarioContent.CleanupData> =
@@ -150,7 +150,7 @@ constructor(
       imageAssertionHistoryCount = imageAssertionsHistoryCountState.text.toString().toIntOrNull()
         ?: 1,
       imageAssertions = imageAssertionsStateFlow.value.filter { it.assertionPrompt.isNotBlank() },
-      promptTemplate = promptTemplateState.text.toString()
+      userPromptTemplate = userUserPromptTemplateState.text.toString()
     )
   }
 
@@ -166,8 +166,8 @@ constructor(
     noteForHumans.edit {
       replace(0, length, scenarioContent.noteForHumans)
     }
-    promptTemplateState.edit {
-      replace(0, length, scenarioContent.promptTemplate)
+    userUserPromptTemplateState.edit {
+      replace(0, length, scenarioContent.userPromptTemplate)
     }
     tagManager.loadTagsForScenario(this, scenarioContent.tags.map { it.name }.toSet())
     // This is no longer used.

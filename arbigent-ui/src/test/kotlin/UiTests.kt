@@ -379,15 +379,15 @@ class TestRobot(
 
   fun changePromptTemplate(template: String) {
     composeUiTest.onNode(hasContentDescription("Project Settings")).performClick()
-    composeUiTest.waitUntilAtLeastOneExists(hasText("Prompt Template"), timeoutMillis = 1000)
-    composeUiTest.onNode(hasTestTag("prompt_template"))
+    composeUiTest.waitUntilAtLeastOneExists(hasText("User Prompt Template"), timeoutMillis = 1000)
+    composeUiTest.onNode(hasTestTag("user_prompt_template"))
       .performTextClearance()
-    composeUiTest.onNode(hasTestTag("prompt_template"))
+    composeUiTest.onNode(hasTestTag("user_prompt_template"))
       .performTextInput(template)
   }
 
   fun assertPromptTemplateContains(expectedText: String) {
-    composeUiTest.onNode(hasTestTag("prompt_template"))
+    composeUiTest.onNode(hasTestTag("user_prompt_template"))
       .assertTextContains(expectedText, substring = true)
   }
 

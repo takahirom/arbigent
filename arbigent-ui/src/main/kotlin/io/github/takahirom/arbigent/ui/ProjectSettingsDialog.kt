@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
 import io.github.takahirom.arbigent.AiDecisionCacheStrategy
 import io.github.takahirom.arbigent.BuildConfig
-import io.github.takahirom.arbigent.PromptTemplate
+import io.github.takahirom.arbigent.UserPromptTemplate
 import androidx.compose.foundation.ExperimentalFoundationApi
 import org.jetbrains.jewel.ui.component.IconActionButton
 import org.jetbrains.jewel.ui.component.TextArea
@@ -63,7 +63,7 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
           modifier = Modifier.padding(8.dp)
         )
         GroupHeader {
-          Text("Prompt Template")
+          Text("User Prompt Template")
           IconActionButton(
             key = AllIconsKeys.General.Information,
             onClick = {},
@@ -79,19 +79,19 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
             )
           }
         }
-        val promptTemplate: TextFieldState = remember {
+        var isValidTemplate by remember { mutableStateOf(true) }
+        val userPromptTemplate: TextFieldState = remember {
           TextFieldState(
-            appStateHolder.promptFlow.value.promptTemplate
+            appStateHolder.promptFlow.value.userPromptTemplate
           )
         }
-        var isValidTemplate by remember { mutableStateOf(true) }
         LaunchedEffect(Unit) {
-          snapshotFlow { promptTemplate.text }.collect { text ->
+          snapshotFlow { userPromptTemplate.text }.collect { text ->
             if (text.isNotBlank()) {
               isValidTemplate = try {
-                PromptTemplate(text.toString())
+                UserPromptTemplate(text.toString())
                 appStateHolder.onPromptChanged(
-                  appStateHolder.promptFlow.value.copy(promptTemplate = text.toString())
+                  appStateHolder.promptFlow.value.copy(userPromptTemplate = text.toString())
                 )
                 true
               } catch (e: IllegalArgumentException) {
@@ -101,12 +101,12 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
           }
         }
         TextArea(
-          state = promptTemplate,
+          state = userPromptTemplate,
           modifier = Modifier
             .padding(8.dp)
             .height(120.dp)
-            .testTag("prompt_template"),
-          placeholder = { Text("Prompt Template") },
+            .testTag("user_prompt_template"),
+          placeholder = { Text("User Prompt Template") },
           decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
         )
         if (!isValidTemplate) {

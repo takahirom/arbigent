@@ -115,7 +115,7 @@ class ArbigentProjectFileContentTest {
     """scenarios:
 - id: "A-ID"
   goal: "A-GOAL"
-  promptTemplate: |
+  userPromptTemplate: |
     Task: {{USER_INPUT_GOAL}}
 
     Current progress: Step {{CURRENT_STEP}} of {{MAX_STEP}}
@@ -137,18 +137,18 @@ Current progress: Step {{CURRENT_STEP}} of {{MAX_STEP}}
 Previous steps:
 {{STEPS}}
 """.trimEnd(),
-      scenarioWithCustomTemplate.promptTemplate.trimEnd()
+      scenarioWithCustomTemplate.userPromptTemplate.trimEnd()
     )
 
     // Test default template
     val scenarioWithDefaultTemplate = basicProject.scenarioContents[0]
-    assertEquals(PromptTemplate.DEFAULT_TEMPLATE, scenarioWithDefaultTemplate.promptTemplate)
+    assertEquals(UserPromptTemplate.DEFAULT_TEMPLATE, scenarioWithDefaultTemplate.userPromptTemplate)
 
     // Test template in prompt
     val contextHolder = ArbigentContextHolder(
       goal = "test goal",
       maxStep = 10,
-      promptTemplate = PromptTemplate(scenarioWithCustomTemplate.promptTemplate)
+      userPromptTemplate = UserPromptTemplate(scenarioWithCustomTemplate.userPromptTemplate)
     )
     val prompt = contextHolder.prompt()
     assertTrue(prompt.contains("Task: test goal"))

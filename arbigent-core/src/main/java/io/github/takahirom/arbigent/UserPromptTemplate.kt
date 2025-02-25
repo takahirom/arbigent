@@ -1,6 +1,6 @@
 package io.github.takahirom.arbigent
 
-public class PromptTemplate(
+public class UserPromptTemplate(
     private val template: String
 ) {
     public companion object {

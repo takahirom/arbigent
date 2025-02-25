@@ -1,14 +1,14 @@
 package io.github.takahirom.arbigent.sample.test
 
-import io.github.takahirom.arbigent.PromptTemplate
+import io.github.takahirom.arbigent.UserPromptTemplate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
-class PromptTemplateTest {
+class UserPromptTemplateTest {
     @Test
     fun testValidTemplate() {
-        val template = PromptTemplate("""
+        val template = UserPromptTemplate("""
             Goal:"{{USER_INPUT_GOAL}}"
             
             Your step:{{CURRENT_STEP}}
@@ -39,7 +39,7 @@ class PromptTemplateTest {
     @Test
     fun testMissingPlaceholder() {
         assertFailsWith<IllegalArgumentException> {
-            PromptTemplate("""
+            UserPromptTemplate("""
                 Goal:"{{USER_INPUT_GOAL}}"
                 
                 Your step:{{CURRENT_STEP}}
@@ -53,7 +53,7 @@ class PromptTemplateTest {
 
     @Test
     fun testDefaultTemplate() {
-        val template = PromptTemplate(PromptTemplate.DEFAULT_TEMPLATE)
+        val template = UserPromptTemplate(UserPromptTemplate.DEFAULT_TEMPLATE)
         
         val result = template.format(
             goal = "Test goal",
