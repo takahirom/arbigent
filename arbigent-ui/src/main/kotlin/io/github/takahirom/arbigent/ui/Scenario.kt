@@ -69,11 +69,13 @@ fun Scenario(
     Row(
       verticalAlignment = Alignment.CenterVertically
     ) {
-      TextField(
-        modifier = Modifier.weight(1f).padding(4.dp).testTag("goal"),
+      TextArea(
+        modifier = Modifier.weight(1f).padding(4.dp).testTag("goal").height(40.dp),
         enabled = scenarioType.isScenario(),
         state = goal,
         placeholder = { Text("Goal") },
+        textStyle = JewelTheme.editorTextStyle,
+        decorationBoxModifier = Modifier.padding(horizontal = 8.dp)
       )
       IconActionButton(
         key = AllIconsKeys.RunConfigurations.TestState.Run,

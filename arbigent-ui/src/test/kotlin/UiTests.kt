@@ -110,6 +110,17 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
               }
             }
           }
+          describe("when enter multiline goal") {
+            doIt {
+              enterGoal("First line of the goal\nSecond line of the goal\nThird line")
+              expandOptions()
+              changeScenarioId("multiline_scenario")
+            }
+            itShould("show multiline goal input properly") {
+              capture(it)
+              assertGoalInputExists()
+            }
+          }
           describe("when enter goals and run") {
             doIt {
               enterGoal("launch the app")
