@@ -901,12 +901,15 @@ private suspend fun step(
     }
   }
   val uiTreeStrings = device.viewTreeString()
-  val cacheKey =
-    (BuildConfig.VERSION_NAME + contextHolder.prompt() + uiTreeStrings.optimizedTreeString).hashCode().toString()
+  val uiTreeHash = uiTreeStrings.optimizedTreeString.hashCode().toString().replace("-", "")
+  val contextHash = contextHolder.prompt().hashCode().toString().replace("-", "")
+  val cacheKey = "v${BuildConfig.VERSION_NAME}-uitree-${uiTreeHash}-context-${contextHash}"
   arbigentInfoLog("cacheKey: $cacheKey")
   arbigentInfoLog("  BuildConfig.VERSION_NAME: ${BuildConfig.VERSION_NAME}")
   arbigentInfoLog("  prompt: ${contextHolder.prompt()}")
   arbigentInfoLog("  uiTreeStrings.optimizedTreeString: ${uiTreeStrings.optimizedTreeString}")
+  arbigentInfoLog("  uiTreeHash: $uiTreeHash")
+  arbigentInfoLog("  contextHash: $contextHash")
   val screenshotFilePath =
     ArbigentFiles.screenshotsDir.absolutePath + File.separator + "$stepId.png"
   val decisionJsonlFilePath =

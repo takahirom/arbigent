@@ -1,15 +1,48 @@
 package io.github.takahirom.arbigent.sample.test
 
-import io.github.takahirom.arbigent.AgentConfig
-import io.github.takahirom.arbigent.ArbigentAgent
-import io.github.takahirom.arbigent.ArbigentAgentTask
-import io.github.takahirom.arbigent.ArbigentCoroutinesDispatcher
+import io.github.takahirom.arbigent.*
+import io.github.takahirom.arbigent.result.ArbigentUiTreeStrings
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import kotlin.test.Test
+import kotlin.test.*
 
 class ArbigentAgentExecutorTest {
+  @OptIn(ExperimentalStdlibApi::class)
+  @Test
+  fun testCacheKeyFormat() = runTest {
+    ArbigentCoroutinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
+
+    val testDevice = FakeDevice()
+    val cacheKeyCapture = FakeAi.Status.CacheKeyCapture()
+    val testAi = FakeAi().apply {
+      status = cacheKeyCapture
+    }
+
+    val agentConfig = AgentConfig {
+      deviceFactory { testDevice }
+      ai(testAi)
+    }
+
+    val task = ArbigentAgentTask("id1", "Test goal", agentConfig)
+    ArbigentAgent(agentConfig).execute(task)
+    advanceUntilIdle()
+
+    // Verify cache key format
+    val cacheKey = assertNotNull(cacheKeyCapture.capturedCacheKey, "Cache key should not be null")
+
+    // Log for debugging
+    println("[DEBUG_LOG] Generated cache key: $cacheKey")
+
+    // Verify essential components are present and in correct order
+    val keyPattern = Regex("v.+?-uitree-[^-]+-context-[^-]+")
+    assertTrue(cacheKey.matches(keyPattern), 
+      """
+      Cache key should match pattern: v{version}-uitree-{hash}-context-{hash}
+      Actual: $cacheKey
+      """.trimIndent())
+  }
+
   @OptIn(ExperimentalStdlibApi::class)
   @Test
   fun tests() = runTest {

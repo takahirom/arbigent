@@ -84,35 +84,57 @@ class FakeDevice : ArbigentDevice {
 }
 
 class FakeAi : ArbigentAi {
-  private var count = 0
-  private fun createDecisionOutput(
-    agentCommand: ArbigentAgentCommand = ClickWithTextAgentCommand("text")
-  ): ArbigentAi.DecisionOutput {
-    return ArbigentAi.DecisionOutput(
-      listOf(agentCommand),
-      ArbigentContextHolder.Step(
-        stepId = "stepId",
-        agentCommand = agentCommand,
-        memo = "memo",
-        screenshotFilePath = "screenshotFileName",
-        cacheKey = "cacheKey",
+  sealed class Status {
+    class FailAndSuccess : Status() {
+      private var count = 0
+      override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
+        if (count == 0) {
+          count++
+          return createDecisionOutput()
+        } else if (count == 1) {
+          count++
+          return createDecisionOutput()
+        } else {
+          return createDecisionOutput(
+            agentCommand = GoalAchievedAgentCommand()
+          )
+        }
+      }
+    }
+
+    class CacheKeyCapture : Status() {
+      var capturedCacheKey: String? = null
+        private set
+
+      override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
+        capturedCacheKey = decisionInput.cacheKey
+        return createDecisionOutput()
+      }
+    }
+
+    protected fun createDecisionOutput(
+      agentCommand: ArbigentAgentCommand = ClickWithTextAgentCommand("text")
+    ): ArbigentAi.DecisionOutput {
+      return ArbigentAi.DecisionOutput(
+        listOf(agentCommand),
+        ArbigentContextHolder.Step(
+          stepId = "stepId",
+          agentCommand = agentCommand,
+          memo = "memo",
+          screenshotFilePath = "screenshotFileName",
+          cacheKey = "cacheKey",
+        )
       )
-    )
+    }
+
+    abstract fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput
   }
+
+  var status: Status = Status.FailAndSuccess()
 
   override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
     arbigentDebugLog("FakeAi.decideWhatToDo")
-    if (count == 0) {
-      count++
-      return createDecisionOutput()
-    } else if (count == 1) {
-      count++
-      return createDecisionOutput()
-    } else {
-      return createDecisionOutput(
-        agentCommand = GoalAchievedAgentCommand()
-      )
-    }
+    return status.decideAgentCommands(decisionInput)
   }
 
   override fun assertImage(imageAssertionInput: ArbigentAi.ImageAssertionInput): ArbigentAi.ImageAssertionOutput {
