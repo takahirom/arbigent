@@ -244,27 +244,6 @@ private fun ScenarioOptions(
       )
     }
     Column(
-      modifier = Modifier.padding(8.dp).widthIn(min = 80.dp, max = 400.dp).width(IntrinsicSize.Min)
-    ) {
-      GroupHeader {
-        Text("Prompt Template")
-        IconActionButton(
-          key = AllIconsKeys.General.Information,
-          onClick = {},
-          contentDescription = "Prompt Template Info",
-          hint = Size(16),
-        ) {
-          Text(
-            text = "Available placeholders:\n" +
-              "{{USER_INPUT_GOAL}} - The goal of the scenario\n" +
-              "{{CURRENT_STEP}} - Current step number\n" +
-              "{{MAX_STEP}} - Maximum steps allowed\n" +
-              "{{STEPS}} - Steps completed so far"
-          )
-        }
-      }
-    }
-    Column(
       modifier = Modifier.padding(8.dp).width(160.dp)
     ) {
       GroupHeader("Scenario dependency")
