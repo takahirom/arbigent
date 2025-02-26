@@ -211,15 +211,10 @@ private fun ScenarioOptions(
           }
         }
       }
-      TextArea(
+      TextField(
         state = idTextFieldState,
-        modifier = Modifier
-          .padding(4.dp)
-          .height(40.dp)
-          .testTag("scenario_id"),
-        textStyle = JewelTheme.editorTextStyle,
+        modifier = Modifier.padding(4.dp).testTag("scenario_id"),
         placeholder = { Text("Scenario ID") },
-        decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
       )
       if (duplicated) {
         Text(
