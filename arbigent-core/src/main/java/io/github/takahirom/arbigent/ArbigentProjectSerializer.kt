@@ -52,7 +52,8 @@ public data class ArbigentProjectSettings(
 public data class ArbigentPrompt(
   public val systemPrompts: List<String> = listOf(ArbigentPrompts.systemPrompt),
   public val systemPromptsForTv: List<String> = listOf(ArbigentPrompts.systemPromptForTv),
-  public val additionalSystemPrompts: List<String> = listOf()
+  public val additionalSystemPrompts: List<String> = listOf(),
+  public val userPromptTemplate: String = UserPromptTemplate.DEFAULT_TEMPLATE
 )
 
 @Serializable
@@ -167,7 +168,8 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
   // This is no longer used and will be removed in the future.
   public val cleanupData: CleanupData = CleanupData.Noop,
   public val imageAssertionHistoryCount: Int = 1,
-  public val imageAssertions: List<ArbigentImageAssertion> = emptyList()
+  public val imageAssertions: List<ArbigentImageAssertion> = emptyList(),
+  public val userPromptTemplate: String = UserPromptTemplate.DEFAULT_TEMPLATE
 ) {
   @Serializable
   public sealed interface CleanupData {

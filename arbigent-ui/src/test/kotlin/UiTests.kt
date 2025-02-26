@@ -58,12 +58,6 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
             capture(it)
             assertConnectToDeviceButtonExists()
           }
-          describe("when clicks the Connect to device") {
-            doIt {
-              clickConnectToDeviceButton()
-              enableCache()
-            }
-          }
         }
         describe("when add scenario") {
           doIt {
@@ -74,6 +68,24 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
           itShould("show goal input") {
             capture(it)
             assertGoalInputExists()
+          }
+          describe("when change prompt template") {
+            doIt {
+              changePromptTemplate("""
+                Task: {{USER_INPUT_GOAL}}
+
+                Current step: {{CURRENT_STEP}}
+                Total steps: {{MAX_STEP}}
+
+                Progress:
+                {{STEPS}}
+              """.trimIndent())
+            }
+            itShould("show updated template with dialog") {
+              assertPromptTemplateContains("Task: {{USER_INPUT_GOAL}}")
+              capture(it)
+              closeProjectSettingsDialog()
+            }
           }
           describe("when enter goals and image assertion") {
             doIt {
@@ -365,6 +377,20 @@ class TestRobot(
     composeUiTest.onNode(hasText("Close")).performClick()
   }
 
+  fun changePromptTemplate(template: String) {
+    composeUiTest.onNode(hasContentDescription("Project Settings")).performClick()
+    composeUiTest.waitUntilAtLeastOneExists(hasText("User Prompt Template"), timeoutMillis = 1000)
+    composeUiTest.onNode(hasTestTag("user_prompt_template"))
+      .performTextClearance()
+    composeUiTest.onNode(hasTestTag("user_prompt_template"))
+      .performTextInput(template)
+  }
+
+  fun assertPromptTemplateContains(expectedText: String) {
+    composeUiTest.onNode(hasTestTag("user_prompt_template"))
+      .assertTextContains(expectedText, substring = true)
+  }
+
   fun selectDependencyDropDown(text: String) {
     composeUiTest.onAllNodes(hasText(text), useUnmergedTree = true)
       .filterToOne(hasTestTag("dependency_scenario"))
@@ -462,6 +488,11 @@ class TestRobot(
   fun assertDontRunImageAssertion() {
     assertEquals(0, (fakeAi.status as FakeAi.AiStatus.Normal).imageAssertionCount)
   }
+
+  fun closeProjectSettingsDialog() {
+    composeUiTest.onNode(hasText("Close")).performClick()
+  }
+
 }
 
 class FakeDevice : ArbigentDevice {

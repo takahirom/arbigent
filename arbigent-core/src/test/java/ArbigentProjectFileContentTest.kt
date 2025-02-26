@@ -110,4 +110,48 @@ class ArbigentProjectFileContentTest {
         it is ArbigentInitializerInterceptor
       })
   }
+
+  private val projectWithCustomTemplate = ArbigentProjectSerializer().load(
+    """scenarios:
+- id: "A-ID"
+  goal: "A-GOAL"
+  userPromptTemplate: |
+    Task: {{USER_INPUT_GOAL}}
+
+    Current progress: Step {{CURRENT_STEP}} of {{MAX_STEP}}
+
+    Previous steps:
+    {{STEPS}}
+"""
+  )
+
+  @Test
+  fun testPromptTemplate() {
+    // Test custom template
+    val scenarioWithCustomTemplate = projectWithCustomTemplate.scenarioContents[0]
+    assertEquals(
+      """Task: {{USER_INPUT_GOAL}}
+
+Current progress: Step {{CURRENT_STEP}} of {{MAX_STEP}}
+
+Previous steps:
+{{STEPS}}
+""".trimEnd(),
+      scenarioWithCustomTemplate.userPromptTemplate.trimEnd()
+    )
+
+    // Test default template
+    val scenarioWithDefaultTemplate = basicProject.scenarioContents[0]
+    assertEquals(UserPromptTemplate.DEFAULT_TEMPLATE, scenarioWithDefaultTemplate.userPromptTemplate)
+
+    // Test template in prompt
+    val contextHolder = ArbigentContextHolder(
+      goal = "test goal",
+      maxStep = 10,
+      userPromptTemplate = UserPromptTemplate(scenarioWithCustomTemplate.userPromptTemplate)
+    )
+    val prompt = contextHolder.prompt()
+    assertTrue(prompt.contains("Task: test goal"))
+    assertTrue(prompt.contains("Current progress: Step 1 of 10"))
+  }
 }

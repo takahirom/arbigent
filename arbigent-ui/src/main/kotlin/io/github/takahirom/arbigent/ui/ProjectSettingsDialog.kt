@@ -4,21 +4,30 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
 import io.github.takahirom.arbigent.AiDecisionCacheStrategy
 import io.github.takahirom.arbigent.BuildConfig
+import io.github.takahirom.arbigent.UserPromptTemplate
+import androidx.compose.foundation.ExperimentalFoundationApi
+import org.jetbrains.jewel.ui.component.IconActionButton
+import org.jetbrains.jewel.ui.component.TextArea
+import org.jetbrains.jewel.ui.icons.AllIconsKeys
+import org.jetbrains.jewel.ui.painter.hints.Size
 import org.jetbrains.jewel.ui.component.ActionButton
 import org.jetbrains.jewel.ui.component.Dropdown
 import org.jetbrains.jewel.ui.component.GroupHeader
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.TextField
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest: () -> Unit) {
   TestCompatibleDialog(
@@ -53,6 +62,60 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
           state = additionalSystemPrompt,
           modifier = Modifier.padding(8.dp)
         )
+        GroupHeader {
+          Text("User Prompt Template")
+          IconActionButton(
+            key = AllIconsKeys.General.Information,
+            onClick = {},
+            contentDescription = "Prompt Template Info",
+            hint = Size(16),
+          ) {
+            Text(
+              text = "Available placeholders:\n" +
+                "{{USER_INPUT_GOAL}} - The goal of the scenario\n" +
+                "{{CURRENT_STEP}} - Current step number\n" +
+                "{{MAX_STEP}} - Maximum steps allowed\n" +
+                "{{STEPS}} - Steps completed so far"
+            )
+          }
+        }
+        var isValidTemplate by remember { mutableStateOf(true) }
+        val userPromptTemplate: TextFieldState = remember {
+          TextFieldState(
+            appStateHolder.promptFlow.value.userPromptTemplate
+          )
+        }
+        LaunchedEffect(Unit) {
+          snapshotFlow { userPromptTemplate.text }.collect { text ->
+            if (text.isNotBlank()) {
+              isValidTemplate = try {
+                UserPromptTemplate(text.toString())
+                appStateHolder.onPromptChanged(
+                  appStateHolder.promptFlow.value.copy(userPromptTemplate = text.toString())
+                )
+                true
+              } catch (e: IllegalArgumentException) {
+                false
+              }
+            }
+          }
+        }
+        TextArea(
+          state = userPromptTemplate,
+          modifier = Modifier
+            .padding(8.dp)
+            .height(120.dp)
+            .testTag("user_prompt_template"),
+          placeholder = { Text("User Prompt Template") },
+          decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
+        )
+        if (!isValidTemplate) {
+          Text(
+            text = "Template must contain all required placeholders: {{USER_INPUT_GOAL}}, {{CURRENT_STEP}}, {{MAX_STEP}}, {{STEPS}}",
+            color = Color.Red,
+            modifier = Modifier.padding(4.dp)
+          )
+        }
         GroupHeader("AI decision cache")
         val cacheStrategy by appStateHolder.cacheStrategyFlow.collectAsState()
         Dropdown(

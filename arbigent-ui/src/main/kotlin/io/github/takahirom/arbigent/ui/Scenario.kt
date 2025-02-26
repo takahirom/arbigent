@@ -24,7 +24,6 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.loadImageBitmap
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -35,8 +34,19 @@ import io.github.takahirom.arbigent.result.StepFeedback
 import io.github.takahirom.arbigent.result.StepFeedbackEvent
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.Orientation
-import org.jetbrains.jewel.ui.component.*
-import org.jetbrains.jewel.ui.component.styling.ChipStyle
+import org.jetbrains.jewel.ui.component.CheckboxRow
+import org.jetbrains.jewel.ui.component.CircularProgressIndicator
+import org.jetbrains.jewel.ui.component.Divider
+import org.jetbrains.jewel.ui.component.Dropdown
+import org.jetbrains.jewel.ui.component.GroupHeader
+import org.jetbrains.jewel.ui.component.Icon
+import org.jetbrains.jewel.ui.component.IconActionButton
+import org.jetbrains.jewel.ui.component.MenuScope
+import org.jetbrains.jewel.ui.component.OutlinedButton
+import org.jetbrains.jewel.ui.component.RadioButtonRow
+import org.jetbrains.jewel.ui.component.Text
+import org.jetbrains.jewel.ui.component.TextArea
+import org.jetbrains.jewel.ui.component.TextField
 import org.jetbrains.jewel.ui.component.styling.GroupHeaderStyle
 import org.jetbrains.jewel.ui.component.styling.LocalGroupHeaderStyle
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
@@ -532,7 +542,7 @@ private fun InitializationOptions(
               index,
               ArbigentScenarioContent.InitializationMethod.CleanupData(it)
             )
-          },
+          }
         )
       }
       Column {
