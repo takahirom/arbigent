@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -35,8 +37,11 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
     title = "Project Settings",
     resizable = false,
     content = {
+      val scrollState = rememberScrollState()
       Column(
-        modifier = Modifier.padding(16.dp)
+        modifier = Modifier
+          .padding(16.dp)
+          .verticalScroll(scrollState)
       ) {
         val additionalSystemPrompt: TextFieldState = remember {
           TextFieldState(
@@ -62,7 +67,7 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
           state = additionalSystemPrompt,
           modifier = Modifier
             .padding(8.dp)
-            .height(120.dp)
+            .height(60.dp)
             .testTag("additional_system_prompt"),
           placeholder = { Text("Additional System Prompt") },
           decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
