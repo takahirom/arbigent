@@ -133,6 +133,27 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
               assertGoalInputExists()
             }
           }
+
+          describe("Project Settings") {
+            describe("Additional System Prompt") {
+              val multiLineText = """
+                First line
+                Second line
+                Third line
+              """.trimIndent()
+
+              doIt {
+                openProjectSettings()
+              }
+
+              itShould("handle multi-line input") {
+                enterAdditionalSystemPrompt(multiLineText)
+                assertAdditionalSystemPromptContains(multiLineText)
+                capture(it)
+                closeProjectSettingsDialog()
+              }
+            }
+          }
           describe("when enter goals and run") {
             doIt {
               enterGoal("launch the app")
@@ -491,6 +512,19 @@ class TestRobot(
 
   fun closeProjectSettingsDialog() {
     composeUiTest.onNode(hasText("Close")).performClick()
+  }
+
+  fun openProjectSettings() {
+    composeUiTest.onNode(hasTestTag("settings_button")).performClick()
+  }
+
+  fun enterAdditionalSystemPrompt(text: String) {
+    composeUiTest.onNode(hasTestTag("additional_system_prompt")).performTextInput(text)
+  }
+
+  fun assertAdditionalSystemPromptContains(expectedText: String) {
+    composeUiTest.onNode(hasTestTag("additional_system_prompt"))
+      .assertTextContains(expectedText)
   }
 
 }

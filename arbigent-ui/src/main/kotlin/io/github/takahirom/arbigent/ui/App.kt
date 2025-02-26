@@ -223,7 +223,8 @@ fun ProjectFileControls(appStateHolder: ArbigentAppStateHolder) {
         appStateHolder.projectDialogState.value = ProjectDialogState.ShowProjectSettings
       },
       contentDescription = "Project Settings",
-      hint = Size(28)
+      hint = Size(28),
+      modifier = Modifier.testTag("settings_button")
     ) {
       Text("Settings")
     }
@@ -326,4 +327,3 @@ fun ScenarioControls(appStateHolder: ArbigentAppStateHolder) {
     }
   }
 }
-

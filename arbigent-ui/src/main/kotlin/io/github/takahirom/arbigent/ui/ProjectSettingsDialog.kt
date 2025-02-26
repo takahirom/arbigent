@@ -58,9 +58,14 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
           modifier = Modifier.padding(8.dp)
         )
         GroupHeader("Additional System Prompt")
-        TextField(
+        TextArea(
           state = additionalSystemPrompt,
-          modifier = Modifier.padding(8.dp)
+          modifier = Modifier
+            .padding(8.dp)
+            .height(120.dp)
+            .testTag("additional_system_prompt"),
+          placeholder = { Text("Additional System Prompt") },
+          decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
         )
         GroupHeader {
           Text("User Prompt Template")
