@@ -191,6 +191,9 @@ public class MaestroDevice(
   private val maestro: Maestro,
   screenshotsDir: File = ArbigentFiles.screenshotsDir
 ) : ArbigentDevice, ArbigentTvCompatDevice {
+  init {
+    arbigentInfoLog("MaestroDevice created: screenshotsDir:${screenshotsDir.absolutePath}")
+  }
   private val orchestra = Orchestra(
     maestro = maestro,
     screenshotsDir = screenshotsDir
