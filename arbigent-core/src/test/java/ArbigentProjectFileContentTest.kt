@@ -150,7 +150,7 @@ Previous steps:
       maxStep = 10,
       userPromptTemplate = UserPromptTemplate(scenarioWithCustomTemplate.userPromptTemplate)
     )
-    val prompt = contextHolder.prompt()
+    val prompt = contextHolder.context()
     assertTrue(prompt.contains("Task: test goal"))
     assertTrue(prompt.contains("Current progress: Step 1 of 10"))
   }

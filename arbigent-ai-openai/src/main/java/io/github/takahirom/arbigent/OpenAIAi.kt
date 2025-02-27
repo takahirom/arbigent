@@ -231,17 +231,13 @@ public class OpenAIAi(
     agentCommandTypes: List<AgentCommandType>,
     elements: ArbigentElementList
   ): String {
-    val contextPrompt = contextHolder.prompt()
     val templates = agentCommandTypes.joinToString("\nor\n") { it.templateForAI() }
     val focusedTreeText = focusedTree?.let { "\nCurrently focused Tree:\n$it\n\n" } ?: ""
-    val prompt = """
-
-UI Index to Element Map:
-${elements.getAiTexts()}
-$focusedTreeText
-Based on the above, decide on the next action to achieve the goal. Please ensure not to repeat the same action. The action must be one of the following:
-$templates"""
-    return contextPrompt + (prompt.trimIndent())
+    return contextHolder.prompt(
+      uiElements = elements.getAiTexts(),
+      focusedTree = focusedTreeText,
+      commandTemplates = templates
+    )
   }
 
   private fun parseResponse(
@@ -505,5 +501,3 @@ private fun File.getResizedIamgeBase64(scale: Float): String {
 //  return output.readBytes().encodeBase64()
   return this.readBytes().encodeBase64()
 }
-
-
