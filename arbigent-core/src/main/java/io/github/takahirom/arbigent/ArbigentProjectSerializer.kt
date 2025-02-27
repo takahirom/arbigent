@@ -3,6 +3,8 @@ package io.github.takahirom.arbigent
 import com.charleskorn.kaml.PolymorphismStyle
 import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
+import com.charleskorn.kaml.YamlMultiLineStringStyle
+import com.charleskorn.kaml.MultiLineStringStyle
 import io.github.takahirom.arbigent.result.ArbigentProjectExecutionResult
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import kotlinx.serialization.Contextual
@@ -53,6 +55,7 @@ public data class ArbigentPrompt(
   public val systemPrompts: List<String> = listOf(ArbigentPrompts.systemPrompt),
   public val systemPromptsForTv: List<String> = listOf(ArbigentPrompts.systemPromptForTv),
   public val additionalSystemPrompts: List<String> = listOf(),
+  @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
   public val userPromptTemplate: String = UserPromptTemplate.DEFAULT_TEMPLATE
 )
 
@@ -153,6 +156,7 @@ public sealed interface ArbigentScenarioType {
 @Serializable
 public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) constructor(
   public val id: String = Uuid.random().toString(),
+  @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
   public val goal: String,
   public val type: ArbigentScenarioType = ArbigentScenarioType.Scenario,
   @SerialName("dependency")
@@ -160,6 +164,7 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
   public val initializationMethods: List<InitializationMethod> = listOf(),
   @Deprecated("use initializationMethods")
   public val initializeMethods: InitializationMethod = InitializationMethod.Noop,
+  @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
   public val noteForHumans: String = "",
   public val maxRetry: Int = 3,
   public val maxStep: Int = 10,
