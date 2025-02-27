@@ -76,7 +76,7 @@ public class ArbigentContextHolder(
 
   public fun getStepsText(): String {
     return steps().mapIndexed { index, turn ->
-      "Step:${index + 1}. \n" + turn.text()
+      "Step ${index + 1}. \n" + turn.text()
     }.joinToString("\n")
   }
 

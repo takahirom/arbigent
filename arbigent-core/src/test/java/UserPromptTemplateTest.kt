@@ -65,6 +65,7 @@ class UserPromptTemplateTest {
         assertEquals("""
 <GOAL>Test goal</GOAL>
 
+<STEP>
 Current step: 2
 Max step: 5
 
@@ -72,6 +73,7 @@ Max step: 5
 Step 1: Action
 Step 2: Another action
 </PREVIOUS_STEPS>
+</STEP>
 
 <UI_STATE>
 <ELEMENTS></ELEMENTS>
