@@ -55,4 +55,6 @@ dependencies {
   testImplementation(kotlin("test"))
   // coroutine test
   testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.5.2")
+  // robospec
+  testImplementation("io.github.takahirom.robospec:robospec:0.2.0")
 }

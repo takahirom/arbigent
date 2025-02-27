@@ -65,7 +65,11 @@ public class ArbigentHtmlReport {
                     val screenshotFile = File(step.screenshotFilePath)
                     val newScreenshotFile = File(screenshotsDir, screenshotFile.name)
                     screenshotFile.copyTo(newScreenshotFile, overwrite = true)
-                    screenshotFile.toAnnotatedFile().copyTo(newScreenshotFile.toAnnotatedFile(), overwrite = true)
+                    // Only copy annotated file if it exists
+                    val annotatedFile = screenshotFile.toAnnotatedFile()
+                    if (annotatedFile.exists()) {
+                      annotatedFile.copyTo(newScreenshotFile.toAnnotatedFile(), overwrite = true)
+                    }
                     step.copy(
                       screenshotFilePath = newScreenshotFile.absolutePath
                     ).let {
@@ -131,4 +135,3 @@ public class ArbigentHtmlReport {
       }
   }
 }
-

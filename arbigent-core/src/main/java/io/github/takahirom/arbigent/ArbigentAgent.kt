@@ -872,7 +872,7 @@ private suspend fun step(
   stepInput: StepInput
 ): StepResult {
   val contextHolder = stepInput.arbigentContextHolder
-  arbigentDebugLog("step start: ${contextHolder.prompt()}")
+  arbigentDebugLog("step start: ${contextHolder.context()}")
   val commandTypes = stepInput.agentCommandTypes
   val device = stepInput.device
   val deviceFormFactor = stepInput.deviceFormFactor
@@ -902,11 +902,11 @@ private suspend fun step(
   }
   val uiTreeStrings = device.viewTreeString()
   val uiTreeHash = uiTreeStrings.optimizedTreeString.hashCode().toString().replace("-", "")
-  val contextHash = contextHolder.prompt().hashCode().toString().replace("-", "")
+  val contextHash = contextHolder.context().hashCode().toString().replace("-", "")
   val cacheKey = "v${BuildConfig.VERSION_NAME}-uitree-${uiTreeHash}-context-${contextHash}"
   arbigentInfoLog("cacheKey: $cacheKey")
   arbigentInfoLog("  BuildConfig.VERSION_NAME: ${BuildConfig.VERSION_NAME}")
-  arbigentInfoLog("  prompt: ${contextHolder.prompt()}")
+  arbigentInfoLog("  prompt: ${contextHolder.context()}")
   arbigentInfoLog("  uiTreeStrings.optimizedTreeString: ${uiTreeStrings.optimizedTreeString}")
   arbigentInfoLog("  uiTreeHash: $uiTreeHash")
   arbigentInfoLog("  contextHash: $contextHash")

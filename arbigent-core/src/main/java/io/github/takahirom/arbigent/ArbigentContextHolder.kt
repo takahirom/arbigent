@@ -11,7 +11,7 @@ public class ArbigentContextHolder(
   public val goal: String,
   public val maxStep: Int,
   public val startTimestamp: Long = System.currentTimeMillis(),
-  public val userPromptTemplate: UserPromptTemplate = UserPromptTemplate(UserPromptTemplate.DEFAULT_TEMPLATE),
+  private val userPromptTemplate: UserPromptTemplate = UserPromptTemplate(UserPromptTemplate.DEFAULT_TEMPLATE),
 ) {
   public fun generateStepId(): String {
     return "" + goal.hashCode() + "_" +
@@ -43,6 +43,7 @@ public class ArbigentContextHolder(
         imageDescription?.let { append("image description: $it\n") }
         memo?.let { append("memo: $it\n") }
         feedback?.let { append("feedback: $it\n") }
+        action?.let { append("action: $it\n") }
         agentCommand?.let { append("action done: ${it.stepLogText()}\n") }
       }
     }
@@ -73,16 +74,34 @@ public class ArbigentContextHolder(
     _steps.value = steps().toMutableList() + step
   }
 
-  public fun prompt(): String {
-    val stepsText = steps().mapIndexed { index, turn ->
-      "Step:${index + 1}. \n" + turn.text()
+  public fun getStepsText(): String {
+    return steps().mapIndexed { index, turn ->
+      "Step ${index + 1}. \n" + turn.text()
     }.joinToString("\n")
+  }
 
+  public fun prompt(
+    uiElements: String,
+    focusedTree: String,
+    commandTemplates: String
+  ): String {
     return userPromptTemplate.format(
       goal = goal,
       currentStep = steps().size + 1,
       maxStep = maxStep,
-      steps = stepsText
+      steps = getStepsText(),
+      uiElements = uiElements,
+      focusedTree = focusedTree,
+      commandTemplates = commandTemplates
+    )
+  }
+
+  public fun context(): String {
+    return userPromptTemplate.format(
+      goal = goal,
+      currentStep = steps().size + 1,
+      maxStep = maxStep,
+      steps = getStepsText()
     )
   }
 }
