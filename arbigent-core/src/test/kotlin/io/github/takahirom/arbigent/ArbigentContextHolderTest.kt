@@ -26,7 +26,7 @@ class ArbigentContextHolderTest {
         val stepsText = contextHolder.getStepsText()
 
         // Verify step text contains all components
-        assertEquals(true, stepsText.contains("Step:1"))
+        assertEquals(true, stepsText.contains("Step 1"))
         assertEquals(true, stepsText.contains("Test Action"))
         assertEquals(true, stepsText.contains("Test Feedback"))
         assertEquals(true, stepsText.contains("Test Memo"))
@@ -47,9 +47,9 @@ class ArbigentContextHolderTest {
         )
 
         // Verify basic content
-        assertEquals(true, prompt.contains("Goal:\"Test Goal\""))
-        assertEquals(true, prompt.contains("Your step:1"))
-        assertEquals(true, prompt.contains("Max step:5"))
+        assertEquals(true, prompt.contains("<GOAL>Test Goal</GOAL>"))
+        assertEquals(true, prompt.contains("Current step: 1"))
+        assertEquals(true, prompt.contains("Max step: 5"))
 
         // Verify UI elements
         assertEquals(true, prompt.contains("Button1: Click me"))
