@@ -10,10 +10,10 @@ class UserPromptTemplateTest {
     fun testValidTemplate() {
         val template = UserPromptTemplate("""
             Goal:"{{USER_INPUT_GOAL}}"
-            
+
             Your step:{{CURRENT_STEP}}
             Max step:{{MAX_STEP}}
-            
+
             What you did so far:
             {{STEPS}}
         """.trimIndent())
@@ -27,10 +27,10 @@ class UserPromptTemplateTest {
 
         assertEquals("""
             Goal:"Test goal"
-            
+
             Your step:1
             Max step:10
-            
+
             What you did so far:
             Step 1: Did something
         """.trimIndent(), result)
@@ -41,10 +41,10 @@ class UserPromptTemplateTest {
         assertFailsWith<IllegalArgumentException> {
             UserPromptTemplate("""
                 Goal:"{{USER_INPUT_GOAL}}"
-                
+
                 Your step:{{CURRENT_STEP}}
                 Max step:{{MAX_STEP}}
-                
+
                 What you did so far:
                 // Missing STEPS placeholder
             """.trimIndent())
@@ -54,7 +54,7 @@ class UserPromptTemplateTest {
     @Test
     fun testDefaultTemplate() {
         val template = UserPromptTemplate(UserPromptTemplate.DEFAULT_TEMPLATE)
-        
+
         val result = template.format(
             goal = "Test goal",
             currentStep = 2,
@@ -63,14 +63,28 @@ class UserPromptTemplateTest {
         )
 
         assertEquals("""
-            Goal:"Test goal"
+<GOAL>Test goal</GOAL>
 
-            Your step:2
-            Max step:5
+Current step: 2
+Max step: 5
 
-            What you did so far:
-            Step 1: Action
-            Step 2: Another action
-        """.trimIndent(), result)
+<PREVIOUS_STEPS>
+Step 1: Action
+Step 2: Another action
+</PREVIOUS_STEPS>
+
+<UI_STATE>
+<ELEMENTS></ELEMENTS>
+<FOCUSED_TREE></FOCUSED_TREE>
+</UI_STATE>
+
+<INSTRUCTIONS>
+Based on the above, decide on the next action to achieve the goal. Please ensure not to repeat the same action. The action must be one of the following:
+</INSTRUCTIONS>
+
+<COMMAND_OPTIONS>
+
+</COMMAND_OPTIONS>
+""".trimIndent(), result)
     }
 }

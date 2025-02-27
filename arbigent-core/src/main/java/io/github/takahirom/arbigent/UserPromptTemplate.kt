@@ -13,20 +13,30 @@ public class UserPromptTemplate(
         public const val COMMAND_TEMPLATES: String = "{{COMMAND_TEMPLATES}}"
 
         public val DEFAULT_TEMPLATE: String = """
-            Goal:"$USER_INPUT_GOAL"
+<GOAL>$USER_INPUT_GOAL</GOAL>
 
-            Your step:$CURRENT_STEP
-            Max step:$MAX_STEP
+<STEP>
+Current step: $CURRENT_STEP
+Max step: $MAX_STEP
 
-            What you did so far:
-            $STEPS
+<PREVIOUS_STEPS>
+$STEPS
+</PREVIOUS_STEPS>
+</STEP>
 
-            UI Index to Element Map:
-            $UI_ELEMENTS
-            $FOCUSED_TREE
-            Based on the above, decide on the next action to achieve the goal. Please ensure not to repeat the same action. The action must be one of the following:
-            $COMMAND_TEMPLATES
-        """.trimIndent()
+<UI_STATE>
+<ELEMENTS>$UI_ELEMENTS</ELEMENTS>
+<FOCUSED_TREE>$FOCUSED_TREE</FOCUSED_TREE>
+</UI_STATE>
+
+<INSTRUCTIONS>
+Based on the above, decide on the next action to achieve the goal. Please ensure not to repeat the same action. The action must be one of the following:
+</INSTRUCTIONS>
+
+<COMMAND_OPTIONS>
+$COMMAND_TEMPLATES
+</COMMAND_OPTIONS>
+""".trimIndent()
     }
 
     init {
