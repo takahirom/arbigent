@@ -58,6 +58,16 @@ class ArbigentHtmlReportTest(private val behavior: DescribedBehavior<ArbigentHtm
                             assertReportFileExists()
                         }
                     }
+                    describe("with XML content in aiRequest") {
+                        doIt {
+                            createScreenshotFile()
+                            generateReportWithXmlContent()
+                        }
+                        itShould("contain XML tags in YAML") {
+                            capture(it)
+                            assertReportContainsXml()
+                        }
+                    }
                 }
             }
         }
@@ -114,13 +124,31 @@ class ArbigentHtmlReportRobot(private val tempFolder: TemporaryFolder) {
         return this
     }
 
-    private fun createTestStep() = ArbigentAgentTaskStepResult(
+    fun generateReportWithXmlContent(): ArbigentHtmlReportRobot {
+        val xmlContent = "<PROMPT><CONTEXT>This is a test XML content</CONTEXT></PROMPT>"
+        val step = createTestStep(aiRequest = xmlContent)
+        result = createTestProjectExecutionResult(step)
+        outputDir = tempFolder.newFolder("output")
+        ArbigentHtmlReport().saveReportHtml(outputDir.absolutePath, result)
+        return this
+    }
+
+    fun assertReportContainsXml(): ArbigentHtmlReportRobot {
+        val reportContent = File(outputDir, "report.html").readText()
+        println("[DEBUG_LOG] Report content: $reportContent")
+        println("[DEBUG_LOG] Looking for XML tags in YAML content")
+        assertTrue(reportContent.contains("<PROMPT>"), "Report should contain XML opening tag")
+        assertTrue(reportContent.contains("</PROMPT>"), "Report should contain XML closing tag")
+        return this
+    }
+
+    private fun createTestStep(aiRequest: String? = null) = ArbigentAgentTaskStepResult(
         stepId = "test_step",
         summary = "Test step",
         screenshotFilePath = screenshotFile.absolutePath,
         apiCallJsonPath = null,
         agentCommand = null,
-        aiRequest = null,
+        aiRequest = aiRequest,
         aiResponse = null,
         timestamp = System.currentTimeMillis(),
         cacheHit = false
