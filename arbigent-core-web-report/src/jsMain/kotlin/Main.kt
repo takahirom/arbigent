@@ -253,7 +253,7 @@ private fun StepView(step: ArbigentAgentTaskStepResult) {
             whiteSpace("pre-wrap")
           }
         }) {
-          Text(step.aiRequest ?: "N/A")
+          Text(step.aiRequest?.replace("<", "&lt;")?.replace(">", "&gt;") ?: "N/A")
         }
       }
       ExpandableSection("AI Response") {
