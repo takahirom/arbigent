@@ -28,7 +28,7 @@ $arbigentReportTemplateString
 <script type="application/javascript" src="arbigent-core-web-report.js"></script>
 <script type="application/javascript">
     window.onload = (event) => {
-        let counterController = MyComposables.ArbigentReportApp(document.getElementById('result').innerText);
+        let counterController = MyComposables.ArbigentReportApp(document.getElementById('result').innerHTML);
     };
 </script>
 </body>
