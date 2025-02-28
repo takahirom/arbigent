@@ -201,6 +201,11 @@ private fun AgentResultView(taskIndex: Int, agentResult: ArbigentAgentResult) {
   }
 }
 
+private fun formatTimestamp(timestamp: Long): String {
+  val instant = kotlinx.datetime.Instant.fromEpochMilliseconds(timestamp)
+  return instant.toString().replace('T', ' ').substringBefore('.')
+}
+
 @Composable
 private fun StepView(step: ArbigentAgentTaskStepResult) {
   Div({
@@ -234,7 +239,7 @@ private fun StepView(step: ArbigentAgentTaskStepResult) {
           whiteSpace("pre-wrap")
         }
       }) {
-        Text(step.summary)
+        Text("${step.summary} (Time: ${formatTimestamp(step.timestamp)})")
       }
 //      ExpandableSection("UI Tree Strings") {
 //        Pre({
