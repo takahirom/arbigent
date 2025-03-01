@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import com.github.ajalt.clikt.core.CliktAction
+import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.CliktError
 import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.parameters.groups.OptionGroup
@@ -69,7 +69,7 @@ class AzureOpenAiConfig : AiConfig("Options for Azure OpenAI") {
 private const val defaultResultPath = "arbigent-result"
 private const val defaultCachePath = "arbigent-cache"
 
-class ArbigentCli : CliktAction(name = "arbigent") {
+class ArbigentCli : CliktCommand(name = "arbigent") {
   private val aiType by option(help = "Type of AI to use")
     .groupChoice(
       "openai" to OpenAIAiConfig(),
