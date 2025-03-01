@@ -147,7 +147,7 @@ class ArbigentHtmlReportRobot(private val tempFolder: TemporaryFolder) {
         summary = "Test step",
         screenshotFilePath = screenshotFile.absolutePath,
         apiCallJsonPath = null,
-        agentCommand = null,
+        agentAction = null,
         aiRequest = aiRequest,
         aiResponse = null,
         timestamp = System.currentTimeMillis(),

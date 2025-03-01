@@ -88,9 +88,9 @@ Please refer to the image above.
 Based on the above, decide on the next action to achieve the goal. Please ensure not to repeat the same action. The action must be one of the following:
 </INSTRUCTIONS>
 
-<COMMAND_OPTIONS>
+<ACTION_OPTIONS>
 
-</COMMAND_OPTIONS>
+</ACTION_OPTIONS>
 """.trimIndent(), result)
     }
 }

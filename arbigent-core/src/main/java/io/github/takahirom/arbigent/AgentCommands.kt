@@ -6,9 +6,9 @@ import maestro.MaestroException
 import maestro.orchestra.*
 
 @Serializable
-public sealed interface ArbigentAgentCommand {
+public sealed interface ArbigentAgentAction {
   public val actionName: String
-  public fun runDeviceCommand(runInput: RunInput)
+  public fun runDeviceAction(runInput: RunInput)
   public fun stepLogText(): String
 
   public class RunInput(
@@ -17,11 +17,11 @@ public sealed interface ArbigentAgentCommand {
   )
 
   public fun isGoal(): Boolean {
-    return actionName == GoalAchievedAgentCommand.actionName
+    return actionName == GoalAchievedAgentAction.actionName
   }
 }
 
-public interface AgentCommandType {
+public interface AgentActionType {
   public val actionName: String
   public fun templateForAI(): String
   public fun isSupported(deviceOs: ArbigentDeviceOs): Boolean = true
@@ -35,17 +35,17 @@ private fun getRegexToIndex(text: String): Pair<String, String> {
 }
 
 @Serializable
-public data class ClickWithIndex(val index: Int): ArbigentAgentCommand {
+public data class ClickWithIndex(val index: Int): ArbigentAgentAction {
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
     return "Click on index: $index"
   }
 
-  override fun runDeviceCommand(runInput: ArbigentAgentCommand.RunInput) {
+  override fun runDeviceAction(runInput: ArbigentAgentAction.RunInput) {
     val elements = runInput.elements
-    runInput.device.executeCommands(
-      commands = listOf(
+    runInput.device.executeActions(
+      actions = listOf(
         MaestroCommand(
           tapOnPointV2Command = TapOnPointV2Command(
             point = "${elements.elements[index].rect.centerX()},${elements.elements[index].rect.centerY()}"
@@ -55,7 +55,7 @@ public data class ClickWithIndex(val index: Int): ArbigentAgentCommand {
     )
   }
 
-  public companion object : AgentCommandType {
+  public companion object : AgentActionType {
     override val actionName: String = "ClickWithIndex"
 
     override fun templateForAI(): String {
@@ -72,14 +72,14 @@ public data class ClickWithIndex(val index: Int): ArbigentAgentCommand {
 }
 
 @Serializable
-public data class ClickWithTextAgentCommand(val textRegex: String) : ArbigentAgentCommand {
+public data class ClickWithTextAgentAction(val textRegex: String) : ArbigentAgentAction {
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
     return "Click on text: $textRegex"
   }
 
-  override fun runDeviceCommand(runInput: ArbigentAgentCommand.RunInput) {
+  override fun runDeviceAction(runInput: ArbigentAgentAction.RunInput) {
     val (textRegex, index) = getRegexToIndex(textRegex)
     val maestroCommand = MaestroCommand(
       tapOnElement = TapOnElementCommand(
@@ -89,14 +89,14 @@ public data class ClickWithTextAgentCommand(val textRegex: String) : ArbigentAge
       )
     )
     try {
-      runInput.device.executeCommands(
-        commands = listOf(
+      runInput.device.executeActions(
+        actions = listOf(
           maestroCommand
         ),
       )
     } catch (e: MaestroException) {
-      runInput.device.executeCommands(
-        commands = listOf(
+      runInput.device.executeActions(
+        actions = listOf(
           maestroCommand.copy(
             tapOnElement = maestroCommand.tapOnElement!!.copy(
               selector = maestroCommand.tapOnElement!!.selector.copy(
@@ -109,7 +109,7 @@ public data class ClickWithTextAgentCommand(val textRegex: String) : ArbigentAge
     }
   }
 
-  public companion object : AgentCommandType {
+  public companion object : AgentActionType {
     override val actionName: String = "ClickWithText"
 
     override fun templateForAI(): String {
@@ -128,17 +128,17 @@ public data class ClickWithTextAgentCommand(val textRegex: String) : ArbigentAge
 }
 
 @Serializable
-public data class ClickWithIdAgentCommand(val textRegex: String) : ArbigentAgentCommand {
+public data class ClickWithIdAgentAction(val textRegex: String) : ArbigentAgentAction {
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
     return "Click on id: $textRegex"
   }
 
-  override fun runDeviceCommand(runInput: ArbigentAgentCommand.RunInput) {
+  override fun runDeviceAction(runInput: ArbigentAgentAction.RunInput) {
     val (textRegex, index) = getRegexToIndex(textRegex)
-    runInput.device.executeCommands(
-      commands = listOf(
+    runInput.device.executeActions(
+      actions = listOf(
         MaestroCommand(
           tapOnElement = TapOnElementCommand(
             selector = ElementSelector(
@@ -150,7 +150,7 @@ public data class ClickWithIdAgentCommand(val textRegex: String) : ArbigentAgent
     )
   }
 
-  public companion object : AgentCommandType {
+  public companion object : AgentActionType {
     override val actionName: String = "ClickWithId"
 
     override fun templateForAI(): String {
@@ -169,16 +169,16 @@ public data class ClickWithIdAgentCommand(val textRegex: String) : ArbigentAgent
 }
 
 @Serializable
-public data class DpadDownArrowAgentCommand(val count: Int) : ArbigentAgentCommand {
+public data class DpadDownArrowAgentAction(val count: Int) : ArbigentAgentAction {
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
     return "Press down arrow key $count times"
   }
 
-  override fun runDeviceCommand(runInput: ArbigentAgentCommand.RunInput) {
-    runInput.device.executeCommands(
-      commands = List(count) {
+  override fun runDeviceAction(runInput: ArbigentAgentAction.RunInput) {
+    runInput.device.executeActions(
+      actions = List(count) {
         MaestroCommand(
           pressKeyCommand = PressKeyCommand(
             code = KeyCode.REMOTE_DOWN
@@ -188,7 +188,7 @@ public data class DpadDownArrowAgentCommand(val count: Int) : ArbigentAgentComma
     )
   }
 
-  public companion object : AgentCommandType {
+  public companion object : AgentActionType {
     override val actionName: String = "DpadDownArrow"
 
     override fun templateForAI(): String {
@@ -205,16 +205,16 @@ public data class DpadDownArrowAgentCommand(val count: Int) : ArbigentAgentComma
 }
 
 @Serializable
-public data class DpadUpArrowAgentCommand(val count: Int) : ArbigentAgentCommand {
+public data class DpadUpArrowAgentAction(val count: Int) : ArbigentAgentAction {
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
     return "Press up arrow key $count times"
   }
 
-  override fun runDeviceCommand(runInput: ArbigentAgentCommand.RunInput) {
-    runInput.device.executeCommands(
-      commands = List(count) {
+  override fun runDeviceAction(runInput: ArbigentAgentAction.RunInput) {
+    runInput.device.executeActions(
+      actions = List(count) {
         MaestroCommand(
           pressKeyCommand = PressKeyCommand(
             code = KeyCode.REMOTE_UP
@@ -224,7 +224,7 @@ public data class DpadUpArrowAgentCommand(val count: Int) : ArbigentAgentCommand
     )
   }
 
-  public companion object : AgentCommandType {
+  public companion object : AgentActionType {
     override val actionName: String = "DpadUpArrow"
 
     override fun templateForAI(): String {
@@ -241,16 +241,16 @@ public data class DpadUpArrowAgentCommand(val count: Int) : ArbigentAgentCommand
 }
 
 @Serializable
-public data class DpadRightArrowAgentCommand(val count: Int) : ArbigentAgentCommand {
+public data class DpadRightArrowAgentAction(val count: Int) : ArbigentAgentAction {
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
     return "Press right arrow key $count times"
   }
 
-  override fun runDeviceCommand(runInput: ArbigentAgentCommand.RunInput) {
-    runInput.device.executeCommands(
-      commands = List(count) {
+  override fun runDeviceAction(runInput: ArbigentAgentAction.RunInput) {
+    runInput.device.executeActions(
+      actions = List(count) {
         MaestroCommand(
           pressKeyCommand = PressKeyCommand(
             code = KeyCode.REMOTE_RIGHT
@@ -260,7 +260,7 @@ public data class DpadRightArrowAgentCommand(val count: Int) : ArbigentAgentComm
     )
   }
 
-  public companion object : AgentCommandType {
+  public companion object : AgentActionType {
     override val actionName: String = "DpadRightArrow"
 
     override fun templateForAI(): String {
@@ -277,16 +277,16 @@ public data class DpadRightArrowAgentCommand(val count: Int) : ArbigentAgentComm
 }
 
 @Serializable
-public data class DpadLeftArrowAgentCommand(val count: Int) : ArbigentAgentCommand {
+public data class DpadLeftArrowAgentAction(val count: Int) : ArbigentAgentAction {
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
     return "Press left arrow key $count times"
   }
 
-  override fun runDeviceCommand(runInput: ArbigentAgentCommand.RunInput) {
-    runInput.device.executeCommands(
-      commands = List(count) {
+  override fun runDeviceAction(runInput: ArbigentAgentAction.RunInput) {
+    runInput.device.executeActions(
+      actions = List(count) {
         MaestroCommand(
           pressKeyCommand = PressKeyCommand(
             code = KeyCode.REMOTE_LEFT
@@ -296,7 +296,7 @@ public data class DpadLeftArrowAgentCommand(val count: Int) : ArbigentAgentComma
     )
   }
 
-  public companion object : AgentCommandType {
+  public companion object : AgentActionType {
     override val actionName: String = "DpadLeftArrow"
 
     override fun templateForAI(): String {
@@ -313,16 +313,16 @@ public data class DpadLeftArrowAgentCommand(val count: Int) : ArbigentAgentComma
 }
 
 @Serializable
-public data class DpadCenterAgentCommand(val count: Int) : ArbigentAgentCommand {
+public data class DpadCenterAgentAction(val count: Int) : ArbigentAgentAction {
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
     return "Press center key $count times"
   }
 
-  override fun runDeviceCommand(runInput: ArbigentAgentCommand.RunInput) {
-    runInput.device.executeCommands(
-      commands = List(count) {
+  override fun runDeviceAction(runInput: ArbigentAgentAction.RunInput) {
+    runInput.device.executeActions(
+      actions = List(count) {
         MaestroCommand(
           pressKeyCommand = PressKeyCommand(
             code = KeyCode.REMOTE_CENTER
@@ -332,7 +332,7 @@ public data class DpadCenterAgentCommand(val count: Int) : ArbigentAgentCommand 
     )
   }
 
-  public companion object : AgentCommandType {
+  public companion object : AgentActionType {
     override val actionName: String = "DpadCenter"
 
     override fun templateForAI(): String {
@@ -349,19 +349,19 @@ public data class DpadCenterAgentCommand(val count: Int) : ArbigentAgentCommand 
 }
 
 @Serializable
-public data class DpadAutoFocusWithIdAgentCommand(val id: String) : ArbigentAgentCommand {
+public data class DpadAutoFocusWithIdAgentAction(val id: String) : ArbigentAgentAction {
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
     return "Try to focus by id: $id"
   }
 
-  override fun runDeviceCommand(runInput: ArbigentAgentCommand.RunInput) {
-    val tvCompatibleDevice = (runInput.device as? ArbigentTvCompatDevice)?: throw NotImplementedError(message = "This command is only available for TV device")
+  override fun runDeviceAction(runInput: ArbigentAgentAction.RunInput) {
+    val tvCompatibleDevice = (runInput.device as? ArbigentTvCompatDevice)?: throw NotImplementedError(message = "This action is only available for TV device")
     tvCompatibleDevice.moveFocusToElement(ArbigentTvCompatDevice.Selector.ById.fromId(id))
   }
 
-  public companion object : AgentCommandType {
+  public companion object : AgentActionType {
     override val actionName: String = "DpadTryAutoFocusById"
 
     override fun templateForAI(): String {
@@ -379,19 +379,19 @@ public data class DpadAutoFocusWithIdAgentCommand(val id: String) : ArbigentAgen
 }
 
 @Serializable
-public data class DpadAutoFocusWithTextAgentCommand(val text: String) : ArbigentAgentCommand {
+public data class DpadAutoFocusWithTextAgentAction(val text: String) : ArbigentAgentAction {
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
     return "Try to focus by text: $text"
   }
 
-  override fun runDeviceCommand(runInput: ArbigentAgentCommand.RunInput) {
-    val tvCompatibleDevice = (runInput.device as? ArbigentTvCompatDevice)?: throw NotImplementedError(message = "This command is only available for TV device")
+  override fun runDeviceAction(runInput: ArbigentAgentAction.RunInput) {
+    val tvCompatibleDevice = (runInput.device as? ArbigentTvCompatDevice)?: throw NotImplementedError(message = "This action is only available for TV device")
     tvCompatibleDevice.moveFocusToElement(ArbigentTvCompatDevice.Selector.ByText.fromText(text))
   }
 
-  public companion object : AgentCommandType {
+  public companion object : AgentActionType {
     override val actionName: String = "DpadTryAutoFocusByText"
 
     override fun templateForAI(): String {
@@ -409,20 +409,20 @@ public data class DpadAutoFocusWithTextAgentCommand(val text: String) : Arbigent
 }
 
 @Serializable
-public data class DpadAutoFocusWithIndexAgentCommand(val index: Int): ArbigentAgentCommand {
+public data class DpadAutoFocusWithIndexAgentAction(val index: Int): ArbigentAgentAction {
   override val actionName: String = Companion.actionName
 
   public override fun stepLogText(): String {
     return "Try to focus by index: $index"
   }
 
-  public override fun runDeviceCommand(runInput: ArbigentAgentCommand.RunInput) {
+  public override fun runDeviceAction(runInput: ArbigentAgentAction.RunInput) {
     val elements = runInput.elements
-    val tvCompatibleDevice = (runInput.device as? ArbigentTvCompatDevice)?: throw NotImplementedError(message = "This command is only available for TV device")
+    val tvCompatibleDevice = (runInput.device as? ArbigentTvCompatDevice)?: throw NotImplementedError(message = "This action is only available for TV device")
     tvCompatibleDevice.moveFocusToElement(elements.elements[index])
   }
 
-  public companion object : AgentCommandType {
+  public companion object : AgentActionType {
     override val actionName: String = "DPadTryAutoFocusByIndex"
 
     override fun templateForAI(): String {
@@ -438,16 +438,16 @@ public data class DpadAutoFocusWithIndexAgentCommand(val index: Int): ArbigentAg
 }
 
 @Serializable
-public data class InputTextAgentCommand(val text: String) : ArbigentAgentCommand {
+public data class InputTextAgentAction(val text: String) : ArbigentAgentAction {
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
     return "Input text: $text"
   }
 
-  override fun runDeviceCommand(runInput: ArbigentAgentCommand.RunInput) {
-    runInput.device.executeCommands(
-      commands = listOf(
+  override fun runDeviceAction(runInput: ArbigentAgentAction.RunInput) {
+    runInput.device.executeActions(
+      actions = listOf(
         MaestroCommand(
           inputTextCommand = InputTextCommand(
             text
@@ -457,13 +457,13 @@ public data class InputTextAgentCommand(val text: String) : ArbigentAgentCommand
     )
   }
 
-  public companion object : AgentCommandType {
+  public companion object : AgentActionType {
     override val actionName: String = "InputText"
 
     override fun templateForAI(): String {
       return """
         {
-            // You have to **Click** on a text field before sending this command
+            // You have to **Click** on a text field before sending this action
             "action": "$actionName",
             "text": "..."
         }
@@ -474,16 +474,16 @@ public data class InputTextAgentCommand(val text: String) : ArbigentAgentCommand
 }
 
 @Serializable
-public class BackPressAgentCommand : ArbigentAgentCommand {
+public class BackPressAgentAction : ArbigentAgentAction {
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
     return "Press back button"
   }
 
-  override fun runDeviceCommand(runInput: ArbigentAgentCommand.RunInput) {
-    runInput.device.executeCommands(
-      commands = listOf(
+  override fun runDeviceAction(runInput: ArbigentAgentAction.RunInput) {
+    runInput.device.executeActions(
+      actions = listOf(
         MaestroCommand(
           backPressCommand = BackPressCommand()
         )
@@ -491,7 +491,7 @@ public class BackPressAgentCommand : ArbigentAgentCommand {
     )
   }
 
-  public companion object : AgentCommandType {
+  public companion object : AgentActionType {
     override val actionName: String = "BackPress"
 
     override fun isSupported(deviceOs: ArbigentDeviceOs): Boolean {
@@ -510,16 +510,16 @@ public class BackPressAgentCommand : ArbigentAgentCommand {
 }
 
 @Serializable
-public class ScrollAgentCommand : ArbigentAgentCommand {
+public class ScrollAgentAction : ArbigentAgentAction {
   override val actionName: String = "Scroll"
 
   override fun stepLogText(): String {
     return "Scroll"
   }
 
-  override fun runDeviceCommand(runInput: ArbigentAgentCommand.RunInput) {
-    runInput.device.executeCommands(
-      commands = listOf(
+  override fun runDeviceAction(runInput: ArbigentAgentAction.RunInput) {
+    runInput.device.executeActions(
+      actions = listOf(
         MaestroCommand(
           scrollCommand = ScrollCommand()
         )
@@ -527,7 +527,7 @@ public class ScrollAgentCommand : ArbigentAgentCommand {
     )
   }
 
-  public companion object : AgentCommandType {
+  public companion object : AgentActionType {
     override val actionName: String = "Scroll"
 
     override fun templateForAI(): String {
@@ -542,18 +542,18 @@ public class ScrollAgentCommand : ArbigentAgentCommand {
 }
 
 @Serializable
-public data class KeyPressAgentCommand(val keyName: String) : ArbigentAgentCommand {
+public data class KeyPressAgentAction(val keyName: String) : ArbigentAgentAction {
   override val actionName: String = "KeyPress"
 
   override fun stepLogText(): String {
     return "Press key: $keyName"
   }
 
-  override fun runDeviceCommand(runInput: ArbigentAgentCommand.RunInput) {
+  override fun runDeviceAction(runInput: ArbigentAgentAction.RunInput) {
     val code = KeyCode.getByName(keyName)
       ?: throw MaestroException.InvalidCommand(message = "Unknown key: $keyName")
-    runInput.device.executeCommands(
-      commands = listOf(
+    runInput.device.executeActions(
+      actions = listOf(
         MaestroCommand(
           pressKeyCommand = PressKeyCommand(
             code
@@ -563,7 +563,7 @@ public data class KeyPressAgentCommand(val keyName: String) : ArbigentAgentComma
     )
   }
 
-  public companion object : AgentCommandType {
+  public companion object : AgentActionType {
     override val actionName: String = "KeyPress"
 
     override fun templateForAI(): String {
@@ -578,18 +578,18 @@ public data class KeyPressAgentCommand(val keyName: String) : ArbigentAgentComma
 }
 
 @Serializable
-public class WaitAgentCommand(private val timeMs: Int) : ArbigentAgentCommand {
+public class WaitAgentAction(private val timeMs: Int) : ArbigentAgentAction {
   override val actionName: String = "Wait"
 
   override fun stepLogText(): String {
     return "Wait for $timeMs ms"
   }
 
-  override fun runDeviceCommand(runInput: ArbigentAgentCommand.RunInput) {
+  override fun runDeviceAction(runInput: ArbigentAgentAction.RunInput) {
     Thread.sleep(timeMs.toLong())
   }
 
-  public companion object : AgentCommandType {
+  public companion object : AgentActionType {
     override val actionName: String = "Wait"
 
     override fun templateForAI(): String {
@@ -605,17 +605,17 @@ public class WaitAgentCommand(private val timeMs: Int) : ArbigentAgentCommand {
 }
 
 @Serializable
-public class GoalAchievedAgentCommand : ArbigentAgentCommand {
+public class GoalAchievedAgentAction : ArbigentAgentAction {
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
     return "Goal achieved"
   }
 
-  override fun runDeviceCommand(runInput: ArbigentAgentCommand.RunInput) {
+  override fun runDeviceAction(runInput: ArbigentAgentAction.RunInput) {
   }
 
-  public companion object : AgentCommandType {
+  public companion object : AgentActionType {
     override val actionName: String = "GoalAchieved"
 
     override fun templateForAI(): String {
@@ -630,17 +630,17 @@ public class GoalAchievedAgentCommand : ArbigentAgentCommand {
 }
 
 @Serializable
-public class FailedAgentCommand : ArbigentAgentCommand {
+public class FailedAgentAction : ArbigentAgentAction {
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
     return "Failed"
   }
 
-  override fun runDeviceCommand(runInput: ArbigentAgentCommand.RunInput) {
+  override fun runDeviceAction(runInput: ArbigentAgentAction.RunInput) {
   }
 
-  public companion object : AgentCommandType {
+  public companion object : AgentActionType {
     override val actionName: String = "Failed"
 
     override fun templateForAI(): String {
