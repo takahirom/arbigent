@@ -347,14 +347,14 @@ class TestRobot(
   fun assertRunInitializeAndLaunchTwice() {
     val actions = fakeDevice.getActionHistory()
     val firstLaunch = actions.indexOfFirst {
-      it.launchAppAction != null
+      it.launchAppCommand != null
     }
     // The first action is failed so it runs twice
-    assertEquals(3, actions.count { it.launchAppAction != null })
+    assertEquals(3, actions.count { it.launchAppCommand != null })
     val firstCleanup = actions.indexOfFirst {
-      it.clearStateAction != null
+      it.clearStateCommand != null
     }
-    assertEquals(3, actions.count { it.clearStateAction != null })
+    assertEquals(3, actions.count { it.clearStateCommand != null })
 
     assert(firstCleanup < firstLaunch)
   }
