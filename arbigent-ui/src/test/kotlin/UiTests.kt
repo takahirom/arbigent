@@ -36,6 +36,8 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
     val testDispatcher = StandardTestDispatcher()
     ArbigentCoroutinesDispatcher.dispatcher = testDispatcher
     globalKeyStoreFactory = TestKeyStoreFactory()
+    // Use fixed timestamp for deterministic UI tests
+    TimeProvider.set(TestTimeProvider(1234567890000L))
     runComposeUiTest {
       runTest(testDispatcher) {
         val robot = TestRobot(this, this@runComposeUiTest)

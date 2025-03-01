@@ -27,7 +27,6 @@ class ArbigentContextHolderTest {
 
         // Verify step text contains all components
         assertEquals(true, stepsText.contains("Step 1"))
-        assertEquals(true, stepsText.contains("Test Action"))
         assertEquals(true, stepsText.contains("Test Feedback"))
         assertEquals(true, stepsText.contains("Test Memo"))
         assertEquals(true, stepsText.contains("Test Image"))

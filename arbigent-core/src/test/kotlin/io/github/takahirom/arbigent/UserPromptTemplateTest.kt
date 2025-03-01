@@ -1,6 +1,5 @@
-package io.github.takahirom.arbigent.sample.test
+package io.github.takahirom.arbigent
 
-import io.github.takahirom.arbigent.UserPromptTemplate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -76,6 +75,7 @@ Step 2: Another action
 </STEP>
 
 <UI_STATE>
+Please refer to the image above.
 <ELEMENTS>
 
 </ELEMENTS>

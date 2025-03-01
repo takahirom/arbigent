@@ -10,12 +10,12 @@ import kotlinx.serialization.Serializable
 public class ArbigentContextHolder(
   public val goal: String,
   public val maxStep: Int,
-  public val startTimestamp: Long = System.currentTimeMillis(),
+  public val startTimestamp: Long = TimeProvider.get().currentTimeMillis(),
   private val userPromptTemplate: UserPromptTemplate = UserPromptTemplate(UserPromptTemplate.DEFAULT_TEMPLATE),
 ) {
   public fun generateStepId(): String {
     return "" + goal.hashCode() + "_" +
-      steps().size +"_" + startTimestamp + "_" + System.currentTimeMillis() .toString()
+      steps().size +"_" + startTimestamp + "_" + TimeProvider.get().currentTimeMillis().toString()
   }
   @Serializable
   public data class Step(
@@ -29,7 +29,7 @@ public class ArbigentContextHolder(
     public val aiRequest: String? = null,
     public val aiResponse: String? = null,
     public val cacheKey: String,
-    public val timestamp: Long = System.currentTimeMillis(),
+    public val timestamp: Long = TimeProvider.get().currentTimeMillis(),
     public val screenshotFilePath: String,
     public val apiCallJsonLFilePath: String? = null,
     public val cacheHit: Boolean = false,
@@ -43,7 +43,6 @@ public class ArbigentContextHolder(
         imageDescription?.let { append("image description: $it\n") }
         memo?.let { append("memo: $it\n") }
         feedback?.let { append("feedback: $it\n") }
-        action?.let { append("action: $it\n") }
         agentCommand?.let { append("action done: ${it.stepLogText()}\n") }
       }
     }

@@ -94,7 +94,7 @@ public data class ArbigentElementList(
   val screenWidth: Int
 ) {
 
-  public fun getAiTexts(): String {
+  public fun getPromptTexts(): String {
     return elements.joinToString("\n") { "" + it.index + ":" + it.textForAI }
   }
 
