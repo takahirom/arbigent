@@ -51,6 +51,25 @@ class UserPromptTemplateTest {
     }
 
     @Test
+    fun testCommandTemplatesRejected() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            UserPromptTemplate("""
+                Goal:"{{USER_INPUT_GOAL}}"
+                Your step:{{CURRENT_STEP}}
+                Max step:{{MAX_STEP}}
+                What you did so far:
+                {{STEPS}}
+                Available commands:
+                {{COMMAND_TEMPLATES}}
+            """.trimIndent())
+        }
+        assertEquals(
+            "Template contains unknown placeholders: COMMAND_TEMPLATES",
+            exception.message
+        )
+    }
+
+    @Test
     fun testDefaultTemplate() {
         val template = UserPromptTemplate(UserPromptTemplate.DEFAULT_TEMPLATE)
 
@@ -92,5 +111,10 @@ Based on the above, decide on the next action to achieve the goal. Please ensure
 
 </ACTION_OPTIONS>
 """.trimIndent(), result)
+    }
+
+    @Test
+    fun showDefaultTemplate() {
+        println(UserPromptTemplate.DEFAULT_TEMPLATE)
     }
 }
