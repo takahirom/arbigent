@@ -232,9 +232,10 @@ public class OpenAIAi(
     elements: ArbigentElementList
   ): String {
     val templates = agentCommandTypes.joinToString("\nor\n") { it.templateForAI() }
-    val focusedTreeText = focusedTree?.let { "\nCurrently focused Tree:\n$it\n\n" } ?: ""
+    val focusedTreeText = focusedTree.orEmpty().ifBlank { "No focused tree" }
+    val uiElements = elements.getPromptTexts().ifBlank { "No UI elements to select. Please check the image." }
     return contextHolder.prompt(
-      uiElements = elements.getAiTexts(),
+      uiElements = uiElements,
       focusedTree = focusedTreeText,
       commandTemplates = templates
     )

@@ -43,7 +43,6 @@ public class ArbigentContextHolder(
         imageDescription?.let { append("image description: $it\n") }
         memo?.let { append("memo: $it\n") }
         feedback?.let { append("feedback: $it\n") }
-        action?.let { append("action: $it\n") }
         agentCommand?.let { append("action done: ${it.stepLogText()}\n") }
       }
     }
