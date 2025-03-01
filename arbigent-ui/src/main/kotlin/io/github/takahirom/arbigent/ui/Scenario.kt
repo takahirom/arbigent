@@ -270,13 +270,13 @@ private fun ScenarioOptions(
           )
         }
       }
-      val inputCommandType by updatedScenarioStateHolder.scenarioTypeStateFlow.collectAsState()
+      val inputActionType by updatedScenarioStateHolder.scenarioTypeStateFlow.collectAsState()
       Row(
         verticalAlignment = Alignment.CenterVertically
       ) {
         RadioButtonRow(
           text = "Scenario",
-          selected = inputCommandType == ArbigentScenarioType.Scenario,
+          selected = inputActionType == ArbigentScenarioType.Scenario,
           onClick = {
             updatedScenarioStateHolder.scenarioTypeStateFlow.value = ArbigentScenarioType.Scenario
           }
@@ -287,7 +287,7 @@ private fun ScenarioOptions(
       ) {
         RadioButtonRow(
           text = "Execution",
-          selected = inputCommandType == ArbigentScenarioType.Execution,
+          selected = inputActionType == ArbigentScenarioType.Execution,
           onClick = {
             updatedScenarioStateHolder.scenarioTypeStateFlow.value = ArbigentScenarioType.Execution
           }
@@ -298,14 +298,14 @@ private fun ScenarioOptions(
     Column(
       modifier = Modifier.padding(8.dp).width(160.dp)
     ) {
-      val inputCommandType by updatedScenarioStateHolder.deviceFormFactorStateFlow.collectAsState()
+      val inputActionType by updatedScenarioStateHolder.deviceFormFactorStateFlow.collectAsState()
       GroupHeader("Device form factors")
       Row(
         verticalAlignment = Alignment.CenterVertically
       ) {
         RadioButtonRow(
           text = "Mobile",
-          selected = inputCommandType.isMobile(),
+          selected = inputActionType.isMobile(),
           onClick = {
             updatedScenarioStateHolder.deviceFormFactorStateFlow.value =
               ArbigentScenarioDeviceFormFactor.Mobile
@@ -317,7 +317,7 @@ private fun ScenarioOptions(
       ) {
         RadioButtonRow(
           text = "TV",
-          selected = inputCommandType.isTv(),
+          selected = inputActionType.isTv(),
           onClick = {
             updatedScenarioStateHolder.deviceFormFactorStateFlow.value =
               ArbigentScenarioDeviceFormFactor.Tv
@@ -795,7 +795,7 @@ data class ScenarioSection(val goal: String, val isRunning: Boolean, val steps: 
 
 data class StepItem(val step: ArbigentContextHolder.Step) {
   fun isAchieved(): Boolean {
-    return step.agentCommand is GoalAchievedAgentCommand
+    return step.agentAction is GoalAchievedAgentAction
   }
 }
 

@@ -109,14 +109,14 @@ public class OpenAIAi(
   private var retried = 0
 
   @OptIn(ExperimentalSerializationApi::class, ArbigentInternalApi::class)
-  override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
+  override fun decideAgentActions(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
     val contextHolder = decisionInput.contextHolder
     val screenshotFilePath = decisionInput.screenshotFilePath
     val decisionJsonlFilePath = decisionInput.apiCallJsonLFilePath
     val formFactor = decisionInput.formFactor
     val uiTreeStrings = decisionInput.uiTreeStrings
     val focusedTree = decisionInput.focusedTreeString
-    val agentCommandTypes = decisionInput.agentCommandTypes
+    val agentActionTypes = decisionInput.agentActionTypes
     val elements = decisionInput.elements
 
     val original = File(screenshotFilePath)
@@ -126,7 +126,7 @@ public class OpenAIAi(
 
     val imageBase64 = File(screenshotFilePath).getResizedIamgeBase64(1.0F)
     val prompt =
-      buildPrompt(contextHolder, uiTreeStrings.optimizedTreeString, focusedTree, agentCommandTypes, elements)
+      buildPrompt(contextHolder, uiTreeStrings.optimizedTreeString, focusedTree, agentActionTypes, elements)
     val messages: List<ChatMessage> = listOf(
       ChatMessage(
         role = "system",
@@ -166,7 +166,7 @@ public class OpenAIAi(
       messages = messages,
       ResponseFormat(
         type = "json_schema",
-        jsonSchema = buildActionSchema(agentCommandTypes = agentCommandTypes),
+        jsonSchema = buildActionSchema(agentActionTypes = agentActionTypes),
       ),
     )
     val responseText = try {
@@ -180,7 +180,7 @@ public class OpenAIAi(
         Thread.sleep(waitMs)
       }
       retried++
-      return decideAgentCommands(decisionInput)
+      return decideAgentActions(decisionInput)
     }
     retried = 0
     val json = Json { ignoreUnknownKeys = true }
@@ -217,7 +217,7 @@ public class OpenAIAi(
           cacheKey = decisionInput.cacheKey,
         )
       }
-      return ArbigentAi.DecisionOutput(listOfNotNull(step.agentCommand), step)
+      return ArbigentAi.DecisionOutput(listOfNotNull(step.agentAction), step)
     } catch (e: MissingFieldException) {
       arbigentInfoLog("Missing required field in OpenAI response: $e $responseText")
       throw e
@@ -228,16 +228,16 @@ public class OpenAIAi(
     contextHolder: ArbigentContextHolder,
     dumpHierarchy: String,
     focusedTree: String?,
-    agentCommandTypes: List<AgentCommandType>,
+    agentActionTypes: List<AgentActionType>,
     elements: ArbigentElementList
   ): String {
-    val templates = agentCommandTypes.joinToString("\nor\n") { it.templateForAI() }
+    val templates = agentActionTypes.joinToString("\nor\n") { it.templateForAI() }
     val focusedTreeText = focusedTree.orEmpty().ifBlank { "No focused tree" }
     val uiElements = elements.getPromptTexts().ifBlank { "No UI elements to select. Please check the image." }
     return contextHolder.prompt(
       uiElements = uiElements,
       focusedTree = focusedTreeText,
-      commandTemplates = templates
+      actionTemplates = templates
     )
   }
 
@@ -249,7 +249,7 @@ public class OpenAIAi(
   ): ArbigentContextHolder.Step {
     val screenshotFilePath = decisionInput.screenshotFilePath
     val elements = decisionInput.elements
-    val agentCommandList = decisionInput.agentCommandTypes
+    val agentActionList = decisionInput.agentActionTypes
 
     val content = chatCompletionResponse.choices.firstOrNull()?.message?.content ?: ""
     return try {
@@ -257,69 +257,69 @@ public class OpenAIAi(
       val jsonObject = jsonElement.jsonObject
       val action =
         jsonObject["action"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Action not found")
-      val agentCommandMap = agentCommandList.associateBy { it.actionName }
-      val commandPrototype = agentCommandMap[action] ?: throw IllegalArgumentException("Unknown action: $action")
-      val agentCommand: ArbigentAgentCommand = when (commandPrototype) {
-        GoalAchievedAgentCommand -> GoalAchievedAgentCommand()
-        FailedAgentCommand -> FailedAgentCommand()
-        ClickWithTextAgentCommand -> {
+      val agentActionMap = agentActionList.associateBy { it.actionName }
+      val actionPrototype = agentActionMap[action] ?: throw IllegalArgumentException("Unknown action: $action")
+      val agentAction: ArbigentAgentAction = when (actionPrototype) {
+        GoalAchievedAgentAction -> GoalAchievedAgentAction()
+        FailedAgentAction -> FailedAgentAction()
+        ClickWithTextAgentAction -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
-          ClickWithTextAgentCommand(text)
+          ClickWithTextAgentAction(text)
         }
 
-        ClickWithIdAgentCommand -> {
+        ClickWithIdAgentAction -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
-          ClickWithIdAgentCommand(text)
+          ClickWithIdAgentAction(text)
         }
 
-        DpadUpArrowAgentCommand -> {
+        DpadUpArrowAgentAction -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
-          DpadUpArrowAgentCommand(text.toIntOrNull() ?: 1)
+          DpadUpArrowAgentAction(text.toIntOrNull() ?: 1)
         }
 
-        DpadDownArrowAgentCommand -> {
+        DpadDownArrowAgentAction -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
-          DpadDownArrowAgentCommand(text.toIntOrNull() ?: 1)
+          DpadDownArrowAgentAction(text.toIntOrNull() ?: 1)
         }
 
-        DpadLeftArrowAgentCommand -> {
+        DpadLeftArrowAgentAction -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
-          DpadLeftArrowAgentCommand(text.toIntOrNull() ?: 1)
+          DpadLeftArrowAgentAction(text.toIntOrNull() ?: 1)
         }
 
-        DpadRightArrowAgentCommand -> {
+        DpadRightArrowAgentAction -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
-          DpadRightArrowAgentCommand(text.toIntOrNull() ?: 1)
+          DpadRightArrowAgentAction(text.toIntOrNull() ?: 1)
         }
 
-        DpadCenterAgentCommand -> {
+        DpadCenterAgentAction -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
-          DpadCenterAgentCommand(text.toIntOrNull() ?: 1)
+          DpadCenterAgentAction(text.toIntOrNull() ?: 1)
         }
 
-        DpadAutoFocusWithIdAgentCommand -> {
+        DpadAutoFocusWithIdAgentAction -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
-          DpadAutoFocusWithIdAgentCommand(text)
+          DpadAutoFocusWithIdAgentAction(text)
         }
 
-        DpadAutoFocusWithTextAgentCommand -> {
+        DpadAutoFocusWithTextAgentAction -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
-          DpadAutoFocusWithTextAgentCommand(text)
+          DpadAutoFocusWithTextAgentAction(text)
         }
 
-        DpadAutoFocusWithIndexAgentCommand -> {
+        DpadAutoFocusWithIndexAgentAction -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           val index = text.toIntOrNull()
-            ?: throw IllegalArgumentException("text should be a number for ${DpadAutoFocusWithIndexAgentCommand.actionName}")
+            ?: throw IllegalArgumentException("text should be a number for ${DpadAutoFocusWithIndexAgentAction.actionName}")
           if (elements.elements.size <= index) {
             throw IllegalArgumentException("Index out of bounds: $index")
           }
-          DpadAutoFocusWithIndexAgentCommand(index)
+          DpadAutoFocusWithIndexAgentAction(index)
         }
 
-        InputTextAgentCommand -> {
+        InputTextAgentAction -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
-          InputTextAgentCommand(text)
+          InputTextAgentAction(text)
         }
 
         ClickWithIndex -> {
@@ -334,25 +334,25 @@ public class OpenAIAi(
           )
         }
 
-        BackPressAgentCommand -> BackPressAgentCommand()
+        BackPressAgentAction -> BackPressAgentAction()
 
-        KeyPressAgentCommand -> {
+        KeyPressAgentAction -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
-          KeyPressAgentCommand(text)
+          KeyPressAgentAction(text)
         }
 
-        WaitAgentCommand -> {
+        WaitAgentAction -> {
           val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
-          WaitAgentCommand(text.toIntOrNull() ?: 1000)
+          WaitAgentAction(text.toIntOrNull() ?: 1000)
         }
 
-        ScrollAgentCommand -> ScrollAgentCommand()
+        ScrollAgentAction -> ScrollAgentAction()
 
         else -> throw IllegalArgumentException("Unsupported action: $action")
       }
       ArbigentContextHolder.Step(
         stepId = decisionInput.stepId,
-        agentCommand = agentCommand,
+        agentAction = agentAction,
         action = action,
         imageDescription = jsonObject["image-description"]?.jsonPrimitive?.content ?: "",
         memo = jsonObject["memo"]?.jsonPrimitive?.content ?: "",
@@ -399,8 +399,8 @@ public class OpenAIAi(
     }
   }
 
-  private fun buildActionSchema(agentCommandTypes: List<AgentCommandType>): JsonObject {
-    val actions = agentCommandTypes.map { it.actionName }.joinToString { "\"$it\"" }
+  private fun buildActionSchema(agentActionTypes: List<AgentActionType>): JsonObject {
+    val actions = agentActionTypes.map { it.actionName }.joinToString { "\"$it\"" }
     val schemaJson = """
     {
       "name": "ActionSchema",

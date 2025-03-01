@@ -20,7 +20,7 @@ public class ArbigentContextHolder(
   @Serializable
   public data class Step(
     public val stepId: String,
-    public val agentCommand: ArbigentAgentCommand? = null,
+    public val agentAction: ArbigentAgentAction? = null,
     public val action: String? = null,
     public val feedback: String? = null,
     public val memo: String? = null,
@@ -43,7 +43,7 @@ public class ArbigentContextHolder(
         imageDescription?.let { append("image description: $it\n") }
         memo?.let { append("memo: $it\n") }
         feedback?.let { append("feedback: $it\n") }
-        agentCommand?.let { append("action done: ${it.stepLogText()}\n") }
+        agentAction?.let { append("action done: ${it.stepLogText()}\n") }
       }
     }
 
@@ -54,7 +54,7 @@ public class ArbigentContextHolder(
         timestamp = timestamp,
         screenshotFilePath = screenshotFilePath,
         apiCallJsonPath = apiCallJsonLFilePath,
-        agentCommand = agentCommand?.stepLogText(),
+        agentAction = agentAction?.stepLogText(),
 //        uiTreeStrings = uiTreeStrings,
         aiRequest = aiRequest,
         aiResponse = aiResponse,
@@ -66,7 +66,7 @@ public class ArbigentContextHolder(
   private val _steps = MutableStateFlow<List<Step>>(listOf())
   public val stepsFlow: Flow<List<Step>> = _steps.asSharedFlow()
   public fun isGoalAchieved(): Boolean =
-    steps().any { it.agentCommand is GoalAchievedAgentCommand }
+    steps().any { it.agentAction is GoalAchievedAgentAction }
 
   public fun steps(): List<Step> = _steps.value
   public fun addStep(step: Step) {
@@ -82,7 +82,7 @@ public class ArbigentContextHolder(
   public fun prompt(
     uiElements: String,
     focusedTree: String,
-    commandTemplates: String
+    actionTemplates: String
   ): String {
     return userPromptTemplate.format(
       goal = goal,
@@ -91,7 +91,7 @@ public class ArbigentContextHolder(
       steps = getStepsText(),
       uiElements = uiElements,
       focusedTree = focusedTree,
-      commandTemplates = commandTemplates
+      actionTemplates = actionTemplates
     )
   }
 

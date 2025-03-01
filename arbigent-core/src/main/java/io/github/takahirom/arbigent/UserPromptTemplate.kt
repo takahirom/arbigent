@@ -10,7 +10,7 @@ public class UserPromptTemplate(
         public const val STEPS: String = "{{STEPS}}"
         public const val UI_ELEMENTS: String = "{{UI_ELEMENTS}}"
         public const val FOCUSED_TREE: String = "{{FOCUSED_TREE}}"
-        public const val COMMAND_TEMPLATES: String = "{{COMMAND_TEMPLATES}}"
+        public const val ACTION_TEMPLATES: String = "{{ACTION_TEMPLATES}}"
 
         public val DEFAULT_TEMPLATE: String = """
 <GOAL>$USER_INPUT_GOAL</GOAL>
@@ -38,9 +38,9 @@ $FOCUSED_TREE
 Based on the above, decide on the next action to achieve the goal. Please ensure not to repeat the same action. The action must be one of the following:
 </INSTRUCTIONS>
 
-<COMMAND_OPTIONS>
-$COMMAND_TEMPLATES
-</COMMAND_OPTIONS>
+<ACTION_OPTIONS>
+$ACTION_TEMPLATES
+</ACTION_OPTIONS>
 """.trimIndent()
     }
 
@@ -58,7 +58,7 @@ $COMMAND_TEMPLATES
         val optionalPlaceholders = listOf(
             UI_ELEMENTS,
             FOCUSED_TREE,
-            COMMAND_TEMPLATES
+            ACTION_TEMPLATES
         )
         val missingRequiredPlaceholders = requiredPlaceholders.filter { !template.contains(it) }
         if (missingRequiredPlaceholders.isNotEmpty()) {
@@ -87,7 +87,7 @@ $COMMAND_TEMPLATES
         steps: String,
         uiElements: String = "",
         focusedTree: String = "",
-        commandTemplates: String = ""
+        actionTemplates: String = ""
     ): String {
         return template
             .replace(USER_INPUT_GOAL, goal)
@@ -96,6 +96,6 @@ $COMMAND_TEMPLATES
             .replace(STEPS, steps)
             .replace(UI_ELEMENTS, uiElements)
             .replace(FOCUSED_TREE, focusedTree)
-            .replace(COMMAND_TEMPLATES, commandTemplates)
+            .replace(ACTION_TEMPLATES, actionTemplates)
     }
 }

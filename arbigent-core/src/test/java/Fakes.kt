@@ -6,8 +6,8 @@ import maestro.TreeNode
 import maestro.orchestra.MaestroCommand
 
 class FakeDevice : ArbigentDevice {
-  override fun executeCommands(commands: List<MaestroCommand>) {
-    arbigentDebugLog("FakeDevice.executeCommands: $commands")
+  override fun executeActions(actions: List<MaestroCommand>) {
+    arbigentDebugLog("FakeDevice.executeActions: $actions")
   }
 
   override fun os(): ArbigentDeviceOs {
@@ -87,7 +87,7 @@ class FakeAi : ArbigentAi {
   sealed class Status {
     class FailAndSuccess : Status() {
       private var count = 0
-      override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
+      override fun decideAgentActions(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
         if (count == 0) {
           count++
           return createDecisionOutput()
@@ -96,7 +96,7 @@ class FakeAi : ArbigentAi {
           return createDecisionOutput()
         } else {
           return createDecisionOutput(
-            agentCommand = GoalAchievedAgentCommand()
+            agentAction = GoalAchievedAgentAction()
           )
         }
       }
@@ -106,20 +106,20 @@ class FakeAi : ArbigentAi {
       var capturedCacheKey: String? = null
         private set
 
-      override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
+      override fun decideAgentActions(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
         capturedCacheKey = decisionInput.cacheKey
         return createDecisionOutput()
       }
     }
 
     protected fun createDecisionOutput(
-      agentCommand: ArbigentAgentCommand = ClickWithTextAgentCommand("text")
+      agentAction: ArbigentAgentAction = ClickWithTextAgentAction("text")
     ): ArbigentAi.DecisionOutput {
       return ArbigentAi.DecisionOutput(
-        listOf(agentCommand),
+        listOf(agentAction),
         ArbigentContextHolder.Step(
           stepId = "stepId",
-          agentCommand = agentCommand,
+          agentAction = agentAction,
           memo = "memo",
           screenshotFilePath = "screenshotFileName",
           cacheKey = "cacheKey",
@@ -127,14 +127,14 @@ class FakeAi : ArbigentAi {
       )
     }
 
-    abstract fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput
+    abstract fun decideAgentActions(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput
   }
 
   var status: Status = Status.FailAndSuccess()
 
-  override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
+  override fun decideAgentActions(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
     arbigentDebugLog("FakeAi.decideWhatToDo")
-    return status.decideAgentCommands(decisionInput)
+    return status.decideAgentActions(decisionInput)
   }
 
   override fun assertImage(imageAssertionInput: ArbigentAi.ImageAssertionInput): ArbigentAi.ImageAssertionOutput {

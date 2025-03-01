@@ -12,7 +12,7 @@ public interface ArbigentAi {
     val uiTreeStrings: ArbigentUiTreeStrings,
     // Only true if it is TV form factor
     val focusedTreeString: String?,
-    val agentCommandTypes: List<AgentCommandType>,
+    val agentActionTypes: List<AgentActionType>,
     val screenshotFilePath: String,
     val apiCallJsonLFilePath: String,
     val elements: ArbigentElementList,
@@ -21,11 +21,11 @@ public interface ArbigentAi {
   )
   @Serializable
   public data class DecisionOutput(
-    val agentCommands: List<ArbigentAgentCommand>,
+    val agentActions: List<ArbigentAgentAction>,
     val step: ArbigentContextHolder.Step,
   )
   public class FailedToParseResponseException(message: String, cause: Throwable) : Exception(message, cause)
-  public fun decideAgentCommands(
+  public fun decideAgentActions(
     decisionInput: DecisionInput
   ): DecisionOutput
 

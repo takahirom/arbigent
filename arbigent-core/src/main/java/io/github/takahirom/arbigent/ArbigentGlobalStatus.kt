@@ -39,8 +39,8 @@ public object ArbigentGlobalStatus {
     return on("Initializing..", block)
   }
 
-  public fun<T : Any> onDevice(command:String, block: () -> T): T {
-    return on("Processing device command: $command", block)
+  public fun<T : Any> onDevice(action:String, block: () -> T): T {
+    return on("Processing device action: $action", block)
   }
 
   public fun<T : Any> onImageAssertion(assertionPrompt: String, block: () -> T): T {

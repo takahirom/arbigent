@@ -345,16 +345,16 @@ class TestRobot(
   }
 
   fun assertRunInitializeAndLaunchTwice() {
-    val commands = fakeDevice.getCommandHistory()
-    val firstLaunch = commands.indexOfFirst {
+    val actions = fakeDevice.getActionHistory()
+    val firstLaunch = actions.indexOfFirst {
       it.launchAppCommand != null
     }
-    // The first command is failed so it runs twice
-    assertEquals(3, commands.count { it.launchAppCommand != null })
-    val firstCleanup = commands.indexOfFirst {
+    // The first action is failed so it runs twice
+    assertEquals(3, actions.count { it.launchAppCommand != null })
+    val firstCleanup = actions.indexOfFirst {
       it.clearStateCommand != null
     }
-    assertEquals(3, commands.count { it.clearStateCommand != null })
+    assertEquals(3, actions.count { it.clearStateCommand != null })
 
     assert(firstCleanup < firstLaunch)
   }
@@ -532,14 +532,14 @@ class TestRobot(
 }
 
 class FakeDevice : ArbigentDevice {
-  private val commandHistory = mutableListOf<MaestroCommand>()
-  override fun executeCommands(commands: List<MaestroCommand>) {
-    arbigentDebugLog("FakeDevice.executeCommands: $commands")
-    commandHistory.addAll(commands)
+  private val actionHistory = mutableListOf<MaestroCommand>()
+  override fun executeActions(actions: List<MaestroCommand>) {
+    arbigentDebugLog("FakeDevice.executeActions: $actions")
+    actionHistory.addAll(actions)
   }
 
-  fun getCommandHistory(): List<MaestroCommand> {
-    return commandHistory
+  fun getActionHistory(): List<MaestroCommand> {
+    return actionHistory
   }
 
   override fun os(): ArbigentDeviceOs {
@@ -609,14 +609,14 @@ class FakeAi : ArbigentAi {
         private set
 
       private fun createDecisionOutput(
-        agentCommand: ArbigentAgentCommand = ClickWithTextAgentCommand("text"),
+        agentAction: ArbigentAgentAction = ClickWithTextAgentAction("text"),
         decisionInput: ArbigentAi.DecisionInput
       ): ArbigentAi.DecisionOutput {
         return ArbigentAi.DecisionOutput(
-          listOf(agentCommand),
+          listOf(agentAction),
           ArbigentContextHolder.Step(
             stepId = "stepId1",
-            agentCommand = agentCommand,
+            agentAction = agentAction,
             memo = "memo",
             screenshotFilePath = "screenshotFileName",
             uiTreeStrings = decisionInput.uiTreeStrings,
@@ -625,7 +625,7 @@ class FakeAi : ArbigentAi {
         )
       }
 
-      override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
+      override fun decideAgentActions(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
         arbigentDebugLog("FakeAi.decideWhatToDo")
         if (decisionCount < 10) {
           decisionCount++
@@ -636,11 +636,11 @@ class FakeAi : ArbigentAi {
           decisionCount++
           return createDecisionOutput(
             decisionInput = decisionInput,
-            agentCommand = FailedAgentCommand()
+            agentAction = FailedAgentAction()
           )
         } else {
           return createDecisionOutput(
-            agentCommand = GoalAchievedAgentCommand(),
+            agentAction = GoalAchievedAgentAction(),
             decisionInput = decisionInput,
           )
         }
@@ -663,12 +663,12 @@ class FakeAi : ArbigentAi {
     }
 
     class ImageAssertionFailed() : AiStatus {
-      override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
+      override fun decideAgentActions(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
         return ArbigentAi.DecisionOutput(
-          listOf(GoalAchievedAgentCommand()),
+          listOf(GoalAchievedAgentAction()),
           ArbigentContextHolder.Step(
             stepId = "stepId1",
-            agentCommand = GoalAchievedAgentCommand(),
+            agentAction = GoalAchievedAgentAction(),
             memo = "memo",
             screenshotFilePath = "screenshotFileName",
             cacheKey = decisionInput.cacheKey
@@ -692,8 +692,8 @@ class FakeAi : ArbigentAi {
   }
 
   var status: AiStatus = AiStatus.Normal()
-  override fun decideAgentCommands(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
-    return status.decideAgentCommands(decisionInput)
+  override fun decideAgentActions(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
+    return status.decideAgentActions(decisionInput)
   }
 
   override fun assertImage(imageAssertionInput: ArbigentAi.ImageAssertionInput): ArbigentAi.ImageAssertionOutput {

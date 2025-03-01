@@ -47,7 +47,7 @@ public interface ArbigentTvCompatDevice {
 
 public interface ArbigentDevice {
   public fun deviceName(): String = "ArbigentDevice"
-  public fun executeCommands(commands: List<MaestroCommand>)
+  public fun executeActions(actions: List<MaestroCommand>)
   public fun viewTreeString(): ArbigentUiTreeStrings
   public fun focusedTreeString(): String
   public fun close()
@@ -203,8 +203,8 @@ public class MaestroDevice(
     return maestro.deviceName
   }
 
-  override fun executeCommands(commands: List<MaestroCommand>) {
-    ArbigentGlobalStatus.onDevice(commands.joinToString { it.toString() }) {
+  override fun executeActions(actions: List<MaestroCommand>) {
+    ArbigentGlobalStatus.onDevice(actions.joinToString { it.toString() }) {
       // If the jsEngine is already initialized, we don't need to reinitialize it
       val shouldJsReinit = if (orchestra::class.java.getDeclaredField("jsEngine").apply {
           isAccessible = true
@@ -213,7 +213,7 @@ public class MaestroDevice(
       } else {
         true
       }
-      orchestra.executeCommands(commands, shouldReinitJsEngine = shouldJsReinit)
+      orchestra.executeCommands(actions, shouldReinitJsEngine = shouldJsReinit)
     }
   }
 

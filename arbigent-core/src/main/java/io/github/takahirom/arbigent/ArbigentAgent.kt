@@ -79,7 +79,7 @@ public class ArbigentAgent(
   private val decisionChain: suspend (ArbigentAi.DecisionInput) -> ArbigentAi.DecisionOutput = { input ->
     var chain: suspend (ArbigentAi.DecisionInput) -> ArbigentAi.DecisionOutput = { decisionInput ->
       ArbigentGlobalStatus.onAi {
-        ai.decideAgentCommands(decisionInput)
+        ai.decideAgentActions(decisionInput)
       }
     }
     decisionInterceptors.reversed().forEach { interceptor ->
@@ -114,14 +114,14 @@ public class ArbigentAgent(
         }
       }
     )
-  private val executeCommandsInterceptors: List<ArbigentExecuteCommandsInterceptor> = interceptors
-    .filterIsInstance<ArbigentExecuteCommandsInterceptor>()
-  private val executeCommandChain: (ExecuteCommandsInput) -> ExecuteCommandsOutput =
-    executeCommandsInterceptors.foldRight(
-      { input: ExecuteCommandsInput -> executeCommands(input) },
-      { interceptor: ArbigentExecuteCommandsInterceptor, acc: (ExecuteCommandsInput) -> ExecuteCommandsOutput ->
+  private val executeActionsInterceptors: List<ArbigentExecuteActionsInterceptor> = interceptors
+    .filterIsInstance<ArbigentExecuteActionsInterceptor>()
+  private val executeActionChain: (ExecuteActionsInput) -> ExecuteActionsOutput =
+    executeActionsInterceptors.foldRight(
+      { input: ExecuteActionsInput -> executeActions(input) },
+      { interceptor: ArbigentExecuteActionsInterceptor, acc: (ExecuteActionsInput) -> ExecuteActionsOutput ->
         { input ->
-          interceptor.intercept(input) { executeCommandsInput -> acc(executeCommandsInput) }
+          interceptor.intercept(input) { executeActionsInput -> acc(executeActionsInput) }
         }
       }
     )
@@ -151,14 +151,14 @@ public class ArbigentAgent(
       it?.stepsFlow ?: flowOf()
     }
     .map { steps: List<ArbigentContextHolder.Step> ->
-      steps.any { it.agentCommand is GoalAchievedAgentCommand }
+      steps.any { it.agentAction is GoalAchievedAgentAction }
     }
     .shareIn(coroutineScope, SharingStarted.WhileSubscribed(), 1)
 
   public fun isGoalAchieved(): Boolean = arbigentContextHolderStateFlow
     .value
     ?.steps()
-    ?.any { it.agentCommand is GoalAchievedAgentCommand }
+    ?.any { it.agentAction is GoalAchievedAgentAction }
     ?: false
 
   public suspend fun execute(
@@ -167,9 +167,9 @@ public class ArbigentAgent(
     execute(
       goal = agentTask.goal,
       maxStep = agentTask.maxStep,
-      agentCommandTypes = when (agentTask.deviceFormFactor) {
-        ArbigentScenarioDeviceFormFactor.Mobile -> defaultAgentCommandTypesForVisualMode()
-        ArbigentScenarioDeviceFormFactor.Tv -> defaultAgentCommandTypesForTvForVisualMode()
+      agentActionTypes = when (agentTask.deviceFormFactor) {
+        ArbigentScenarioDeviceFormFactor.Mobile -> defaultAgentActionTypesForVisualMode()
+        ArbigentScenarioDeviceFormFactor.Tv -> defaultAgentActionTypesForTvForVisualMode()
         else -> throw IllegalArgumentException("Unsupported device form factor: ${agentTask.deviceFormFactor}")
       }
     )
@@ -178,12 +178,12 @@ public class ArbigentAgent(
   public suspend fun execute(
     goal: String,
     maxStep: Int = 10,
-    agentCommandTypes: List<AgentCommandType> = defaultAgentCommandTypesForVisualMode()
+    agentActionTypes: List<AgentActionType> = defaultAgentActionTypesForVisualMode()
   ) {
     val executeInput = ExecuteInput(
       goal = goal,
       maxStep = maxStep,
-      agentCommandTypes = agentCommandTypes,
+      agentActionTypes = agentActionTypes,
       deviceFormFactor = deviceFormFactor,
       prompt = prompt,
       device = device,
@@ -199,7 +199,7 @@ public class ArbigentAgent(
       stepChain = stepChain,
       decisionChain = decisionChain,
       imageAssertionChain = imageAssertionChain,
-      executeCommandChain = executeCommandChain
+      executeActionChain = executeActionChain
     )
 
     when (executeChain(executeInput)) {
@@ -212,7 +212,7 @@ public class ArbigentAgent(
   public data class ExecuteInput(
     val goal: String,
     val maxStep: Int,
-    val agentCommandTypes: List<AgentCommandType>,
+    val agentActionTypes: List<AgentActionType>,
     val deviceFormFactor: ArbigentScenarioDeviceFormFactor,
     val prompt: ArbigentPrompt,
     val device: ArbigentDevice,
@@ -225,7 +225,7 @@ public class ArbigentAgent(
     val stepChain: suspend (StepInput) -> StepResult,
     val decisionChain: suspend (ArbigentAi.DecisionInput) -> ArbigentAi.DecisionOutput,
     val imageAssertionChain: (ArbigentAi.ImageAssertionInput) -> ArbigentAi.ImageAssertionOutput,
-    val executeCommandChain: (ExecuteCommandsInput) -> ExecuteCommandsOutput,
+    val executeActionChain: (ExecuteActionsInput) -> ExecuteActionsOutput,
   )
 
   public sealed interface ExecutionResult {
@@ -236,13 +236,13 @@ public class ArbigentAgent(
 
   public data class StepInput(
     val arbigentContextHolder: ArbigentContextHolder,
-    val agentCommandTypes: List<AgentCommandType>,
+    val agentActionTypes: List<AgentActionType>,
     val device: ArbigentDevice,
     val deviceFormFactor: ArbigentScenarioDeviceFormFactor,
     val ai: ArbigentAi,
     val decisionChain: suspend (ArbigentAi.DecisionInput) -> ArbigentAi.DecisionOutput,
     val imageAssertionChain: (ArbigentAi.ImageAssertionInput) -> ArbigentAi.ImageAssertionOutput,
-    val executeCommandChain: (ExecuteCommandsInput) -> ExecuteCommandsOutput,
+    val executeActionChain: (ExecuteActionsInput) -> ExecuteActionsOutput,
     val prompt: ArbigentPrompt,
   )
 
@@ -252,7 +252,7 @@ public class ArbigentAgent(
     public object Continue : StepResult
   }
 
-  public data class ExecuteCommandsInput(
+  public data class ExecuteActionsInput(
     val stepId: String,
     val decisionOutput: ArbigentAi.DecisionOutput,
     val arbigentContextHolder: ArbigentContextHolder,
@@ -262,7 +262,7 @@ public class ArbigentAgent(
     val elements: ArbigentElementList,
   )
 
-  public class ExecuteCommandsOutput
+  public class ExecuteActionsOutput
 
 
   public fun cancel() {
@@ -480,8 +480,8 @@ public fun AgentConfigBuilder(
           ) {
             repeat(initializeMethod.times) {
               try {
-                device.executeCommands(
-                  commands = listOf(
+                device.executeActions(
+                  actions = listOf(
                     MaestroCommand(
                       backPressCommand = BackPressCommand()
                     )
@@ -521,7 +521,7 @@ public fun AgentConfigBuilder(
             device: ArbigentDevice,
             chain: ArbigentInitializerInterceptor.Chain
           ) {
-            device.executeCommands(
+            device.executeActions(
               listOf(
                 MaestroCommand(
                   launchAppCommand = LaunchAppCommand(
@@ -545,7 +545,7 @@ public fun AgentConfigBuilder(
             device: ArbigentDevice,
             chain: ArbigentInitializerInterceptor.Chain
           ) {
-            device.executeCommands(
+            device.executeActions(
               listOf(
                 MaestroCommand(
                   clearStateCommand = ClearStateCommand(
@@ -565,7 +565,7 @@ public fun AgentConfigBuilder(
             device: ArbigentDevice,
             chain: ArbigentInitializerInterceptor.Chain
           ) {
-            device.executeCommands(
+            device.executeActions(
               listOf(
                 MaestroCommand(
                   openLinkCommand = OpenLinkCommand(
@@ -661,12 +661,12 @@ public fun AgentConfigBuilder(
         chain: ArbigentDecisionInterceptor.Chain
       ): ArbigentAi.DecisionOutput {
         return ArbigentAi.DecisionOutput(
-          agentCommands = listOf(
-            GoalAchievedAgentCommand()
+          agentActions = listOf(
+            GoalAchievedAgentAction()
           ),
           step = ArbigentContextHolder.Step(
             stepId = decisionInput.stepId,
-            agentCommand = GoalAchievedAgentCommand(),
+            agentAction = GoalAchievedAgentAction(),
             screenshotFilePath = decisionInput.screenshotFilePath,
             cacheKey = decisionInput.cacheKey
           )
@@ -707,14 +707,14 @@ public interface ArbigentImageAssertionInterceptor : ArbigentInterceptor {
   }
 }
 
-public interface ArbigentExecuteCommandsInterceptor : ArbigentInterceptor {
+public interface ArbigentExecuteActionsInterceptor : ArbigentInterceptor {
   public fun intercept(
-    executeCommandsInput: ExecuteCommandsInput,
+    executeActionsInput: ExecuteActionsInput,
     chain: Chain
-  ): ExecuteCommandsOutput
+  ): ExecuteActionsOutput
 
   public fun interface Chain {
-    public fun proceed(executeCommandsInput: ExecuteCommandsInput): ExecuteCommandsOutput
+    public fun proceed(executeActionsInput: ExecuteActionsInput): ExecuteActionsOutput
   }
 }
 
@@ -736,50 +736,50 @@ public interface ArbigentStepInterceptor : ArbigentInterceptor {
   }
 }
 
-public fun defaultAgentCommandTypesForVisualMode(): List<AgentCommandType> {
+public fun defaultAgentActionTypesForVisualMode(): List<AgentActionType> {
   return listOf(
-//    ClickWithIdAgentCommand,
-//    ClickWithTextAgentCommand,
+//    ClickWithIdAgentAction,
+//    ClickWithTextAgentAction,
     ClickWithIndex,
-    InputTextAgentCommand,
-    BackPressAgentCommand,
-    KeyPressAgentCommand,
-    ScrollAgentCommand,
-    WaitAgentCommand,
-    GoalAchievedAgentCommand,
-    FailedAgentCommand
+    InputTextAgentAction,
+    BackPressAgentAction,
+    KeyPressAgentAction,
+    ScrollAgentAction,
+    WaitAgentAction,
+    GoalAchievedAgentAction,
+    FailedAgentAction
   )
 }
 
-public fun defaultAgentCommandTypesForTvForVisualMode(): List<AgentCommandType> {
+public fun defaultAgentActionTypesForTvForVisualMode(): List<AgentActionType> {
   return listOf(
-    DpadAutoFocusWithIndexAgentCommand,
-//    DpadAutoFocusWithIdAgentCommand,
-//    DpadAutoFocusWithTextAgentCommand,
-    DpadUpArrowAgentCommand,
-    DpadDownArrowAgentCommand,
-    DpadLeftArrowAgentCommand,
-    DpadRightArrowAgentCommand,
-    DpadCenterAgentCommand,
-    InputTextAgentCommand,
-    BackPressAgentCommand,
-    KeyPressAgentCommand,
-    WaitAgentCommand,
-    GoalAchievedAgentCommand,
-    FailedAgentCommand
+    DpadAutoFocusWithIndexAgentAction,
+//    DpadAutoFocusWithIdAgentAction,
+//    DpadAutoFocusWithTextAgentAction,
+    DpadUpArrowAgentAction,
+    DpadDownArrowAgentAction,
+    DpadLeftArrowAgentAction,
+    DpadRightArrowAgentAction,
+    DpadCenterAgentAction,
+    InputTextAgentAction,
+    BackPressAgentAction,
+    KeyPressAgentAction,
+    WaitAgentAction,
+    GoalAchievedAgentAction,
+    FailedAgentAction
   )
 }
 
-private fun executeCommands(
-  executeCommandsInput: ExecuteCommandsInput,
-): ExecuteCommandsOutput {
-  val (stepId, decisionOutput, arbigentContextHolder, screenshotFilePath, device) = executeCommandsInput
-  decisionOutput.agentCommands.forEach { agentCommand ->
+private fun executeActions(
+  executeActionsInput: ExecuteActionsInput,
+): ExecuteActionsOutput {
+  val (stepId, decisionOutput, arbigentContextHolder, screenshotFilePath, device) = executeActionsInput
+  decisionOutput.agentActions.forEach { agentAction ->
     try {
-      agentCommand.runDeviceCommand(
-        ArbigentAgentCommand.RunInput(
+      agentAction.runDeviceAction(
+        ArbigentAgentAction.RunInput(
           device = device,
-          elements = executeCommandsInput.elements,
+          elements = executeActionsInput.elements,
         )
       )
     } catch (e: MaestroException) {
@@ -788,7 +788,7 @@ private fun executeCommands(
         ArbigentContextHolder.Step(
           stepId = stepId,
           feedback = "Failed to perform action: ${e.message}. Please try other actions.",
-          cacheKey = executeCommandsInput.cacheKey,
+          cacheKey = executeActionsInput.cacheKey,
           screenshotFilePath = screenshotFilePath
         )
       )
@@ -798,7 +798,7 @@ private fun executeCommands(
         ArbigentContextHolder.Step(
           stepId = stepId,
           feedback = "Failed to perform action: ${e.message}. Please try other actions.",
-          cacheKey = executeCommandsInput.cacheKey,
+          cacheKey = executeActionsInput.cacheKey,
           screenshotFilePath = screenshotFilePath
         )
       )
@@ -808,13 +808,13 @@ private fun executeCommands(
         ArbigentContextHolder.Step(
           stepId = stepId,
           feedback = "Failed to perform action: ${e.message}. Please try other actions.",
-          cacheKey = executeCommandsInput.cacheKey,
+          cacheKey = executeActionsInput.cacheKey,
           screenshotFilePath = screenshotFilePath
         )
       )
     }
   }
-  return ExecuteCommandsOutput()
+  return ExecuteActionsOutput()
 }
 
 private suspend fun executeDefault(input: ExecuteInput): ExecutionResult {
@@ -832,13 +832,13 @@ private suspend fun executeDefault(input: ExecuteInput): ExecutionResult {
     while (stepRemain-- > 0 && !contextHolder.isGoalAchieved()) {
       val stepInput = StepInput(
         arbigentContextHolder = contextHolder,
-        agentCommandTypes = input.agentCommandTypes,
+        agentActionTypes = input.agentActionTypes,
         device = input.device,
         deviceFormFactor = input.deviceFormFactor,
         ai = input.ai,
         decisionChain = input.decisionChain,
         imageAssertionChain = input.imageAssertionChain,
-        executeCommandChain = input.executeCommandChain,
+        executeActionChain = input.executeActionChain,
         prompt = input.prompt
       )
       when (input.stepChain(stepInput)) {
@@ -873,20 +873,20 @@ private suspend fun step(
 ): StepResult {
   val contextHolder = stepInput.arbigentContextHolder
   arbigentDebugLog("step start: ${contextHolder.context()}")
-  val commandTypes = stepInput.agentCommandTypes
+  val actionTypes = stepInput.agentActionTypes
   val device = stepInput.device
   val deviceFormFactor = stepInput.deviceFormFactor
   val ai = stepInput.ai
   val decisionChain = stepInput.decisionChain
   val imageAssertionChain = stepInput.imageAssertionChain
-  val executeCommandChain = stepInput.executeCommandChain
+  val executeActionChain = stepInput.executeActionChain
 
   val stepId = contextHolder.generateStepId()
   val elements = device.elements()
   for (it in 0..2) {
     try {
-      device.executeCommands(
-        commands = listOf(
+      device.executeActions(
+        actions = listOf(
           MaestroCommand(
             takeScreenshotCommand = TakeScreenshotCommand(
               stepId
@@ -940,13 +940,13 @@ private suspend fun step(
     } else {
       null
     },
-    agentCommandTypes = commandTypes,
+    agentActionTypes = actionTypes,
     screenshotFilePath = screenshotFilePath,
     prompt = stepInput.prompt,
     cacheKey = cacheKey
   )
   val decisionOutput = decisionChain(decisionInput)
-  if (decisionOutput.agentCommands.any { it is GoalAchievedAgentCommand }) {
+  if (decisionOutput.agentActions.any { it is GoalAchievedAgentAction }) {
     val imageAssertionOutput = imageAssertionChain(
       ArbigentAi.ImageAssertionInput(
         ai = ai,
@@ -990,14 +990,14 @@ private suspend fun step(
   } else {
     contextHolder.addStep(decisionOutput.step)
   }
-  if (contextHolder.steps().last().agentCommand is GoalAchievedAgentCommand) {
+  if (contextHolder.steps().last().agentAction is GoalAchievedAgentAction) {
     return StepResult.GoalAchieved
   }
-  if (contextHolder.steps().last().agentCommand is FailedAgentCommand) {
+  if (contextHolder.steps().last().agentAction is FailedAgentAction) {
     return StepResult.Failed
   }
-  executeCommandChain(
-    ExecuteCommandsInput(
+  executeActionChain(
+    ExecuteActionsInput(
       stepId = stepId,
       decisionOutput = decisionOutput,
       elements = elements,
