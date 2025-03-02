@@ -25,6 +25,10 @@ constructor(
   private val _id = MutableStateFlow(id)
   val idStateFlow: StateFlow<String> = _id
   val id: String get() = _id.value
+
+  private val _aiOptions = MutableStateFlow<ArbigentAiOptions?>(null)
+  val aiOptionsFlow: StateFlow<ArbigentAiOptions?> = _aiOptions
+
   val goalState = TextFieldState("")
   val goal get() = goalState.text.toString()
   val noteForHumans = TextFieldState("")
@@ -132,6 +136,10 @@ constructor(
     _id.value = id
   }
 
+  fun onAiOptionsChanged(options: ArbigentAiOptions?) {
+    _aiOptions.value = options
+  }
+
   fun createArbigentScenarioContent(): ArbigentScenarioContent {
     return ArbigentScenarioContent(
       id = id,
@@ -150,7 +158,8 @@ constructor(
       imageAssertionHistoryCount = imageAssertionsHistoryCountState.text.toString().toIntOrNull()
         ?: 1,
       imageAssertions = imageAssertionsStateFlow.value.filter { it.assertionPrompt.isNotBlank() },
-      userPromptTemplate = userUserPromptTemplateState.text.toString()
+      userPromptTemplate = userUserPromptTemplateState.text.toString(),
+      aiOptions = _aiOptions.value
     )
   }
 
@@ -179,6 +188,7 @@ constructor(
     _initializationMethodStateFlow.value = scenarioContent.initializationMethods.toMutableList()
     deviceFormFactorStateFlow.value = scenarioContent.deviceFormFactor
     scenarioTypeStateFlow.value = scenarioContent.type
+    _aiOptions.value = scenarioContent.aiOptions
   }
 
   fun onRemoveInitializationMethod(index: Int) {

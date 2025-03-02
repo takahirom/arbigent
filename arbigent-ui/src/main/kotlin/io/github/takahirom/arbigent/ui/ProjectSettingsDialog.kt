@@ -28,6 +28,12 @@ import org.jetbrains.jewel.ui.component.Dropdown
 import org.jetbrains.jewel.ui.component.GroupHeader
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.TextField
+import org.jetbrains.jewel.ui.component.Slider
+import org.jetbrains.jewel.ui.component.Checkbox
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.Alignment
+import io.github.takahirom.arbigent.ArbigentAiOptions
+import io.github.takahirom.arbigent.ui.components.AiOptionsComponent
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -71,6 +77,14 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
             .testTag("additional_system_prompt"),
           placeholder = { Text("Additional System Prompt") },
           decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
+        )
+
+        GroupHeader("AI Options")
+        val aiOptions by appStateHolder.aiOptionsFlow.collectAsState()
+        val currentOptions = aiOptions ?: ArbigentAiOptions()
+        AiOptionsComponent(
+            currentOptions = currentOptions,
+            onOptionsChanged = appStateHolder::onAiOptionsChanged
         )
         GroupHeader {
           Text("User Prompt Template")

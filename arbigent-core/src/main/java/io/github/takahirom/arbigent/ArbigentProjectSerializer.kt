@@ -45,9 +45,15 @@ public data class ArbigentContentTag(
 )
 
 @Serializable
+public data class ArbigentAiOptions(
+  public val temperature: Double? = null
+)
+
+@Serializable
 public data class ArbigentProjectSettings(
   public val prompt: ArbigentPrompt = ArbigentPrompt(),
-  public val cacheStrategy: CacheStrategy = CacheStrategy()
+  public val cacheStrategy: CacheStrategy = CacheStrategy(),
+  public val aiOptions: ArbigentAiOptions? = null
 )
 
 @Serializable
@@ -120,6 +126,7 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
           ),
           aiDecisionCache = aiDecisionCache
         ).apply {
+          aiOptions(nodeScenario.aiOptions ?: projectSettings.aiOptions)
           ai(aiFactory())
           deviceFactory(deviceFactory)
         }.build(),
@@ -174,7 +181,8 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
   public val cleanupData: CleanupData = CleanupData.Noop,
   public val imageAssertionHistoryCount: Int = 1,
   public val imageAssertions: List<ArbigentImageAssertion> = emptyList(),
-  public val userPromptTemplate: String = UserPromptTemplate.DEFAULT_TEMPLATE
+  public val userPromptTemplate: String = UserPromptTemplate.DEFAULT_TEMPLATE,
+  public val aiOptions: ArbigentAiOptions? = null
 ) {
   @Serializable
   public sealed interface CleanupData {
