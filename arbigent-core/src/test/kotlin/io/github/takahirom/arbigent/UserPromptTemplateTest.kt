@@ -96,6 +96,7 @@ Step 2: Another action
 <UI_STATE>
 Please refer to the image above.
 <ELEMENTS>
+index:element
 
 </ELEMENTS>
 <FOCUSED_TREE>

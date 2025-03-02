@@ -27,6 +27,7 @@ $STEPS
 <UI_STATE>
 Please refer to the image above.
 <ELEMENTS>
+index:element
 $UI_ELEMENTS
 </ELEMENTS>
 <FOCUSED_TREE>
