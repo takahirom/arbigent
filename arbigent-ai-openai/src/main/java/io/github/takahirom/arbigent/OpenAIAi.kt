@@ -172,6 +172,7 @@ public class OpenAIAi(
     val responseText = try {
       chatCompletion(
         completionRequest,
+        decisionInput.aiOptions
       )
     } catch (e: ArbigentAiRateLimitExceededException) {
       val waitMs = 10000L * (1 shl retried)
@@ -371,8 +372,10 @@ public class OpenAIAi(
     }
   }
 
+
   private fun chatCompletion(
-    chatCompletionRequest: ChatCompletionRequest
+    chatCompletionRequest: ChatCompletionRequest,
+    aiOptions: ArbigentAiOptions? = null
   ): String {
     return runBlocking {
       val response: HttpResponse =
@@ -380,7 +383,9 @@ public class OpenAIAi(
           requestBuilderModifier()
           contentType(ContentType.Application.Json)
           setBody(
-            chatCompletionRequest
+            aiOptions?.temperature?.let { temp ->
+              chatCompletionRequest.copy(temperature = temp)
+            } ?: chatCompletionRequest
           )
         }
       if (response.status == HttpStatusCode.TooManyRequests) {

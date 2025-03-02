@@ -9,7 +9,7 @@ import java.io.File
 
 @OptIn(ArbigentInternalApi::class)
 class ArbigentAppStateHolder(
-  val aiFactory: () -> ArbigentAi,
+  private val aiFactory: () -> ArbigentAi,
   val deviceFactory: (ArbigentAvailableDevice) -> ArbigentDevice = { avaiableDevice ->
     ArbigentGlobalStatus.onConnect {
       avaiableDevice.connectToDevice()
@@ -66,6 +66,7 @@ class ArbigentAppStateHolder(
   val promptFlow = MutableStateFlow(ArbigentPrompt())
   val tagManager = ArbigentTagManager()
   val cacheStrategyFlow = MutableStateFlow(CacheStrategy())
+  val aiOptionsFlow = MutableStateFlow<ArbigentAiOptions?>(null)
   val decisionCache = cacheStrategyFlow
     .map {
       val decisionCacheStrategy = it.aiDecisionCacheStrategy
@@ -136,7 +137,8 @@ class ArbigentAppStateHolder(
     val arbigentProject = ArbigentProject(
       settings = ArbigentProjectSettings(
         prompt = promptFlow.value,
-        cacheStrategy = cacheStrategyFlow.value
+        cacheStrategy = cacheStrategyFlow.value,
+        aiOptions = aiOptionsFlow.value
       ),
       initialScenarios = allScenarioStateHoldersStateFlow.value.map { scenario ->
         scenario.createScenario(allScenarioStateHoldersStateFlow.value)
@@ -160,7 +162,8 @@ class ArbigentAppStateHolder(
       .createArbigentScenario(
         projectSettings = ArbigentProjectSettings(
           promptFlow.value,
-          cacheStrategyFlow.value
+          cacheStrategyFlow.value,
+          aiOptionsFlow.value
         ),
         scenario = createArbigentScenarioContent(),
         aiFactory = aiFactory,
@@ -249,7 +252,8 @@ class ArbigentAppStateHolder(
       projectFileContent = ArbigentProjectFileContent(
         settings = ArbigentProjectSettings(
           promptFlow.value,
-          cacheStrategyFlow.value
+          cacheStrategyFlow.value,
+          aiOptionsFlow.value
         ),
         scenarioContents = sortedScenarios.map {
           it.createArbigentScenarioContent()
@@ -281,6 +285,7 @@ class ArbigentAppStateHolder(
     }
     promptFlow.value = projectFile.settings.prompt
     cacheStrategyFlow.value = projectFile.settings.cacheStrategy
+    aiOptionsFlow.value = projectFile.settings.aiOptions
     projectStateFlow.value = ArbigentProject(
       settings = projectFile.settings,
       initialScenarios = arbigentScenarioStateHolders.map {
@@ -356,6 +361,10 @@ class ArbigentAppStateHolder(
 
   fun onCacheStrategyChanged(strategy: CacheStrategy) {
     cacheStrategyFlow.value = strategy
+  }
+
+  fun onAiOptionsChanged(options: ArbigentAiOptions?) {
+    aiOptionsFlow.value = options
   }
 
   fun scenarioCountById(newScenarioId: String): Int {

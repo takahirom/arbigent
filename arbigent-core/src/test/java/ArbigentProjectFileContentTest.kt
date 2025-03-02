@@ -5,6 +5,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 
@@ -153,5 +154,53 @@ Previous steps:
     val prompt = contextHolder.context()
     assertTrue(prompt.contains("Task: test goal"))
     assertTrue(prompt.contains("Current progress: Step 1 of 10"))
+  }
+
+  private val projectWithAiOptions = ArbigentProjectSerializer().load(
+    """
+    settings:
+      aiOptions:
+        temperature: 0.8
+    scenarios:
+    - id: "A-ID"
+      goal: "A-GOAL"
+    - id: "B-ID"
+      goal: "B-GOAL"
+      aiOptions:
+        temperature: 0.5
+    """
+  )
+
+  @Test
+  fun testAiOptions() {
+    // Test project-level aiOptions
+    val projectSettings = projectWithAiOptions.settings
+    val projectAiOptions = projectSettings.aiOptions
+    assertNotNull(projectAiOptions, "Project aiOptions should not be null")
+    assertEquals(0.8, projectAiOptions.temperature!!, "Project temperature should be 0.8")
+
+    // Test scenario without custom aiOptions (should use project settings)
+    val scenarioA = projectWithAiOptions.scenarioContents.createArbigentScenario(
+      projectSettings = projectSettings,
+      scenario = projectWithAiOptions.scenarioContents[0],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
+    )
+    val scenarioAAiOptions = scenarioA.agentTasks[0].agentConfig.aiOptions
+    assertNotNull(scenarioAAiOptions, "Scenario A aiOptions should not be null")
+    assertEquals(0.8, scenarioAAiOptions.temperature!!, "Scenario A temperature should be 0.8")
+
+    // Test scenario with custom aiOptions (should override project settings)
+    val scenarioB = projectWithAiOptions.scenarioContents.createArbigentScenario(
+      projectSettings = projectSettings,
+      scenario = projectWithAiOptions.scenarioContents[1],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
+    )
+    val scenarioBAiOptions = scenarioB.agentTasks[0].agentConfig.aiOptions
+    assertNotNull(scenarioBAiOptions, "Scenario B aiOptions should not be null")
+    assertEquals(0.5, scenarioBAiOptions.temperature!!, "Scenario B temperature should be 0.5")
   }
 }

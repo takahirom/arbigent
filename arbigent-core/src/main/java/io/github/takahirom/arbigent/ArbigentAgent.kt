@@ -33,6 +33,7 @@ public class ArbigentAgent(
   private val interceptors: List<ArbigentInterceptor> = agentConfig.interceptors
   private val deviceFormFactor = agentConfig.deviceFormFactor
   private val prompt = agentConfig.prompt
+  private val aiOptions = agentConfig.aiOptions
 
   private val executeInterceptors: List<ArbigentExecutionInterceptor> = interceptors
     .filterIsInstance<ArbigentExecutionInterceptor>()
@@ -188,6 +189,7 @@ public class ArbigentAgent(
       prompt = prompt,
       device = device,
       ai = ai,
+      aiOptions = aiOptions,
       createContextHolder = { g, m -> ArbigentContextHolder(g, m, userPromptTemplate = UserPromptTemplate(prompt.userPromptTemplate)) },
       addContextHolder = { holder ->
         arbigentContextHolderStateFlow.value = holder
@@ -217,6 +219,7 @@ public class ArbigentAgent(
     val prompt: ArbigentPrompt,
     val device: ArbigentDevice,
     val ai: ArbigentAi,
+    val aiOptions: ArbigentAiOptions?,
     val createContextHolder: (String, Int) -> ArbigentContextHolder,
     val addContextHolder: (ArbigentContextHolder) -> Unit,
     val updateIsRunning: (Boolean) -> Unit,
@@ -244,6 +247,7 @@ public class ArbigentAgent(
     val imageAssertionChain: (ArbigentAi.ImageAssertionInput) -> ArbigentAi.ImageAssertionOutput,
     val executeActionChain: (ExecuteActionsInput) -> ExecuteActionsOutput,
     val prompt: ArbigentPrompt,
+    val aiOptions: ArbigentAiOptions?,
   )
 
   public sealed interface StepResult {
@@ -292,7 +296,8 @@ public class AgentConfig(
   internal val ai: ArbigentAi,
   internal val deviceFactory: () -> ArbigentDevice,
   internal val deviceFormFactor: ArbigentScenarioDeviceFormFactor,
-  internal val prompt: ArbigentPrompt
+  internal val prompt: ArbigentPrompt,
+  internal val aiOptions: ArbigentAiOptions?
 ) {
   public class Builder {
     private val interceptors = mutableListOf<ArbigentInterceptor>()
@@ -301,6 +306,7 @@ public class AgentConfig(
     private var deviceFormFactor: ArbigentScenarioDeviceFormFactor =
       ArbigentScenarioDeviceFormFactor.Mobile
     private var prompt: ArbigentPrompt = ArbigentPrompt()
+    private var aiOptions: ArbigentAiOptions? = null
 
     public fun addInterceptor(interceptor: ArbigentInterceptor) {
       interceptors.add(0, interceptor)
@@ -322,13 +328,18 @@ public class AgentConfig(
       this.prompt = prompt
     }
 
+    public fun aiOptions(aiOptions: ArbigentAiOptions?) {
+      this.aiOptions = aiOptions
+    }
+
     public fun build(): AgentConfig {
       return AgentConfig(
         interceptors = interceptors,
         ai = ai!!,
         deviceFactory = deviceFactory!!,
         deviceFormFactor = deviceFormFactor,
-        prompt = prompt
+        prompt = prompt,
+        aiOptions = aiOptions
       )
     }
   }
@@ -340,6 +351,7 @@ public class AgentConfig(
     }
     builder.deviceFactory(deviceFactory)
     builder.ai(ai)
+    builder.aiOptions(aiOptions)
     return builder
   }
 }
@@ -839,7 +851,8 @@ private suspend fun executeDefault(input: ExecuteInput): ExecutionResult {
         decisionChain = input.decisionChain,
         imageAssertionChain = input.imageAssertionChain,
         executeActionChain = input.executeActionChain,
-        prompt = input.prompt
+        prompt = input.prompt,
+        aiOptions = input.aiOptions
       )
       when (input.stepChain(stepInput)) {
         StepResult.GoalAchieved -> break
@@ -943,7 +956,8 @@ private suspend fun step(
     agentActionTypes = actionTypes,
     screenshotFilePath = screenshotFilePath,
     prompt = stepInput.prompt,
-    cacheKey = cacheKey
+    cacheKey = cacheKey,
+    aiOptions = stepInput.aiOptions
   )
   val decisionOutput = decisionChain(decisionInput)
   if (decisionOutput.agentActions.any { it is GoalAchievedAgentAction }) {

@@ -28,6 +28,11 @@ import org.jetbrains.jewel.ui.component.Dropdown
 import org.jetbrains.jewel.ui.component.GroupHeader
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.TextField
+import org.jetbrains.jewel.ui.component.Slider
+import org.jetbrains.jewel.ui.component.Checkbox
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.Alignment
+import io.github.takahirom.arbigent.ArbigentAiOptions
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -72,6 +77,41 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
           placeholder = { Text("Additional System Prompt") },
           decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
         )
+
+        GroupHeader("AI Options")
+        val aiOptions by appStateHolder.aiOptionsFlow.collectAsState()
+        val currentOptions = aiOptions ?: ArbigentAiOptions()
+        Row(
+          modifier = Modifier.padding(horizontal = 8.dp),
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          Checkbox(
+            checked = currentOptions.temperature != null,
+            onCheckedChange = { enabled: Boolean ->
+              appStateHolder.onAiOptionsChanged(
+                currentOptions.copy(temperature = if (enabled) 0.7 else null)
+              )
+            }
+          )
+          Text("Use Temperature", modifier = Modifier.padding(start = 8.dp))
+        }
+        currentOptions.temperature?.let { temp ->
+          Text("Temperature (0.0 - 1.0)", modifier = Modifier.padding(horizontal = 8.dp))
+          Slider(
+            value = temp.toFloat(),
+            onValueChange = { newTemperature ->
+              appStateHolder.onAiOptionsChanged(
+                currentOptions.copy(temperature = newTemperature.toDouble())
+              )
+            },
+            valueRange = 0f..1f,
+            modifier = Modifier.padding(horizontal = 8.dp)
+          )
+          Text(
+            text = String.format("%.2f", temp),
+            modifier = Modifier.padding(horizontal = 8.dp)
+          )
+        }
         GroupHeader {
           Text("User Prompt Template")
           IconActionButton(

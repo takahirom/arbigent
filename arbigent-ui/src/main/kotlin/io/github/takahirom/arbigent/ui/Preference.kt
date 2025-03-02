@@ -8,7 +8,7 @@ import com.github.javakeyring.PasswordAccessException
 import kotlin.reflect.KProperty
 
 
-val aiSettingYaml = Yaml(
+val yaml = Yaml(
   configuration = YamlConfiguration(
     encodeDefaults = false,
     strictMode = false,
@@ -19,7 +19,7 @@ val aiSettingYaml = Yaml(
 internal object Preference {
   private var aiSetting: String by KeychainDelegate(
     default = {
-      aiSettingYaml
+      yaml
         .encodeToString(
           serializer = AiSetting.serializer(),
           value = AiSetting(
@@ -30,8 +30,9 @@ internal object Preference {
     }
   )
 
+
   var aiSettingValue: AiSetting
-    get() = aiSettingYaml.decodeFromString(AiSetting.serializer(), aiSetting)
+    get() = yaml.decodeFromString(AiSetting.serializer(), aiSetting)
       .let { savedAiSetting: AiSetting ->
         savedAiSetting.copy(
           aiSettings = savedAiSetting.aiSettings + defaultAiProviderSettings()
@@ -41,8 +42,9 @@ internal object Preference {
         )
       }
     set(value) {
-      aiSetting = aiSettingYaml.encodeToString(AiSetting.serializer(), value)
+      aiSetting = yaml.encodeToString(AiSetting.serializer(), value)
     }
+
 }
 
 private fun defaultAiProviderSettings() = listOf(

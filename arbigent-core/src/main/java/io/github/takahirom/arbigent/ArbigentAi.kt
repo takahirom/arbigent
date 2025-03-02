@@ -18,6 +18,7 @@ public interface ArbigentAi {
     val elements: ArbigentElementList,
     val prompt: ArbigentPrompt,
     val cacheKey: String,
+    val aiOptions: ArbigentAiOptions?,
   )
   @Serializable
   public data class DecisionOutput(

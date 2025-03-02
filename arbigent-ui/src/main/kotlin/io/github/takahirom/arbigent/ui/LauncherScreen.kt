@@ -220,6 +220,7 @@ private fun NormalAiSetting(
       state = modelName,
       modifier = Modifier.padding(8.dp)
     )
+
   }
 }
 

@@ -35,6 +35,7 @@ public data class ChatCompletionRequest(
   val model: String,
   val messages: List<ChatMessage>,
   @SerialName("response_format") val responseFormat: ResponseFormat?,
+  val temperature: Double? = null,
 )
 
 @Serializable
