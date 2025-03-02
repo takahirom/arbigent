@@ -25,7 +25,7 @@ $STEPS
 </STEP>
 
 <UI_STATE>
-Please refer to the image above.
+Please refer to the image.
 <ELEMENTS>
 index:element
 $UI_ELEMENTS

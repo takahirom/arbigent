@@ -94,7 +94,7 @@ Step 2: Another action
 </STEP>
 
 <UI_STATE>
-Please refer to the image above.
+Please refer to the image.
 <ELEMENTS>
 index:element
 
