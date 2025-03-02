@@ -415,11 +415,24 @@ public sealed interface ArbigentAiDecisionCache {
         maxSize: Long = 500 * 1024 * 1024, // 500MB
       ): Disk {
         return runBlocking {
-          val cache = JavaFileKache(directory = ArbigentFiles.cacheDir, maxSize = maxSize) {
-            strategy = KacheStrategy.LRU
-            this.maxSize = maxSize
+          try {
+            ArbigentFiles.cacheDir.mkdirs()
+            val cache = JavaFileKache(directory = ArbigentFiles.cacheDir, maxSize = maxSize) {
+              strategy = KacheStrategy.LRU
+              this.maxSize = maxSize
+            }
+            Disk(cache)
+          } catch (e: Exception) {
+            errorHandler.invoke(e)
+            arbigentErrorLog("Failed to create AI-decision cache: $e. Recovering...")
+            ArbigentFiles.cacheDir.deleteRecursively()
+            ArbigentFiles.cacheDir.mkdirs()
+            val cache = JavaFileKache(directory = ArbigentFiles.cacheDir, maxSize = maxSize) {
+              strategy = KacheStrategy.LRU
+              this.maxSize = maxSize
+            }
+            Disk(cache)
           }
-          Disk(cache)
         }
       }
     }

@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import io.github.takahirom.arbigent.*
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
+import io.github.takahirom.arbigent.ui.components.AiOptionsComponent
 import io.github.takahirom.arbigent.result.StepFeedback
 import io.github.takahirom.arbigent.result.StepFeedbackEvent
 import org.jetbrains.jewel.foundation.theme.JewelTheme
@@ -252,6 +253,17 @@ private fun ScenarioOptions(
       ) {
         Text(dependency?.goal ?: "Select dependency")
       }
+    }
+    Column(
+      modifier = Modifier.padding(8.dp).width(200.dp)
+    ) {
+      GroupHeader("AI Options")
+      val aiOptions by updatedScenarioStateHolder.aiOptionsFlow.collectAsState()
+      val currentOptions = aiOptions ?: ArbigentAiOptions()
+      AiOptionsComponent(
+        currentOptions = currentOptions,
+        onOptionsChanged = updatedScenarioStateHolder::onAiOptionsChanged
+      )
     }
     Column(
       modifier = Modifier.padding(8.dp).width(160.dp)
