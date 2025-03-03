@@ -831,6 +831,11 @@ fun buildSections(tasksToAgent: List<ArbigentTaskAssignment>): List<ScenarioSect
   return sections
 }
 
+private fun formatTimestamp(timestamp: Long): String {
+  val date = java.time.Instant.ofEpochMilli(timestamp)
+  return date.toString().replace('T', ' ').substringBefore('.')
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ContentPanel(
@@ -909,7 +914,7 @@ private fun ContentPanel(
                 modifier = Modifier.fillMaxWidth(),
               ) {
                 Text(
-                  text = "Step ${stepIndex + 1}",
+                  text = "Step ${stepIndex + 1} (${formatTimestamp(step.timestamp)})",
                 )
                 if (step.cacheHit) {
                   Text(
