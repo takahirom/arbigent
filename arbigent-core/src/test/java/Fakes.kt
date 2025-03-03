@@ -8,6 +8,21 @@ import maestro.orchestra.MaestroCommand
 class FakeDevice : ArbigentDevice {
   override fun executeActions(actions: List<MaestroCommand>) {
     arbigentDebugLog("FakeDevice.executeActions: $actions")
+    actions.forEach { command ->
+      val screenshotCommand = command.takeScreenshotCommand
+      if (screenshotCommand != null) {
+        // Construct the correct path in the screenshots directory
+        val screenshotFile = java.io.File(ArbigentFiles.screenshotsDir, "${screenshotCommand.path}.png")
+        screenshotFile.parentFile?.mkdirs()
+        // Create a simple image file to simulate screenshot
+        val image = java.awt.image.BufferedImage(100, 100, java.awt.image.BufferedImage.TYPE_INT_RGB)
+        val graphics = image.createGraphics()
+        graphics.color = java.awt.Color.WHITE
+        graphics.fillRect(0, 0, 100, 100)
+        graphics.dispose()
+        javax.imageio.ImageIO.write(image, "png", screenshotFile)
+      }
+    }
   }
 
   override fun os(): ArbigentDeviceOs {
