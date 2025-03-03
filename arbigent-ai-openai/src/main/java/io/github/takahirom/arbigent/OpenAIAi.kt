@@ -119,7 +119,7 @@ public class OpenAIAi(
     val original = File(screenshotFilePath)
     val canvas = ArbigentCanvas.load(original, elements.screenWidth, TYPE_INT_RGB)
     canvas.draw(elements)
-    canvas.save(original.getAnnotatedFilePath())
+    canvas.save(original.getAnnotatedFilePath(), decisionInput.aiOptions)
 
     val imageBase64 = File(screenshotFilePath).getResizedIamgeBase64(1.0F)
     val prompt =
@@ -150,7 +150,7 @@ public class OpenAIAi(
           Content(
             type = "image_url",
             imageUrl = ImageUrl(
-              url = "data:image/png;base64,$imageBase64",
+              url = "data:${decisionInput.aiOptions?.imageFormat?.mimeType ?: ImageFormat.PNG.mimeType};base64,$imageBase64",
               detail = imageDetail
             )
           ),

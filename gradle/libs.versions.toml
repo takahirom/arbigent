@@ -13,6 +13,7 @@ ktor = "2.3.11"
 kotlinx-serialization = "1.6.3"
 kotlinx-coroutines = "1.6.0"
 kotlinx-io = "0.3.3"
+webpImageio = "0.3.3"
 identityJvm = "202411.1"
 
 [libraries]
@@ -37,9 +38,9 @@ ktor-serialization-gson = { module = "io.ktor:ktor-serialization-gson", version.
 ktor-serialization-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
 kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.ref = "kotlinx-io" }
 identity-jvm = { group = "com.android.identity", name = "identity-jvm", version.ref = "identityJvm" }
+webp-imageio = { module = "io.github.darkxanter:webp-imageio", version.ref = "webpImageio" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 buildconfig = { id = "com.github.gmazzo.buildconfig", version = "5.5.1" }
-

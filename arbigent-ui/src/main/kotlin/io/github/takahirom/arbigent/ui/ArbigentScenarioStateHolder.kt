@@ -137,6 +137,10 @@ constructor(
   }
 
   fun onAiOptionsChanged(options: ArbigentAiOptions?) {
+    if (options?.imageFormat == null && options?.imageDetail == null && options?.temperature == null) {
+      _aiOptions.value = null
+      return
+    }
     _aiOptions.value = options
   }
 
