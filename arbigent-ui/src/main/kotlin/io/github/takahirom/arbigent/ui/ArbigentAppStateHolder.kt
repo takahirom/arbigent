@@ -161,9 +161,9 @@ class ArbigentAppStateHolder(
     allScenarioStateHolder.map { it.createArbigentScenarioContent() }
       .createArbigentScenario(
         projectSettings = ArbigentProjectSettings(
-          promptFlow.value,
-          cacheStrategyFlow.value,
-          aiOptionsFlow.value
+          this@ArbigentAppStateHolder.promptFlow.value,
+          this@ArbigentAppStateHolder.cacheStrategyFlow.value,
+          this@ArbigentAppStateHolder.aiOptionsFlow.value
         ),
         scenario = createArbigentScenarioContent(),
         aiFactory = aiFactory,
@@ -364,6 +364,10 @@ class ArbigentAppStateHolder(
   }
 
   fun onAiOptionsChanged(options: ArbigentAiOptions?) {
+    if (options?.imageFormat == null && options?.imageDetail == null && options?.temperature == null) {
+      aiOptionsFlow.value = null
+      return
+    }
     aiOptionsFlow.value = options
   }
 

@@ -31,9 +31,6 @@ class ArbigentAgentExecutorTest {
     // Verify cache key format
     val cacheKey = assertNotNull(cacheKeyCapture.capturedCacheKey, "Cache key should not be null")
 
-    // Log for debugging
-    println("[DEBUG_LOG] Generated cache key: $cacheKey")
-
     // Verify essential components are present and in correct order
     val keyPattern = Regex("v.+?-uitree-[^-]+-context-[^-]+")
     assertTrue(cacheKey.matches(keyPattern), 

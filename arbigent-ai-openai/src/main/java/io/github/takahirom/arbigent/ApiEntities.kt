@@ -75,12 +75,15 @@ public data class Content(
 
 @Serializable
 public data class ImageUrl(
-  val url: String
+  val url: String,
+  val detail: String? = null
 )
 
 @Serializable
 public data class Usage(
   @SerialName("completion_tokens") val completionTokens: Int? = null,
+  @SerialName("prompt_tokens") val promptTokens: Int? = null,
+  @SerialName("total_tokens") val totalTokens: Int? = null
 )
 
 @Serializable

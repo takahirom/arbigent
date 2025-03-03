@@ -45,9 +45,50 @@ public data class ArbigentContentTag(
 )
 
 @Serializable
+public enum class ImageDetailLevel {
+  @SerialName("high")
+  HIGH,
+  @SerialName("low")
+  LOW
+}
+
+@Serializable
+public enum class ImageFormat {
+  @SerialName("png")
+  PNG,
+  @SerialName("webp")
+  WEBP,
+  @SerialName("lossy_webp")
+  LOSSY_WEBP;
+
+  public val fileExtension: String
+    get() = when (this) {
+      PNG -> "png"
+      WEBP, LOSSY_WEBP -> "webp"
+    }
+
+  public val mimeType: String
+    get() = when (this) {
+      PNG -> "image/png"
+      WEBP, LOSSY_WEBP -> "image/webp"
+    }
+}
+
+@Serializable
 public data class ArbigentAiOptions(
-  public val temperature: Double? = null
-)
+  public val temperature: Double? = null,
+  public val imageDetail: ImageDetailLevel? = null,
+  public val imageFormat: ImageFormat? = null
+) {
+  public fun mergeWith(other: ArbigentAiOptions?): ArbigentAiOptions {
+    if (other == null) return this
+    return ArbigentAiOptions(
+      temperature = other.temperature ?: temperature,
+      imageDetail = other.imageDetail ?: imageDetail,
+      imageFormat = other.imageFormat ?: imageFormat
+    )
+  }
+}
 
 @Serializable
 public data class ArbigentProjectSettings(
@@ -126,7 +167,7 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
           ),
           aiDecisionCache = aiDecisionCache
         ).apply {
-          aiOptions(nodeScenario.aiOptions ?: projectSettings.aiOptions)
+          aiOptions(projectSettings.aiOptions?.mergeWith(nodeScenario.aiOptions) ?: nodeScenario.aiOptions)
           ai(aiFactory())
           deviceFactory(deviceFactory)
         }.build(),

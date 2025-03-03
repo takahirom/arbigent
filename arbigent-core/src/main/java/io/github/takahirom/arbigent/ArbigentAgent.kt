@@ -22,6 +22,7 @@ import maestro.MaestroException
 import maestro.orchestra.*
 import org.mobilenativefoundation.store.cache5.CacheBuilder
 import java.io.File
+import javax.imageio.ImageIO
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 
@@ -190,7 +191,13 @@ public class ArbigentAgent(
       device = device,
       ai = ai,
       aiOptions = aiOptions,
-      createContextHolder = { g, m -> ArbigentContextHolder(g, m, userPromptTemplate = UserPromptTemplate(prompt.userPromptTemplate)) },
+      createContextHolder = { g, m ->
+        ArbigentContextHolder(
+          g,
+          m,
+          userPromptTemplate = UserPromptTemplate(prompt.userPromptTemplate)
+        )
+      },
       addContextHolder = { holder ->
         arbigentContextHolderStateFlow.value = holder
         arbigentContextHistoryStateFlow.value += holder
@@ -207,7 +214,7 @@ public class ArbigentAgent(
     when (executeChain(executeInput)) {
       ExecutionResult.Success -> arbigentDebugLog("Execution succeeded.")
       is ExecutionResult.Failed -> arbigentDebugLog("Execution failed.")
-      ExecutionResult.Cancelled -> arbigentDebugLog("Execution cancelled.")
+      is ExecutionResult.Cancelled -> arbigentDebugLog("Execution cancelled.")
     }
   }
 
@@ -234,7 +241,7 @@ public class ArbigentAgent(
   public sealed interface ExecutionResult {
     public object Success : ExecutionResult
     public data class Failed(val contextHolder: ArbigentContextHolder?) : ExecutionResult
-    public object Cancelled : ExecutionResult
+    public data class Cancelled(val contextHolder: ArbigentContextHolder?) : ExecutionResult
   }
 
   public data class StepInput(
@@ -399,8 +406,9 @@ public sealed interface ArbigentAiDecisionCache {
       cache.put(key, { file ->
         file.writeText(
           json.encodeToString(
-          value
-        ))
+            value
+          )
+        )
         true
       })
     }
@@ -622,11 +630,13 @@ public fun AgentConfigBuilder(
         }
         arbigentDebugLog("AI-decision cache miss with view tree and prompt")
         val output = chain.proceed(decisionInput)
-        aiDecisionCache.set(decisionInput.cacheKey, output.copy(
-          step = output.step.copy(
-            cacheHit = true,
+        aiDecisionCache.set(
+          decisionInput.cacheKey, output.copy(
+            step = output.step.copy(
+              cacheHit = true,
+            )
           )
-        ))
+        )
         return output
       }
 
@@ -644,7 +654,14 @@ public fun AgentConfigBuilder(
             }
           }
 
-          ExecutionResult.Cancelled,
+          is ExecutionResult.Cancelled -> {
+            output.contextHolder?.let { contextHolder ->
+              contextHolder.steps().forEach { step ->
+                aiDecisionCache.remove(step.cacheKey)
+              }
+            }
+          }
+
           ExecutionResult.Success -> {
           }
         }
@@ -843,6 +860,7 @@ private fun executeActions(
 }
 
 private suspend fun executeDefault(input: ExecuteInput): ExecutionResult {
+  val nullableContextHolder: ArbigentContextHolder? = null
   try {
     input.updateIsRunning(true)
     input.updateCurrentGoal(input.goal)
@@ -883,7 +901,7 @@ private suspend fun executeDefault(input: ExecuteInput): ExecutionResult {
     }
   } catch (e: CancellationException) {
     ArbigentGlobalStatus.onCanceled()
-    return ExecutionResult.Cancelled
+    return ExecutionResult.Cancelled(nullableContextHolder)
   } catch (e: Exception) {
     errorHandler(e)
     ArbigentGlobalStatus.onError(e)
@@ -931,13 +949,35 @@ private suspend fun step(
   val contextHash = contextHolder.context().hashCode().toString().replace("-", "")
   val cacheKey = "v${BuildConfig.VERSION_NAME}-uitree-${uiTreeHash}-context-${contextHash}"
   arbigentInfoLog("cacheKey: $cacheKey")
-  arbigentInfoLog("  BuildConfig.VERSION_NAME: ${BuildConfig.VERSION_NAME}")
-  arbigentInfoLog("  prompt: ${contextHolder.context()}")
-  arbigentInfoLog("  uiTreeStrings.optimizedTreeString: ${uiTreeStrings.optimizedTreeString}")
-  arbigentInfoLog("  uiTreeHash: $uiTreeHash")
-  arbigentInfoLog("  contextHash: $contextHash")
-  val screenshotFilePath =
+  val originalScreenshotFilePath =
     ArbigentFiles.screenshotsDir.absolutePath + File.separator + "$stepId.png"
+  if (File(originalScreenshotFilePath).exists().not()) {
+    arbigentErrorLog("Failed to take screenshot. originalScreenshotFilePath:$originalScreenshotFilePath")
+    contextHolder.addStep(
+      ArbigentContextHolder.Step(
+        stepId = stepId,
+        feedback = "Failed to take screenshot.",
+        cacheKey = cacheKey,
+        screenshotFilePath = originalScreenshotFilePath
+      )
+    )
+    return StepResult.Failed
+  }
+  val imageFormat = stepInput.aiOptions?.imageFormat ?: ImageFormat.PNG
+  val screenshotFilePath = if (imageFormat == ImageFormat.PNG) {
+    originalScreenshotFilePath
+  } else {
+    val convertedScreenshotFilePath =
+      ArbigentFiles.screenshotsDir.absolutePath + File.separator + "$stepId.webp"
+    val file = File(originalScreenshotFilePath)
+    val image = ImageIO.read(file)
+    ArbigentImageEncoder.saveImage(
+      image,
+      convertedScreenshotFilePath,
+      ImageFormat.WEBP
+    )
+    convertedScreenshotFilePath
+  }
   val decisionJsonlFilePath =
     ArbigentFiles.jsonlsDir.absolutePath + File.separator + "$stepId.jsonl"
   val lastScreenshot = contextHolder.steps().lastOrNull()?.screenshotFilePath

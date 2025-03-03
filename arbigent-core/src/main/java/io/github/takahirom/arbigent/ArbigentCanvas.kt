@@ -151,8 +151,12 @@ public class ArbigentCanvas(width: Int, height: Int, bufferedImageType: Int) {
     TextLayout(text, graphics2D.font, frc)
   }
 
-  public fun save(screenshotFilePath: String) {
-    ImageIO.write(bufferedImage, "png", File(screenshotFilePath))
+  public fun save(screenshotFilePath: String, aiOptions: ArbigentAiOptions? = null) {
+    ArbigentImageEncoder.saveImage(
+      image = bufferedImage,
+      filePath = screenshotFilePath,
+      format = aiOptions?.imageFormat ?: ImageFormat.PNG
+    )
   }
 
   public companion object {

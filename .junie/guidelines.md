@@ -41,7 +41,8 @@ arbigent/
 ### Testing
 #### Key Testing Practices
 - Use Kotlin test framework with coroutines (`runTest`, `advanceUntilIdle`)
-- Write unit tests for core components
+- Prefer Integration tests over Unit tests to reduce test maintenance overhead
+- Write unit tests for core complex components
 - Test YAML configurations and backward compatibility
 - Implement fake objects (FakeDevice, FakeAi) for dependencies
 

@@ -155,6 +155,55 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
                 closeProjectSettingsDialog()
               }
             }
+
+            describe("Image Detail Settings") {
+              doIt {
+                openProjectSettings()
+              }
+
+              describe("when checking initial state") {
+                itShould("have image detail checkbox disabled") {
+                  assertImageDetailCheckboxExists()
+                  assertImageDetailDisabled()
+                  capture(it)
+                }
+              }
+
+              describe("when enabling image detail") {
+                doIt {
+                  clickImageDetailCheckbox()
+                }
+
+                itShould("show enabled state with dropdown") {
+                  assertImageDetailEnabled()
+                  capture(it)
+                }
+
+                describe("when selecting detail levels") {
+                  doIt {
+                    openImageDetailLevelDropdown()
+                  }
+
+                  itShould("show both high and low options") {
+                    assertImageDetailLevelExists("high")
+                    assertImageDetailLevelExists("low")
+                    capture(it)
+                  }
+
+                  describe("when changing detail levels") {
+                    doIt {
+                      clickImageDetailLevel("high")
+                      clickImageDetailLevel("low")
+                    }
+
+                    itShould("apply the changes") {
+                      capture(it)
+                      closeProjectSettingsDialog()
+                    }
+                  }
+                }
+              }
+            }
           }
           describe("when enter goals and run") {
             doIt {
@@ -529,12 +578,120 @@ class TestRobot(
       .assertTextContains(expectedText)
   }
 
+  fun assertImageDetailCheckboxExists() {
+    composeUiTest
+      .onNode(hasTestTag("image_detail_checkbox"))
+      .assertExists()
+      .assertIsToggleable()
+  }
+
+  fun assertImageDetailCheckboxIsOff() {
+    composeUiTest
+      .onNode(hasTestTag("image_detail_checkbox"))
+      .assertIsOff()
+  }
+
+  fun assertImageDetailCheckboxIsOn() {
+    composeUiTest
+      .onNode(hasTestTag("image_detail_checkbox"))
+      .assertIsOn()
+  }
+
+  fun clickImageDetailCheckbox() {
+    composeUiTest
+      .onNode(hasTestTag("image_detail_checkbox"))
+      .performClick()
+    waitALittle()
+  }
+
+  fun openImageDetailLevelDropdown() {
+    composeUiTest
+      .onNode(hasTestTag("image_detail_level_combo"))
+      .assertExists()
+      .performClick()
+    waitALittle()
+  }
+
+  private fun waitForNode(matcher: SemanticsMatcher) {
+    composeUiTest.waitUntil(timeoutMillis = 2000) {
+      try {
+        composeUiTest.onNode(matcher, useUnmergedTree = true).assertExists()
+        true
+      } catch (e: AssertionError) {
+        false
+      }
+    }
+  }
+
+  private fun verifyDropdownIsOpen() {
+    waitForNode(hasTestTag("image_detail_level_item_high"))
+  }
+
+  private fun ensureDropdownIsOpen() {
+    try {
+      verifyDropdownIsOpen()
+    } catch (e: AssertionError) {
+      openImageDetailLevelDropdown()
+      verifyDropdownIsOpen()
+    }
+  }
+
+  fun assertImageDetailLevelExists(level: String) {
+    ensureDropdownIsOpen()
+    waitForNode(hasTestTag("image_detail_level_item_${level.lowercase()}"))
+  }
+
+  fun clickImageDetailLevel(level: String) {
+    val levelLower = level.lowercase()
+    ensureDropdownIsOpen()
+    waitForNode(hasTestTag("image_detail_level_item_$levelLower"))
+
+    composeUiTest
+      .onNode(hasTestTag("image_detail_level_item_$levelLower"), useUnmergedTree = true)
+      .performClick()
+    waitALittle()
+
+    waitForNode(hasTestTag("image_detail_level_combo"))
+    composeUiTest
+      .onNode(hasTestTag("image_detail_level_combo"))
+      .assertTextContains(levelLower)
+  }
+
+  fun assertImageDetailEnabled() {
+    assertImageDetailCheckboxIsOn()
+    composeUiTest
+      .onNode(hasTestTag("image_detail_level_combo"))
+      .assertExists()
+  }
+
+  fun assertImageDetailDisabled() {
+    assertImageDetailCheckboxIsOff()
+    composeUiTest
+      .onNode(hasTestTag("image_detail_level_combo"))
+      .assertDoesNotExist()
+  }
+
 }
 
 class FakeDevice : ArbigentDevice {
   private val actionHistory = mutableListOf<MaestroCommand>()
   override fun executeActions(actions: List<MaestroCommand>) {
     arbigentDebugLog("FakeDevice.executeActions: $actions")
+    actions.forEach { command ->
+      val screenshotCommand = command.takeScreenshotCommand
+      if (screenshotCommand != null) {
+        // Construct the correct path in the screenshots directory
+        val screenshotFile = java.io.File(ArbigentFiles.screenshotsDir, "${screenshotCommand.path}.png")
+        screenshotFile.parentFile?.mkdirs()
+        // Create a simple image file to simulate screenshot
+        val image = java.awt.image.BufferedImage(100, 100, java.awt.image.BufferedImage.TYPE_INT_RGB)
+        val graphics = image.createGraphics()
+        graphics.color = java.awt.Color.WHITE
+        graphics.fillRect(0, 0, 100, 100)
+        graphics.dispose()
+        javax.imageio.ImageIO.write(image, "png", screenshotFile)
+      }
+    }
     actionHistory.addAll(actions)
   }
 
