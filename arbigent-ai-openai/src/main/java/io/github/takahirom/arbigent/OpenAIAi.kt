@@ -49,7 +49,7 @@ public class OpenAIAi(
     header("Authorization", "Bearer $apiKey")
   },
   @property:ArbigentInternalApi
-  public val loggingEnabled: Boolean = true,
+  public val loggingEnabled: Boolean = false,
   private val openAiImageAssertionModel: OpenAiAiAssertionModel = OpenAiAiAssertionModel(
     apiKey = apiKey,
     baseUrl = baseUrl,
