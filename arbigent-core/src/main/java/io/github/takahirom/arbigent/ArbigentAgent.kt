@@ -969,13 +969,15 @@ private suspend fun step(
   } else {
     val convertedScreenshotFilePath =
       ArbigentFiles.screenshotsDir.absolutePath + File.separator + "$stepId.webp"
-    val file = File(originalScreenshotFilePath)
-    val image = ImageIO.read(file)
+    val originalFile = File(originalScreenshotFilePath)
+    val originalImage = ImageIO.read(originalFile)
     ArbigentImageEncoder.saveImage(
-      image,
+      originalImage,
       convertedScreenshotFilePath,
       ImageFormat.WEBP
     )
+    originalFile.delete()
+    originalImage.flush()
     convertedScreenshotFilePath
   }
   val decisionJsonlFilePath =
