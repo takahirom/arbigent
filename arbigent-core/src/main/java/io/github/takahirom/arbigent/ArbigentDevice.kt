@@ -80,6 +80,7 @@ public data class ArbigentElement(
     public fun centerX(): Int = (left + right) / 2
     public fun centerY(): Int = (top + bottom) / 2
   }
+
   public data class IdentifierData(
     val identifier: List<Any>,
     val index: Int
@@ -194,9 +195,10 @@ public class MaestroDevice(
   init {
     arbigentInfoLog("MaestroDevice created: screenshotsDir:${screenshotsDir.absolutePath}")
   }
+
   private val orchestra = Orchestra(
     maestro = maestro,
-    screenshotsDir = screenshotsDir
+    screenshotsDir = screenshotsDir,
   )
 
   override fun deviceName(): String {
@@ -375,7 +377,8 @@ public class MaestroDevice(
     while (remainCount-- > 0) {
       val currentFocus = findCurrentFocus()
         ?: throw IllegalStateException("No focused node")
-      val targetBounds = fetchTarget() ?: throw IllegalStateException("Attempted to move to element but missed the target bounds")
+      val targetBounds =
+        fetchTarget() ?: throw IllegalStateException("Attempted to move to element but missed the target bounds")
       val currentBounds = currentFocus.toUiElement().bounds
 
       // Helper functions to calculate the center X and Y of a Bounds object.
@@ -681,7 +684,8 @@ public fun TreeNode.optimizeTree2(
   fun isIncludeView(node: TreeNode): Boolean {
     val isOkResourceId = run {
       val resourceId = node.attributes["resource-id"] ?: return@run true
-      val hasNotNeededId = resourceId.contains("status_bar_container") || resourceId.contains("status_bar_launch_animation_container")
+      val hasNotNeededId =
+        resourceId.contains("status_bar_container") || resourceId.contains("status_bar_launch_animation_container")
       !hasNotNeededId
     }
     val isVisibleRectView = node.toUiElementOrNull()?.bounds?.let {
@@ -689,6 +693,7 @@ public fun TreeNode.optimizeTree2(
     } ?: true
     return isOkResourceId && isVisibleRectView
   }
+
   fun isMeaningfulViewDfs(node: TreeNode): Boolean {
     if (node.isMeaningfulView()) {
       return true

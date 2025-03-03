@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import io.github.takahirom.arbigent.ArbigentAiOptions
 import io.github.takahirom.arbigent.ImageDetailLevel
+import io.github.takahirom.arbigent.ImageFormat
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.*
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
@@ -119,6 +120,58 @@ fun AiOptionsComponent(
                                 },
                             style = JewelTheme.simpleListItemStyle,
                             contentDescription = item.name.lowercase()
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    Row(
+        modifier = Modifier.padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(
+            checked = updatedOptions.imageFormat != null,
+            onCheckedChange = { enabled: Boolean ->
+                updatedOptionsChanged(
+                    updatedOptions.copy(imageFormat = if (enabled) ImageFormat.PNG else null)
+                )
+            },
+            modifier = Modifier.testTag("image_format_checkbox")
+        )
+        Text("Use Custom Format", modifier = Modifier.padding(start = 8.dp))
+    }
+    if (updatedOptions.imageFormat != null) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Image Format", modifier = Modifier.padding(end = 8.dp))
+            ComboBox(
+                labelText = updatedOptions.imageFormat?.name?.lowercase()?.replace("_", " ") ?: "png",
+                maxPopupHeight = 150.dp,
+                modifier = Modifier
+                    .width(150.dp)
+                    .testTag("image_format_combo")
+            ) {
+                Column {
+                    listOf(ImageFormat.PNG, ImageFormat.WEBP, ImageFormat.LOSSY_WEBP).forEach { item ->
+                        val isSelected = item == updatedOptions.imageFormat
+                        val isItemHovered = false
+                        val isPreviewSelection = false
+                        SimpleListItem(
+                            text = item.name.lowercase().replace("_", " "),
+                            state = ListItemState(isSelected, isItemHovered, isPreviewSelection),
+                            modifier = Modifier
+                                .testTag("image_format_item_${item.name.lowercase()}")
+                                .clickable {
+                                    updatedOptionsChanged(
+                                        updatedOptions.copy(imageFormat = item)
+                                    )
+                                },
+                            style = JewelTheme.simpleListItemStyle,
+                            contentDescription = item.name.lowercase().replace("_", " ")
                         )
                     }
                 }

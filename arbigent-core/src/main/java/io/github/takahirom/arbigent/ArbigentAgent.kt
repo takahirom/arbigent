@@ -22,6 +22,7 @@ import maestro.MaestroException
 import maestro.orchestra.*
 import org.mobilenativefoundation.store.cache5.CacheBuilder
 import java.io.File
+import javax.imageio.ImageIO
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 
@@ -948,8 +949,35 @@ private suspend fun step(
   val contextHash = contextHolder.context().hashCode().toString().replace("-", "")
   val cacheKey = "v${BuildConfig.VERSION_NAME}-uitree-${uiTreeHash}-context-${contextHash}"
   arbigentInfoLog("cacheKey: $cacheKey")
-  val screenshotFilePath =
+  val originalScreenshotFilePath =
     ArbigentFiles.screenshotsDir.absolutePath + File.separator + "$stepId.png"
+  if (File(originalScreenshotFilePath).exists().not()) {
+    arbigentErrorLog("Failed to take screenshot. originalScreenshotFilePath:$originalScreenshotFilePath")
+    contextHolder.addStep(
+      ArbigentContextHolder.Step(
+        stepId = stepId,
+        feedback = "Failed to take screenshot.",
+        cacheKey = cacheKey,
+        screenshotFilePath = originalScreenshotFilePath
+      )
+    )
+    return StepResult.Failed
+  }
+  val imageFormat = stepInput.aiOptions?.imageFormat ?: ImageFormat.PNG
+  val screenshotFilePath = if (imageFormat == ImageFormat.PNG) {
+    originalScreenshotFilePath
+  } else {
+    val convertedScreenshotFilePath =
+      ArbigentFiles.screenshotsDir.absolutePath + File.separator + "$stepId.webp"
+    val file = File(originalScreenshotFilePath)
+    val image = ImageIO.read(file)
+    ArbigentImageEncoder.saveImage(
+      image,
+      convertedScreenshotFilePath,
+      ImageFormat.WEBP
+    )
+    convertedScreenshotFilePath
+  }
   val decisionJsonlFilePath =
     ArbigentFiles.jsonlsDir.absolutePath + File.separator + "$stepId.jsonl"
   val lastScreenshot = contextHolder.steps().lastOrNull()?.screenshotFilePath
