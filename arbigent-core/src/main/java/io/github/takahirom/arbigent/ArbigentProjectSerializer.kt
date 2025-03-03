@@ -45,8 +45,17 @@ public data class ArbigentContentTag(
 )
 
 @Serializable
+public enum class ImageDetailLevel {
+  @SerialName("high")
+  HIGH,
+  @SerialName("low")
+  LOW
+}
+
+@Serializable
 public data class ArbigentAiOptions(
-  public val temperature: Double? = null
+  public val temperature: Double? = null,
+  public val imageDetail: ImageDetailLevel? = null
 )
 
 @Serializable

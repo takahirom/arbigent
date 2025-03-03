@@ -161,9 +161,9 @@ class ArbigentAppStateHolder(
     allScenarioStateHolder.map { it.createArbigentScenarioContent() }
       .createArbigentScenario(
         projectSettings = ArbigentProjectSettings(
-          promptFlow.value,
-          cacheStrategyFlow.value,
-          aiOptionsFlow.value
+          this@ArbigentAppStateHolder.promptFlow.value,
+          this@ArbigentAppStateHolder.cacheStrategyFlow.value,
+          this@ArbigentAppStateHolder.aiOptionsFlow.value
         ),
         scenario = createArbigentScenarioContent(),
         aiFactory = aiFactory,

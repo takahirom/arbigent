@@ -1,11 +1,8 @@
 package io.github.takahirom.arbigent
 
-import com.github.takahirom.roborazzi.AiAssertionOptions
+import com.github.takahirom.roborazzi.*
 import com.github.takahirom.roborazzi.AiAssertionOptions.AiAssertionModel.TargetImage
 import com.github.takahirom.roborazzi.AiAssertionOptions.AiAssertionModel.TargetImages
-import com.github.takahirom.roborazzi.AnySerializer
-import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
-import com.github.takahirom.roborazzi.OpenAiAiAssertionModel
 import io.github.takahirom.arbigent.ConfidentialInfo.removeConfidentialInfo
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import io.ktor.client.HttpClient
@@ -52,7 +49,7 @@ public class OpenAIAi(
     header("Authorization", "Bearer $apiKey")
   },
   @property:ArbigentInternalApi
-  public val loggingEnabled: Boolean = false,
+  public val loggingEnabled: Boolean = true,
   private val openAiImageAssertionModel: OpenAiAiAssertionModel = OpenAiAiAssertionModel(
     apiKey = apiKey,
     baseUrl = baseUrl,
@@ -127,6 +124,8 @@ public class OpenAIAi(
     val imageBase64 = File(screenshotFilePath).getResizedIamgeBase64(1.0F)
     val prompt =
       buildPrompt(contextHolder, uiTreeStrings.optimizedTreeString, focusedTree, agentActionTypes, elements)
+    val imageDetail = decisionInput.aiOptions?.imageDetail?.name?.lowercase()
+    arbigentDebugLog { "AI imageDetailOption: $imageDetail" }
     val messages: List<ChatMessage> = listOf(
       ChatMessage(
         role = "system",
@@ -151,7 +150,8 @@ public class OpenAIAi(
           Content(
             type = "image_url",
             imageUrl = ImageUrl(
-              url = "data:image/png;base64,$imageBase64"
+              url = "data:image/png;base64,$imageBase64",
+              detail = imageDetail
             )
           ),
           Content(
@@ -251,6 +251,9 @@ public class OpenAIAi(
     val screenshotFilePath = decisionInput.screenshotFilePath
     val elements = decisionInput.elements
     val agentActionList = decisionInput.agentActionTypes
+    arbigentInfoLog {
+      "AI usage: ${chatCompletionResponse.usage}"
+    }
 
     val content = chatCompletionResponse.choices.firstOrNull()?.message?.content ?: ""
     return try {
