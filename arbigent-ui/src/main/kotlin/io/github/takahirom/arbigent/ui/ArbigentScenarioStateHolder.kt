@@ -29,6 +29,9 @@ constructor(
   private val _aiOptions = MutableStateFlow<ArbigentAiOptions?>(null)
   val aiOptionsFlow: StateFlow<ArbigentAiOptions?> = _aiOptions
 
+  private val _cacheOptions = MutableStateFlow(ArbigentScenarioCacheOptions())
+  val cacheOptionsFlow: StateFlow<ArbigentScenarioCacheOptions> = _cacheOptions
+
   val goalState = TextFieldState("")
   val goal get() = goalState.text.toString()
   val noteForHumans = TextFieldState("")
@@ -144,6 +147,10 @@ constructor(
     _aiOptions.value = options
   }
 
+  fun onCacheOptionsChanged(options: ArbigentScenarioCacheOptions) {
+    _cacheOptions.value = options
+  }
+
   fun createArbigentScenarioContent(): ArbigentScenarioContent {
     return ArbigentScenarioContent(
       id = id,
@@ -163,7 +170,8 @@ constructor(
         ?: 1,
       imageAssertions = imageAssertionsStateFlow.value.filter { it.assertionPrompt.isNotBlank() },
       userPromptTemplate = userUserPromptTemplateState.text.toString(),
-      aiOptions = _aiOptions.value
+      aiOptions = aiOptionsFlow.value,
+      cacheOptions = cacheOptionsFlow.value
     )
   }
 
@@ -193,6 +201,7 @@ constructor(
     deviceFormFactorStateFlow.value = scenarioContent.deviceFormFactor
     scenarioTypeStateFlow.value = scenarioContent.type
     _aiOptions.value = scenarioContent.aiOptions
+    _cacheOptions.value = scenarioContent.cacheOptions ?: ArbigentScenarioCacheOptions()
   }
 
   fun onRemoveInitializationMethod(index: Int) {
