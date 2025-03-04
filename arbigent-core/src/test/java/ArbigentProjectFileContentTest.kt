@@ -100,7 +100,7 @@ class ArbigentProjectFileContentTest {
       scenario = oldInitializeProject.scenarioContents[0],
       aiFactory = { FakeAi() },
       deviceFactory = { FakeDevice() },
-      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
+      aiDecisionCache = ArbigentAiDecisionCache.Disabled
     ).agentTasks
     assertEquals(1, firstTask.size)
 
@@ -170,6 +170,56 @@ Previous steps:
         temperature: 0.5
     """
   )
+
+  private val projectWithCacheOptions = ArbigentProjectSerializer().load(
+    """
+    scenarios:
+    - id: "cache-enabled"
+      goal: "Test cache enabled"
+      cacheOptions:
+        overrideCacheEnabled: true
+    - id: "cache-disabled"
+      goal: "Test cache disabled"
+      cacheOptions:
+        overrideCacheEnabled: false
+    - id: "cache-default"
+      goal: "Test default cache"
+    """
+  )
+
+  @Test
+  fun testCacheOptions() {
+    // Test scenario with cache enabled
+    // Test scenario with cache override enabled
+    val scenarioWithCacheEnabled = projectWithCacheOptions.scenarioContents.createArbigentScenario(
+      projectSettings = ArbigentProjectSettings(),
+      scenario = projectWithCacheOptions.scenarioContents[0],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
+    )
+    assertEquals(true, scenarioWithCacheEnabled.cacheOptions.overrideCacheEnabled, "Cache override should be enabled")
+
+    // Test scenario with cache override disabled
+    val scenarioWithCacheDisabled = projectWithCacheOptions.scenarioContents.createArbigentScenario(
+      projectSettings = ArbigentProjectSettings(),
+      scenario = projectWithCacheOptions.scenarioContents[1],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
+    )
+    assertEquals(false, scenarioWithCacheDisabled.cacheOptions.overrideCacheEnabled, "Cache override should be disabled")
+
+    // Test scenario with default cache settings
+    val scenarioWithDefaultCache = projectWithCacheOptions.scenarioContents.createArbigentScenario(
+      projectSettings = ArbigentProjectSettings(),
+      scenario = projectWithCacheOptions.scenarioContents[2],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
+    )
+    assertEquals(null, scenarioWithDefaultCache.cacheOptions.overrideCacheEnabled, "Cache override should be null by default")
+  }
 
   @Test
   fun testAiOptions() {

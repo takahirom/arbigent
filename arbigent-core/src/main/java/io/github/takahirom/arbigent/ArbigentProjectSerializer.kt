@@ -165,7 +165,8 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
             nodeScenario.imageAssertions,
             nodeScenario.imageAssertionHistoryCount
           ),
-          aiDecisionCache = aiDecisionCache
+          aiDecisionCache = aiDecisionCache,
+          cacheOptions = nodeScenario.cacheOptions ?: ArbigentScenarioCacheOptions()
         ).apply {
           aiOptions(projectSettings.aiOptions?.mergeWith(nodeScenario.aiOptions) ?: nodeScenario.aiOptions)
           ai(aiFactory())
@@ -184,7 +185,7 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
     tags = scenario.tags,
     deviceFormFactor = scenario.deviceFormFactor,
     isLeaf = this.none { it.dependencyId == scenario.id },
-    cacheOptions = scenario.cacheOptions ?: ArbigentScenarioCacheOptions()
+    cacheOptions = scenario.cacheOptions
   )
 }
 

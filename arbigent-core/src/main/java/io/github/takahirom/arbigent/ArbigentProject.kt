@@ -122,7 +122,7 @@ public data class ArbigentScenario(
   // Leaf means that the scenario does not have any dependant scenarios.
   // Even if we only run leaf scenarios, we can run all scenarios.
   val isLeaf: Boolean,
-  val cacheOptions: ArbigentScenarioCacheOptions = ArbigentScenarioCacheOptions(),
+  val cacheOptions: ArbigentScenarioCacheOptions? = null,
 ) {
   public fun goal(): String? {
     return agentTasks.lastOrNull()?.goal
