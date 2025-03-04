@@ -20,7 +20,7 @@ dependencies {
   api("io.github.takahirom.roborazzi:roborazzi-core:1.41.0")
   implementation(libs.kotlinx.coroutines.core)
   implementation(libs.ktor.serialization.json)
-  implementation(libs.ktor.client.cio)
+  implementation(libs.ktor.client.okhttp)
   implementation(libs.ktor.client.logging)
   implementation(libs.ktor.client.contentnegotiation)
   implementation(libs.kotlinx.io.core)

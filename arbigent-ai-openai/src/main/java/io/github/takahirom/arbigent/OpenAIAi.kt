@@ -6,6 +6,7 @@ import com.github.takahirom.roborazzi.AiAssertionOptions.AiAssertionModel.Target
 import io.github.takahirom.arbigent.ConfidentialInfo.removeConfidentialInfo
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import io.ktor.client.HttpClient
+import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.HttpTimeout.Plugin.INFINITE_TIMEOUT_MS
@@ -34,6 +35,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.modules.SerializersModule
+import okhttp3.OkHttpClient
 import java.awt.image.BufferedImage.TYPE_INT_RGB
 import java.io.File
 import java.nio.charset.Charset
@@ -50,15 +52,7 @@ public class OpenAIAi(
   },
   @property:ArbigentInternalApi
   public val loggingEnabled: Boolean = false,
-  private val openAiImageAssertionModel: OpenAiAiAssertionModel = OpenAiAiAssertionModel(
-    apiKey = apiKey,
-    baseUrl = baseUrl,
-    modelName = modelName,
-    loggingEnabled = loggingEnabled,
-    requestBuilderModifier = requestBuilderModifier,
-    seed = null
-  ),
-  private val httpClient: HttpClient = HttpClient {
+  private val httpClient: HttpClient = HttpClient(OkHttp) {
     install(HttpRequestRetry) {
       maxRetries = 3
       exponentialDelay()
@@ -98,6 +92,15 @@ public class OpenAIAi(
       }
     }
   },
+  private val openAiImageAssertionModel: OpenAiAiAssertionModel = OpenAiAiAssertionModel(
+    apiKey = apiKey,
+    baseUrl = baseUrl,
+    modelName = modelName,
+    loggingEnabled = loggingEnabled,
+    requestBuilderModifier = requestBuilderModifier,
+    seed = null,
+    httpClient = httpClient
+  ),
 ) : ArbigentAi {
   init {
     ConfidentialInfo.addStringToBeRemoved(apiKey)
