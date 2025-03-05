@@ -905,10 +905,9 @@ private suspend fun executeDefault(input: ExecuteInput): ExecutionResult {
   } catch (e: Exception) {
     errorHandler(e)
     ArbigentGlobalStatus.onError(e)
-    return ExecutionResult.Failed(null)
+    return ExecutionResult.Failed(nullableContextHolder)
   } finally {
     input.updateIsRunning(false)
-    ArbigentGlobalStatus.onFinished()
   }
 }
 
