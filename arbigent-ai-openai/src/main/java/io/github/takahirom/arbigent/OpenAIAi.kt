@@ -185,6 +185,17 @@ public class OpenAIAi(
       }
       retried++
       return decideAgentActions(decisionInput)
+    } catch (e: Exception) {
+      contextHolder.addStep(
+        ArbigentContextHolder.Step(
+          stepId = decisionInput.stepId,
+          agentAction = FailedAgentAction(),
+          feedback = "Failed to execute the task by the exception: ${e.message}.",
+          cacheKey = decisionInput.cacheKey,
+          screenshotFilePath = decisionInput.screenshotFilePath,
+        )
+      )
+      throw e
     }
     retried = 0
     val json = Json { ignoreUnknownKeys = true }
