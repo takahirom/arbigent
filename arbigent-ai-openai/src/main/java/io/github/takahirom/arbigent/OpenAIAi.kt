@@ -43,7 +43,7 @@ import java.nio.charset.Charset
 public class ArbigentAiRateLimitExceededException : Exception("Rate limit exceeded")
 
 @OptIn(ExperimentalRoborazziApi::class, ExperimentalSerializationApi::class)
-public class OpenAIAi(
+public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
   private val apiKey: String,
   private val baseUrl: String = "https://api.openai.com/v1/",
   private val modelName: String = "gpt-4o-mini",
@@ -80,12 +80,7 @@ public class OpenAIAi(
       install(Logging) {
         logger = object : Logger {
           override fun log(message: String) {
-            Logger.SIMPLE.log(
-              message.replace(
-                apiKey,
-                "****"
-              )
-            )
+            arbigentInfoLog(message.removeConfidentialInfo())
           }
         }
         level = LogLevel.ALL

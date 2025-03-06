@@ -120,6 +120,11 @@ class AiSettingStateHolder {
     })
     Preference.aiSettingValue = aiSetting
   }
+
+  fun onLoggingEnabledChanged(enabled: Boolean) {
+    aiSetting = aiSetting.copy(loggingEnabled = enabled)
+    Preference.aiSettingValue = aiSetting
+  }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -128,6 +133,18 @@ private fun AiProviderSetting(modifier: Modifier) {
   val aiSettingStateHolder = remember { AiSettingStateHolder() }
   GroupHeader("AI Provider")
   val aiSetting = aiSettingStateHolder.aiSetting
+  Row(
+    modifier = Modifier.padding(8.dp),
+    verticalAlignment = Alignment.CenterVertically
+  ) {
+    Checkbox(
+      checked = aiSetting.loggingEnabled,
+      onCheckedChange = { enabled ->
+        aiSettingStateHolder.onLoggingEnabledChanged(enabled)
+      }
+    )
+    Text("Enable Debug Logging")
+  }
   FlowRow(modifier = modifier) {
     aiSetting.aiSettings.forEach { aiProviderSetting: AiProviderSetting ->
       RadioButtonRow(
