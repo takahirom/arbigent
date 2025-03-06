@@ -41,13 +41,15 @@ fun main() {
             OpenAIAi(
               apiKey = aiProviderSetting.apiKey,
               modelName = aiProviderSetting.modelName,
-              baseUrl = aiProviderSetting.baseUrl
+              baseUrl = aiProviderSetting.baseUrl,
+              loggingEnabled = aiSetting.loggingEnabled,
             )
           } else if (aiProviderSetting is AiProviderSetting.AzureOpenAi) {
             OpenAIAi(
               apiKey = aiProviderSetting.apiKey,
               modelName = aiProviderSetting.modelName,
               baseUrl = aiProviderSetting.endpoint,
+              loggingEnabled = aiSetting.loggingEnabled,
               requestBuilderModifier = {
                 parameter("api-version", aiProviderSetting.apiVersion)
                 header("api-key", aiProviderSetting.apiKey)
@@ -57,7 +59,8 @@ fun main() {
             OpenAIAi(
               apiKey = aiProviderSetting.apiKey,
               modelName = aiProviderSetting.modelName,
-              baseUrl = aiProviderSetting.baseUrl
+              loggingEnabled = aiSetting.loggingEnabled,
+              baseUrl = aiProviderSetting.baseUrl,
             )
           } else {
             throw IllegalArgumentException("Unsupported aiProviderSetting: $aiProviderSetting")

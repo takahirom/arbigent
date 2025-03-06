@@ -24,7 +24,8 @@ internal object Preference {
           serializer = AiSetting.serializer(),
           value = AiSetting(
             selectedId = "defaultOpenAi",
-            aiSettings = defaultAiProviderSettings()
+            aiSettings = defaultAiProviderSettings(),
+            loggingEnabled = false
           ),
         )
     }
