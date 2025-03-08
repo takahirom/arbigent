@@ -180,15 +180,17 @@ fun Scenario(
   }
 }
 
+
 @OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
-private fun ScenarioOptions(
+private fun ScenarioFundamentalOptions(
   scenarioStateHolder: ArbigentScenarioStateHolder,
   scenarioCountById: (String) -> Int,
   dependencyScenarioMenu: MenuScope.() -> Unit
 ) {
   val updatedScenarioStateHolder by rememberUpdatedState(scenarioStateHolder)
-  FlowRow(modifier = Modifier.padding(4.dp).height(320.dp).verticalScroll(rememberScrollState())) {
+  FlowRow {
+    // ID
     Column(
       modifier = Modifier.padding(8.dp).widthIn(min = 80.dp, max = 400.dp).width(IntrinsicSize.Min)
     ) {
@@ -224,6 +226,7 @@ private fun ScenarioOptions(
         )
       }
     }
+    // Note
     Column(
       modifier = Modifier.padding(8.dp).widthIn(min = 80.dp, max = 400.dp).width(IntrinsicSize.Min)
     ) {
@@ -239,6 +242,7 @@ private fun ScenarioOptions(
         decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
       )
     }
+    // Dependency
     Column(
       modifier = Modifier.padding(8.dp).width(160.dp)
     ) {
@@ -254,33 +258,7 @@ private fun ScenarioOptions(
         Text(dependency?.goal ?: "Select dependency")
       }
     }
-    Column(
-      modifier = Modifier.padding(8.dp).width(240.dp)
-    ) {
-      GroupHeader("AI Options")
-      val aiOptions by updatedScenarioStateHolder.aiOptionsFlow.collectAsState()
-      val currentOptions = aiOptions ?: ArbigentAiOptions()
-      AiOptionsComponent(
-        currentOptions = currentOptions,
-        onOptionsChanged = updatedScenarioStateHolder::onAiOptionsChanged
-      )
-    }
-    Column(
-      modifier = Modifier.padding(8.dp).width(160.dp)
-    ) {
-      GroupHeader("Cache Options")
-      val cacheOptions by updatedScenarioStateHolder.cacheOptionsFlow.collectAsState()
-      Column {
-        CheckboxRow(
-          modifier = Modifier.padding(start = 16.dp),
-          text = "Force disable Cache for this scenario",
-          checked = cacheOptions?.forceCacheDisabled == true,
-          onCheckedChange = { disabled ->
-            updatedScenarioStateHolder.onOverrideCacheForceDisabledChanged(disabled)
-          }
-        )
-      }
-    }
+    // Scenario type
     Column(
       modifier = Modifier.padding(8.dp).width(160.dp)
     ) {
@@ -322,7 +300,7 @@ private fun ScenarioOptions(
         )
       }
     }
-
+    // Form factor
     Column(
       modifier = Modifier.padding(8.dp).width(160.dp)
     ) {
@@ -349,6 +327,75 @@ private fun ScenarioOptions(
           onClick = {
             updatedScenarioStateHolder.deviceFormFactorStateFlow.value =
               ArbigentScenarioDeviceFormFactor.Tv
+          }
+        )
+      }
+    }
+    // Max retry and step count
+    Column(
+      modifier = Modifier.padding(8.dp).width(80.dp)
+    ) {
+      GroupHeader("Max retry count")
+      Row(
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        TextField(
+          state = updatedScenarioStateHolder.maxRetryState,
+          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+          modifier = Modifier
+            .padding(4.dp),
+        )
+      }
+      GroupHeader("Max step count")
+      Row(
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        TextField(
+          modifier = Modifier
+            .padding(4.dp),
+          state = updatedScenarioStateHolder.maxStepState,
+          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        )
+      }
+    }
+  }
+}
+
+@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
+@Composable
+private fun ScenarioOptions(
+  scenarioStateHolder: ArbigentScenarioStateHolder,
+  scenarioCountById: (String) -> Int,
+  dependencyScenarioMenu: MenuScope.() -> Unit
+) {
+  val updatedScenarioStateHolder by rememberUpdatedState(scenarioStateHolder)
+  GroupHeader("Fundamental options")
+  ScenarioFundamentalOptions(scenarioStateHolder, scenarioCountById, dependencyScenarioMenu)
+  GroupHeader("Other options")
+  FlowRow(modifier = Modifier.padding(4.dp).height(320.dp).verticalScroll(rememberScrollState())) {
+    Column(
+      modifier = Modifier.padding(8.dp).width(240.dp)
+    ) {
+      GroupHeader("AI Options")
+      val aiOptions by updatedScenarioStateHolder.aiOptionsFlow.collectAsState()
+      val currentOptions = aiOptions ?: ArbigentAiOptions()
+      AiOptionsComponent(
+        currentOptions = currentOptions,
+        onOptionsChanged = updatedScenarioStateHolder::onAiOptionsChanged
+      )
+    }
+    Column(
+      modifier = Modifier.padding(8.dp).width(160.dp)
+    ) {
+      GroupHeader("Cache Options")
+      val cacheOptions by updatedScenarioStateHolder.cacheOptionsFlow.collectAsState()
+      Column {
+        CheckboxRow(
+          modifier = Modifier.padding(start = 16.dp),
+          text = "Force disable Cache for this scenario",
+          checked = cacheOptions?.forceCacheDisabled == true,
+          onCheckedChange = { disabled ->
+            updatedScenarioStateHolder.onOverrideCacheForceDisabledChanged(disabled)
           }
         )
       }
