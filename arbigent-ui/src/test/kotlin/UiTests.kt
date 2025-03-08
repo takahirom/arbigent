@@ -73,7 +73,8 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
           }
           describe("when change prompt template") {
             doIt {
-              changePromptTemplate("""
+              changePromptTemplate(
+                """
                 Task: {{USER_INPUT_GOAL}}
 
                 Current step: {{CURRENT_STEP}}
@@ -81,7 +82,8 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
 
                 Progress:
                 {{STEPS}}
-              """.trimIndent())
+              """.trimIndent()
+              )
             }
             itShould("show updated template with dialog") {
               assertPromptTemplateContains("Task: {{USER_INPUT_GOAL}}")
@@ -379,6 +381,10 @@ class TestRobot(
   }
 
   fun enterImageAssertion(assertion: String) {
+    composeUiTest.onNode(hasTestTag("scenario_options"))
+      .performScrollToNode(
+        hasContentDescription("Add image assertion")
+      )
     composeUiTest.onNode(hasContentDescription("Add image assertion")).performClick()
     composeUiTest.onNode(hasTestTag("image_assertion")).performTextInput(assertion)
     waitALittle()
@@ -457,12 +463,22 @@ class TestRobot(
 
   fun expandOptions() {
     composeUiTest.onNode(hasContentDescription("Expand Options")).performClick()
+    composeUiTest.waitUntilAtLeastOneExists(hasContentDescription("Collapse Options"))
     // To make the test deterministic
     changeScenarioId("default_scenario")
   }
 
   fun collapseOptions() {
-    composeUiTest.onNode(hasContentDescription("Collapse Options")).performClick()
+    // There is a case that we need to close other windows before closing the options
+    fun isCollapsed() = try {
+      composeUiTest.onNode(hasContentDescription("Collapse Options")).assertExists()
+      false
+    } catch (e: AssertionError) {
+      true
+    }
+    while (!isCollapsed()) {
+      composeUiTest.onNode(hasContentDescription("Collapse Options")).performClick()
+    }
   }
 
   fun clickDependencyDropDown() {
@@ -569,8 +585,16 @@ class TestRobot(
   }
 
   fun addCleanupDataInitializationMethod() {
+    composeUiTest.onNode(hasTestTag("scenario_options"))
+      .performScrollToNode(
+        hasContentDescription("Add initialization method")
+      )
     composeUiTest.onNode(hasContentDescription("Add initialization method")).performClick()
     waitALittle()
+    composeUiTest.onNode(hasTestTag("scenario_options"))
+      .performScrollToNode(
+        hasTestTag("initialization_method")
+      )
     composeUiTest.onAllNodes(hasText(InitializationMethodMenu.Noop.type), useUnmergedTree = true)
       .onFirst()
       .performClick()
