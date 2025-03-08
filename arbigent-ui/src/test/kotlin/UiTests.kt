@@ -477,17 +477,17 @@ class TestRobot(
   }
 
   fun toggleScenarioCache() {
-    composeUiTest.onNode(hasText("Enable Cache")).performClick()
+    composeUiTest.onNode(hasText("Force disable Cache for this scenario")).performClick()
   }
 
   fun assertScenarioCacheEnabled() {
-    composeUiTest.onNode(hasText("Enable Cache")).assertIsToggleable()
-      .assertIsOn()
+    composeUiTest.onNode(hasText("Force disable Cache for this scenario")).assertIsToggleable()
+      .assertIsOff()
   }
 
   fun assertScenarioCacheDisabled() {
-    composeUiTest.onNode(hasText("Enable Cache")).assertIsToggleable()
-      .assertIsOff()
+    composeUiTest.onNode(hasText("Force disable Cache for this scenario")).assertIsToggleable()
+      .assertIsOn()
   }
 
   fun changePromptTemplate(template: String) {
