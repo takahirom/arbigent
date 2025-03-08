@@ -255,7 +255,7 @@ private fun ScenarioOptions(
       }
     }
     Column(
-      modifier = Modifier.padding(8.dp).width(200.dp)
+      modifier = Modifier.padding(8.dp).width(240.dp)
     ) {
       GroupHeader("AI Options")
       val aiOptions by updatedScenarioStateHolder.aiOptionsFlow.collectAsState()
