@@ -79,7 +79,7 @@ public data class ArbigentAiOptions(
   public val temperature: Double? = null,
   public val imageDetail: ImageDetailLevel? = null,
   public val imageFormat: ImageFormat? = null,
-  public val lastStepCount: Int? = null
+  public val historicalStepLimit: Int? = null
 ) {
   public fun mergeWith(other: ArbigentAiOptions?): ArbigentAiOptions {
     if (other == null) return this
@@ -87,7 +87,7 @@ public data class ArbigentAiOptions(
       temperature = other.temperature ?: temperature,
       imageDetail = other.imageDetail ?: imageDetail,
       imageFormat = other.imageFormat ?: imageFormat,
-      lastStepCount = other.lastStepCount ?: lastStepCount
+      historicalStepLimit = other.historicalStepLimit ?: historicalStepLimit
     )
   }
 }

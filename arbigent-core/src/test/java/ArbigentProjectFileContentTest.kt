@@ -14,7 +14,7 @@ class ArbigentProjectFileContentTest {
     temperature = null,
     imageDetail = null,
     imageFormat = null,
-    lastStepCount = null
+    historicalStepLimit = null
   )
 
   private val basicProject: ArbigentProjectFileContent = ArbigentProjectSerializer().load(

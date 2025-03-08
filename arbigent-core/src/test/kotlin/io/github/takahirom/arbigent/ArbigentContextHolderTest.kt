@@ -8,7 +8,7 @@ class ArbigentContextHolderTest {
         temperature = null,
         imageDetail = null,
         imageFormat = null,
-        lastStepCount = null
+        historicalStepLimit = null
     )
     @Test
     fun testGetStepsText() {
@@ -97,7 +97,7 @@ class ArbigentContextHolderTest {
             temperature = null,
             imageDetail = null,
             imageFormat = null,
-            lastStepCount = 2
+            historicalStepLimit = 2
         )
         val lastTwoStepsText = contextHolder.getStepsText(limitedAiOptions)
         assertEquals(false, lastTwoStepsText.contains("Test Feedback 1"))
@@ -128,7 +128,7 @@ class ArbigentContextHolderTest {
             temperature = null,
             imageDetail = null,
             imageFormat = null,
-            lastStepCount = 2
+            historicalStepLimit = 2
         )
         val prompt = contextHolder.prompt(
             uiElements = "Button1: Click me",
@@ -166,7 +166,7 @@ class ArbigentContextHolderTest {
             temperature = null,
             imageDetail = null,
             imageFormat = null,
-            lastStepCount = 2
+            historicalStepLimit = 2
         )
         val context = contextHolder.context(limitedAiOptions)
 
