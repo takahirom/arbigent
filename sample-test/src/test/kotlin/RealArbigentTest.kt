@@ -21,7 +21,8 @@ class RealArbigentTest {
       file = scenarioFile,
       aiFactory = {
         OpenAIAi(
-          apiKey = System.getenv("OPENAI_API_KEY")
+          apiKey = System.getenv("OPENAI_API_KEY"),
+          loggingEnabled = false,
         )
       },
       deviceFactory = {
