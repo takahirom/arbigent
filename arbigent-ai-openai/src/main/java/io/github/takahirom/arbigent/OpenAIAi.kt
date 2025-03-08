@@ -51,7 +51,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     header("Authorization", "Bearer $apiKey")
   },
   @property:ArbigentInternalApi
-  public val loggingEnabled: Boolean = false,
+  public val loggingEnabled: Boolean,
   private val httpClient: HttpClient = HttpClient(OkHttp) {
     install(HttpRequestRetry) {
       maxRetries = 3

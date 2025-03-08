@@ -78,6 +78,11 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
     )
     .defaultByName("openai")
 
+  private val aiApiLoggingEnabled by option(
+    "--ai-api-logging",
+    help = "Enable AI API debug logging"
+  ).flag(default = false)
+
   private val os by option(help = "Target operating system")
     .choice("android", "ios", "web")
     .default("android")
@@ -150,18 +155,21 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
           apiKey = aiType.openAiApiKey,
           baseUrl = aiType.openAiEndpoint,
           modelName = aiType.openAiModelName,
+          loggingEnabled = aiApiLoggingEnabled,
         )
 
         is GeminiAiConfig -> OpenAIAi(
           apiKey = aiType.geminiApiKey,
           baseUrl = aiType.geminiEndpoint,
           modelName = aiType.geminiModelName,
+          loggingEnabled = aiApiLoggingEnabled,
         )
 
         is AzureOpenAiConfig -> OpenAIAi(
           apiKey = aiType.azureOpenAIKey,
           baseUrl = aiType.azureOpenAIEndpoint,
           modelName = aiType.azureOpenAIModelName,
+          loggingEnabled = aiApiLoggingEnabled,
           requestBuilderModifier = {
             parameter("api-version", aiType.azureOpenAIApiVersion)
             header("api-key", System.getenv("AZURE_OPENAI_API_KEY").orEmpty())
