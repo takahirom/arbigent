@@ -166,8 +166,19 @@ fun Scenario(
         }
       }
     }
-    ExpandableSection(title = "Options", modifier = Modifier.fillMaxWidth()) {
-      ScenarioOptions(scenarioStateHolder, scenarioCountById, dependencyScenarioMenu)
+    BoxWithConstraints {
+      ExpandableSection(
+        title = "Options",
+        modifier = Modifier.fillMaxWidth()
+          .heightIn(max = maxHeight * 0.7f)
+      ) {
+        Column(
+          modifier = Modifier.verticalScroll(rememberScrollState())
+            .testTag("scenario_options")
+        ) {
+          ScenarioOptions(scenarioStateHolder, scenarioCountById, dependencyScenarioMenu)
+        }
+      }
     }
     arbigentScenarioExecutor?.let { arbigentScenarioExecutor ->
       val taskToAgents: List<List<ArbigentTaskAssignment>> by arbigentScenarioExecutor.taskAssignmentsHistoryFlow.collectAsState(
@@ -372,7 +383,7 @@ private fun ScenarioOptions(
   GroupHeader("Fundamental options")
   ScenarioFundamentalOptions(scenarioStateHolder, scenarioCountById, dependencyScenarioMenu)
   GroupHeader("Other options")
-  FlowRow(modifier = Modifier.padding(4.dp).height(320.dp).verticalScroll(rememberScrollState())) {
+  FlowRow(modifier = Modifier.padding(4.dp).height(320.dp)) {
     Column(
       modifier = Modifier.padding(8.dp).width(240.dp)
     ) {
@@ -536,6 +547,7 @@ private fun InitializationOptions(
 ) {
   Column(
     modifier = Modifier.padding(8.dp).width(240.dp)
+      .testTag("initialization_method")
   ) {
     GroupHeader {
       Text("Initialization method ${index + 1}")
@@ -1220,13 +1232,13 @@ fun ExpandableSection(
       if (expanded) {
         Icon(
           key = AllIconsKeys.General.ArrowDown,
-          contentDescription = "Collapse " + title,
+          contentDescription = "Collapse $title",
           hint = Size(28)
         )
       } else {
         Icon(
           key = AllIconsKeys.General.ArrowRight,
-          contentDescription = "Expand " + title,
+          contentDescription = "Expand $title",
           hint = Size(28)
         )
       }
