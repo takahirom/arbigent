@@ -10,6 +10,12 @@ import kotlin.test.assertTrue
 
 
 class ArbigentProjectFileContentTest {
+  private val defaultAiOptions = ArbigentAiOptions(
+    temperature = null,
+    imageDetail = null,
+    imageFormat = null,
+    lastStepCount = null
+  )
 
   private val basicProject: ArbigentProjectFileContent = ArbigentProjectSerializer().load(
     """scenarios:
@@ -151,7 +157,7 @@ Previous steps:
       maxStep = 10,
       userPromptTemplate = UserPromptTemplate(scenarioWithCustomTemplate.userPromptTemplate)
     )
-    val prompt = contextHolder.context()
+    val prompt = contextHolder.context(defaultAiOptions)
     assertTrue(prompt.contains("Task: test goal"))
     assertTrue(prompt.contains("Current progress: Step 1 of 10"))
   }

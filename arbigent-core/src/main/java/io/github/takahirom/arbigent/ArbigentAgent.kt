@@ -932,7 +932,14 @@ private suspend fun step(
   stepInput: StepInput
 ): StepResult {
   val contextHolder = stepInput.arbigentContextHolder
-  arbigentDebugLog("step start: ${contextHolder.context()}")
+  val defaultAiOptions = ArbigentAiOptions(
+    temperature = null,
+    imageDetail = null,
+    imageFormat = null,
+    lastStepCount = null
+  )
+  val aiOptions = stepInput.aiOptions ?: defaultAiOptions
+  arbigentDebugLog("step start: ${contextHolder.context(aiOptions)}")
   val actionTypes = stepInput.agentActionTypes
   val device = stepInput.device
   val deviceFormFactor = stepInput.deviceFormFactor
@@ -962,7 +969,7 @@ private suspend fun step(
   }
   val uiTreeStrings = device.viewTreeString()
   val uiTreeHash = uiTreeStrings.optimizedTreeString.hashCode().toString().replace("-", "")
-  val contextHash = contextHolder.context().hashCode().toString().replace("-", "")
+  val contextHash = contextHolder.context(aiOptions).hashCode().toString().replace("-", "")
   val cacheKey = "v${BuildConfig.VERSION_NAME}-uitree-${uiTreeHash}-context-${contextHash}"
   arbigentInfoLog("cacheKey: $cacheKey")
   val originalScreenshotFilePath =
