@@ -6,7 +6,7 @@ import org.junit.Test
 class OpenAIAiTest {
   @OptIn(ArbigentInternalApi::class)
   @Test
-  fun test() {
+  fun testDefaultLoggingDisabled() {
     assertEquals(false, OpenAIAi("apiKey").loggingEnabled)
   }
 }
