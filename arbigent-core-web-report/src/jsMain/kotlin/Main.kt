@@ -281,7 +281,9 @@ private fun StepView(step: ArbigentAgentTaskStepResult) {
       }
     }) {
       if (step.screenshotFilePath.isNotEmpty()) {
-        ExpandableSection("Annotated Screenshot", defaultExpanded = !step.cacheHit) {
+        val isAnnotatedExpandDefault = !step.summary.contains("Image assertion", ignoreCase = true)
+          && !step.cacheHit
+        ExpandableSection("Annotated Screenshot", defaultExpanded = isAnnotatedExpandDefault) {
           AsyncImage(
             path = step.screenshotFilePath.substringBeforeLast(".") + "_annotated." + step.screenshotFilePath.substringAfterLast(
               "."
@@ -289,7 +291,7 @@ private fun StepView(step: ArbigentAgentTaskStepResult) {
             contentDescription = "Annotated Screenshot for step: ${step.summary}"
           )
         }
-        ExpandableSection("Screenshot", defaultExpanded = step.cacheHit) {
+        ExpandableSection("Screenshot", defaultExpanded = !isAnnotatedExpandDefault) {
           AsyncImage(
             path = step.screenshotFilePath,
             contentDescription = "Screenshot for step: ${step.summary}"
