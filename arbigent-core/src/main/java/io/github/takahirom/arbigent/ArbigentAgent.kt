@@ -936,7 +936,7 @@ private suspend fun step(
     temperature = null,
     imageDetail = null,
     imageFormat = null,
-    lastStepCount = null
+    historicalStepLimit = null
   )
   val aiOptions = stepInput.aiOptions ?: defaultAiOptions
   arbigentDebugLog("step start: ${contextHolder.context(aiOptions)}")

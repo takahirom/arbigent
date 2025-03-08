@@ -144,7 +144,7 @@ fun AiOptionsComponent(
             },
             modifier = Modifier.testTag("image_format_checkbox")
         )
-        Text("Use Custom Format", modifier = Modifier.padding(start = 8.dp))
+        Text("Use Custom Image Format", modifier = Modifier.padding(start = 8.dp))
     }
     if (updatedOptions.imageFormat != null) {
         Row(
@@ -188,28 +188,28 @@ fun AiOptionsComponent(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Checkbox(
-            checked = updatedOptions.lastStepCount != null,
+            checked = updatedOptions.historicalStepLimit != null,
             onCheckedChange = { enabled: Boolean ->
                 updatedOptionsChanged(
-                    updatedOptions.copy(lastStepCount = if (enabled) 100 else null)
+                    updatedOptions.copy(historicalStepLimit = if (enabled) 100 else null)
                 )
             },
-            modifier = Modifier.testTag("last_step_count_checkbox")
+            modifier = Modifier.testTag("use_historical_step_limit")
         )
-        Text("Use Last Step Count", modifier = Modifier.padding(start = 8.dp))
+        Text("Use Historical Step Limit", modifier = Modifier.padding(start = 8.dp))
     }
-    updatedOptions.lastStepCount?.let { count ->
+    updatedOptions.historicalStepLimit?.let { limit ->
         Row(
             modifier = Modifier.padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Last Step Count", modifier = Modifier.padding(end = 8.dp))
-            val textFieldState = rememberTextFieldState(count.toString())
+            Text("Historical Step Limit", modifier = Modifier.padding(end = 8.dp))
+            val textFieldState = rememberTextFieldState(limit.toString())
             LaunchedEffect(textFieldState.text) {
                 textFieldState.text.toString().toIntOrNull()?.let { intValue ->
                     if (intValue > 0) {
                         updatedOptionsChanged(
-                            updatedOptions.copy(lastStepCount = intValue)
+                            updatedOptions.copy(historicalStepLimit = intValue)
                         )
                     }
                 }
@@ -219,7 +219,7 @@ fun AiOptionsComponent(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier
                     .width(100.dp)
-                    .testTag("last_step_count_input")
+                    .testTag("historical_step_limit")
             )
         }
     }

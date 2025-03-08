@@ -75,7 +75,7 @@ public class ArbigentContextHolder(
 
   public fun getStepsText(aiOptions: ArbigentAiOptions?): String {
     val allSteps = steps().withIndex().toList()
-    val stepsToInclude = aiOptions?.lastStepCount?.let { count ->
+    val stepsToInclude = aiOptions?.historicalStepLimit?.let { count ->
       allSteps.takeLast(count)
     } ?: allSteps
     return stepsToInclude.map { (index, turn) ->
