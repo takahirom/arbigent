@@ -74,11 +74,11 @@ public class ArbigentContextHolder(
   }
 
   public fun getStepsText(aiOptions: ArbigentAiOptions?): String {
-    val allSteps = steps()
+    val allSteps = steps().withIndex().toList()
     val stepsToInclude = aiOptions?.lastStepCount?.let { count ->
       allSteps.takeLast(count)
     } ?: allSteps
-    return stepsToInclude.mapIndexed { index, turn ->
+    return stepsToInclude.map { (index, turn) ->
       "Step ${index + 1}. \n" + turn.text()
     }.joinToString("\n")
   }
