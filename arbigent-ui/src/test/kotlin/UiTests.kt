@@ -457,6 +457,8 @@ class TestRobot(
 
   fun expandOptions() {
     composeUiTest.onNode(hasContentDescription("Expand Options")).performClick()
+    // To make the test deterministic
+    changeScenarioId("default_scenario")
   }
 
   fun collapseOptions() {
