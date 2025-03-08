@@ -70,11 +70,6 @@ private const val defaultResultPath = "arbigent-result"
 private const val defaultCachePath = "arbigent-cache"
 
 class ArbigentCli : CliktCommand(name = "arbigent") {
-  private val aiApiLoggingEnabled by option(
-    "--ai-api-logging",
-    help = "Enable AI API debug logging"
-  ).flag(default = false)
-
   private val aiType by option(help = "Type of AI to use")
     .groupChoice(
       "openai" to OpenAIAiConfig(),
@@ -82,6 +77,11 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
       "azureopenai" to AzureOpenAiConfig()
     )
     .defaultByName("openai")
+
+  private val aiApiLoggingEnabled by option(
+    "--ai-api-logging",
+    help = "Enable AI API debug logging"
+  ).flag(default = false)
 
   private val os by option(help = "Target operating system")
     .choice("android", "ios", "web")
