@@ -9,9 +9,8 @@ import kotlinx.serialization.Serializable
 public data class ArbigentScenarioCacheOptions(
     /**
      * Override the default cache behavior for this scenario.
-     * - null: Use default cache behavior
-     * - true: Force enable cache
-     * - false: Force disable cache
+     * - true: Force cache disable
+     * - false: Do nothing
      */
-    val overrideCacheEnabled: Boolean? = null
+    val forceCacheDisabled: Boolean = false
 )

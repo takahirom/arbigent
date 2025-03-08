@@ -148,8 +148,8 @@ constructor(
     _aiOptions.value = options
   }
 
-  fun onOverrideCacheEnabledChanged(enabled: Boolean?) {
-    _cacheOptions.value = if (enabled == null) null else ArbigentScenarioCacheOptions(enabled)
+  fun onOverrideCacheForceDisabledChanged(disabled: Boolean?) {
+    _cacheOptions.value = if (disabled == null) null else ArbigentScenarioCacheOptions(disabled)
   }
 
   fun createArbigentScenarioContent(): ArbigentScenarioContent {

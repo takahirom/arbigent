@@ -631,7 +631,7 @@ public fun AgentConfigBuilder(
         chain: ArbigentDecisionInterceptor.Chain
       ): ArbigentAi.DecisionOutput {
         // Only use cache if enabled in scenario options
-        if (cacheOptions.overrideCacheEnabled == true || cacheOptions.overrideCacheEnabled == null) {
+        if (!cacheOptions.forceCacheDisabled) {
           val cached = aiDecisionCache.get(decisionInput.cacheKey)
           if (cached != null) {
             arbigentInfoLog("AI-decision cache hit with view tree and prompt")

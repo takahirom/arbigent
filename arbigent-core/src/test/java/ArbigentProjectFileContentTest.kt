@@ -177,11 +177,11 @@ Previous steps:
     - id: "cache-enabled"
       goal: "Test cache enabled"
       cacheOptions:
-        overrideCacheEnabled: true
+        forceCacheDisabled: true
     - id: "cache-disabled"
       goal: "Test cache disabled"
       cacheOptions:
-        overrideCacheEnabled: false
+        forceCacheDisabled: false
     - id: "cache-default"
       goal: "Test default cache"
     """
@@ -198,7 +198,7 @@ Previous steps:
       deviceFactory = { FakeDevice() },
       aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
     )
-    assertEquals(true, scenarioWithCacheEnabled.cacheOptions.overrideCacheEnabled, "Cache override should be enabled")
+    assertEquals(true, scenarioWithCacheEnabled.cacheOptions?.forceCacheDisabled, "Cache override should be disabled")
 
     // Test scenario with cache override disabled
     val scenarioWithCacheDisabled = projectWithCacheOptions.scenarioContents.createArbigentScenario(
@@ -208,7 +208,7 @@ Previous steps:
       deviceFactory = { FakeDevice() },
       aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
     )
-    assertEquals(false, scenarioWithCacheDisabled.cacheOptions.overrideCacheEnabled, "Cache override should be disabled")
+    assertEquals(false, scenarioWithCacheDisabled.cacheOptions?.forceCacheDisabled, "Cache override should be enabled")
 
     // Test scenario with default cache settings
     val scenarioWithDefaultCache = projectWithCacheOptions.scenarioContents.createArbigentScenario(
@@ -218,7 +218,7 @@ Previous steps:
       deviceFactory = { FakeDevice() },
       aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
     )
-    assertEquals(null, scenarioWithDefaultCache.cacheOptions.overrideCacheEnabled, "Cache override should be null by default")
+    assertEquals(null, scenarioWithDefaultCache.cacheOptions, "Cache override should be null by default")
   }
 
   @Test

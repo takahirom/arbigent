@@ -272,22 +272,13 @@ private fun ScenarioOptions(
       val cacheOptions by updatedScenarioStateHolder.cacheOptionsFlow.collectAsState()
       Column {
         CheckboxRow(
-          text = "Override Cache",
-          checked = cacheOptions?.overrideCacheEnabled != null,
-          onCheckedChange = { checked ->
-            updatedScenarioStateHolder.onOverrideCacheEnabledChanged(if (checked) true else null)
+          modifier = Modifier.padding(start = 16.dp),
+          text = "Force disable Cache for this scenario",
+          checked = cacheOptions?.forceCacheDisabled == true,
+          onCheckedChange = { disabled ->
+            updatedScenarioStateHolder.onOverrideCacheForceDisabledChanged(disabled)
           }
         )
-        if (cacheOptions?.overrideCacheEnabled != null) {
-          CheckboxRow(
-            modifier = Modifier.padding(start = 16.dp),
-            text = "Enable Cache",
-            checked = cacheOptions?.overrideCacheEnabled == true,
-            onCheckedChange = { enabled ->
-              updatedScenarioStateHolder.onOverrideCacheEnabledChanged(enabled)
-            }
-          )
-        }
       }
     }
     Column(
