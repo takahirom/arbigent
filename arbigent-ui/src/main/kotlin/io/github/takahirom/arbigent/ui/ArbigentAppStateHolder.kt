@@ -364,7 +364,7 @@ class ArbigentAppStateHolder(
   }
 
   fun onAiOptionsChanged(options: ArbigentAiOptions?) {
-    if (options?.imageFormat == null && options?.imageDetail == null && options?.temperature == null) {
+    if (options == ArbigentAiOptions()) {
       aiOptionsFlow.value = null
       return
     }
