@@ -121,7 +121,14 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
 
     val imageBase64 = File(screenshotFilePath).getResizedIamgeBase64(1.0F)
     val prompt =
-      buildPrompt(contextHolder, uiTreeStrings.optimizedTreeString, focusedTree, agentActionTypes, elements)
+      buildPrompt(
+        contextHolder = contextHolder,
+        dumpHierarchy = uiTreeStrings.optimizedTreeString,
+        focusedTree = focusedTree,
+        agentActionTypes = agentActionTypes,
+        elements = elements,
+        aiOptions = decisionInput.aiOptions ?: ArbigentAiOptions()
+      )
     val imageDetail = decisionInput.aiOptions?.imageDetail?.name?.lowercase()
     arbigentDebugLog { "AI imageDetailOption: $imageDetail" }
     val messages: List<ChatMessage> = listOf(
@@ -239,7 +246,8 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     dumpHierarchy: String,
     focusedTree: String?,
     agentActionTypes: List<AgentActionType>,
-    elements: ArbigentElementList
+    elements: ArbigentElementList,
+    aiOptions: ArbigentAiOptions,
   ): String {
     val templates = agentActionTypes.joinToString("\nor\n") { it.templateForAI() }
     val focusedTreeText = focusedTree.orEmpty().ifBlank { "No focused tree" }
@@ -247,7 +255,8 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     return contextHolder.prompt(
       uiElements = uiElements,
       focusedTree = focusedTreeText,
-      actionTemplates = templates
+      actionTemplates = templates,
+      aiOptions = aiOptions
     )
   }
 

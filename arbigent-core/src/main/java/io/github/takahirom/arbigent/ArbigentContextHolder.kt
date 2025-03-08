@@ -73,8 +73,12 @@ public class ArbigentContextHolder(
     _steps.value = steps().toMutableList() + step
   }
 
-  public fun getStepsText(): String {
-    return steps().mapIndexed { index, turn ->
+  public fun getStepsText(aiOptions: ArbigentAiOptions?): String {
+    val allSteps = steps()
+    val stepsToInclude = aiOptions?.lastStepCount?.let { count ->
+      allSteps.takeLast(count)
+    } ?: allSteps
+    return stepsToInclude.mapIndexed { index, turn ->
       "Step ${index + 1}. \n" + turn.text()
     }.joinToString("\n")
   }
@@ -82,25 +86,26 @@ public class ArbigentContextHolder(
   public fun prompt(
     uiElements: String,
     focusedTree: String,
-    actionTemplates: String
+    actionTemplates: String,
+    aiOptions: ArbigentAiOptions
   ): String {
     return userPromptTemplate.format(
       goal = goal,
       currentStep = steps().size + 1,
       maxStep = maxStep,
-      steps = getStepsText(),
+      steps = getStepsText(aiOptions),
       uiElements = uiElements,
       focusedTree = focusedTree,
       actionTemplates = actionTemplates
     )
   }
 
-  public fun context(): String {
+  public fun context(aiOptions: ArbigentAiOptions): String {
     return userPromptTemplate.format(
       goal = goal,
       currentStep = steps().size + 1,
       maxStep = maxStep,
-      steps = getStepsText()
+      steps = getStepsText(aiOptions)
     )
   }
 }

@@ -6,13 +6,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import io.github.takahirom.arbigent.ArbigentAiOptions
 import io.github.takahirom.arbigent.ImageDetailLevel
@@ -176,6 +180,47 @@ fun AiOptionsComponent(
                     }
                 }
             }
+        }
+    }
+
+    Row(
+        modifier = Modifier.padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(
+            checked = updatedOptions.lastStepCount != null,
+            onCheckedChange = { enabled: Boolean ->
+                updatedOptionsChanged(
+                    updatedOptions.copy(lastStepCount = if (enabled) 100 else null)
+                )
+            },
+            modifier = Modifier.testTag("last_step_count_checkbox")
+        )
+        Text("Use Last Step Count", modifier = Modifier.padding(start = 8.dp))
+    }
+    updatedOptions.lastStepCount?.let { count ->
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Last Step Count", modifier = Modifier.padding(end = 8.dp))
+            val textFieldState = rememberTextFieldState(count.toString())
+            LaunchedEffect(textFieldState.text) {
+                textFieldState.text.toString().toIntOrNull()?.let { intValue ->
+                    if (intValue > 0) {
+                        updatedOptionsChanged(
+                            updatedOptions.copy(lastStepCount = intValue)
+                        )
+                    }
+                }
+            }
+            TextField(
+                state = textFieldState,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier
+                    .width(100.dp)
+                    .testTag("last_step_count_input")
+            )
         }
     }
 }

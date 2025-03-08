@@ -78,14 +78,16 @@ public enum class ImageFormat {
 public data class ArbigentAiOptions(
   public val temperature: Double? = null,
   public val imageDetail: ImageDetailLevel? = null,
-  public val imageFormat: ImageFormat? = null
+  public val imageFormat: ImageFormat? = null,
+  public val lastStepCount: Int? = 100
 ) {
   public fun mergeWith(other: ArbigentAiOptions?): ArbigentAiOptions {
     if (other == null) return this
     return ArbigentAiOptions(
       temperature = other.temperature ?: temperature,
       imageDetail = other.imageDetail ?: imageDetail,
-      imageFormat = other.imageFormat ?: imageFormat
+      imageFormat = other.imageFormat ?: imageFormat,
+      lastStepCount = other.lastStepCount ?: lastStepCount
     )
   }
 }
