@@ -425,34 +425,6 @@ private fun ScenarioOptions(
       InitializationOptions(initializeMethod, updatedScenarioStateHolder, initializeMethods, index)
     }
     Column(
-      modifier = Modifier.padding(8.dp).width(80.dp)
-    ) {
-      GroupHeader("Max retry count")
-      Row(
-        verticalAlignment = Alignment.CenterVertically
-      ) {
-        // Retry count
-        TextField(
-          state = updatedScenarioStateHolder.maxRetryState,
-          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-          modifier = Modifier
-            .padding(4.dp),
-        )
-      }
-      GroupHeader("Max step count")
-      Row(
-        verticalAlignment = Alignment.CenterVertically
-      ) {
-        // Retry count
-        TextField(
-          modifier = Modifier
-            .padding(4.dp),
-          state = updatedScenarioStateHolder.maxStepState,
-          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        )
-      }
-    }
-    Column(
       modifier = Modifier.padding(8.dp).width(320.dp)
     ) {
       GroupHeader {
