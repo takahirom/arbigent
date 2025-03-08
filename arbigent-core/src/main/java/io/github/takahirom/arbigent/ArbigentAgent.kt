@@ -637,6 +637,7 @@ public fun AgentConfigBuilder(
             arbigentInfoLog("AI-decision cache hit with view tree and prompt")
             return cached.copy(
               step = cached.step.copy(
+                timestamp = System.currentTimeMillis(),
                 screenshotFilePath = decisionInput.screenshotFilePath
               )
             )
