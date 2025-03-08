@@ -165,7 +165,8 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
             nodeScenario.imageAssertions,
             nodeScenario.imageAssertionHistoryCount
           ),
-          aiDecisionCache = aiDecisionCache
+          aiDecisionCache = aiDecisionCache,
+          cacheOptions = nodeScenario.cacheOptions ?: ArbigentScenarioCacheOptions()
         ).apply {
           aiOptions(projectSettings.aiOptions?.mergeWith(nodeScenario.aiOptions) ?: nodeScenario.aiOptions)
           ai(aiFactory())
@@ -183,7 +184,8 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
     maxStepCount = scenario.maxStep,
     tags = scenario.tags,
     deviceFormFactor = scenario.deviceFormFactor,
-    isLeaf = this.none { it.dependencyId == scenario.id }
+    isLeaf = this.none { it.dependencyId == scenario.id },
+    cacheOptions = scenario.cacheOptions
   )
 }
 
@@ -223,7 +225,8 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
   public val imageAssertionHistoryCount: Int = 1,
   public val imageAssertions: List<ArbigentImageAssertion> = emptyList(),
   public val userPromptTemplate: String = UserPromptTemplate.DEFAULT_TEMPLATE,
-  public val aiOptions: ArbigentAiOptions? = null
+  public val aiOptions: ArbigentAiOptions? = null,
+  public val cacheOptions: ArbigentScenarioCacheOptions? = null
 ) {
   @Serializable
   public sealed interface CleanupData {

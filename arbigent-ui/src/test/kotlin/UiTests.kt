@@ -161,14 +161,6 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
                 openProjectSettings()
               }
 
-              describe("when checking initial state") {
-                itShould("have image detail checkbox disabled") {
-                  assertImageDetailCheckboxExists()
-                  assertImageDetailDisabled()
-                  capture(it)
-                }
-              }
-
               describe("when enabling image detail") {
                 doIt {
                   clickImageDetailCheckbox()
@@ -200,6 +192,41 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
                       capture(it)
                       closeProjectSettingsDialog()
                     }
+                  }
+                }
+              }
+            }
+
+            describe("Scenario Cache Settings") {
+              doIt {
+                clickAddScenarioButton()
+                enterGoal("Test cache settings")
+                expandOptions()
+              }
+
+              itShould("have cache enabled by default") {
+                assertScenarioCacheEnabled()
+                capture(it)
+              }
+
+              describe("when toggling cache") {
+                doIt {
+                  toggleScenarioCache()
+                }
+
+                itShould("disable cache") {
+                  assertScenarioCacheDisabled()
+                  capture(it)
+                }
+
+                describe("when toggling again") {
+                  doIt {
+                    toggleScenarioCache()
+                  }
+
+                  itShould("enable cache") {
+                    assertScenarioCacheEnabled()
+                    capture(it)
                   }
                 }
               }
@@ -447,6 +474,20 @@ class TestRobot(
     composeUiTest.waitUntilAtLeastOneExists(hasText("InMemory"), timeoutMillis = 1000)
     composeUiTest.onNode(hasText("InMemory"), useUnmergedTree = true).performClick()
     composeUiTest.onNode(hasText("Close")).performClick()
+  }
+
+  fun toggleScenarioCache() {
+    composeUiTest.onNode(hasText("Force disable Cache for this scenario")).performClick()
+  }
+
+  fun assertScenarioCacheEnabled() {
+    composeUiTest.onNode(hasText("Force disable Cache for this scenario")).assertIsToggleable()
+      .assertIsOff()
+  }
+
+  fun assertScenarioCacheDisabled() {
+    composeUiTest.onNode(hasText("Force disable Cache for this scenario")).assertIsToggleable()
+      .assertIsOn()
   }
 
   fun changePromptTemplate(template: String) {

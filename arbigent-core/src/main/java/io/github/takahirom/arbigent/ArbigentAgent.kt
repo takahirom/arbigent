@@ -227,6 +227,7 @@ public class ArbigentAgent(
     val device: ArbigentDevice,
     val ai: ArbigentAi,
     val aiOptions: ArbigentAiOptions?,
+    val cacheOptions: ArbigentScenarioCacheOptions = ArbigentScenarioCacheOptions(),
     val createContextHolder: (String, Int) -> ArbigentContextHolder,
     val addContextHolder: (ArbigentContextHolder) -> Unit,
     val updateIsRunning: (Boolean) -> Unit,
@@ -255,6 +256,7 @@ public class ArbigentAgent(
     val executeActionChain: (ExecuteActionsInput) -> ExecuteActionsOutput,
     val prompt: ArbigentPrompt,
     val aiOptions: ArbigentAiOptions?,
+    val cacheOptions: ArbigentScenarioCacheOptions = ArbigentScenarioCacheOptions(),
   )
 
   public sealed interface StepResult {
@@ -500,9 +502,17 @@ public fun AgentConfigBuilder(
   initializationMethods: List<ArbigentScenarioContent.InitializationMethod>,
   imageAssertions: ArbigentImageAssertions,
   aiDecisionCache: ArbigentAiDecisionCache = ArbigentAiDecisionCache.Disabled,
+  cacheOptions: ArbigentScenarioCacheOptions,
 ): AgentConfig.Builder = AgentConfigBuilder {
   deviceFormFactor(deviceFormFactor)
   prompt(prompt)
+  // Add basic decision interceptor
+  addInterceptor(object : ArbigentDecisionInterceptor {
+    override suspend fun intercept(
+      decisionInput: ArbigentAi.DecisionInput,
+      chain: ArbigentDecisionInterceptor.Chain
+    ): ArbigentAi.DecisionOutput = chain.proceed(decisionInput)
+  })
   initializationMethods.reversed().forEach { initializeMethod ->
     when (initializeMethod) {
       is ArbigentScenarioContent.InitializationMethod.Back -> {
@@ -613,31 +623,36 @@ public fun AgentConfigBuilder(
       }
     }
   }
+  // Add cache control interceptor
   if (aiDecisionCache is ArbigentAiDecisionCache.Enabled) {
     addInterceptor(object : ArbigentDecisionInterceptor, ArbigentExecutionInterceptor {
       override suspend fun intercept(
         decisionInput: ArbigentAi.DecisionInput,
         chain: ArbigentDecisionInterceptor.Chain
       ): ArbigentAi.DecisionOutput {
-        val cached = aiDecisionCache.get(decisionInput.cacheKey)
-        if (cached != null) {
-          arbigentInfoLog("AI-decision cache hit with view tree and prompt")
-          return cached.copy(
-            step = cached.step.copy(
-              screenshotFilePath = decisionInput.screenshotFilePath
+        // Only use cache if enabled in scenario options
+        if (!cacheOptions.forceCacheDisabled) {
+          val cached = aiDecisionCache.get(decisionInput.cacheKey)
+          if (cached != null) {
+            arbigentInfoLog("AI-decision cache hit with view tree and prompt")
+            return cached.copy(
+              step = cached.step.copy(
+                screenshotFilePath = decisionInput.screenshotFilePath
+              )
+            )
+          }
+          arbigentDebugLog("AI-decision cache miss with view tree and prompt")
+          val output = chain.proceed(decisionInput)
+          aiDecisionCache.set(
+            decisionInput.cacheKey, output.copy(
+              step = output.step.copy(
+                cacheHit = true,
+              )
             )
           )
+          return output
         }
-        arbigentDebugLog("AI-decision cache miss with view tree and prompt")
-        val output = chain.proceed(decisionInput)
-        aiDecisionCache.set(
-          decisionInput.cacheKey, output.copy(
-            step = output.step.copy(
-              cacheHit = true,
-            )
-          )
-        )
-        return output
+        return chain.proceed(decisionInput)
       }
 
       override suspend fun intercept(
@@ -883,7 +898,8 @@ private suspend fun executeDefault(input: ExecuteInput): ExecutionResult {
         imageAssertionChain = input.imageAssertionChain,
         executeActionChain = input.executeActionChain,
         prompt = input.prompt,
-        aiOptions = input.aiOptions
+        aiOptions = input.aiOptions,
+        cacheOptions = input.cacheOptions
       )
       when (input.stepChain(stepInput)) {
         StepResult.GoalAchieved -> break

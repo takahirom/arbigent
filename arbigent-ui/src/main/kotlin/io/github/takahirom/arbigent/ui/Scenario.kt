@@ -268,6 +268,22 @@ private fun ScenarioOptions(
     Column(
       modifier = Modifier.padding(8.dp).width(160.dp)
     ) {
+      GroupHeader("Cache Options")
+      val cacheOptions by updatedScenarioStateHolder.cacheOptionsFlow.collectAsState()
+      Column {
+        CheckboxRow(
+          modifier = Modifier.padding(start = 16.dp),
+          text = "Force disable Cache for this scenario",
+          checked = cacheOptions?.forceCacheDisabled == true,
+          onCheckedChange = { disabled ->
+            updatedScenarioStateHolder.onOverrideCacheForceDisabledChanged(disabled)
+          }
+        )
+      }
+    }
+    Column(
+      modifier = Modifier.padding(8.dp).width(160.dp)
+    ) {
       GroupHeader {
         Text("Scenario type")
         IconActionButton(
