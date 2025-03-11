@@ -397,7 +397,12 @@ public sealed interface ArbigentAiDecisionCache {
       val file = cache.get(key)
       arbigentInfoLog("AI-decision cache get with key: $key")
       if (file == null) {
-        arbigentInfoLog("AI-decision cache miss with key: $key")
+        arbigentInfoLog("AI-decision cache miss with key: $key due to cache miss")
+        return null
+      }
+      if (!file.exists()) {
+        arbigentInfoLog("AI-decision cache miss with key: $key due to file not found")
+        cache.remove(key)
         return null
       }
       return json.decodeFromString<ArbigentAi.DecisionOutput>(file.readText())
