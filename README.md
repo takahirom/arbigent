@@ -107,6 +107,7 @@ Refer to [Apple's guide on opening apps from unidentified developers](https://su
 
 <img src="https://github.com/user-attachments/assets/44372fa0-1f58-4eea-9fff-a7cc672a0f86" width="300" />
 
+This `Open Anyway` button is available for about an hour after you try to open the app.
 <img 
   src="https://github.com/user-attachments/assets/b8249cd6-3a40-4863-827c-78e63fdbfd87" 
   width="400" 
