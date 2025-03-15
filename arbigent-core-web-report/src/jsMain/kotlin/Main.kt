@@ -42,7 +42,9 @@ private fun ArbigentReportComposeApp(reportString: String) {
         style {
           display(DisplayStyle.Flex)
           flexDirection(FlexDirection.Column)
-          width(200.px)
+          width(300.px)
+          minWidth(300.px)
+          flexShrink(0)
           padding(10.px)
         }
       }
@@ -77,13 +79,15 @@ private fun ScenarioList(
   scenarios.forEach { scenario ->
     Div({
       style {
-        padding(5.px)
+        padding(8.px)
+        marginBottom(5.px)
         cursor("pointer") // Change cursor to pointer on hover
         border {
-          right(1.px)
+          width(1.px)
           style(LineStyle.Solid)
           color(Color.gray)
         }
+        borderRadius(4.px)
         if (scenario == selectedScenario) {
           backgroundColor(Color.lightgray)
         }
@@ -95,7 +99,44 @@ private fun ScenarioList(
         onScenarioSelected(scenario)
       }
     }) {
-      Text("scenario: ${scenario.goal ?: scenario.id}")
+      Div({
+        style {
+          fontWeight("bold")
+          fontSize(14.px)
+          marginBottom(4.px)
+        }
+      }) {
+        Text("${scenario.goal ?: scenario.id}")
+      }
+      Div({
+        style {
+          fontSize(12.px)
+          marginBottom(2.px)
+        }
+      }) {
+        Text("Status: ${scenario.executionStatus ?: "N/A"}")
+      }
+      Div({
+        style {
+          fontSize(12.px)
+          marginBottom(2.px)
+          color(if (scenario.isSuccess) Color.green else Color.red)
+        }
+      }) {
+        Text("Success: ${scenario.isSuccess}")
+      }
+      val startTimestamp = scenario.startTimestamp()
+      val endTimestamp = scenario.endTimestamp()
+      if (startTimestamp != null && endTimestamp != null) {
+        Div({
+          style {
+            fontSize(12.px)
+            color(Color.gray)
+          }
+        }) {
+          Text("Duration: ${(endTimestamp.toDouble() - startTimestamp) / 1000}s")
+        }
+      }
     }
   }
 }
