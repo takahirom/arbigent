@@ -103,6 +103,7 @@ public data class ArbigentProjectSettings(
 public data class ArbigentPrompt(
   public val systemPrompts: List<String> = listOf(ArbigentPrompts.systemPrompt),
   public val systemPromptsForTv: List<String> = listOf(ArbigentPrompts.systemPromptForTv),
+  @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
   public val additionalSystemPrompts: List<String> = listOf(),
   @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
   public val userPromptTemplate: String = UserPromptTemplate.DEFAULT_TEMPLATE
