@@ -1,10 +1,13 @@
 package io.github.takahirom.arbigent.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicSecureTextField
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -15,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import io.github.takahirom.arbigent.ArbigentDeviceOs
 import org.jetbrains.jewel.intui.standalone.styling.light
 import org.jetbrains.jewel.ui.component.*
+import org.jetbrains.jewel.ui.component.styling.LocalDividerStyle
 import org.jetbrains.jewel.ui.component.styling.TextFieldStyle
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
@@ -26,7 +30,11 @@ fun LauncherScreen(
 ) {
   val devicesStateHolder = appStateHolder.devicesStateHolder
   Column(
-    modifier.width(400.dp).fillMaxHeight(),
+    modifier
+      .width(400.dp)
+      .verticalScroll(rememberScrollState())
+      .border(1.dp, LocalDividerStyle.current.color, RoundedCornerShape(4.dp))
+      .padding(8.dp),
     verticalArrangement = Arrangement.Center
   ) {
     GroupHeader("Device Type")
@@ -89,7 +97,7 @@ fun LauncherScreen(
       }
     }
     AiProviderSetting(
-      modifier = Modifier.padding(8.dp)
+      modifier = Modifier.padding(8.dp),
     )
     if (devices.isNotEmpty()) {
       DefaultButton(
