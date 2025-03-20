@@ -2,9 +2,11 @@ package io.github.takahirom.arbigent.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicSecureTextField
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -26,7 +28,10 @@ fun LauncherScreen(
 ) {
   val devicesStateHolder = appStateHolder.devicesStateHolder
   Column(
-    modifier.width(400.dp).fillMaxHeight(),
+    modifier
+      .width(400.dp)
+      .verticalScroll(rememberScrollState())
+      .padding(8.dp),
     verticalArrangement = Arrangement.Center
   ) {
     GroupHeader("Device Type")
@@ -89,7 +94,7 @@ fun LauncherScreen(
       }
     }
     AiProviderSetting(
-      modifier = Modifier.padding(8.dp)
+      modifier = Modifier.padding(8.dp),
     )
     if (devices.isNotEmpty()) {
       DefaultButton(
