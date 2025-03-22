@@ -189,7 +189,7 @@ jobs:
           xcodebuild -version
       - name: Install applesimutils
         run: brew tap wix/brew && brew install applesimutils
-      - name: Start iOS Simulator with Timeout
+      - name: Start iOS Simulator with Custom Timeout
         run: |
           # List available devices
           xcrun simctl list devices
@@ -202,14 +202,26 @@ jobs:
           echo "Booting iPhone 15 Pro simulator..."
           xcrun simctl boot "iPhone 15 Pro"
           
-          # Wait for the simulator to finish booting using the blocking -b option with a 300s timeout
+          # Start bootstatus in background (-b blocks until boot complete)
           echo "Waiting for simulator to finish booting..."
-          if timeout 300 xcrun simctl bootstatus "iPhone 15 Pro" -b; then
-            echo "Simulator booted successfully."
-          else
-            echo "Error: Simulator failed to boot within the timeout period."
-            exit 1
-          fi
+          xcrun simctl bootstatus "iPhone 15 Pro" -b &
+          BOOT_PID=$!
+          
+          # Set maximum timeout in seconds
+          MAX_TIMEOUT=300
+          elapsed=0
+          
+          # Loop until bootstatus process finishes or timeout is reached
+          while kill -0 $BOOT_PID 2>/dev/null; do
+            sleep 1
+            elapsed=$((elapsed+1))
+            if [ $elapsed -ge $MAX_TIMEOUT ]; then
+              echo "Error: Simulator failed to boot within the timeout period."
+              kill $BOOT_PID
+              exit 1
+            fi
+          done
+          echo "Simulator booted successfully."
 
       - name: CLI E2E test for iOS
         env:
