@@ -215,6 +215,7 @@ jobs:
           while kill -0 $BOOT_PID 2>/dev/null; do
             sleep 1
             elapsed=$((elapsed+1))
+            echo "Elapsed time: $elapsed seconds"
             if [ $elapsed -ge $MAX_TIMEOUT ]; then
               echo "Error: Simulator failed to boot within the timeout period."
               kill $BOOT_PID
