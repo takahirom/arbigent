@@ -18,6 +18,7 @@ import io.github.takahirom.robospec.DescribedBehavior
 import io.github.takahirom.robospec.DescribedBehaviors
 import io.github.takahirom.robospec.describeBehaviors
 import io.github.takahirom.robospec.execute
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -98,16 +99,14 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
               changeScenarioId("scenario1")
               enterImageAssertion("The screen should show the app")
             }
-            describe("when run") {
-              describe("should finish the scenario") {
-                doIt {
-                  clickRunButton()
-                  waitUntilScenarioRunning()
-                }
-                itShould("show goal achieved") {
-                  capture(it)
-                  assertGoalAchieved()
-                }
+            describe("when run and finish the scenario") {
+              doIt {
+                clickRunButton()
+                waitUntilScenarioRunning()
+              }
+              itShould("show goal achieved") {
+                capture(it)
+                assertGoalAchieved()
               }
             }
             describe("when ai fail with image and run") {
@@ -417,6 +416,7 @@ class TestRobot(
     }
   }
 
+  @OptIn(ExperimentalCoroutinesApi::class)
   fun waitALittle() {
     testScope.advanceUntilIdle()
   }
@@ -462,6 +462,7 @@ class TestRobot(
   }
 
   fun expandOptions() {
+    debugCapture()
     composeUiTest.onNode(hasContentDescription("Expand Options")).performClick()
     composeUiTest.waitUntilAtLeastOneExists(hasContentDescription("Collapse Options"))
     // To make the test deterministic
@@ -539,6 +540,10 @@ class TestRobot(
       .performTextClearance()
     composeUiTest.onNode(hasTestTag("scenario_id"))
       .performTextInput(id)
+  }
+
+  fun debugCapture() {
+    composeUiTest.onAllNodes(isRoot()).onLast().captureRoboImage("debug.png")
   }
 
   fun capture(describedBehavior: DescribedBehavior<TestRobot>) {
@@ -630,6 +635,7 @@ class TestRobot(
 
   fun closeProjectSettingsDialog() {
     composeUiTest.onNode(hasText("Close")).performClick()
+    composeUiTest.onNode(hasTestTag("project_settings_dialog")).assertDoesNotExist()
   }
 
   fun openProjectSettings() {
