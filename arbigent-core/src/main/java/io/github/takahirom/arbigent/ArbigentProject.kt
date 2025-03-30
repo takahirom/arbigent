@@ -31,22 +31,47 @@ public class ArbigentProject(
     }
   }
 
+  /**
+   * Executes the given block within an MCP scope, connecting to the MCP server before execution
+   * and closing the connection after execution.
+   *
+   * @param block The block of code to execute within the MCP scope.
+   * @return The result of the block execution.
+   */
+  public suspend fun <T> mcpScope(block: suspend () -> T): T {
+    val mcpClient = MCPClient(settings.mcpJson)
+    try {
+      arbigentInfoLog("Connecting to MCP server...")
+      mcpClient.connect()
+      arbigentInfoLog("Connected to MCP server")
+      
+      return block()
+    } finally {
+      arbigentInfoLog("Closing MCP connection...")
+      mcpClient.close()
+      arbigentInfoLog("MCP connection closed")
+    }
+  }
 
   public suspend fun execute() {
-    executeScenarios(leafScenarioAssignments().map { it.scenario })
+    mcpScope {
+      executeScenarios(leafScenarioAssignments().map { it.scenario })
+    }
   }
 
   public suspend fun executeScenarios(scenarios: List<ArbigentScenario>) {
-    scenarios.forEach { scenario ->
-      arbigentInfoLog("Start scenario: $scenario")
-      val scenarioExecutor =
-        scenarioAssignments().first { it.scenario.id == scenario.id }.scenarioExecutor
-      try {
-        scenarioExecutor.execute(scenario)
-      } catch (e: FailedToArchiveException) {
-        arbigentErrorLog("Failed to archive: $scenario" + e.stackTraceToString())
+    mcpScope {
+      scenarios.forEach { scenario ->
+        arbigentInfoLog("Start scenario: $scenario")
+        val scenarioExecutor =
+          scenarioAssignments().first { it.scenario.id == scenario.id }.scenarioExecutor
+        try {
+          scenarioExecutor.execute(scenario)
+        } catch (e: FailedToArchiveException) {
+          arbigentErrorLog("Failed to archive: $scenario" + e.stackTraceToString())
+        }
+        arbigentDebugLog(scenarioExecutor.statusText())
       }
-      arbigentDebugLog(scenarioExecutor.statusText())
     }
   }
 
@@ -54,11 +79,13 @@ public class ArbigentProject(
     .filter { it.scenario.isLeaf }
 
   public suspend fun execute(scenario: ArbigentScenario) {
-    arbigentInfoLog("Start scenario: $scenario")
-    val scenarioExecutor =
-      scenarioAssignments().first { it.scenario.id == scenario.id }.scenarioExecutor
-    scenarioExecutor.execute(scenario)
-    arbigentDebugLog(scenarioExecutor.statusText())
+    mcpScope {
+      arbigentInfoLog("Start scenario: $scenario")
+      val scenarioExecutor =
+        scenarioAssignments().first { it.scenario.id == scenario.id }.scenarioExecutor
+      scenarioExecutor.execute(scenario)
+      arbigentDebugLog(scenarioExecutor.statusText())
+    }
   }
 
   public fun cancel() {
