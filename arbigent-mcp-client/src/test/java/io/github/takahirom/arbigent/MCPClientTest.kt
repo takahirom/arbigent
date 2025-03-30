@@ -4,7 +4,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 
 class MCPClientTest {
     @Test
@@ -23,13 +22,13 @@ class MCPClientTest {
           }
         }
         """.trimIndent()
-        
+
         val mcpClient = MCPClient(jsonString)
         assertEquals(jsonString, mcpClient.jsonString)
     }
-    
+
     @Test
-    fun `test executeTool`() {
+    fun `test executeTool when not connected`() {
         // Create a tool and execute it
         val tool = Tool(
             name = "test-tool",
@@ -39,16 +38,24 @@ class MCPClientTest {
                 required = listOf("param")
             )
         )
-        
+
         val executeToolArgs = ExecuteToolArgs(
             arguments = JsonObject(mapOf("param" to JsonPrimitive("value")))
         )
-        
+
         val mcpClient = MCPClient("{}")
-        
-        // This should throw an IllegalStateException because we haven't connected
-        assertFailsWith<IllegalStateException> {
-            mcpClient.executeTool(tool, executeToolArgs)
-        }
+
+        // This should return a default result because we haven't connected
+        val result = mcpClient.executeTool(tool, executeToolArgs)
+        assertEquals("[MCP server not available]", result.content)
+    }
+
+    @Test
+    fun `test tools when not connected`() {
+        val mcpClient = MCPClient("{}")
+
+        // This should return an empty list because we haven't connected
+        val tools = mcpClient.tools()
+        assertEquals(emptyList(), tools)
     }
 }
