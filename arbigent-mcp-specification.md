@@ -2,7 +2,7 @@
 
 ## What users can do
 1. Launch Arbigent UI
-2. Edit json string in UI(ProjectSettingsDialog) . Users can directly edit json string.
+2. Edit json string in UI(ProjectSettingsDialog) . Users can directly edit json string. The json string is in one yaml field string. mcpJson: "{...}"
 3. Save json string in the project yaml field
 4. Connect to MCP server
 5. Get tool list
