@@ -5,6 +5,7 @@ import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
 import com.charleskorn.kaml.YamlMultiLineStringStyle
 import com.charleskorn.kaml.MultiLineStringStyle
+import io.github.takahirom.arbigent.ArbigentProjectSettings.Companion.DefaultMcpJson
 import io.github.takahirom.arbigent.result.ArbigentProjectExecutionResult
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import kotlinx.serialization.Contextual
@@ -98,8 +99,12 @@ public data class ArbigentProjectSettings(
   public val cacheStrategy: CacheStrategy = CacheStrategy(),
   public val aiOptions: ArbigentAiOptions? = null,
   @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
-  public val mcpJson: String = "{}"
-)
+  public val mcpJson: String = DefaultMcpJson,
+) {
+  public companion object {
+    public const val DefaultMcpJson: String = "{}"
+  }
+}
 
 @Serializable
 public data class ArbigentPrompt(
@@ -171,7 +176,12 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
             nodeScenario.imageAssertionHistoryCount
           ),
           aiDecisionCache = aiDecisionCache,
-          cacheOptions = nodeScenario.cacheOptions ?: ArbigentScenarioCacheOptions()
+          cacheOptions = nodeScenario.cacheOptions ?: ArbigentScenarioCacheOptions(),
+          mcpClient = if (projectSettings.mcpJson.isNotBlank() && projectSettings.mcpJson != DefaultMcpJson) {
+            MCPClient(projectSettings.mcpJson)
+          } else {
+            null
+          }
         ).apply {
           aiOptions(projectSettings.aiOptions?.mergeWith(nodeScenario.aiOptions) ?: nodeScenario.aiOptions)
           ai(aiFactory())

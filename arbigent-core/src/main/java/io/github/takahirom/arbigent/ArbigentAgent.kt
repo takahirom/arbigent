@@ -35,6 +35,7 @@ public class ArbigentAgent(
   private val deviceFormFactor = agentConfig.deviceFormFactor
   private val prompt = agentConfig.prompt
   private val aiOptions = agentConfig.aiOptions
+  public val mcpClient: MCPClient? = agentConfig.mcpClient
 
   private val executeInterceptors: List<ArbigentExecutionInterceptor> = interceptors
     .filterIsInstance<ArbigentExecutionInterceptor>()
@@ -306,7 +307,8 @@ public class AgentConfig(
   internal val deviceFactory: () -> ArbigentDevice,
   internal val deviceFormFactor: ArbigentScenarioDeviceFormFactor,
   internal val prompt: ArbigentPrompt,
-  internal val aiOptions: ArbigentAiOptions?
+  internal val aiOptions: ArbigentAiOptions?,
+  internal val mcpClient: MCPClient? = null
 ) {
   public class Builder {
     private val interceptors = mutableListOf<ArbigentInterceptor>()
@@ -316,6 +318,7 @@ public class AgentConfig(
       ArbigentScenarioDeviceFormFactor.Mobile
     private var prompt: ArbigentPrompt = ArbigentPrompt()
     private var aiOptions: ArbigentAiOptions? = null
+    private var mcpClient: MCPClient? = null
 
     public fun addInterceptor(interceptor: ArbigentInterceptor) {
       interceptors.add(0, interceptor)
@@ -341,6 +344,10 @@ public class AgentConfig(
       this.aiOptions = aiOptions
     }
 
+    public fun mcpClient(mcpClient: MCPClient?) {
+      this.mcpClient = mcpClient
+    }
+
     public fun build(): AgentConfig {
       return AgentConfig(
         interceptors = interceptors,
@@ -348,7 +355,8 @@ public class AgentConfig(
         deviceFactory = deviceFactory!!,
         deviceFormFactor = deviceFormFactor,
         prompt = prompt,
-        aiOptions = aiOptions
+        aiOptions = aiOptions,
+        mcpClient = mcpClient
       )
     }
   }
@@ -361,6 +369,7 @@ public class AgentConfig(
     builder.deviceFactory(deviceFactory)
     builder.ai(ai)
     builder.aiOptions(aiOptions)
+    builder.mcpClient(mcpClient)
     return builder
   }
 }
@@ -508,9 +517,11 @@ public fun AgentConfigBuilder(
   imageAssertions: ArbigentImageAssertions,
   aiDecisionCache: ArbigentAiDecisionCache = ArbigentAiDecisionCache.Disabled,
   cacheOptions: ArbigentScenarioCacheOptions,
+  mcpClient: MCPClient? = null,
 ): AgentConfig.Builder = AgentConfigBuilder {
   deviceFormFactor(deviceFormFactor)
   prompt(prompt)
+  mcpClient(mcpClient)
   // Add basic decision interceptor
   addInterceptor(object : ArbigentDecisionInterceptor {
     override suspend fun intercept(
