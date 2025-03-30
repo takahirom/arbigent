@@ -462,7 +462,6 @@ class TestRobot(
   }
 
   fun expandOptions() {
-    debugCapture()
     composeUiTest.onNode(hasContentDescription("Expand Options")).performClick()
     composeUiTest.waitUntilAtLeastOneExists(hasContentDescription("Collapse Options"))
     // To make the test deterministic
