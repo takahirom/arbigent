@@ -67,6 +67,7 @@ class ArbigentAppStateHolder(
   val tagManager = ArbigentTagManager()
   val cacheStrategyFlow = MutableStateFlow(CacheStrategy())
   val aiOptionsFlow = MutableStateFlow<ArbigentAiOptions?>(null)
+  val mcpJsonFlow = MutableStateFlow("{}")
   val decisionCache = cacheStrategyFlow
     .map {
       val decisionCacheStrategy = it.aiDecisionCacheStrategy
@@ -138,7 +139,8 @@ class ArbigentAppStateHolder(
       settings = ArbigentProjectSettings(
         prompt = promptFlow.value,
         cacheStrategy = cacheStrategyFlow.value,
-        aiOptions = aiOptionsFlow.value
+        aiOptions = aiOptionsFlow.value,
+        mcpJson = mcpJsonFlow.value
       ),
       initialScenarios = allScenarioStateHoldersStateFlow.value.map { scenario ->
         scenario.createScenario(allScenarioStateHoldersStateFlow.value)
@@ -163,7 +165,8 @@ class ArbigentAppStateHolder(
         projectSettings = ArbigentProjectSettings(
           this@ArbigentAppStateHolder.promptFlow.value,
           this@ArbigentAppStateHolder.cacheStrategyFlow.value,
-          this@ArbigentAppStateHolder.aiOptionsFlow.value
+          this@ArbigentAppStateHolder.aiOptionsFlow.value,
+          this@ArbigentAppStateHolder.mcpJsonFlow.value
         ),
         scenario = createArbigentScenarioContent(),
         aiFactory = aiFactory,
@@ -253,7 +256,8 @@ class ArbigentAppStateHolder(
         settings = ArbigentProjectSettings(
           promptFlow.value,
           cacheStrategyFlow.value,
-          aiOptionsFlow.value
+          aiOptionsFlow.value,
+          mcpJsonFlow.value
         ),
         scenarioContents = sortedScenarios.map {
           it.createArbigentScenarioContent()
@@ -286,6 +290,7 @@ class ArbigentAppStateHolder(
     promptFlow.value = projectFile.settings.prompt
     cacheStrategyFlow.value = projectFile.settings.cacheStrategy
     aiOptionsFlow.value = projectFile.settings.aiOptions
+    mcpJsonFlow.value = projectFile.settings.mcpJson
     projectStateFlow.value = ArbigentProject(
       settings = projectFile.settings,
       initialScenarios = arbigentScenarioStateHolders.map {
@@ -369,6 +374,10 @@ class ArbigentAppStateHolder(
       return
     }
     aiOptionsFlow.value = options
+  }
+
+  fun onMcpJsonChanged(json: String) {
+    mcpJsonFlow.value = json
   }
 
   fun scenarioCountById(newScenarioId: String): Int {

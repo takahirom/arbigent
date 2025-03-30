@@ -185,6 +185,29 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
             }
           )
         }
+
+        GroupHeader("MCP JSON Configuration")
+        val mcpJson: TextFieldState = remember {
+          TextFieldState(
+            appStateHolder.mcpJsonFlow.value
+          )
+        }
+        LaunchedEffect(Unit) {
+          snapshotFlow { mcpJson.text }.collect { text ->
+            if (text.isNotBlank()) {
+              appStateHolder.onMcpJsonChanged(text.toString())
+            }
+          }
+        }
+        TextArea(
+          state = mcpJson,
+          modifier = Modifier
+            .padding(8.dp)
+            .height(200.dp)
+            .testTag("mcp_json"),
+          placeholder = { Text("MCP JSON Configuration") },
+          decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
+        )
         // Close Button
         ActionButton(
           onClick = onCloseRequest,
