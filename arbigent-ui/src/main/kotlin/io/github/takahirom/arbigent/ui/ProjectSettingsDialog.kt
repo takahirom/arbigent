@@ -44,170 +44,173 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
     resizable = false,
     content = {
       val scrollState = rememberScrollState()
-      Column(
-        modifier = Modifier
-          .padding(16.dp)
-          .verticalScroll(scrollState)
-      ) {
-        val additionalSystemPrompt: TextFieldState = remember {
-          TextFieldState(
-            appStateHolder.promptFlow.value.additionalSystemPrompts.firstOrNull() ?: ""
+      Column {
+        Column(
+          modifier = Modifier
+            .padding(16.dp)
+            .weight(1F)
+            .verticalScroll(scrollState)
+        ) {
+          val additionalSystemPrompt: TextFieldState = remember {
+            TextFieldState(
+              appStateHolder.promptFlow.value.additionalSystemPrompts.firstOrNull() ?: ""
+            )
+          }
+          LaunchedEffect(Unit) {
+            snapshotFlow { additionalSystemPrompt.text }.collect {
+              if (it.isNotBlank()) {
+                appStateHolder.onPromptChanged(
+                  appStateHolder.promptFlow.value.copy(additionalSystemPrompts = listOf(it.toString()))
+                )
+              }
+            }
+          }
+          GroupHeader("Version")
+          Text(
+            text = BuildConfig.VERSION_NAME,
+            modifier = Modifier.padding(8.dp)
           )
-        }
-        LaunchedEffect(Unit) {
-          snapshotFlow { additionalSystemPrompt.text }.collect {
-            if (it.isNotBlank()) {
-              appStateHolder.onPromptChanged(
-                appStateHolder.promptFlow.value.copy(additionalSystemPrompts = listOf(it.toString()))
+          GroupHeader("Additional System Prompt")
+          TextArea(
+            state = additionalSystemPrompt,
+            modifier = Modifier
+              .padding(8.dp)
+              .height(60.dp)
+              .testTag("additional_system_prompt"),
+            placeholder = { Text("Additional System Prompt") },
+            decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
+          )
+
+          GroupHeader("AI Options")
+          val aiOptions by appStateHolder.aiOptionsFlow.collectAsState()
+          val currentOptions = aiOptions ?: ArbigentAiOptions()
+          AiOptionsComponent(
+            currentOptions = currentOptions,
+            onOptionsChanged = appStateHolder::onAiOptionsChanged
+          )
+          GroupHeader {
+            Text("User Prompt Template")
+            IconActionButton(
+              key = AllIconsKeys.General.Information,
+              onClick = {},
+              contentDescription = "Prompt Template Info",
+              hint = Size(16),
+            ) {
+              Text(
+                text = "Available placeholders:\n" +
+                  "{{USER_INPUT_GOAL}} - The goal of the scenario\n" +
+                  "{{CURRENT_STEP}} - Current step number\n" +
+                  "{{MAX_STEP}} - Maximum steps allowed\n" +
+                  "{{STEPS}} - Steps completed so far"
               )
             }
           }
-        }
-        GroupHeader("Version")
-        Text(
-          text = BuildConfig.VERSION_NAME,
-          modifier = Modifier.padding(8.dp)
-        )
-        GroupHeader("Additional System Prompt")
-        TextArea(
-          state = additionalSystemPrompt,
-          modifier = Modifier
-            .padding(8.dp)
-            .height(60.dp)
-            .testTag("additional_system_prompt"),
-          placeholder = { Text("Additional System Prompt") },
-          decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
-        )
-
-        GroupHeader("AI Options")
-        val aiOptions by appStateHolder.aiOptionsFlow.collectAsState()
-        val currentOptions = aiOptions ?: ArbigentAiOptions()
-        AiOptionsComponent(
-            currentOptions = currentOptions,
-            onOptionsChanged = appStateHolder::onAiOptionsChanged
-        )
-        GroupHeader {
-          Text("User Prompt Template")
-          IconActionButton(
-            key = AllIconsKeys.General.Information,
-            onClick = {},
-            contentDescription = "Prompt Template Info",
-            hint = Size(16),
-          ) {
-            Text(
-              text = "Available placeholders:\n" +
-                "{{USER_INPUT_GOAL}} - The goal of the scenario\n" +
-                "{{CURRENT_STEP}} - Current step number\n" +
-                "{{MAX_STEP}} - Maximum steps allowed\n" +
-                "{{STEPS}} - Steps completed so far"
+          var isValidTemplate by remember { mutableStateOf(true) }
+          val userPromptTemplate: TextFieldState = remember {
+            TextFieldState(
+              appStateHolder.promptFlow.value.userPromptTemplate
             )
           }
-        }
-        var isValidTemplate by remember { mutableStateOf(true) }
-        val userPromptTemplate: TextFieldState = remember {
-          TextFieldState(
-            appStateHolder.promptFlow.value.userPromptTemplate
-          )
-        }
-        LaunchedEffect(Unit) {
-          snapshotFlow { userPromptTemplate.text }.collect { text ->
-            if (text.isNotBlank()) {
-              isValidTemplate = try {
-                UserPromptTemplate(text.toString())
-                appStateHolder.onPromptChanged(
-                  appStateHolder.promptFlow.value.copy(userPromptTemplate = text.toString())
-                )
-                true
-              } catch (e: IllegalArgumentException) {
-                false
+          LaunchedEffect(Unit) {
+            snapshotFlow { userPromptTemplate.text }.collect { text ->
+              if (text.isNotBlank()) {
+                isValidTemplate = try {
+                  UserPromptTemplate(text.toString())
+                  appStateHolder.onPromptChanged(
+                    appStateHolder.promptFlow.value.copy(userPromptTemplate = text.toString())
+                  )
+                  true
+                } catch (e: IllegalArgumentException) {
+                  false
+                }
               }
             }
           }
-        }
-        TextArea(
-          state = userPromptTemplate,
-          modifier = Modifier
-            .padding(8.dp)
-            .height(120.dp)
-            .testTag("user_prompt_template"),
-          placeholder = { Text("User Prompt Template") },
-          decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
-        )
-        if (!isValidTemplate) {
-          Text(
-            text = "Template must contain all required placeholders: {{USER_INPUT_GOAL}}, {{CURRENT_STEP}}, {{MAX_STEP}}, {{STEPS}}",
-            color = Color.Red,
-            modifier = Modifier.padding(4.dp)
+          TextArea(
+            state = userPromptTemplate,
+            modifier = Modifier
+              .padding(8.dp)
+              .height(120.dp)
+              .testTag("user_prompt_template"),
+            placeholder = { Text("User Prompt Template") },
+            decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
           )
-        }
-        GroupHeader("AI decision cache")
-        val cacheStrategy by appStateHolder.cacheStrategyFlow.collectAsState()
-        Dropdown(
-          modifier = Modifier.padding(8.dp),
-          menuContent = {
-            selectableItem(
-              cacheStrategy.aiDecisionCacheStrategy == AiDecisionCacheStrategy.Disabled,
-              onClick = {
-                appStateHolder.onCacheStrategyChanged(
-                  appStateHolder.cacheStrategyFlow.value.copy(aiDecisionCacheStrategy = AiDecisionCacheStrategy.Disabled)
-                )
-              }
-            ) {
-              Text("Disabled")
-            }
-            selectableItem(
-              cacheStrategy.aiDecisionCacheStrategy is AiDecisionCacheStrategy.InMemory,
-              onClick = {
-                appStateHolder.onCacheStrategyChanged(
-                  appStateHolder.cacheStrategyFlow.value.copy(aiDecisionCacheStrategy = AiDecisionCacheStrategy.InMemory())
-                )
-              }
-            ) {
-              Text("InMemory")
-            }
-            selectableItem(
-              cacheStrategy.aiDecisionCacheStrategy is AiDecisionCacheStrategy.Disk,
-              onClick = {
-                appStateHolder.onCacheStrategyChanged(
-                  appStateHolder.cacheStrategyFlow.value.copy(aiDecisionCacheStrategy = AiDecisionCacheStrategy.Disk())
-                )
-              }
-            ) {
-              Text("Disk")
-            }
+          if (!isValidTemplate) {
+            Text(
+              text = "Template must contain all required placeholders: {{USER_INPUT_GOAL}}, {{CURRENT_STEP}}, {{MAX_STEP}}, {{STEPS}}",
+              color = Color.Red,
+              modifier = Modifier.padding(4.dp)
+            )
           }
-        ) {
-          Text(
-            when (cacheStrategy.aiDecisionCacheStrategy) {
-              is AiDecisionCacheStrategy.Disabled -> "Disabled"
-              is AiDecisionCacheStrategy.InMemory -> "InMemory"
-              is AiDecisionCacheStrategy.Disk -> "Disk"
+          GroupHeader("AI decision cache")
+          val cacheStrategy by appStateHolder.cacheStrategyFlow.collectAsState()
+          Dropdown(
+            modifier = Modifier.padding(8.dp),
+            menuContent = {
+              selectableItem(
+                cacheStrategy.aiDecisionCacheStrategy == AiDecisionCacheStrategy.Disabled,
+                onClick = {
+                  appStateHolder.onCacheStrategyChanged(
+                    appStateHolder.cacheStrategyFlow.value.copy(aiDecisionCacheStrategy = AiDecisionCacheStrategy.Disabled)
+                  )
+                }
+              ) {
+                Text("Disabled")
+              }
+              selectableItem(
+                cacheStrategy.aiDecisionCacheStrategy is AiDecisionCacheStrategy.InMemory,
+                onClick = {
+                  appStateHolder.onCacheStrategyChanged(
+                    appStateHolder.cacheStrategyFlow.value.copy(aiDecisionCacheStrategy = AiDecisionCacheStrategy.InMemory())
+                  )
+                }
+              ) {
+                Text("InMemory")
+              }
+              selectableItem(
+                cacheStrategy.aiDecisionCacheStrategy is AiDecisionCacheStrategy.Disk,
+                onClick = {
+                  appStateHolder.onCacheStrategyChanged(
+                    appStateHolder.cacheStrategyFlow.value.copy(aiDecisionCacheStrategy = AiDecisionCacheStrategy.Disk())
+                  )
+                }
+              ) {
+                Text("Disk")
+              }
             }
-          )
-        }
+          ) {
+            Text(
+              when (cacheStrategy.aiDecisionCacheStrategy) {
+                is AiDecisionCacheStrategy.Disabled -> "Disabled"
+                is AiDecisionCacheStrategy.InMemory -> "InMemory"
+                is AiDecisionCacheStrategy.Disk -> "Disk"
+              }
+            )
+          }
 
-        GroupHeader("MCP JSON Configuration")
-        val mcpJson: TextFieldState = remember {
-          TextFieldState(
-            appStateHolder.mcpJsonFlow.value
-          )
-        }
-        LaunchedEffect(Unit) {
-          snapshotFlow { mcpJson.text }.collect { text ->
-            if (text.isNotBlank()) {
-              appStateHolder.onMcpJsonChanged(text.toString())
+          GroupHeader("MCP JSON Configuration")
+          val mcpJson: TextFieldState = remember {
+            TextFieldState(
+              appStateHolder.mcpJsonFlow.value
+            )
+          }
+          LaunchedEffect(Unit) {
+            snapshotFlow { mcpJson.text }.collect { text ->
+              if (text.isNotBlank()) {
+                appStateHolder.onMcpJsonChanged(text.toString())
+              }
             }
           }
+          TextArea(
+            state = mcpJson,
+            modifier = Modifier
+              .padding(8.dp)
+              .height(200.dp)
+              .testTag("mcp_json"),
+            placeholder = { Text("MCP JSON Configuration") },
+            decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
+          )
         }
-        TextArea(
-          state = mcpJson,
-          modifier = Modifier
-            .padding(8.dp)
-            .height(200.dp)
-            .testTag("mcp_json"),
-          placeholder = { Text("MCP JSON Configuration") },
-          decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
-        )
         // Close Button
         ActionButton(
           onClick = onCloseRequest,
