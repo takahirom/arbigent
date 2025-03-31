@@ -16,16 +16,13 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
-import io.ktor.http.ContentType
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.contentType
+import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.MissingFieldException
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.modules.SerializersModule
@@ -442,39 +439,6 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
       val responseBody = response.bodyAsText()
       return@runBlocking responseBody
     }
-  }
-
-  private fun buildActionSchema(agentActionTypes: List<AgentActionType>): JsonObject {
-    val actions = agentActionTypes.map { it.actionName }.joinToString { "\"$it\"" }
-    val schemaJson = """
-    {
-      "name": "ActionSchema",
-      "description": "Schema for user actions",
-      "strict": true,
-      "schema": {
-        "type": "object",
-        "required": ["image-description","memo",  "action", "text"],
-        "additionalProperties": false,
-        "properties": {
-          "image-description": {
-            "type": "string"
-          },
-          "memo": {
-            "type": "string"
-          },
-          "action": {
-            "type": "string",
-            "enum": [$actions]
-          },
-          "text": {
-            "type": "string",
-            "nullable": true
-          }
-        }
-      }
-    }
-    """.trimIndent()
-    return Json.parseToJsonElement(schemaJson).jsonObject
   }
 
   private fun buildTools(agentActionTypes: List<AgentActionType>): List<ToolDefinition> {
