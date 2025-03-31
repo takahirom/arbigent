@@ -23,8 +23,35 @@ public sealed interface ArbigentAgentAction {
 
 public interface AgentActionType {
   public val actionName: String
-  public fun templateForAI(): String
+
+  /**
+   * Returns a description of the action.
+   * Default implementation extracts the description from the comment in templateForAI().
+   */
+  public fun actionDescription(): String = 
+    templateForAI().lines()
+      .filter { it.contains("//") }
+      .joinToString(" ") { it.substringAfter("//").trim() }
+      .ifEmpty { "Perform $actionName action" }
+
+  /**
+   * Returns a list of argument descriptions for the action.
+   * Default implementation extracts the argument descriptions from templateForAI().
+   */
+  public fun argumentDescription(): List<String> = 
+    listOf("\"text\": {", 
+           "  \"type\": \"string\",", 
+           "  \"description\": \"Parameter for the $actionName action\"", 
+           "}")
+
   public fun isSupported(deviceOs: ArbigentDeviceOs): Boolean = true
+
+  /**
+   * Returns a template for the action in JSON format.
+   * This method is deprecated. Use actionDescription() and argumentDescription() instead.
+   */
+  @Deprecated("Use actionDescription() and argumentDescription() instead")
+  public fun templateForAI(): String
 }
 
 private fun getRegexToIndex(text: String): Pair<String, String> {
@@ -57,6 +84,15 @@ public data class ClickWithIndex(val index: Int): ArbigentAgentAction {
 
   public companion object : AgentActionType {
     override val actionName: String = "ClickWithIndex"
+
+    override fun actionDescription(): String = "Click on an element by its index in the UI hierarchy"
+
+    override fun argumentDescription(): List<String> = listOf(
+        "\"text\": {",
+        "  \"type\": \"string\",",
+        "  \"description\": \"Index of the element to click (e.g., 1, 2). Should be a number, not text or ID.\"",
+        "}"
+    )
 
     override fun templateForAI(): String {
       return """
