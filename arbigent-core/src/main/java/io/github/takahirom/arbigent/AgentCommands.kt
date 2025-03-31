@@ -34,15 +34,34 @@ public interface AgentActionType {
       .joinToString(" ") { it.substringAfter("//").trim() }
       .ifEmpty { "Perform $actionName action" }
 
+  public data class Parameter(
+    val name: String,
+    val type: String,
+    val description: String
+  ) {
+    public fun toJson(): String {
+      return """
+        {
+          "name": "$name",
+          "type": "$type",
+          "description": "$description"
+        }
+      """.trimIndent()
+    }
+  }
+
   /**
    * Returns a list of argument descriptions for the action.
    * Default implementation extracts the argument descriptions from templateForAI().
    */
-  public fun argumentDescription(): List<String> = 
-    listOf("\"text\": {", 
-           "  \"type\": \"string\",", 
-           "  \"description\": \"Parameter for the $actionName action\"", 
-           "}")
+  public fun argumentDescriptions(): List<Parameter> =
+    listOf(
+      Parameter(
+        name = "text",
+        type = "string",
+        description = "Parameter for the $actionName action"
+      )
+    )
 
   public fun isSupported(deviceOs: ArbigentDeviceOs): Boolean = true
 
@@ -86,13 +105,6 @@ public data class ClickWithIndex(val index: Int): ArbigentAgentAction {
     override val actionName: String = "ClickWithIndex"
 
     override fun actionDescription(): String = "Click on an element by its index in the UI hierarchy"
-
-    override fun argumentDescription(): List<String> = listOf(
-        "\"text\": {",
-        "  \"type\": \"string\",",
-        "  \"description\": \"Index of the element to click (e.g., 1, 2). Should be a number, not text or ID.\"",
-        "}"
-    )
 
     override fun templateForAI(): String {
       return """

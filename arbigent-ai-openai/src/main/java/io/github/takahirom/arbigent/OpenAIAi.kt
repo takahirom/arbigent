@@ -325,15 +325,15 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
 
         val actionKey = functionName.removePrefix("perform_")
         // Convert action key to proper case if needed (e.g., "clickwithindex" -> "ClickWithIndex")
-        val actionName = agentActionList.find { 
-          it.actionName.equals(actionKey, ignoreCase = true) 
+        val actionName = agentActionList.find {
+          it.actionName.equals(actionKey, ignoreCase = true)
         }?.actionName ?: actionKey
 
         json.parseToJsonElement(toolCall.function.arguments).jsonObject to actionName
       } else if (message.content != null) {
         // Handle regular response (legacy format)
         val jsonObj = json.parseToJsonElement(message.content).jsonObject
-        val actionName = jsonObj["action"]?.jsonPrimitive?.content 
+        val actionName = jsonObj["action"]?.jsonPrimitive?.content
           ?: throw IllegalArgumentException("Action not found in response content")
         jsonObj to actionName
       } else {
@@ -341,7 +341,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
       }
 
       val agentActionMap = agentActionList.associateBy { it.actionName }
-      val actionPrototype = agentActionMap[action] 
+      val actionPrototype = agentActionMap[action]
         ?: throw IllegalArgumentException("Unknown action: $action. Available actions: ${agentActionMap.keys.joinToString()}")
       val agentAction: ArbigentAgentAction = when (actionPrototype) {
         GoalAchievedAgentAction -> GoalAchievedAgentAction()
@@ -527,10 +527,13 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
         function = FunctionDefinition(
           name = "perform_${actionType.actionName.lowercase()}",
           description = actionType.actionDescription(),
-          parameters = Json.parseToJsonElement("""
+          parameters = Json.parseToJsonElement(
+            """
           {
             "type": "object",
-            "required": ["image-description", "memo"${if (actionType.argumentDescription().isNotEmpty()) ", \"text\"" else ""}],
+            "required": ["image-description", "memo"${
+            if (actionType.argumentDescriptions().isNotEmpty()) ", \"text\"" else ""
+          }],
             "additionalProperties": false,
             "properties": {
               "image-description": {
@@ -540,7 +543,11 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
               "memo": {
                 "type": "string",
                 "description": "Additional notes or observations"
-              }${if (actionType.argumentDescription().isNotEmpty()) ",\n" + actionType.argumentDescription().joinToString("\n") { it } else ""}
+              }${
+            if (actionType.argumentDescriptions().isNotEmpty()) {
+              ",\n" + actionType.argumentDescriptions().joinToString("\n") { it.toJson() }
+            } else ""
+          }
             }
           }
           """).jsonObject,
