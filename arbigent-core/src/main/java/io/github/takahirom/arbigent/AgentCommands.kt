@@ -1,6 +1,5 @@
 package io.github.takahirom.arbigent
 
-import com.oracle.truffle.regex.tregex.util.json.JsonString
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonPrimitive
 import maestro.KeyCode
