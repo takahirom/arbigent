@@ -242,57 +242,14 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     aiOptions: ArbigentAiOptions,
     tools: List<Tool>? = null,
   ): String {
-    val templates = agentActionTypes.joinToString("\nor\n") { it.templateForAI() }
     val focusedTreeText = focusedTree.orEmpty().ifBlank { "No focused tree" }
     val uiElements = elements.getPromptTexts().ifBlank { "No UI elements to select. Please check the image." }
-
-    // Format tools if available and include them in the action templates
-    val actionTemplatesWithTools = if (!tools.isNullOrEmpty()) {
-      val toolsText = formatToolsForPrompt(tools)
-      "$templates\n\n$toolsText"
-    } else {
-      templates
-    }
 
     return contextHolder.prompt(
       uiElements = uiElements,
       focusedTree = focusedTreeText,
-      actionTemplates = actionTemplatesWithTools,
       aiOptions = aiOptions
     )
-  }
-
-  private fun formatToolsForPrompt(tools: List<Tool>): String {
-    val sb = StringBuilder("<TOOLS>\n")
-
-    tools.forEach { tool ->
-      sb.append("  <TOOL name=\"${tool.name}\">\n")
-      if (tool.description != null) {
-        sb.append("    <DESCRIPTION>${tool.description}</DESCRIPTION>\n")
-      }
-
-      val schema = tool.inputSchema
-      if (schema != null) {
-        val properties = schema.properties
-        val requiredParams = schema.required
-
-        if (properties.isNotEmpty()) {
-          sb.append("    <PARAMETERS>\n")
-          properties.forEach { (name, detailsJsonElement) ->
-            val isRequired = name in requiredParams
-            sb.append("      <PARAMETER name=\"$name\"")
-            if (isRequired) sb.append(" required=\"true\"")
-            sb.append("/>\n")
-          }
-          sb.append("    </PARAMETERS>\n")
-        }
-      }
-
-      sb.append("  </TOOL>\n")
-    }
-
-    sb.append("</TOOLS>")
-    return sb.toString()
   }
 
   private fun parseResponse(

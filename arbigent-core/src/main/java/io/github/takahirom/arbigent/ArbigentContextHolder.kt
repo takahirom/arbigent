@@ -86,7 +86,6 @@ public class ArbigentContextHolder(
   public fun prompt(
     uiElements: String,
     focusedTree: String,
-    actionTemplates: String,
     aiOptions: ArbigentAiOptions
   ): String {
     return userPromptTemplate.format(
