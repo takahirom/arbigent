@@ -117,15 +117,16 @@ public class ArbigentAgent(
     )
   private val executeActionsInterceptors: List<ArbigentExecuteActionsInterceptor> = interceptors
     .filterIsInstance<ArbigentExecuteActionsInterceptor>()
-  private val executeActionChain: (ExecuteActionsInput) -> ExecuteActionsOutput =
-    executeActionsInterceptors.foldRight(
-      { input: ExecuteActionsInput -> executeActions(input) },
-      { interceptor: ArbigentExecuteActionsInterceptor, acc: (ExecuteActionsInput) -> ExecuteActionsOutput ->
-        { input ->
-          interceptor.intercept(input) { executeActionsInput -> acc(executeActionsInput) }
-        }
+  private val executeActionChain: suspend (ExecuteActionsInput) -> ExecuteActionsOutput = { input ->
+    var chain: suspend (ExecuteActionsInput) -> ExecuteActionsOutput = { executeActions(input) }
+    executeActionsInterceptors.reversed().forEach { interceptor ->
+      val previousChain = chain
+      chain = { currentInput ->
+        interceptor.intercept(currentInput) { previousChain(it) }
       }
-    )
+    }
+    chain(input)
+  }
   private val coroutineScope =
     CoroutineScope(ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob())
   private var job: Job? = null
@@ -239,7 +240,7 @@ public class ArbigentAgent(
     val stepChain: suspend (StepInput) -> StepResult,
     val decisionChain: suspend (ArbigentAi.DecisionInput) -> ArbigentAi.DecisionOutput,
     val imageAssertionChain: (ArbigentAi.ImageAssertionInput) -> ArbigentAi.ImageAssertionOutput,
-    val executeActionChain: (ExecuteActionsInput) -> ExecuteActionsOutput,
+    val executeActionChain: suspend (ExecuteActionsInput) -> ExecuteActionsOutput,
     val mcpClient: MCPClient? = null,
   )
 
@@ -257,7 +258,7 @@ public class ArbigentAgent(
     val ai: ArbigentAi,
     val decisionChain: suspend (ArbigentAi.DecisionInput) -> ArbigentAi.DecisionOutput,
     val imageAssertionChain: (ArbigentAi.ImageAssertionInput) -> ArbigentAi.ImageAssertionOutput,
-    val executeActionChain: (ExecuteActionsInput) -> ExecuteActionsOutput,
+    val executeActionChain: suspend (ExecuteActionsInput) -> ExecuteActionsOutput,
     val prompt: ArbigentPrompt,
     val aiOptions: ArbigentAiOptions?,
     val cacheOptions: ArbigentScenarioCacheOptions = ArbigentScenarioCacheOptions(),
@@ -784,13 +785,13 @@ public interface ArbigentImageAssertionInterceptor : ArbigentInterceptor {
 }
 
 public interface ArbigentExecuteActionsInterceptor : ArbigentInterceptor {
-  public fun intercept(
+  public suspend fun intercept(
     executeActionsInput: ExecuteActionsInput,
     chain: Chain
   ): ExecuteActionsOutput
 
   public fun interface Chain {
-    public fun proceed(executeActionsInput: ExecuteActionsInput): ExecuteActionsOutput
+    public suspend fun proceed(executeActionsInput: ExecuteActionsInput): ExecuteActionsOutput
   }
 }
 
@@ -846,7 +847,7 @@ public fun defaultAgentActionTypesForTvForVisualMode(): List<AgentActionType> {
   )
 }
 
-private fun executeActions(
+private suspend fun executeActions(
   executeActionsInput: ExecuteActionsInput,
 ): ExecuteActionsOutput {
   val (stepId, decisionOutput, arbigentContextHolder, screenshotFilePath, device) = executeActionsInput

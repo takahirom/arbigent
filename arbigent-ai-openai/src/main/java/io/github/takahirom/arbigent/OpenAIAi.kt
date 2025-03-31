@@ -160,10 +160,11 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
         )
       )
     )
+    val toolDefinitions = buildTools(agentActionTypes = agentActionTypes, mcpTools = decisionInput.mcpTools)
     val completionRequest = ChatCompletionRequest(
       model = modelName,
       messages = messages,
-      tools = buildTools(agentActionTypes = agentActionTypes, mcpTools = decisionInput.mcpTools),
+      tools = toolDefinitions,
     )
     val responseText = try {
       chatCompletion(
@@ -211,7 +212,8 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
           json = json,
           chatCompletionResponse = responseObj,
           messages = messages,
-          decisionInput = decisionInput
+          decisionInput = decisionInput,
+          toolDefinitions = toolDefinitions,
         )
         step
       } catch (e: ArbigentAi.FailedToParseResponseException) {
@@ -219,7 +221,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
           stepId = decisionInput.stepId,
           feedback = "Failed to parse AI response: ${e.message}",
           screenshotFilePath = screenshotFilePath,
-          aiRequest = messages.toHumanReadableString(),
+          aiRequest = messages.toHumanReadableString(toolDefinitions),
           aiResponse = responseText,
           uiTreeStrings = uiTreeStrings,
           cacheKey = decisionInput.cacheKey,
@@ -255,6 +257,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     json: Json,
     chatCompletionResponse: ChatCompletionResponse,
     messages: List<ChatMessage>,
+    toolDefinitions: List<ToolDefinition>,
     decisionInput: ArbigentAi.DecisionInput,
   ): ArbigentContextHolder.Step {
     val screenshotFilePath = decisionInput.screenshotFilePath
@@ -309,7 +312,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
         action = action,
         imageDescription = argumentsJsonData["image-description"]?.jsonPrimitive?.content ?: "",
         memo = argumentsJsonData["memo"]?.jsonPrimitive?.content ?: "",
-        aiRequest = messages.toHumanReadableString(),
+        aiRequest = messages.toHumanReadableString(tools = toolDefinitions),
         aiResponse = message.toString(),
         screenshotFilePath = screenshotFilePath,
         apiCallJsonLFilePath = decisionInput.apiCallJsonLFilePath,
