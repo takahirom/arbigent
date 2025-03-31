@@ -1,5 +1,6 @@
 package io.github.takahirom.arbigent
 
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Test
@@ -46,7 +47,9 @@ class MCPClientTest {
         val mcpClient = MCPClient("{}")
 
         // This should return a default result because we haven't connected
-        val result = mcpClient.executeTool(tool, executeToolArgs)
+        val result = runBlocking {
+            mcpClient.executeTool(tool, executeToolArgs)
+        }
         assertEquals("[MCP server not available]", result.content)
     }
 
@@ -55,7 +58,7 @@ class MCPClientTest {
         val mcpClient = MCPClient("{}")
 
         // This should return an empty list because we haven't connected
-        val tools = mcpClient.tools()
+        val tools = runBlocking { mcpClient.tools() }
         assertEquals(emptyList(), tools)
     }
 }
