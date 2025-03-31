@@ -107,10 +107,6 @@ index:element
 <INSTRUCTIONS>
 Based on the above, decide on the next action to achieve the goal. Please ensure not to repeat the same action. The action must be one of the following:
 </INSTRUCTIONS>
-
-<ACTION_OPTIONS>
-
-</ACTION_OPTIONS>
 """.trimIndent(), result)
     }
 

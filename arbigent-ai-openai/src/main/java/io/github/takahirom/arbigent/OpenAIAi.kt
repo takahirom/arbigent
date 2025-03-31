@@ -522,18 +522,12 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
 
   private fun buildTools(agentActionTypes: List<AgentActionType>): List<ToolDefinition> {
     return agentActionTypes.map { actionType ->
-      ToolDefinition(
-        type = "function",
-        function = FunctionDefinition(
-          name = "perform_${actionType.actionName.lowercase()}",
-          description = actionType.actionDescription(),
-          parameters = Json.parseToJsonElement(
-            """
+      val jsonString = """
           {
             "type": "object",
             "required": ["image-description", "memo"${
-            if (actionType.argumentDescriptions().isNotEmpty()) ", \"text\"" else ""
-          }],
+        if (actionType.arguments().isNotEmpty()) ", \"text\"" else ""
+      }],
             "additionalProperties": false,
             "properties": {
               "image-description": {
@@ -544,13 +538,25 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
                 "type": "string",
                 "description": "Additional notes or observations"
               }${
-            if (actionType.argumentDescriptions().isNotEmpty()) {
-              ",\n" + actionType.argumentDescriptions().joinToString("\n") { it.toJson() }
-            } else ""
-          }
+        if (actionType.arguments().isNotEmpty()) {
+          ",\n" + actionType.arguments().joinToString(",\n") { it.toJson() }
+        } else ""
+      }
             }
           }
-          """).jsonObject,
+          """
+      arbigentDebugLog {
+        "AI action type: ${actionType.actionName} $jsonString"
+      }
+      val parameters = Json.parseToJsonElement(
+        jsonString
+      )
+      ToolDefinition(
+        type = "function",
+        function = FunctionDefinition(
+          name = "perform_${actionType.actionName.lowercase()}",
+          description = actionType.actionDescription(),
+          parameters = parameters.jsonObject,
           strict = true
         )
       )

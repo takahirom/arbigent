@@ -96,7 +96,6 @@ public class ArbigentContextHolder(
       steps = getStepsText(aiOptions),
       uiElements = uiElements,
       focusedTree = focusedTree,
-      actionTemplates = actionTemplates
     )
   }
 
