@@ -278,6 +278,7 @@ public class ArbigentAgent(
     val device: ArbigentDevice,
     val cacheKey: String,
     val elements: ArbigentElementList,
+    val mcpClient: MCPClient? = null,
   )
 
   public class ExecuteActionsOutput
@@ -822,7 +823,7 @@ public fun defaultAgentActionTypesForVisualMode(): List<AgentActionType> {
     ScrollAgentAction,
     WaitAgentAction,
     GoalAchievedAgentAction,
-    FailedAgentAction
+    FailedAgentAction,
   )
 }
 
@@ -841,7 +842,7 @@ public fun defaultAgentActionTypesForTvForVisualMode(): List<AgentActionType> {
     KeyPressAgentAction,
     WaitAgentAction,
     GoalAchievedAgentAction,
-    FailedAgentAction
+    FailedAgentAction,
   )
 }
 
@@ -851,12 +852,40 @@ private fun executeActions(
   val (stepId, decisionOutput, arbigentContextHolder, screenshotFilePath, device) = executeActionsInput
   decisionOutput.agentActions.forEach { agentAction ->
     try {
-      agentAction.runDeviceAction(
-        ArbigentAgentAction.RunInput(
-          device = device,
-          elements = executeActionsInput.elements,
+      // Handle ExecuteToolAgentAction separately
+      if (agentAction is ExecuteToolAgentAction) {
+        val mcpClient = executeActionsInput.mcpClient
+        if (mcpClient != null) {
+          val result = mcpClient.executeTool(agentAction.tool, agentAction.executeToolArgs)
+          arbigentContextHolder.addStep(
+            ArbigentContextHolder.Step(
+              stepId = stepId,
+              feedback = "Tool execution result: ${result.content}",
+              cacheKey = executeActionsInput.cacheKey,
+              screenshotFilePath = screenshotFilePath,
+              agentAction = agentAction
+            )
+          )
+        } else {
+          arbigentContextHolder.addStep(
+            ArbigentContextHolder.Step(
+              stepId = stepId,
+              feedback = "Failed to execute tool: MCPClient is not available",
+              cacheKey = executeActionsInput.cacheKey,
+              screenshotFilePath = screenshotFilePath,
+              agentAction = agentAction
+            )
+          )
+        }
+      } else {
+        // Handle device actions as before
+        agentAction.runDeviceAction(
+          ArbigentAgentAction.RunInput(
+            device = device,
+            elements = executeActionsInput.elements,
+          )
         )
-      )
+      }
     } catch (e: MaestroException) {
       e.printStackTrace()
       arbigentContextHolder.addStep(
@@ -1120,6 +1149,7 @@ private suspend fun step(
       screenshotFilePath = screenshotFilePath,
       device = device,
       cacheKey = cacheKey,
+      mcpClient = stepInput.mcpClient,
     )
   )
   return StepResult.Continue
