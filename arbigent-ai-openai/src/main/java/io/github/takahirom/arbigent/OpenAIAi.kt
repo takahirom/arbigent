@@ -241,7 +241,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     agentActionTypes: List<AgentActionType>,
     elements: ArbigentElementList,
     aiOptions: ArbigentAiOptions,
-    tools: List<Tool>? = null,
+    tools: List<MCPTool>? = null,
   ): String {
     val focusedTreeText = focusedTree.orEmpty().ifBlank { "No focused tree" }
     val uiElements = elements.getPromptTexts().ifBlank { "No UI elements to select. Please check the image." }
@@ -332,7 +332,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     action: String,
     argumentsJsonData: JsonObject,
     elements: ArbigentElementList,
-    mcpTools: List<Tool>?
+    mcpTools: List<MCPTool>?
   ): ArbigentAgentAction {
     if (action.startsWith("mcp_")) {
       val mcpAction = action.removePrefix("mcp_")
@@ -347,7 +347,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
         )
       }
       return ExecuteToolAgentAction(
-        tool = mcpTool,
+        tool = mcpTool.tool,
         executeToolArgs = ExecuteToolArgs(
           arguments = argumentsJsonData,
         )
@@ -482,7 +482,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     }
   }
 
-  private fun buildTools(agentActionTypes: List<AgentActionType>, mcpTools: List<Tool>?): List<ToolDefinition> {
+  private fun buildTools(agentActionTypes: List<AgentActionType>, mcpTools: List<MCPTool>?): List<ToolDefinition> {
     return agentActionTypes.map { actionType ->
       val jsonString = """
           {

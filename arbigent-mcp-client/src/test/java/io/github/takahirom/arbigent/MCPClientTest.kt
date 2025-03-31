@@ -59,6 +59,32 @@ class MCPClientTest {
 
         // This should return an empty list because we haven't connected
         val tools = runBlocking { mcpClient.tools() }
-        assertEquals(emptyList(), tools)
+        assertEquals(emptyList<MCPTool>(), tools)
+    }
+
+    @Test
+    fun `test executeTool with MCPTool when not connected`() {
+        // Create a tool and wrap it in an MCPTool
+        val tool = Tool(
+            name = "test-tool",
+            description = "A test tool",
+            inputSchema = ToolSchema(
+                properties = JsonObject(mapOf("param" to JsonPrimitive("value"))),
+                required = listOf("param")
+            )
+        )
+        val mcpTool = MCPTool(tool, "test-server")
+
+        val executeToolArgs = ExecuteToolArgs(
+            arguments = JsonObject(mapOf("param" to JsonPrimitive("value")))
+        )
+
+        val mcpClient = MCPClient("{}")
+
+        // This should return a default result because we haven't connected
+        val result = runBlocking {
+            mcpClient.executeTool(mcpTool, executeToolArgs)
+        }
+        assertEquals("[MCP server not available]", result.content)
     }
 }
