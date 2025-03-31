@@ -4,6 +4,7 @@ import com.github.takahirom.roborazzi.*
 import com.github.takahirom.roborazzi.AiAssertionOptions.AiAssertionModel.TargetImage
 import com.github.takahirom.roborazzi.AiAssertionOptions.AiAssertionModel.TargetImages
 import io.github.takahirom.arbigent.ConfidentialInfo.removeConfidentialInfo
+import io.github.takahirom.arbigent.FunctionChoice
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.*
@@ -166,10 +167,8 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     val completionRequest = ChatCompletionRequest(
       model = modelName,
       messages = messages,
-      ResponseFormat(
-        type = "json_schema",
-        jsonSchema = buildActionSchema(agentActionTypes = agentActionTypes),
-      ),
+      tools = buildTools(agentActionTypes = agentActionTypes),
+      toolChoice = ToolChoice.Function(function = FunctionChoice(name = "perform_action"))
     )
     val responseText = try {
       chatCompletion(
@@ -313,10 +312,23 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
       "AI usage: ${chatCompletionResponse.usage}"
     }
 
-    val content = chatCompletionResponse.choices.firstOrNull()?.message?.content ?: ""
     return try {
-      val jsonElement = json.parseToJsonElement(content)
-      val jsonObject = jsonElement.jsonObject
+      val message = chatCompletionResponse.choices.firstOrNull()?.message
+        ?: throw IllegalArgumentException("No message in response")
+
+      val jsonObject = if (message.toolCalls != null && message.toolCalls.isNotEmpty()) {
+        // Handle function calling response
+        val toolCall = message.toolCalls.first()
+        if (toolCall.function.name != "perform_action") {
+          throw IllegalArgumentException("Unknown function: ${toolCall.function.name}")
+        }
+        json.parseToJsonElement(toolCall.function.arguments).jsonObject
+      } else if (message.content != null) {
+        // Handle regular response
+        json.parseToJsonElement(message.content).jsonObject
+      } else {
+        throw IllegalArgumentException("No content or tool calls in response")
+      }
       val action =
         jsonObject["action"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Action not found")
       val agentActionMap = agentActionList.associateBy { it.actionName }
@@ -419,7 +431,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
         imageDescription = jsonObject["image-description"]?.jsonPrimitive?.content ?: "",
         memo = jsonObject["memo"]?.jsonPrimitive?.content ?: "",
         aiRequest = messages.toHumanReadableString(),
-        aiResponse = content,
+        aiResponse = message.content ?: (message.toolCalls?.firstOrNull()?.function?.arguments ?: ""),
         screenshotFilePath = screenshotFilePath,
         apiCallJsonLFilePath = decisionInput.apiCallJsonLFilePath,
         uiTreeStrings = decisionInput.uiTreeStrings,
@@ -496,6 +508,45 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     }
     """.trimIndent()
     return Json.parseToJsonElement(schemaJson).jsonObject
+  }
+
+  private fun buildTools(agentActionTypes: List<AgentActionType>): List<ToolDefinition> {
+    return listOf(
+      ToolDefinition(
+        type = "function",
+        function = FunctionDefinition(
+          name = "perform_action",
+          description = "Perform an action on the device",
+          parameters = Json.parseToJsonElement("""
+          {
+            "type": "object",
+            "required": ["image-description", "memo", "action", "text"],
+            "additionalProperties": false,
+            "properties": {
+              "image-description": {
+                "type": "string",
+                "description": "Description of what is visible in the image"
+              },
+              "memo": {
+                "type": "string",
+                "description": "Additional notes or observations"
+              },
+              "action": {
+                "type": "string",
+                "enum": [${agentActionTypes.map { "\"${it.actionName}\"" }.joinToString(", ")}],
+                "description": "The action to perform"
+              },
+              "text": {
+                "type": "string",
+                "description": "Additional text parameter for the action, such as text to input or element to click"
+              }
+            }
+          }
+          """).jsonObject,
+          strict = true
+        )
+      )
+    )
   }
 
   @OptIn(ExperimentalRoborazziApi::class)
