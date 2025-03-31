@@ -23,6 +23,9 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.MissingFieldException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.modules.SerializersModule
@@ -118,7 +121,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
         agentActionTypes = agentActionTypes,
         elements = elements,
         aiOptions = decisionInput.aiOptions ?: ArbigentAiOptions(),
-        tools = decisionInput.tools
+        tools = decisionInput.mcpTools
       )
     val imageDetail = decisionInput.aiOptions?.imageDetail?.name?.lowercase()
     arbigentDebugLog { "AI imageDetailOption: $imageDetail" }
@@ -160,7 +163,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     val completionRequest = ChatCompletionRequest(
       model = modelName,
       messages = messages,
-      tools = buildTools(agentActionTypes = agentActionTypes),
+      tools = buildTools(agentActionTypes = agentActionTypes, mcpTools = decisionInput.mcpTools),
       toolChoice = null
     )
     val responseText = try {
@@ -273,7 +276,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
         val functionName = toolCall.function.name
 
         // Extract action name from function name (e.g., "perform_clickwithindex" -> "ClickWithIndex")
-        if (!functionName.startsWith("perform_")) {
+        if (!functionName.startsWith("perform_") && !functionName.startsWith("tool_")) {
           throw IllegalArgumentException("Unknown function: $functionName")
         }
 
@@ -441,7 +444,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     }
   }
 
-  private fun buildTools(agentActionTypes: List<AgentActionType>): List<ToolDefinition> {
+  private fun buildTools(agentActionTypes: List<AgentActionType>, mcpTools: List<Tool>?): List<ToolDefinition> {
     return agentActionTypes.map { actionType ->
       val jsonString = """
           {
@@ -478,6 +481,35 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
           name = "perform_${actionType.actionName.lowercase()}",
           description = actionType.actionDescription(),
           parameters = parameters.jsonObject,
+          strict = true
+        )
+      )
+    } + mcpTools.orEmpty().map { tool ->
+      // Create a map for the parameters JsonObject
+      val parametersMap = mutableMapOf<String, JsonElement>()
+
+      // Add the "type" field
+      parametersMap["type"] = JsonPrimitive("object")
+      parametersMap["additionalProperties"] = JsonPrimitive(false)
+
+      // Add the "properties" field with the original properties
+      parametersMap["properties"] = tool.inputSchema?.properties ?: JsonObject(emptyMap())
+
+      // Add the "required" field with the required properties
+      val requiredList = tool.inputSchema?.required ?: emptyList()
+      val requiredJsonArray =
+        Json.parseToJsonElement(requiredList.joinToString(prefix = "[", postfix = "]") { "\"$it\"" })
+      parametersMap["required"] = requiredJsonArray
+
+      // Create the parameters JsonObject
+      val parameters = JsonObject(parametersMap)
+
+      ToolDefinition(
+        type = "function",
+        function = FunctionDefinition(
+          name = "tool_" + tool.name,
+          description = tool.description,
+          parameters = parameters,
           strict = true
         )
       )

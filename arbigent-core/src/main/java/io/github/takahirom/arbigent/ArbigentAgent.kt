@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import maestro.MaestroException
 import maestro.orchestra.*
@@ -35,7 +34,6 @@ public class ArbigentAgent(
   private val deviceFormFactor = agentConfig.deviceFormFactor
   private val prompt = agentConfig.prompt
   private val aiOptions = agentConfig.aiOptions
-  public val mcpClient: MCPClient? = agentConfig.mcpClient
 
   private val executeInterceptors: List<ArbigentExecutionInterceptor> = interceptors
     .filterIsInstance<ArbigentExecutionInterceptor>()
@@ -165,11 +163,13 @@ public class ArbigentAgent(
     ?: false
 
   public suspend fun execute(
-    agentTask: ArbigentAgentTask
+    agentTask: ArbigentAgentTask,
+    mcpClient: MCPClient
   ) {
     execute(
       goal = agentTask.goal,
       maxStep = agentTask.maxStep,
+      mcpClient = mcpClient,
       agentActionTypes = when (agentTask.deviceFormFactor) {
         ArbigentScenarioDeviceFormFactor.Mobile -> defaultAgentActionTypesForVisualMode()
         ArbigentScenarioDeviceFormFactor.Tv -> defaultAgentActionTypesForTvForVisualMode()
@@ -181,7 +181,8 @@ public class ArbigentAgent(
   public suspend fun execute(
     goal: String,
     maxStep: Int = 10,
-    agentActionTypes: List<AgentActionType> = defaultAgentActionTypesForVisualMode()
+    agentActionTypes: List<AgentActionType> = defaultAgentActionTypesForVisualMode(),
+    mcpClient: MCPClient
   ) {
     val executeInput = ExecuteInput(
       goal = goal,
@@ -210,7 +211,7 @@ public class ArbigentAgent(
       decisionChain = decisionChain,
       imageAssertionChain = imageAssertionChain,
       executeActionChain = executeActionChain,
-      mcpClient = mcpClient
+      mcpClient = mcpClient,
     )
 
     when (executeChain(executeInput)) {
@@ -311,7 +312,6 @@ public class AgentConfig(
   internal val deviceFormFactor: ArbigentScenarioDeviceFormFactor,
   internal val prompt: ArbigentPrompt,
   internal val aiOptions: ArbigentAiOptions?,
-  internal val mcpClient: MCPClient? = null
 ) {
   public class Builder {
     private val interceptors = mutableListOf<ArbigentInterceptor>()
@@ -359,7 +359,6 @@ public class AgentConfig(
         deviceFormFactor = deviceFormFactor,
         prompt = prompt,
         aiOptions = aiOptions,
-        mcpClient = mcpClient
       )
     }
   }
@@ -372,7 +371,6 @@ public class AgentConfig(
     builder.deviceFactory(deviceFactory)
     builder.ai(ai)
     builder.aiOptions(aiOptions)
-    builder.mcpClient(mcpClient)
     return builder
   }
 }
@@ -1060,7 +1058,7 @@ private suspend fun step(
     prompt = stepInput.prompt,
     cacheKey = cacheKey,
     aiOptions = stepInput.aiOptions,
-    tools = tools
+    mcpTools = tools
   )
   val decisionOutput = decisionChain(decisionInput)
   if (decisionOutput.agentActions.any { it is GoalAchievedAgentAction }) {

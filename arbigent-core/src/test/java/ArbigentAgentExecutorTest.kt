@@ -1,7 +1,6 @@
 package io.github.takahirom.arbigent.sample.test
 
 import io.github.takahirom.arbigent.*
-import io.github.takahirom.arbigent.result.ArbigentUiTreeStrings
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -25,7 +24,7 @@ class ArbigentAgentExecutorTest {
     }
 
     val task = ArbigentAgentTask("id1", "Test goal", agentConfig)
-    ArbigentAgent(agentConfig).execute(task)
+    ArbigentAgent(agentConfig).execute(task, MCPClient("{}"))
     advanceUntilIdle()
 
     // Verify cache key format
@@ -51,7 +50,7 @@ class ArbigentAgentExecutorTest {
 
     val task = ArbigentAgentTask("id1", "goal1", agentConfig)
     ArbigentAgent(agentConfig)
-      .execute(task)
+      .execute(task, MCPClient("{}"))
 
     advanceUntilIdle()
   }

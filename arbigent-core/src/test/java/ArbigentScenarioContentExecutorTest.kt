@@ -29,7 +29,8 @@ class ArbigentScenarioContentExecutorTest {
       isLeaf = true,
     )
     arbigentScenarioExecutor.execute(
-      arbigentScenario
+      arbigentScenario,
+      MCPClient("{}")
     )
     advanceUntilIdle()
   }
@@ -80,7 +81,8 @@ class ArbigentScenarioContentExecutorTest {
       isLeaf = true
     )
     arbigentScenarioExecutor.execute(
-      arbigentScenario
+      arbigentScenario,
+      MCPClient("{}")
     )
     advanceUntilIdle()
     fun List<String>.repeat(times: Int): List<String> {
@@ -149,7 +151,8 @@ class ArbigentScenarioContentExecutorTest {
       isLeaf = true
     )
     arbigentScenarioExecutor.execute(
-      arbigentScenario
+      arbigentScenario,
+      MCPClient("{}")
     )
     advanceUntilIdle()
     fun List<String>.repeat(times: Int): List<String> {

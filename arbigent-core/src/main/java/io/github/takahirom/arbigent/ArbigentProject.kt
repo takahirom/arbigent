@@ -38,14 +38,14 @@ public class ArbigentProject(
    * @param block The block of code to execute within the MCP scope.
    * @return The result of the block execution.
    */
-  public suspend fun <T> mcpScope(block: suspend () -> T): T {
+  public suspend fun <T> mcpScope(block: suspend (mcpClient: MCPClient) -> T): T {
     val mcpClient = MCPClient(settings.mcpJson)
     try {
       arbigentInfoLog("Connecting to MCP server...")
       mcpClient.connect()
       arbigentInfoLog("Connected to MCP server")
-      
-      return block()
+
+      return block(mcpClient)
     } finally {
       arbigentInfoLog("Closing MCP connection...")
       mcpClient.close()
@@ -54,19 +54,17 @@ public class ArbigentProject(
   }
 
   public suspend fun execute() {
-    mcpScope {
-      executeScenarios(leafScenarioAssignments().map { it.scenario })
-    }
+    executeScenarios(leafScenarioAssignments().map { it.scenario })
   }
 
   public suspend fun executeScenarios(scenarios: List<ArbigentScenario>) {
-    mcpScope {
+    mcpScope { mcpClient ->
       scenarios.forEach { scenario ->
         arbigentInfoLog("Start scenario: $scenario")
         val scenarioExecutor =
           scenarioAssignments().first { it.scenario.id == scenario.id }.scenarioExecutor
         try {
-          scenarioExecutor.execute(scenario)
+          scenarioExecutor.execute(scenario, mcpClient)
         } catch (e: FailedToArchiveException) {
           arbigentErrorLog("Failed to archive: $scenario" + e.stackTraceToString())
         }
@@ -79,11 +77,11 @@ public class ArbigentProject(
     .filter { it.scenario.isLeaf }
 
   public suspend fun execute(scenario: ArbigentScenario) {
-    mcpScope {
+    mcpScope { mcpClient ->
       arbigentInfoLog("Start scenario: $scenario")
       val scenarioExecutor =
         scenarioAssignments().first { it.scenario.id == scenario.id }.scenarioExecutor
-      scenarioExecutor.execute(scenario)
+      scenarioExecutor.execute(scenario, mcpClient)
       arbigentDebugLog(scenarioExecutor.statusText())
     }
   }

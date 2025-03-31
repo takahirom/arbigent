@@ -6,7 +6,6 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.Serializable
 import kotlin.coroutines.cancellation.CancellationException
-import kotlin.math.max
 
 public data class ArbigentScenarioRunningInfo(
   val allTasks: Int,
@@ -179,7 +178,7 @@ public class ArbigentScenarioExecutor {
     arbigentDebugLog("Arbigent.waitUntilFinished end")
   }
 
-  public suspend fun execute(scenario: ArbigentScenario) {
+  public suspend fun execute(scenario: ArbigentScenario, mcpClient: MCPClient) {
     _isFailedToArchiveFlow.value = false
     arbigentDebugLog("Arbigent.execute start")
     _taskAssignmentsHistoryStateFlow.value = listOf()
@@ -220,6 +219,7 @@ public class ArbigentScenarioExecutor {
               .launchIn(coroutineScope)
             agent.execute(
               agentTask = task,
+              mcpClient = mcpClient,
             )
           }
           if (!agent.isGoalAchieved()) {
