@@ -17,12 +17,12 @@ val yaml = Yaml(
 )
 
 internal object Preference {
-  private var aiSetting: String by KeychainDelegate(
+  private var appSetting: String by KeychainDelegate(
     default = {
       yaml
         .encodeToString(
-          serializer = AiSetting.serializer(),
-          value = AiSetting(
+          serializer = AppSetting.serializer(),
+          value = AppSetting(
             selectedId = "defaultOpenAi",
             aiSettings = defaultAiProviderSettings(),
             loggingEnabled = false
@@ -32,18 +32,18 @@ internal object Preference {
   )
 
 
-  var aiSettingValue: AiSetting
-    get() = yaml.decodeFromString(AiSetting.serializer(), aiSetting)
-      .let { savedAiSetting: AiSetting ->
-        savedAiSetting.copy(
-          aiSettings = savedAiSetting.aiSettings + defaultAiProviderSettings()
+  var appSettingValue: AppSetting
+    get() = yaml.decodeFromString(AppSetting.serializer(), appSetting)
+      .let { savedAppSetting: AppSetting ->
+        savedAppSetting.copy(
+          aiSettings = savedAppSetting.aiSettings + defaultAiProviderSettings()
             .filter { defaultAiProviderSetting ->
-              savedAiSetting.aiSettings.none { it.id == defaultAiProviderSetting.id }
+              savedAppSetting.aiSettings.none { it.id == defaultAiProviderSetting.id }
             }
         )
       }
     set(value) {
-      aiSetting = yaml.encodeToString(AiSetting.serializer(), value)
+      appSetting = yaml.encodeToString(AppSetting.serializer(), value)
     }
 
 }

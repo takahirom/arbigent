@@ -108,11 +108,11 @@ fun LauncherScreen(
 }
 
 class AiSettingStateHolder {
-  var aiSetting by mutableStateOf(Preference.aiSettingValue)
+  var aiSetting by mutableStateOf(Preference.appSettingValue)
 
   fun onSelectedAiProviderSettingChanged(aiProviderSetting: AiProviderSetting) {
     aiSetting = aiSetting.copy(selectedId = aiProviderSetting.id)
-    Preference.aiSettingValue = aiSetting
+    Preference.appSettingValue = aiSetting
   }
 
   fun onAiProviderSettingChanged(aiProviderSetting: AiProviderSetting) {
@@ -123,12 +123,12 @@ class AiSettingStateHolder {
         it
       }
     })
-    Preference.aiSettingValue = aiSetting
+    Preference.appSettingValue = aiSetting
   }
 
   fun onLoggingEnabledChanged(enabled: Boolean) {
     aiSetting = aiSetting.copy(loggingEnabled = enabled)
-    Preference.aiSettingValue = aiSetting
+    Preference.appSettingValue = aiSetting
   }
 }
 

@@ -35,7 +35,7 @@ fun main() {
     val appStateHolder = remember {
       ArbigentAppStateHolder(
         aiFactory = {
-          val aiSetting = Preference.aiSettingValue
+          val aiSetting = Preference.appSettingValue
           val aiProviderSetting = aiSetting.aiSettings.first { it.id == aiSetting.selectedId }
           if (aiProviderSetting is AiProviderSetting.OpenAiBasedApiProviderSetting) {
             OpenAIAi(
