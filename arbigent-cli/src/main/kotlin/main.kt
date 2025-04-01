@@ -33,6 +33,13 @@ import kotlinx.coroutines.runBlocking
 import java.io.File
 import kotlin.system.exitProcess
 
+/**
+ * Custom implementation of [ArbigentAppSettings] for CLI.
+ */
+data class CliAppSettings(
+  override val workingDirectory: String?
+) : ArbigentAppSettings
+
 sealed class AiConfig(name: String) : OptionGroup(name)
 
 class OpenAIAiConfig : AiConfig("Options for OpenAI API AI") {
@@ -96,6 +103,11 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
 
   private val logFile by option(help = "Log file path")
     .default("$defaultResultPath/arbigent.log")
+
+  private val workingDirectory by option(
+    "--working-directory",
+    help = "Working directory for the project"
+  )
 
   private val scenarioIds by option(
     "--scenario-ids",
@@ -179,11 +191,12 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
     }
 
     var device: ArbigentDevice? = null
+    val appSettings = CliAppSettings(workingDirectory = workingDirectory)
     val arbigentProject = ArbigentProject(
       file = File(projectFile),
       aiFactory = { ai },
       deviceFactory = { device!! },
-      appSettings = DefaultArbigentAppSettings
+      appSettings = appSettings
     )
     if (scenarioIds.isNotEmpty() && tags.isNotEmpty()) {
       throw IllegalArgumentException("Cannot specify both scenario IDs and tags. Please create an issue if you need this feature.")
