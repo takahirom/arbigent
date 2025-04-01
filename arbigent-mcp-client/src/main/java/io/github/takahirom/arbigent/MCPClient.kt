@@ -3,7 +3,7 @@ package io.github.takahirom.arbigent
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import org.slf4j.LoggerFactory
+import co.touchlab.kermit.Logger
 
 /**
  * Client for interacting with Model Context Protocol (MCP) servers.
@@ -14,7 +14,7 @@ public class MCPClient(
   public val jsonString: String,
   public val appSettings: ArbigentAppSettings
 ) {
-  private val logger = LoggerFactory.getLogger(MCPClient::class.java)
+  private val logger = Logger.withTag("MCPClient")
   private val json = Json { ignoreUnknownKeys = true }
   private val connections = mutableListOf<ClientConnection>()
 
@@ -30,12 +30,12 @@ public class MCPClient(
       val mcpServers = config["mcpServers"]?.jsonObject
 
       if (mcpServers == null) {
-        logger.warn("No mcpServers found in configuration, skipping MCP connection")
+        logger.w { "No mcpServers found in configuration, skipping MCP connection" }
         return
       }
 
       if (mcpServers.isEmpty()) {
-        logger.warn("No MCP servers defined in configuration, skipping MCP connection")
+        logger.w { "No MCP servers defined in configuration, skipping MCP connection" }
         return
       }
 
@@ -45,7 +45,7 @@ public class MCPClient(
 
         val command = serverConfigObj["command"]?.jsonPrimitive?.content
         if (command == null) {
-          logger.warn("No command specified for server $serverName, skipping")
+          logger.w { "No command specified for server $serverName, skipping" }
           continue
         }
 
@@ -68,26 +68,28 @@ public class MCPClient(
 
         try {
           // Connect to the server
+          logger.i { "Connecting to server: $serverName" }
           val connected = clientConnection.connect()
           if (connected) {
             connections.add(clientConnection)
-            logger.info("Added connection to server: $serverName")
+            logger.i { "Added connection to server: $serverName" }
           } else {
-            logger.warn("Failed to connect to server: $serverName, skipping")
+            logger.w { "Failed to connect to server: $serverName, skipping" }
           }
         } catch (e: Exception) {
-          logger.warn("Error connecting to server: $serverName: ${e.message}, skipping")
+          logger.w { "Error connecting to server: $serverName: ${e.message}, skipping" }
           clientConnection.close() // Clean up resources if connection fails
+          throw e
         }
       }
 
       if (connections.isEmpty()) {
-        logger.warn("No MCP servers connected, continuing without MCP")
+        logger.w { "No MCP servers connected, continuing without MCP" }
       } else {
-        logger.info("Connected to ${connections.size} MCP servers")
+        logger.i { "Connected to ${connections.size} MCP servers" }
       }
     } catch (e: Exception) {
-      logger.warn("Error parsing MCP configuration: ${e.message}, continuing without MCP")
+      logger.w { "Error parsing MCP configuration: ${e.message}, continuing without MCP" }
       close() // Clean up resources if connection fails
       throw e
     }
@@ -101,7 +103,7 @@ public class MCPClient(
    */
   public suspend fun tools(): List<MCPTool> {
     if (connections.isEmpty()) {
-      logger.warn("Not connected to any MCP server, returning empty tools list")
+      logger.w { "Not connected to any MCP server, returning empty tools list" }
       return emptyList()
     }
 
@@ -115,7 +117,7 @@ public class MCPClient(
         val mcpTools = tools.map { tool -> MCPTool(tool, connection.serverName) }
         allTools.addAll(mcpTools)
       } catch (e: Exception) {
-        logger.warn("Error listing tools from server ${connection.serverName}: ${e.message}")
+        logger.w { "Error listing tools from server ${connection.serverName}: ${e.message}" }
       }
     }
 
@@ -131,14 +133,14 @@ public class MCPClient(
    */
   public suspend fun executeTool(mcpTool: MCPTool, executeToolArgs: ExecuteToolArgs): ExecuteToolResult {
     if (connections.isEmpty()) {
-      logger.warn("Not connected to any MCP server, returning default result for tool: ${mcpTool.name}")
+      logger.w { "Not connected to any MCP server, returning default result for tool: ${mcpTool.name}" }
       return ExecuteToolResult(content = "[MCP server not available]")
     }
 
     // Find the connection for the specified server
     val connection = connections.find { it.serverName == mcpTool.serverName }
     if (connection == null) {
-      logger.warn("No connection found for server: ${mcpTool.serverName}, returning default result for tool: ${mcpTool.name}")
+      logger.w { "No connection found for server: ${mcpTool.serverName}, returning default result for tool: ${mcpTool.name}" }
       return ExecuteToolResult(content = "[MCP server not available: ${mcpTool.serverName}]")
     }
 
@@ -146,7 +148,7 @@ public class MCPClient(
     try {
       return connection.executeTool(mcpTool.tool, executeToolArgs)
     } catch (e: Exception) {
-      logger.warn("Error executing tool ${mcpTool.name} on server ${mcpTool.serverName}: ${e.message}")
+      logger.w { "Error executing tool ${mcpTool.name} on server ${mcpTool.serverName}: ${e.message}" }
       return ExecuteToolResult(content = "[Error executing tool on server ${mcpTool.serverName}: ${e.message}]")
     }
   }
@@ -162,7 +164,7 @@ public class MCPClient(
    */
   public suspend fun executeTool(tool: Tool, executeToolArgs: ExecuteToolArgs): ExecuteToolResult {
     if (connections.isEmpty()) {
-      logger.warn("Not connected to any MCP server, returning default result for tool: ${tool.name}")
+      logger.w { "Not connected to any MCP server, returning default result for tool: ${tool.name}" }
       return ExecuteToolResult(content = "[MCP server not available]")
     }
 
@@ -175,7 +177,7 @@ public class MCPClient(
           return result
         }
       } catch (e: Exception) {
-        logger.warn("Error executing tool ${tool.name} on server ${connection.serverName}: ${e.message}")
+        logger.w { "Error executing tool ${tool.name} on server ${connection.serverName}: ${e.message}" }
       }
     }
 
@@ -191,9 +193,9 @@ public class MCPClient(
     for (connection in connections) {
       try {
         connection.close()
-        logger.info("Closed connection to server: ${connection.serverName}")
+        logger.i { "Closed connection to server: ${connection.serverName}" }
       } catch (e: Exception) {
-        logger.error("Error closing connection to server ${connection.serverName}", e)
+        logger.e(e) { "Error closing connection to server ${connection.serverName}" }
       }
     }
 

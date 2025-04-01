@@ -42,9 +42,8 @@ dependencies {
   // Kotlinx IO (for stream conversion)
   implementation(libs.kotlinx.io.core)
 
-  // SLF4J API and a Logging Implementation
-  implementation("org.slf4j:slf4j-api:2.0.9")
-  runtimeOnly("ch.qos.logback:logback-classic:1.4.14")
+  // Kermit Logging
+  implementation("co.touchlab:kermit:2.0.4")
 
   // Project dependencies
   implementation(project(":arbigent-core-model"))

@@ -36,6 +36,10 @@ scenarios:
     packageName: "com.android.camera2"
   tags:
   - name: "Camera"
+- id: "96eea9f9-b099-4b4e-b98b-ee3caf84bc49"
+  goal: "Just check the weather in Japan using the tool. Include the result in the memo. If you can see the execution result, must archive the goal"
+  initializationMethods:
+  - type: "Back"
 settings:
   cacheStrategy:
     aiDecisionCacheStrategy:
@@ -43,3 +47,11 @@ settings:
   aiOptions:
     temperature: 0.0
     imageFormat: "lossy_webp"
+  mcpJson: |-
+    {
+      "mcpServers": {
+        "weather": {
+          "command": "./mcpserversample.main.kts"
+        }
+      }
+    }
