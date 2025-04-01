@@ -24,7 +24,7 @@ class ArbigentAgentExecutorTest {
     }
 
     val task = ArbigentAgentTask("id1", "Test goal", agentConfig)
-    ArbigentAgent(agentConfig).execute(task, MCPClient("{}"))
+    ArbigentAgent(agentConfig).execute(task, MCPClient())
     advanceUntilIdle()
 
     // Verify cache key format
@@ -50,7 +50,7 @@ class ArbigentAgentExecutorTest {
 
     val task = ArbigentAgentTask("id1", "goal1", agentConfig)
     ArbigentAgent(agentConfig)
-      .execute(task, MCPClient("{}"))
+      .execute(task, MCPClient())
 
     advanceUntilIdle()
   }
