@@ -11,7 +11,8 @@ import org.slf4j.LoggerFactory
  * @property jsonString The JSON configuration string for MCP servers.
  */
 public class MCPClient(
-  public val jsonString: String
+  public val jsonString: String,
+  public val appSettings: ArbigentAppSettings
 ) {
   private val logger = LoggerFactory.getLogger(MCPClient::class.java)
   private val json = Json { ignoreUnknownKeys = true }
@@ -61,7 +62,8 @@ public class MCPClient(
           serverName = serverName,
           command = command,
           args = args,
-          env = env
+          env = env,
+          appSettings = appSettings
         )
 
         try {

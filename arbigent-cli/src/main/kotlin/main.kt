@@ -183,6 +183,7 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
       file = File(projectFile),
       aiFactory = { ai },
       deviceFactory = { device!! },
+      appSettings = DefaultArbigentAppSettings
     )
     if (scenarioIds.isNotEmpty() && tags.isNotEmpty()) {
       throw IllegalArgumentException("Cannot specify both scenario IDs and tags. Please create an issue if you need this feature.")

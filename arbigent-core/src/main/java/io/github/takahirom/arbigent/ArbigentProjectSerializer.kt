@@ -147,7 +147,8 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
   scenario: ArbigentScenarioContent,
   aiFactory: () -> ArbigentAi,
   deviceFactory: () -> ArbigentDevice,
-  aiDecisionCache: ArbigentAiDecisionCache
+  aiDecisionCache: ArbigentAiDecisionCache,
+  appSettings: ArbigentAppSettings = DefaultArbigentAppSettings
 ): ArbigentScenario {
   val visited = mutableSetOf<ArbigentScenarioContent>()
   val result = mutableListOf<ArbigentAgentTask>()
@@ -178,7 +179,7 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
           aiDecisionCache = aiDecisionCache,
           cacheOptions = nodeScenario.cacheOptions ?: ArbigentScenarioCacheOptions(),
           mcpClient = if (projectSettings.mcpJson.isNotBlank() && projectSettings.mcpJson != DefaultMcpJson) {
-            MCPClient(projectSettings.mcpJson)
+            MCPClient(projectSettings.mcpJson, appSettings)
           } else {
             null
           }

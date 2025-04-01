@@ -332,7 +332,7 @@ private fun AppSettingsSection(
   Column(modifier = modifier) {
     Text("Working Directory")
     val workingDirectory = rememberSaveable(saver = TextFieldState.Saver) {
-      TextFieldState(appSettings.workingDirectory, TextRange(appSettings.workingDirectory.length))
+      TextFieldState(appSettings.workingDirectory ?: "", TextRange(appSettings.workingDirectory?.length ?: 0))
     }
     LaunchedEffect(Unit) {
       snapshotFlow { workingDirectory.text }
