@@ -93,6 +93,9 @@ fun LauncherScreen(
         }
       }
     }
+    AppSettingsSection(
+      modifier = Modifier.padding(8.dp),
+    )
     AiProviderSetting(
       modifier = Modifier.padding(8.dp),
     )
@@ -160,30 +163,32 @@ private fun AiProviderSetting(modifier: Modifier) {
         }
       )
     }
-    val selectedAiProviderSetting: AiProviderSetting =
-      aiSetting.aiSettings.firstOrNull() { it.id == aiSetting.selectedId }
-        ?: aiSetting.aiSettings.first()
-    if (selectedAiProviderSetting is AiProviderSetting.NormalAiProviderSetting) {
-      NormalAiSetting(
-        modifier = Modifier.padding(8.dp),
-        aiProviderSetting = selectedAiProviderSetting,
-        onAiProviderSettingChanged = {
-          aiSettingStateHolder.onAiProviderSettingChanged(it)
-        })
-    } else if (selectedAiProviderSetting is AiProviderSetting.AzureOpenAi) {
-      AzureOpenAiSetting(
-        modifier = Modifier.padding(8.dp),
-        aiProviderSetting = selectedAiProviderSetting as AiProviderSetting.AzureOpenAi,
-        onAiProviderSettingChanged = {
-          aiSettingStateHolder.onAiProviderSettingChanged(it)
-        })
-    } else if (selectedAiProviderSetting is AiProviderSetting.CustomOpenAiApiBasedAi) {
-      CustomOpenAiApiBasedAiSetting(
-        modifier = Modifier.padding(8.dp),
-        aiProviderSetting = selectedAiProviderSetting,
-        onAiProviderSettingChanged = {
-          aiSettingStateHolder.onAiProviderSettingChanged(it)
-        })
+    ExpandableSection("AI Provider options") {
+      val selectedAiProviderSetting: AiProviderSetting =
+        aiSetting.aiSettings.firstOrNull() { it.id == aiSetting.selectedId }
+          ?: aiSetting.aiSettings.first()
+      if (selectedAiProviderSetting is AiProviderSetting.NormalAiProviderSetting) {
+        NormalAiSetting(
+          modifier = Modifier.padding(8.dp),
+          aiProviderSetting = selectedAiProviderSetting,
+          onAiProviderSettingChanged = {
+            aiSettingStateHolder.onAiProviderSettingChanged(it)
+          })
+      } else if (selectedAiProviderSetting is AiProviderSetting.AzureOpenAi) {
+        AzureOpenAiSetting(
+          modifier = Modifier.padding(8.dp),
+          aiProviderSetting = selectedAiProviderSetting as AiProviderSetting.AzureOpenAi,
+          onAiProviderSettingChanged = {
+            aiSettingStateHolder.onAiProviderSettingChanged(it)
+          })
+      } else if (selectedAiProviderSetting is AiProviderSetting.CustomOpenAiApiBasedAi) {
+        CustomOpenAiApiBasedAiSetting(
+          modifier = Modifier.padding(8.dp),
+          aiProviderSetting = selectedAiProviderSetting,
+          onAiProviderSettingChanged = {
+            aiSettingStateHolder.onAiProviderSettingChanged(it)
+          })
+      }
     }
   }
 }
@@ -311,6 +316,32 @@ private fun CustomOpenAiApiBasedAiSetting(
     Text("$providerName Endpoint")
     TextField(
       state = endpoint,
+      modifier = Modifier.padding(8.dp)
+    )
+  }
+}
+
+@Composable
+private fun AppSettingsSection(
+  modifier: Modifier = Modifier,
+) {
+  val appSettingsStateHolder = remember { AppSettingsStateHolder() }
+  val appSettings = appSettingsStateHolder.appSettings
+
+  GroupHeader("App Settings")
+  Column(modifier = modifier) {
+    Text("Working Directory")
+    val workingDirectory = rememberSaveable(saver = TextFieldState.Saver) {
+      TextFieldState(appSettings.workingDirectory, TextRange(appSettings.workingDirectory.length))
+    }
+    LaunchedEffect(Unit) {
+      snapshotFlow { workingDirectory.text }
+        .collect {
+          appSettingsStateHolder.onWorkingDirectoryChanged(it.toString())
+        }
+    }
+    TextField(
+      state = workingDirectory,
       modifier = Modifier.padding(8.dp)
     )
   }
