@@ -24,7 +24,7 @@ class MCPClientTest {
         }
         """.trimIndent()
 
-        val mcpClient = MCPClient(jsonString)
+        val mcpClient = MCPClient(jsonString, DefaultArbigentAppSettings)
         assertEquals(jsonString, mcpClient.jsonString)
     }
 
