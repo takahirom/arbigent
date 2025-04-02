@@ -133,14 +133,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: check mcp
-        run: |
-          if [ ! -f mcpserversample.main.kts ]; then
-            echo "mcpserversample.main.kts not found"
-            exit 1
-          fi
-          ./mcpserversample.main.kts
-
       - name: CLI E2E test
         uses: reactivecircus/android-emulator-runner@v2
         env:

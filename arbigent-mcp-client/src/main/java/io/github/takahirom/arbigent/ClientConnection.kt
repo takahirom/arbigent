@@ -40,6 +40,14 @@ public class ClientConnection(
    */
   public suspend fun connect(): Boolean {
     try {
+      serverProcess?.let {
+        if (it.isAlive) {
+          logger.i { "MCP server process is already running (PID: ${it.pid()})" }
+          return true
+        } else {
+          logger.i { "MCP server process has already terminated (PID: ${it.pid()})" }
+        }
+      }
       logger.i { "Starting MCP server: $serverName with command: $command ${args.joinToString(" ")}" }
 
       // Build the command list
@@ -233,14 +241,10 @@ public class ClientConnection(
   /**
    * Closes the connection to the MCP server and cleans up resources.
    */
-  public fun close() {
+  public suspend fun close() {
     // Close MCP Client
     try {
-      mcpClient?.let { client ->
-        runBlocking {
-          client.close()
-        }
-      }
+      mcpClient?.close()
       logger.i { "MCP Client closed successfully" }
     } catch (e: Exception) {
       logger.e(e) { "Error closing MCP client" }

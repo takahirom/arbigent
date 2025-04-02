@@ -19,6 +19,17 @@ public class MCPClient(
   private val json = Json { ignoreUnknownKeys = true }
   private val connections = mutableListOf<ClientConnection>()
 
+  public fun doesConfigHaveMcpServers(): Boolean {
+    return try {
+      val config = json.parseToJsonElement(jsonString).jsonObject
+      val mcpServers = config["mcpServers"]?.jsonObject
+      !mcpServers.isNullOrEmpty()
+    } catch (e: Exception) {
+      logger.w { "Error parsing MCP configuration: ${e.message}" }
+      false
+    }
+  }
+
   /**
    * Connects to the MCP servers specified in the JSON configuration.
    *
@@ -157,7 +168,7 @@ public class MCPClient(
   /**
    * Closes all connections to MCP servers and cleans up resources.
    */
-  public fun close(): Unit {
+  public suspend fun close(): Unit {
     // Close all connections
     for (connection in connections) {
       try {
