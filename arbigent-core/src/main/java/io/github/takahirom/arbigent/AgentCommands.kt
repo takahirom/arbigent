@@ -667,3 +667,39 @@ public class FailedAgentAction : ArbigentAgentAction {
       )
   }
 }
+
+@Serializable
+public data class ExecuteToolAgentAction(
+  val tool: Tool,
+  val executeToolArgs: ExecuteToolArgs
+) : ArbigentAgentAction {
+  override val actionName: String = Companion.actionName
+
+  override fun stepLogText(): String {
+    return "Execute tool: ${tool.name} with args: ${executeToolArgs.arguments}"
+  }
+
+  override fun runDeviceAction(runInput: ArbigentAgentAction.RunInput) {
+    // This is a no-op for device actions, as tool execution is handled separately
+  }
+
+  public companion object : AgentActionType {
+    override val actionName: String = "ExecuteTool"
+
+    override fun actionDescription(): String = "Execute a tool via MCP"
+
+    override fun arguments(): List<AgentActionType.Argument> =
+      listOf(
+        AgentActionType.Argument(
+          name = "tool",
+          type = "object",
+          description = "The tool to execute"
+        ),
+        AgentActionType.Argument(
+          name = "args",
+          type = "object",
+          description = "The arguments for the tool"
+        )
+      )
+  }
+}
