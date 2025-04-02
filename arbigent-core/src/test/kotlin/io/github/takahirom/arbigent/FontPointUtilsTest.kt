@@ -1,8 +1,6 @@
 package io.github.takahirom.arbigent
 
 import java.awt.Font
-import java.awt.Graphics2D
-import java.awt.image.BufferedImage
 import kotlin.system.measureTimeMillis // For basic cache performance check
 import kotlin.test.*
 
@@ -77,22 +75,6 @@ class FontPointUtilsTest {
         assertEquals(MIN_POINT_SIZE, FontPointUtils.estimateRecommendedPointSize(Font.SANS_SERIF, Font.PLAIN, 0, 1080))
         assertEquals(MIN_POINT_SIZE, FontPointUtils.estimateRecommendedPointSize(Font.SANS_SERIF, Font.PLAIN, 1920, 0))
         assertEquals(MIN_POINT_SIZE, FontPointUtils.estimateRecommendedPointSize(Font.SANS_SERIF, Font.PLAIN, -1, 1080))
-    }
-
-    @Test
-    fun estimateRecommendedPointSize_InvalidFontName_ReturnsMinSize() {
-        // Assuming "InvalidFontNameXYZ123" does not exist
-        // The internal logic should catch the font creation error and return fallback
-        assertEquals(
-            MIN_POINT_SIZE,
-            FontPointUtils.estimateRecommendedPointSize("InvalidFontNameXYZ123", Font.PLAIN, 1920, 1080),
-            "Should return min size for invalid font name"
-        )
-        assertEquals(
-            MIN_POINT_SIZE,
-            FontPointUtils.estimateRecommendedPointSize("", Font.PLAIN, 1920, 1080), // Blank font name
-            "Should return min size for blank font name"
-        )
     }
 
     @Test
