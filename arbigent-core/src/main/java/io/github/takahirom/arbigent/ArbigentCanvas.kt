@@ -179,7 +179,13 @@ public class ArbigentCanvas(width: Int, height: Int, bufferedImageType: Int) {
 
 private fun <T> BufferedImage.graphics(block: (Graphics2D) -> T): T {
   val graphics = createGraphics()
-  graphics.font = Font("Courier New", Font.BOLD, 12)
+  graphics.font = Font("Courier New", Font.BOLD, FontPointUtils.estimateRecommendedPointSize(
+    fontName = "Courier New",
+    fontStyle = Font.BOLD,
+    originalWidth = width,
+    originalHeight = height,
+    g2d = graphics
+  ))
   val result = block(graphics)
   graphics.dispose()
   return result
