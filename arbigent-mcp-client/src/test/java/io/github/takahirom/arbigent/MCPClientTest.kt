@@ -32,14 +32,14 @@ class MCPClientTest {
     @Test
     fun `test executeTool when not connected`() {
         // Create a tool and execute it
-        val tool = Tool(
+        val tool = MCPTool(Tool(
             name = "test-tool",
             description = "A test tool",
             inputSchema = ToolSchema(
                 properties = JsonObject(mapOf("param" to JsonPrimitive("value"))),
                 required = listOf("param")
             )
-        )
+        ), "test-server")
 
         val executeToolArgs = ExecuteToolArgs(
             arguments = JsonObject(mapOf("param" to JsonPrimitive("value")))
