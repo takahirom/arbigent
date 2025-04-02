@@ -130,6 +130,10 @@ jobs:
           restore-keys: arbigent-${{ matrix.shardIndex }}-${{ matrix.shardTotal }}-
           path: arbigent-cache
 
+      - name: Update npm
+        run: |
+          npm install -g npm@latest
+
       - name: check mcp
         run: |
           if [ ! -f mcpserversample.main.kts ]; then
