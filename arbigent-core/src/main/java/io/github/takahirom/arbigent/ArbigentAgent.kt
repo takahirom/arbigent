@@ -209,7 +209,8 @@ public class ArbigentAgent(
       stepChain = stepChain,
       decisionChain = decisionChain,
       imageAssertionChain = imageAssertionChain,
-      executeActionChain = executeActionChain
+      executeActionChain = executeActionChain,
+      mcpClient = mcpClient
     )
 
     when (executeChain(executeInput)) {
@@ -238,6 +239,7 @@ public class ArbigentAgent(
     val decisionChain: suspend (ArbigentAi.DecisionInput) -> ArbigentAi.DecisionOutput,
     val imageAssertionChain: (ArbigentAi.ImageAssertionInput) -> ArbigentAi.ImageAssertionOutput,
     val executeActionChain: (ExecuteActionsInput) -> ExecuteActionsOutput,
+    val mcpClient: MCPClient? = null,
   )
 
   public sealed interface ExecutionResult {
@@ -258,6 +260,7 @@ public class ArbigentAgent(
     val prompt: ArbigentPrompt,
     val aiOptions: ArbigentAiOptions?,
     val cacheOptions: ArbigentScenarioCacheOptions = ArbigentScenarioCacheOptions(),
+    val mcpClient: MCPClient? = null,
   )
 
   public sealed interface StepResult {
@@ -916,7 +919,8 @@ private suspend fun executeDefault(input: ExecuteInput): ExecutionResult {
         executeActionChain = input.executeActionChain,
         prompt = input.prompt,
         aiOptions = input.aiOptions,
-        cacheOptions = input.cacheOptions
+        cacheOptions = input.cacheOptions,
+        mcpClient = input.mcpClient
       )
       when (input.stepChain(stepInput)) {
         StepResult.GoalAchieved -> break
@@ -1034,6 +1038,10 @@ private suspend fun step(
       )
     )
   }
+
+  // Get tools from MCPClient if available
+  val tools = stepInput.mcpClient?.tools()
+
   val decisionInput = ArbigentAi.DecisionInput(
     stepId = stepId,
     contextHolder = contextHolder,
@@ -1051,7 +1059,8 @@ private suspend fun step(
     screenshotFilePath = screenshotFilePath,
     prompt = stepInput.prompt,
     cacheKey = cacheKey,
-    aiOptions = stepInput.aiOptions
+    aiOptions = stepInput.aiOptions,
+    tools = tools
   )
   val decisionOutput = decisionChain(decisionInput)
   if (decisionOutput.agentActions.any { it is GoalAchievedAgentAction }) {
