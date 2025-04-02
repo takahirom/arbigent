@@ -93,10 +93,10 @@ fun LauncherScreen(
         }
       }
     }
-    AppSettingsSection(
+    AiProviderSetting(
       modifier = Modifier.padding(8.dp),
     )
-    AiProviderSetting(
+    AppSettingsSection(
       modifier = Modifier.padding(8.dp),
     )
     if (devices.isNotEmpty()) {
@@ -107,6 +107,7 @@ fun LauncherScreen(
         Text("Connect to device")
       }
     }
+
   }
 }
 
@@ -328,22 +329,38 @@ private fun AppSettingsSection(
   val appSettingsStateHolder = remember { AppSettingsStateHolder() }
   val appSettings = appSettingsStateHolder.appSettings
 
-  GroupHeader("App Settings")
-  Column(modifier = modifier) {
-    Text("Working Directory")
-    val workingDirectory = rememberSaveable(saver = TextFieldState.Saver) {
-      TextFieldState(appSettings.workingDirectory ?: "", TextRange(appSettings.workingDirectory?.length ?: 0))
+  ExpandableSection("App Settings(Used for MCP)") {
+    Column(modifier = modifier) {
+      Text("Working Directory")
+      val workingDirectory = rememberSaveable(saver = TextFieldState.Saver) {
+        TextFieldState(appSettings.workingDirectory ?: "", TextRange(appSettings.workingDirectory?.length ?: 0))
+      }
+      LaunchedEffect(Unit) {
+        snapshotFlow { workingDirectory.text }
+          .collect {
+            appSettingsStateHolder.onWorkingDirectoryChanged(it.toString())
+          }
+      }
+      TextField(
+        state = workingDirectory,
+        modifier = Modifier.padding(8.dp)
+      )
+
+      Text("PATH")
+      val path = rememberSaveable(saver = TextFieldState.Saver) {
+        TextFieldState(appSettings.path ?: "", TextRange(appSettings.path?.length ?: 0))
+      }
+      LaunchedEffect(Unit) {
+        snapshotFlow { path.text }
+          .collect {
+            appSettingsStateHolder.onPathChanged(it.toString())
+          }
+      }
+      TextField(
+        state = path,
+        modifier = Modifier.padding(8.dp)
+      )
     }
-    LaunchedEffect(Unit) {
-      snapshotFlow { workingDirectory.text }
-        .collect {
-          appSettingsStateHolder.onWorkingDirectoryChanged(it.toString())
-        }
-    }
-    TextField(
-      state = workingDirectory,
-      modifier = Modifier.padding(8.dp)
-    )
   }
 }
 

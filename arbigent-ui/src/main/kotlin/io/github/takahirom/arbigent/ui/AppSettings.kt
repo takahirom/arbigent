@@ -8,7 +8,8 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class AppSettings(
-  override val workingDirectory: String? = null
+  override val workingDirectory: String? = null,
+  override val path: String? = null
 ) : ArbigentAppSettings
 
 class AppSettingsStateHolder {
@@ -17,6 +18,11 @@ class AppSettingsStateHolder {
 
   fun onWorkingDirectoryChanged(workingDirectory: String) {
     appSettings = appSettings.copy(workingDirectory = workingDirectory)
+    Preference.appSettingValue = appSettings
+  }
+
+  fun onPathChanged(path: String) {
+    appSettings = appSettings.copy(path = path)
     Preference.appSettingValue = appSettings
   }
 }

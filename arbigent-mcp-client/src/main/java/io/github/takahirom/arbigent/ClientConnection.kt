@@ -54,6 +54,17 @@ public class ClientConnection(
         val processEnv = processBuilder.environment()
         env.forEach { (key, value) -> processEnv[key] = value }
 
+        // Set PATH if provided in appSettings
+        try {
+          val path = appSettings.path
+          if (!path.isNullOrBlank()) {
+            logger.i { "Setting PATH: $path" }
+            processEnv["PATH"] = path + File.pathSeparator + processEnv["PATH"]
+          }
+        } catch (e: Exception) {
+          logger.w { "Failed to get PATH from appSettings: ${e.message}" }
+        }
+
         // Set working directory if provided in appSettings
         try {
           // Use the interface method directly

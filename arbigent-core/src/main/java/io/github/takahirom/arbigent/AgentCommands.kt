@@ -669,14 +669,14 @@ public class FailedAgentAction : ArbigentAgentAction {
 }
 
 @Serializable
-public data class ExecuteToolAgentAction(
+public data class ExecuteMcpToolAgentAction(
   val tool: Tool,
   val executeToolArgs: ExecuteToolArgs
 ) : ArbigentAgentAction {
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
-    return "Execute tool: ${tool.name} with args: ${executeToolArgs.arguments}"
+    return "Execute MCP tool: ${tool.name} with args: ${executeToolArgs.arguments}"
   }
 
   override fun runDeviceAction(runInput: ArbigentAgentAction.RunInput) {

@@ -970,6 +970,20 @@ private fun ContentPanel(
                       .background(JewelTheme.colorPalette.purple(8))
                   )
                 }
+                if (step.agentAction is ExecuteMcpToolAgentAction) {
+                  Icon(
+                    key = AllIconsKeys.Run.Widget.Build,
+                    contentDescription = "MCP",
+                    modifier = Modifier.padding(4.dp).align(Alignment.CenterVertically),
+                    hint = Size(12),
+                    tint = JewelTheme.colorPalette.purple(1)
+                  )
+                  Text(
+                    "MCP",
+                    modifier = Modifier.padding(4.dp)
+                      .background(JewelTheme.colorPalette.purple(8))
+                  )
+                }
                 if (step.isFailed()) {
                   Icon(
                     key = AllIconsKeys.General.Error,
