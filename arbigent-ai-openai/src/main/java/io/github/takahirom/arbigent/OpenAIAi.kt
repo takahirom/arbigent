@@ -164,7 +164,6 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
       model = modelName,
       messages = messages,
       tools = buildTools(agentActionTypes = agentActionTypes, mcpTools = decisionInput.mcpTools),
-      toolChoice = null
     )
     val responseText = try {
       chatCompletion(
@@ -398,7 +397,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
         imageDescription = jsonData["image-description"]?.jsonPrimitive?.content ?: "",
         memo = jsonData["memo"]?.jsonPrimitive?.content ?: "",
         aiRequest = messages.toHumanReadableString(),
-        aiResponse = message.content ?: (message.toolCalls?.firstOrNull()?.function?.arguments ?: ""),
+        aiResponse = message.toString(),
         screenshotFilePath = screenshotFilePath,
         apiCallJsonLFilePath = decisionInput.apiCallJsonLFilePath,
         uiTreeStrings = decisionInput.uiTreeStrings,
