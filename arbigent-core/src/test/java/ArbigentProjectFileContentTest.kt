@@ -49,7 +49,7 @@ class ArbigentProjectFileContentTest {
         aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
       )
       val executor = ArbigentScenarioExecutor()
-      executor.execute(executorScenario)
+      executor.execute(executorScenario, MCPClient("{}"))
       assertTrue {
         executor.isGoalAchieved()
       }
