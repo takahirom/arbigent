@@ -22,4 +22,35 @@ buildConfig {
 }
 
 dependencies {
+  // Kotlin Coroutines
+  implementation(libs.kotlinx.coroutines.core)
+
+  // Ktor Client Core and Engine
+  implementation(libs.ktor.client.core)
+  implementation(libs.ktor.client.cio)
+
+  // Ktor Content Negotiation and Kotlinx Serialization
+  implementation(libs.ktor.client.contentnegotiation)
+  implementation(libs.ktor.serialization.json)
+
+  // Kotlinx Serialization JSON runtime
+  implementation(libs.kotlinx.serialization.json)
+
+  // MCP Kotlin SDK
+  implementation("io.modelcontextprotocol:kotlin-sdk:0.4.0")
+
+  // Kotlinx IO (for stream conversion)
+  implementation(libs.kotlinx.io.core)
+
+  // SLF4J API and a Logging Implementation
+  implementation("org.slf4j:slf4j-api:2.0.9")
+  runtimeOnly("ch.qos.logback:logback-classic:1.4.14")
+
+  // Project dependencies
+  implementation(project(":arbigent-core-model"))
+
+  // Test dependencies
+  testImplementation(libs.junit)
+  testImplementation("org.jetbrains.kotlin:kotlin-test:${libs.versions.kotlin.get()}")
+  testImplementation("org.jetbrains.kotlin:kotlin-test-junit:${libs.versions.kotlin.get()}")
 }
