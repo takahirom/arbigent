@@ -11,4 +11,11 @@ public object DefaultArbigentAppSettings : ArbigentAppSettings {
    * @return Always returns null as this is a default implementation.
    */
   override val workingDirectory: String? = null
+
+  /**
+   * Gets the PATH environment variable.
+   *
+   * @return Always returns null as this is a default implementation.
+   */
+  override val path: String? = null
 }

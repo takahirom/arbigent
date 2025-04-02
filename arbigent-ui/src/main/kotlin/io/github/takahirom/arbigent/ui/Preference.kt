@@ -37,7 +37,8 @@ internal object Preference {
         .encodeToString(
           serializer = AppSettings.serializer(),
           value = AppSettings(
-            workingDirectory = ""
+            workingDirectory = "",
+            path = ""
           ),
         )
     }

@@ -5,4 +5,5 @@ package io.github.takahirom.arbigent
  */
 public interface ArbigentAppSettings {
     public val workingDirectory: String?
+    public val path: String?
 }

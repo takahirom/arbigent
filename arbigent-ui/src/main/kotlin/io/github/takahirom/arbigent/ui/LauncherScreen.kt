@@ -344,6 +344,21 @@ private fun AppSettingsSection(
       state = workingDirectory,
       modifier = Modifier.padding(8.dp)
     )
+
+    Text("PATH")
+    val path = rememberSaveable(saver = TextFieldState.Saver) {
+      TextFieldState(appSettings.path ?: "", TextRange(appSettings.path?.length ?: 0))
+    }
+    LaunchedEffect(Unit) {
+      snapshotFlow { path.text }
+        .collect {
+          appSettingsStateHolder.onPathChanged(it.toString())
+        }
+    }
+    TextField(
+      state = path,
+      modifier = Modifier.padding(8.dp)
+    )
   }
 }
 
