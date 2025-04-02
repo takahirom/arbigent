@@ -31,6 +31,17 @@ internal object Preference {
     }
   )
 
+  private var appSetting: String by KeychainDelegate(
+    default = {
+      yaml
+        .encodeToString(
+          serializer = AppSettings.serializer(),
+          value = AppSettings(
+            workingDirectory = ""
+          ),
+        )
+    }
+  )
 
   var aiSettingValue: AiSetting
     get() = yaml.decodeFromString(AiSetting.serializer(), aiSetting)
@@ -46,6 +57,11 @@ internal object Preference {
       aiSetting = yaml.encodeToString(AiSetting.serializer(), value)
     }
 
+  var appSettingValue: AppSettings
+    get() = yaml.decodeFromString(AppSettings.serializer(), appSetting)
+    set(value) {
+      appSetting = yaml.encodeToString(AppSettings.serializer(), value)
+    }
 }
 
 private fun defaultAiProviderSettings() = listOf(
