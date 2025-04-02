@@ -1,5 +1,8 @@
 package io.github.takahirom.arbigent
 
+import co.touchlab.kermit.LogWriter
+import co.touchlab.kermit.Logger
+import co.touchlab.kermit.Severity
 import io.github.takahirom.arbigent.ConfidentialInfo.removeConfidentialInfo
 import java.time.Instant
 import java.time.ZoneId
@@ -23,7 +26,33 @@ public enum class ArbigentLogLevel {
   }
 }
 
-public var arbigentLogLevel: ArbigentLogLevel = ArbigentLogLevel.DEBUG
+private var _arbigentLogLevel: ArbigentLogLevel = run {
+  updateKermit(ArbigentLogLevel.DEBUG)
+  ArbigentLogLevel.DEBUG
+}
+
+public var arbigentLogLevel: ArbigentLogLevel
+  get() = _arbigentLogLevel
+  set(value) {
+    _arbigentLogLevel = value
+    updateKermit(value)
+  }
+
+private fun updateKermit(level: ArbigentLogLevel) {
+  Logger.setLogWriters(object : LogWriter(){
+    override fun log(severity: Severity, message: String, tag: String, throwable: Throwable?) {
+      if (severity == Severity.Debug) {
+        printLog(ArbigentLogLevel.DEBUG, message)
+      } else if (severity == Severity.Info) {
+        printLog(ArbigentLogLevel.INFO, message)
+      } else if (severity == Severity.Warn) {
+        printLog(ArbigentLogLevel.WARN, message)
+      } else if (severity == Severity.Error) {
+        printLog(ArbigentLogLevel.ERROR, message)
+      }
+    }
+  })
+}
 
 public fun arbigentDebugLog(log: String) {
   if (arbigentLogLevel <= ArbigentLogLevel.DEBUG) {

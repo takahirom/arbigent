@@ -1053,9 +1053,12 @@ private suspend fun step(
   }
   val decisionJsonlFilePath =
     ArbigentFiles.jsonlsDir.absolutePath + File.separator + "$stepId.jsonl"
-  val lastScreenshot = contextHolder.steps().lastOrNull()?.screenshotFilePath
+  val lastStepOrNull = contextHolder.steps().lastOrNull()
+  val lastScreenshot = lastStepOrNull?.screenshotFilePath
   val newScreenshot = File(screenshotFilePath)
-  if (detectStuckScreen(lastScreenshot, newScreenshot)) {
+  if (lastStepOrNull?.agentAction !is ExecuteToolAgentAction
+    && lastStepOrNull?.feedback == null
+    && detectStuckScreen(lastScreenshot, newScreenshot)) {
     arbigentDebugLog("Stuck screen detected.")
     contextHolder.addStep(
       ArbigentContextHolder.Step(

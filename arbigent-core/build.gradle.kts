@@ -54,6 +54,8 @@ dependencies {
   implementation(libs.identity.jvm)
   implementation(project(":arbigent-core-model"))
   implementation("io.github.darkxanter:webp-imageio:0.3.3")
+
+  implementation("co.touchlab:kermit:2.0.4")
   testImplementation(kotlin("test"))
   // coroutine test
   testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.5.2")

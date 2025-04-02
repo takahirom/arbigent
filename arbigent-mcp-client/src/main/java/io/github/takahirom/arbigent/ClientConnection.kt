@@ -10,7 +10,7 @@ import kotlinx.io.asSink
 import kotlinx.io.asSource
 import kotlinx.io.buffered
 import kotlinx.serialization.json.JsonObject
-import org.slf4j.LoggerFactory
+import co.touchlab.kermit.Logger
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -29,7 +29,7 @@ public class ClientConnection(
   public val env: Map<String, String>,
   public val appSettings: ArbigentAppSettings
 ) {
-  private val logger = LoggerFactory.getLogger(ClientConnection::class.java)
+  private val logger = Logger.withTag("ClientConnection")
   private var mcpClient: Client? = null
   private var serverProcess: Process? = null
 
@@ -40,7 +40,7 @@ public class ClientConnection(
    */
   public suspend fun connect(): Boolean {
     try {
-      logger.info("Starting MCP server: $serverName with command: $command ${args.joinToString(" ")}")
+      logger.i { "Starting MCP server: $serverName with command: $command ${args.joinToString(" ")}" }
 
       // Build the command list
       val commandList = mutableListOf(command)
@@ -62,17 +62,38 @@ public class ClientConnection(
             val workingDirectoryFile = File(workingDirectory)
             if (workingDirectoryFile.exists() && workingDirectoryFile.isDirectory) {
               processBuilder.directory(workingDirectoryFile)
-              logger.info("Setting working directory: $workingDirectory")
+              logger.i { "Setting working directory: $workingDirectory" }
             } else {
-              logger.warn("Working directory does not exist or is not a directory: $workingDirectory")
+              logger.w { "Working directory does not exist or is not a directory: $workingDirectory" }
             }
           }
         } catch (e: Exception) {
-          logger.warn("Failed to get working directory from appSettings: ${e.message}")
+          logger.w { "Failed to get working directory from appSettings: ${e.message}" }
         }
 
         serverProcess = processBuilder.start()
-        logger.info("Server process started (PID: ${serverProcess?.pid() ?: "unknown"})")
+        logger.i { "Server process started (PID: ${serverProcess?.pid() ?: "unknown"})" }
+
+        // Capture and log error output from the process
+        val errorReader = Thread {
+          try {
+            val errorStream = serverProcess!!.errorStream
+            val reader = errorStream.bufferedReader()
+            var line: String?
+            while (reader.readLine().also { line = it } != null) {
+              logger.w { "MCP server error output: $line" }
+            }
+          } catch (e: Exception) {
+            logger.e { "Error reading from process error stream: ${e.message}" }
+          }
+        }
+        errorReader.isDaemon = true
+        errorReader.start()
+        serverProcess?.onExit()
+          ?.thenAccept { exit ->
+            logger.i { "MCP server process exited with code: ${exit.exitValue()}" }
+            errorReader.interrupt()
+          }
 
         // Initialize MCP client
         mcpClient = Client(clientInfo = Implementation(name = "arbigent-mcp-client", version = "1.0.0"))
@@ -84,16 +105,16 @@ public class ClientConnection(
         )
 
         mcpClient!!.connect(transport)
-        logger.info("MCP connection established with server: $serverName")
+        logger.i { "MCP connection established with server: $serverName" }
         return true
       } catch (e: Exception) {
-        logger.warn("Failed to start or connect to MCP server: ${e.message}, continuing without MCP")
+        logger.w { "Failed to start or connect to MCP server: ${e.message}, continuing without MCP" }
         close() // Clean up resources if connection fails
         throw e
         return false
       }
     } catch (e: Exception) {
-      logger.warn("Error connecting to MCP server: ${e.message}, continuing without MCP")
+      logger.w { "Error connecting to MCP server: ${e.message}, continuing without MCP" }
       close() // Clean up resources if connection fails
       throw e
       return false
@@ -107,7 +128,7 @@ public class ClientConnection(
    */
   public suspend fun tools(): List<Tool> {
     if (mcpClient == null) {
-      logger.warn("Not connected to an MCP server, returning empty tools list")
+      logger.w { "Not connected to an MCP server, returning empty tools list" }
       return emptyList()
     }
 
@@ -128,7 +149,7 @@ public class ClientConnection(
         )
       }
     } catch (e: Exception) {
-      logger.warn("Error listing tools: ${e.message}, returning empty list")
+      logger.w { "Error listing tools: ${e.message}, returning empty list" }
       return emptyList()
     }
   }
@@ -142,7 +163,7 @@ public class ClientConnection(
    */
   public suspend fun executeTool(tool: Tool, executeToolArgs: ExecuteToolArgs): ExecuteToolResult {
     if (mcpClient == null) {
-      logger.warn("Not connected to an MCP server, returning default result for tool: ${tool.name}")
+      logger.w { "Not connected to an MCP server, returning default result for tool: ${tool.name}" }
       return ExecuteToolResult(content = "[MCP server not available]")
     }
 
@@ -159,7 +180,7 @@ public class ClientConnection(
 
       return ExecuteToolResult(content = resultText)
     } catch (e: Exception) {
-      logger.warn("Error executing tool: ${tool.name}: ${e.message}, returning default result")
+      logger.w { "Error executing tool: ${tool.name}: ${e.message}, returning default result" }
       return ExecuteToolResult(content = "[Error executing tool: ${e.message}]")
     }
   }
@@ -175,26 +196,26 @@ public class ClientConnection(
           client.close()
         }
       }
-      logger.info("MCP Client closed successfully")
+      logger.i { "MCP Client closed successfully" }
     } catch (e: Exception) {
-      logger.error("Error closing MCP client", e)
+      logger.e(e) { "Error closing MCP client" }
     }
 
     // Terminate Server Process
     serverProcess?.let { proc ->
       if (proc.isAlive) {
-        logger.info("Attempting to terminate MCP server process (PID: ${proc.pid()})")
+        logger.i { "Attempting to terminate MCP server process (PID: ${proc.pid()})" }
         proc.destroy() // Request graceful termination first
 
         val terminatedGracefully = proc.waitFor(5, TimeUnit.SECONDS) // Wait briefly
 
         if (!terminatedGracefully && proc.isAlive) {
-          logger.warn("Server process did not terminate gracefully, forcing termination")
+          logger.w { "Server process did not terminate gracefully, forcing termination" }
           proc.destroyForcibly() // Force termination if needed
         }
 
         val exitCode = proc.waitFor() // Wait for process to fully exit
-        logger.info("MCP server process terminated with exit code: $exitCode")
+        logger.i { "MCP server process terminated with exit code: $exitCode" }
       } else {
         // Process already finished, just log its exit code if possible
         val exitCode = try {
@@ -202,7 +223,7 @@ public class ClientConnection(
         } catch (_: IllegalThreadStateException) {
           "N/A (already exited)"
         }
-        logger.info("MCP server process had already terminated with exit code: $exitCode")
+        logger.i { "MCP server process had already terminated with exit code: $exitCode" }
       }
     }
 

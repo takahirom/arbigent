@@ -35,6 +35,35 @@ import java.nio.charset.Charset
 
 public class ArbigentAiRateLimitExceededException : Exception("Rate limit exceeded")
 
+private enum class ArbigentAiAnswerItems(
+  val key: String,
+  val type: String,
+  val description: String,
+) {
+  Memo("arbigent-memo", "string", "Memo for the agent"),
+  ImageDescription("arbigent-mage-description", "string", "Description of what is visible in the image");
+
+  fun toJsonString(): String {
+    return """"$key": {
+  "type": "$type",
+  "description": "$description"
+}"""
+  }
+
+  fun toJsonObject(): JsonObject {
+    return JsonObject(
+      mapOf(
+        key to JsonObject(
+          mapOf(
+            "type" to JsonPrimitive(type),
+            "description" to JsonPrimitive(description)
+          )
+        )
+      )
+    )
+  }
+}
+
 @OptIn(ExperimentalRoborazziApi::class, ExperimentalSerializationApi::class)
 public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
   private val apiKey: String,
@@ -310,8 +339,8 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
         stepId = decisionInput.stepId,
         agentAction = agentAction,
         action = action,
-        imageDescription = argumentsJsonData["image-description"]?.jsonPrimitive?.content ?: "",
-        memo = argumentsJsonData["memo"]?.jsonPrimitive?.content ?: "",
+        imageDescription = argumentsJsonData[ArbigentAiAnswerItems.ImageDescription.key]?.jsonPrimitive?.content ?: "",
+        memo = argumentsJsonData[ArbigentAiAnswerItems.Memo.key]?.jsonPrimitive?.content ?: "",
         aiRequest = messages.toHumanReadableString(tools = toolDefinitions),
         aiResponse = message.toString(),
         screenshotFilePath = screenshotFilePath,
@@ -338,18 +367,15 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
       val mcpAction = action.removePrefix("mcp_")
       val mcpTool = mcpTools?.firstOrNull { it.name == mcpAction }
         ?: throw IllegalArgumentException("Unknown MCP action: $action. Available actions: ${mcpTools?.joinToString { it.name }}")
-      val mcpToolInput = mcpTool.inputSchema?.let { schema ->
-        val properties = schema.properties ?: JsonObject(emptyMap())
-        val required = schema.required ?: emptyList()
-        ToolSchema(
-          properties = properties,
-          required = required
-        )
-      }
       return ExecuteToolAgentAction(
         tool = mcpTool.tool,
         executeToolArgs = ExecuteToolArgs(
-          arguments = argumentsJsonData,
+          arguments = argumentsJsonData.let {
+            // Remove arbigent parameters
+            JsonObject(it.filterKeys { key ->
+              !ArbigentAiAnswerItems.entries.map { it.key }.contains(key)
+            }.toMap())
+          },
         )
       )
     }
@@ -485,21 +511,17 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
   private fun buildTools(agentActionTypes: List<AgentActionType>, mcpTools: List<MCPTool>?): List<ToolDefinition> {
     return agentActionTypes.map { actionType ->
       val jsonString = """
-          {
-            "type": "object",
-            "required": ["image-description", "memo"${
+{
+  "type": "object",
+  "required": [${ArbigentAiAnswerItems.entries.joinToString(",") { it.key }}${
         if (actionType.arguments().isNotEmpty()) ", \"text\"" else ""
       }],
-            "additionalProperties": false,
-            "properties": {
-              "image-description": {
-                "type": "string",
-                "description": "Description of what is visible in the image"
-              },
-              "memo": {
-                "type": "string",
-                "description": "Additional notes or observations"
-              }${
+"additionalProperties": false,
+"properties": {${
+        ArbigentAiAnswerItems.entries.joinToString(",\n") { entry ->
+          entry.toJsonString()
+        }
+      }${
         if (actionType.arguments().isNotEmpty()) {
           ",\n" + actionType.arguments().joinToString(",\n") { it.toJson() }
         } else ""
@@ -507,9 +529,6 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
             }
           }
           """
-      arbigentDebugLog {
-        "AI action type: ${actionType.actionName} $jsonString"
-      }
       val parameters = Json.parseToJsonElement(
         jsonString
       )
@@ -531,10 +550,20 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
       parametersMap["additionalProperties"] = JsonPrimitive(false)
 
       // Add the "properties" field with the original properties
-      parametersMap["properties"] = tool.inputSchema?.properties ?: JsonObject(emptyMap())
+      parametersMap["properties"] = (tool.inputSchema?.properties ?: JsonObject(emptyMap())).let {
+        val entries: List<Map.Entry<String, JsonElement>> = it.entries.toList()
+        val additional: List<Map.Entry<String, JsonElement>> = ArbigentAiAnswerItems.entries.flatMap { entry ->
+          entry.toJsonObject().entries
+        }
+        JsonObject(
+          (entries + additional).map { (key, value) ->
+            key to value
+          }.toMap()
+        )
+      }
 
       // Add the "required" field with the required properties
-      val requiredList = tool.inputSchema?.required ?: emptyList()
+      val requiredList = (tool.inputSchema?.required ?: emptyList()) + ArbigentAiAnswerItems.entries.map { it.key }
       val requiredJsonArray =
         Json.parseToJsonElement(requiredList.joinToString(prefix = "[", postfix = "]") { "\"$it\"" })
       parametersMap["required"] = requiredJsonArray
@@ -545,7 +574,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
       ToolDefinition(
         type = "function",
         function = FunctionDefinition(
-          name = "mcp_"+tool.name,
+          name = "mcp_" + tool.name,
           description = tool.description,
           parameters = parameters,
           strict = true
