@@ -970,7 +970,7 @@ private fun ContentPanel(
                       .background(JewelTheme.colorPalette.purple(8))
                   )
                 }
-                if (step.agentAction is ExecuteToolAgentAction) {
+                if (step.agentAction is ExecuteMcpToolAgentAction) {
                   Icon(
                     key = AllIconsKeys.Run.Widget.Build,
                     contentDescription = "MCP",

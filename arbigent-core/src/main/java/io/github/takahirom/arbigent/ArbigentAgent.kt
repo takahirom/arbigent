@@ -854,7 +854,7 @@ private suspend fun executeActions(
   decisionOutput.agentActions.forEach { agentAction ->
     try {
       // Handle ExecuteToolAgentAction separately
-      if (agentAction is ExecuteToolAgentAction) {
+      if (agentAction is ExecuteMcpToolAgentAction) {
         val mcpClient = executeActionsInput.mcpClient
         if (mcpClient != null) {
           val result = mcpClient.executeTool(agentAction.tool, agentAction.executeToolArgs)
@@ -1056,7 +1056,7 @@ private suspend fun step(
   val lastStepOrNull = contextHolder.steps().lastOrNull()
   val lastScreenshot = lastStepOrNull?.screenshotFilePath
   val newScreenshot = File(screenshotFilePath)
-  if (lastStepOrNull?.agentAction !is ExecuteToolAgentAction
+  if (lastStepOrNull?.agentAction !is ExecuteMcpToolAgentAction
     && lastStepOrNull?.feedback == null
     && detectStuckScreen(lastScreenshot, newScreenshot)) {
     arbigentDebugLog("Stuck screen detected.")

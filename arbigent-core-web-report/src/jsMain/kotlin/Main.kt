@@ -275,6 +275,16 @@ private fun StepView(step: ArbigentAgentTaskStepResult) {
           Text("Cache Hit")
         }
       }
+      if (step.agentAction?.contains("MCP") == true) {
+        Pre({
+          style {
+            whiteSpace("pre-wrap")
+            backgroundColor(Color.lightblue)
+          }
+        }) {
+          Text("MCP")
+        }
+      }
       Pre({
         style {
           whiteSpace("pre-wrap")
