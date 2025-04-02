@@ -96,7 +96,9 @@ public data class ArbigentAiOptions(
 public data class ArbigentProjectSettings(
   public val prompt: ArbigentPrompt = ArbigentPrompt(),
   public val cacheStrategy: CacheStrategy = CacheStrategy(),
-  public val aiOptions: ArbigentAiOptions? = null
+  public val aiOptions: ArbigentAiOptions? = null,
+  @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
+  public val mcpJson: String = "{}"
 )
 
 @Serializable
