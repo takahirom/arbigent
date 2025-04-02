@@ -32,6 +32,7 @@ dependencyResolutionManagement {
 rootProject.name = "arbigent"
 include(":arbigent-core-model")
 include(":arbigent-core")
+include(":arbigent-mcp-client")
 include(":arbigent-device-maestro")
 include(":arbigent-ai-openai")
 include(":arbigent-cli")

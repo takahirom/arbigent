@@ -2,7 +2,7 @@ import org.jetbrains.compose.ExperimentalComposeLibrary
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
-  id("org.jetbrains.kotlin.jvm") version "2.0.21"
+  id("org.jetbrains.kotlin.jvm") version libs.versions.kotlin
   id("org.jetbrains.compose")
   id("org.jetbrains.kotlin.plugin.compose")
   id("io.github.takahirom.roborazzi") version "1.41.0"
@@ -31,7 +31,6 @@ dependencies {
   implementation("org.jetbrains.jewel:jewel-int-ui-standalone-243:0.27.0")
   implementation("org.jetbrains.jewel:jewel-int-ui-decorated-window-243:0.27.0")
   implementation("com.jetbrains.intellij.platform:icons:243.22562.218")
-//    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
   implementation("com.charleskorn.kaml:kaml:0.67.0")
   implementation("com.github.javakeyring:java-keyring:1.0.4")
   // kotlin-test
