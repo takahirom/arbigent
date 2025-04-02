@@ -41,7 +41,7 @@ public class ArbigentProject(
    */
   public suspend fun <T> mcpScope(block: suspend (mcpClient: MCPClient) -> T): T {
     val mcpClient = MCPClient(settings.mcpJson, appSettings)
-    if(mcpClient.doesConfigHaveMcpServers().not()) {
+    if(!mcpClient.doesConfigHaveMcpServers()) {
       arbigentInfoLog("No MCP servers found in configuration, skipping MCP connection")
       return block(mcpClient)
     }
