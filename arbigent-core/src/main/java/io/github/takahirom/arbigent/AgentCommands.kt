@@ -670,7 +670,7 @@ public class FailedAgentAction : ArbigentAgentAction {
 
 @Serializable
 public data class ExecuteMcpToolAgentAction(
-  val tool: Tool,
+  val tool: MCPTool,
   val executeToolArgs: ExecuteToolArgs
 ) : ArbigentAgentAction {
   override val actionName: String = Companion.actionName

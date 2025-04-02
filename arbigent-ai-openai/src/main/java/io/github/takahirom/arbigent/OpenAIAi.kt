@@ -368,7 +368,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
       val mcpTool = mcpTools?.firstOrNull { it.name == mcpAction }
         ?: throw IllegalArgumentException("Unknown MCP action: $action. Available actions: ${mcpTools?.joinToString { it.name }}")
       return ExecuteMcpToolAgentAction(
-        tool = mcpTool.tool,
+        tool = mcpTool,
         executeToolArgs = ExecuteToolArgs(
           arguments = argumentsJsonData.let {
             // Remove arbigent parameters

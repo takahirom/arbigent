@@ -154,7 +154,8 @@ public class ClientConnection(
           inputSchema = tool.inputSchema?.let { schema ->
             ToolSchema(
               properties = schema.properties ?: JsonObject(emptyMap()),
-              required = schema.required ?: emptyList()
+//              required = schema.required ?: emptyList()
+              required = schema.properties.entries.map { it.key }
             )
           }
         )

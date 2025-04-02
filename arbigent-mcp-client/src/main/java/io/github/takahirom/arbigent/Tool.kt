@@ -28,6 +28,7 @@ public data class Tool(
  * Represents a tool that can be executed by the MCP client, with server information.
  * This wrapper allows identifying which server a tool belongs to.
  */
+@Serializable
 public data class MCPTool(
     /**
      * The underlying tool.
