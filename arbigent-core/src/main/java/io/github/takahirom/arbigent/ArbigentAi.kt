@@ -19,7 +19,7 @@ public interface ArbigentAi {
     val prompt: ArbigentPrompt,
     val cacheKey: String,
     val aiOptions: ArbigentAiOptions?,
-    val mcpTools: List<Tool>? = null,
+    val mcpTools: List<MCPTool>? = null,
   )
   @Serializable
   public data class DecisionOutput(

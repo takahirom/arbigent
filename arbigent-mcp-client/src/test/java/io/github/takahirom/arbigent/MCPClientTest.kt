@@ -1,5 +1,6 @@
 package io.github.takahirom.arbigent
 
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Test
@@ -46,7 +47,9 @@ class MCPClientTest {
         val mcpClient = MCPClient("{}")
 
         // This should return a default result because we haven't connected
-        val result = mcpClient.executeTool(tool, executeToolArgs)
+        val result = runBlocking {
+            mcpClient.executeTool(tool, executeToolArgs)
+        }
         assertEquals("[MCP server not available]", result.content)
     }
 
@@ -55,7 +58,33 @@ class MCPClientTest {
         val mcpClient = MCPClient("{}")
 
         // This should return an empty list because we haven't connected
-        val tools = mcpClient.tools()
-        assertEquals(emptyList(), tools)
+        val tools = runBlocking { mcpClient.tools() }
+        assertEquals(emptyList<MCPTool>(), tools)
+    }
+
+    @Test
+    fun `test executeTool with MCPTool when not connected`() {
+        // Create a tool and wrap it in an MCPTool
+        val tool = Tool(
+            name = "test-tool",
+            description = "A test tool",
+            inputSchema = ToolSchema(
+                properties = JsonObject(mapOf("param" to JsonPrimitive("value"))),
+                required = listOf("param")
+            )
+        )
+        val mcpTool = MCPTool(tool, "test-server")
+
+        val executeToolArgs = ExecuteToolArgs(
+            arguments = JsonObject(mapOf("param" to JsonPrimitive("value")))
+        )
+
+        val mcpClient = MCPClient("{}")
+
+        // This should return a default result because we haven't connected
+        val result = runBlocking {
+            mcpClient.executeTool(mcpTool, executeToolArgs)
+        }
+        assertEquals("[MCP server not available]", result.content)
     }
 }

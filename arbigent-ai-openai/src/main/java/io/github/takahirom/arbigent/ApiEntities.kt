@@ -13,7 +13,7 @@ public data class ChatMessage(
   val contents: List<Content>
 )
 
-public fun List<ChatMessage>.toHumanReadableString(): String {
+public fun List<ChatMessage>.toHumanReadableString(tools: List<ToolDefinition>): String {
   return buildString {
     for (chatMessage in this@toHumanReadableString) {
       append(chatMessage.role + ": ")
@@ -26,6 +26,13 @@ public fun List<ChatMessage>.toHumanReadableString(): String {
         }
         appendLine()
       }
+      appendLine("----")
+    }
+    appendLine("Tools:")
+    for (tool in tools) {
+      appendLine("Tool name: " + tool.function.name)
+      appendLine("Tool description: " + tool.function.description)
+      appendLine("Tool parameters: " + tool.function.parameters)
       appendLine("----")
     }
   }
