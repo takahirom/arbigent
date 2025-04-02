@@ -33,16 +33,22 @@ public class MCPClient(
     /**
      * Connects to the MCP server specified in the JSON configuration.
      * 
-     * @throws IOException If there's an error connecting to the server.
+     * If the MCP server is not available, logs a warning and returns without throwing an exception.
      */
     public fun connect(): Unit = runBlocking {
         try {
             // Parse the JSON configuration
             val config = json.parseToJsonElement(jsonString).jsonObject
-            val mcpServers = config["mcpServers"]?.jsonObject ?: throw IOException("No mcpServers found in configuration")
+            val mcpServers = config["mcpServers"]?.jsonObject
+
+            if (mcpServers == null) {
+                logger.warn("No mcpServers found in configuration, skipping MCP connection")
+                return@runBlocking
+            }
 
             if (mcpServers.isEmpty()) {
-                throw IOException("No MCP servers defined in configuration")
+                logger.warn("No MCP servers defined in configuration, skipping MCP connection")
+                return@runBlocking
             }
 
             // Use the first server in the configuration
@@ -50,7 +56,10 @@ public class MCPClient(
             val serverConfigObj = serverConfig.jsonObject
 
             val command = serverConfigObj["command"]?.jsonPrimitive?.content
-                ?: throw IOException("No command specified for server $serverName")
+            if (command == null) {
+                logger.warn("No command specified for server $serverName, skipping MCP connection")
+                return@runBlocking
+            }
 
             val args = serverConfigObj["args"]?.jsonObject?.values?.map { 
                 it.jsonPrimitive.content 
@@ -66,43 +75,48 @@ public class MCPClient(
             val commandList = mutableListOf(command)
             commandList.addAll(args)
 
-            // Start the server process
-            val processBuilder = ProcessBuilder(commandList)
+            try {
+                // Start the server process
+                val processBuilder = ProcessBuilder(commandList)
 
-            // Add environment variables
-            val processEnv = processBuilder.environment()
-            env.forEach { (key, value) -> processEnv[key] = value }
+                // Add environment variables
+                val processEnv = processBuilder.environment()
+                env.forEach { (key, value) -> processEnv[key] = value }
 
-            serverProcess = processBuilder.start()
-            logger.info("Server process started (PID: ${serverProcess?.pid() ?: "unknown"})")
+                serverProcess = processBuilder.start()
+                logger.info("Server process started (PID: ${serverProcess?.pid() ?: "unknown"})")
 
-            // Initialize MCP client
-            mcpClient = Client(clientInfo = Implementation(name = "arbigent-mcp-client", version = "1.0.0"))
+                // Initialize MCP client
+                mcpClient = Client(clientInfo = Implementation(name = "arbigent-mcp-client", version = "1.0.0"))
 
-            // Connect to the server process via standard input/output
-            val transport = StdioClientTransport(
-                input = serverProcess!!.inputStream.asSource().buffered(),
-                output = serverProcess!!.outputStream.asSink().buffered()
-            )
+                // Connect to the server process via standard input/output
+                val transport = StdioClientTransport(
+                    input = serverProcess!!.inputStream.asSource().buffered(),
+                    output = serverProcess!!.outputStream.asSink().buffered()
+                )
 
-            mcpClient!!.connect(transport)
-            logger.info("MCP connection established with server")
-
+                mcpClient!!.connect(transport)
+                logger.info("MCP connection established with server")
+            } catch (e: Exception) {
+                logger.warn("Failed to start or connect to MCP server: ${e.message}, continuing without MCP")
+                close() // Clean up resources if connection fails
+            }
         } catch (e: Exception) {
-            logger.error("Error connecting to MCP server", e)
+            logger.warn("Error parsing MCP configuration: ${e.message}, continuing without MCP")
             close() // Clean up resources if connection fails
-            throw IOException("Failed to connect to MCP server: ${e.message}", e)
         }
     }
 
     /**
      * Returns the list of tools available from the connected MCP server.
      * 
-     * @return List of available tools.
-     * @throws IllegalStateException If not connected to an MCP server.
+     * @return List of available tools, or an empty list if not connected to an MCP server.
      */
     public fun tools(): List<Tool> = runBlocking {
-        checkConnection()
+        if (mcpClient == null) {
+            logger.warn("Not connected to an MCP server, returning empty tools list")
+            return@runBlocking emptyList()
+        }
 
         try {
             val toolsResponse = mcpClient!!.listTools()
@@ -121,8 +135,8 @@ public class MCPClient(
                 )
             }
         } catch (e: Exception) {
-            logger.error("Error listing tools", e)
-            throw IOException("Failed to list tools: ${e.message}", e)
+            logger.warn("Error listing tools: ${e.message}, returning empty list")
+            return@runBlocking emptyList()
         }
     }
 
@@ -131,11 +145,13 @@ public class MCPClient(
      * 
      * @param tool The tool to execute.
      * @param executeToolArgs The arguments for the tool.
-     * @return The result of executing the tool.
-     * @throws IllegalStateException If not connected to an MCP server.
+     * @return The result of executing the tool, or a default result if not connected to an MCP server.
      */
     public fun executeTool(tool: Tool, executeToolArgs: ExecuteToolArgs): ExecuteToolResult = runBlocking {
-        checkConnection()
+        if (mcpClient == null) {
+            logger.warn("Not connected to an MCP server, returning default result for tool: ${tool.name}")
+            return@runBlocking ExecuteToolResult(content = "[MCP server not available]")
+        }
 
         try {
             val toolResult: CallToolResultBase? = mcpClient!!.callTool(tool.name, executeToolArgs.arguments)
@@ -150,8 +166,8 @@ public class MCPClient(
 
             return@runBlocking ExecuteToolResult(content = resultText)
         } catch (e: Exception) {
-            logger.error("Error executing tool: ${tool.name}", e)
-            throw IOException("Failed to execute tool ${tool.name}: ${e.message}", e)
+            logger.warn("Error executing tool: ${tool.name}: ${e.message}, returning default result")
+            return@runBlocking ExecuteToolResult(content = "[Error executing tool: ${e.message}]")
         }
     }
 
@@ -201,11 +217,9 @@ public class MCPClient(
     /**
      * Checks if the client is connected to an MCP server.
      * 
-     * @throws IllegalStateException If not connected to an MCP server.
+     * @return true if connected to an MCP server, false otherwise.
      */
-    private fun checkConnection() {
-        if (mcpClient == null) {
-            throw IllegalStateException("Not connected to an MCP server. Call connect() first.")
-        }
+    private fun isConnected(): Boolean {
+        return mcpClient != null
     }
 }
