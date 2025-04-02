@@ -37,7 +37,8 @@ import kotlin.system.exitProcess
  * Custom implementation of [ArbigentAppSettings] for CLI.
  */
 data class CliAppSettings(
-  override val workingDirectory: String?
+  override val workingDirectory: String?,
+  override val path: String?
 ) : ArbigentAppSettings
 
 sealed class AiConfig(name: String) : OptionGroup(name)
@@ -108,6 +109,8 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
     "--working-directory",
     help = "Working directory for the project"
   )
+
+  private val path by option(help = "Path to a file")
 
   private val scenarioIds by option(
     "--scenario-ids",
@@ -191,7 +194,10 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
     }
 
     var device: ArbigentDevice? = null
-    val appSettings = CliAppSettings(workingDirectory = workingDirectory)
+    val appSettings = CliAppSettings(
+      workingDirectory = workingDirectory,
+      path = path,
+    )
     val arbigentProject = ArbigentProject(
       file = File(projectFile),
       aiFactory = { ai },
