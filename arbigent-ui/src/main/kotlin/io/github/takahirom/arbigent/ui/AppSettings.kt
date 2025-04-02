@@ -3,12 +3,13 @@ package io.github.takahirom.arbigent.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import io.github.takahirom.arbigent.ArbigentAppSettings
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class AppSettings(
-  val workingDirectory: String = ""
-)
+  override val workingDirectory: String? = null
+) : ArbigentAppSettings
 
 class AppSettingsStateHolder {
   var appSettings by mutableStateOf(Preference.appSettingValue)

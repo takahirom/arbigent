@@ -29,7 +29,8 @@ class RealArbigentTest {
         ArbigentAvailableDevice.Android(
           dadb = Dadb.discover()!!
         ).connectToDevice()
-      }
+      },
+      appSettings = DefaultArbigentAppSettings
     )
     arbigentProject.execute()
   }

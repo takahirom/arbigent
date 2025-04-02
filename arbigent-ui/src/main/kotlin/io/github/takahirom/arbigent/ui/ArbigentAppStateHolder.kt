@@ -19,6 +19,9 @@ class ArbigentAppStateHolder(
     fetchAvailableDevicesByOs(os)
   }
 ) {
+  // AppSettings for working directory
+  private val appSettingsStateHolder = AppSettingsStateHolder()
+  val appSettings get() = appSettingsStateHolder.appSettings
   val devicesStateHolder = DevicesStateHolder(availableDeviceListFactory)
 
   sealed interface DeviceConnectionState {
@@ -145,6 +148,7 @@ class ArbigentAppStateHolder(
       initialScenarios = allScenarioStateHoldersStateFlow.value.map { scenario ->
         scenario.createScenario(allScenarioStateHoldersStateFlow.value)
       },
+      appSettings = appSettings
     )
     projectStateFlow.value = arbigentProject
     allScenarioStateHoldersStateFlow.value.forEach { scenarioStateHolder ->
@@ -176,7 +180,8 @@ class ArbigentAppStateHolder(
             this@ArbigentAppStateHolder.deviceFactory(selectedDevice)
           }
         },
-        aiDecisionCache = decisionCache.value
+        aiDecisionCache = decisionCache.value,
+        appSettings = appSettings
       )
 
   private fun sortedScenarioAndDepth(allScenarios: List<ArbigentScenarioStateHolder>): List<Pair<ArbigentScenarioStateHolder, Int>> {
@@ -298,6 +303,7 @@ class ArbigentAppStateHolder(
           arbigentScenarioStateHolders
         )
       },
+      appSettings = appSettings
     )
     allScenarioStateHoldersStateFlow.value = arbigentScenarioStateHolders
   }

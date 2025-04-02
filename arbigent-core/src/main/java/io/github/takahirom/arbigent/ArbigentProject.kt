@@ -14,6 +14,7 @@ public class FailedToArchiveException(message: String) : RuntimeException(messag
 public class ArbigentProject(
   public val settings: ArbigentProjectSettings,
   initialScenarios: List<ArbigentScenario>,
+  public val appSettings: ArbigentAppSettings
 ) {
   private val _scenarioAssignmentsFlow =
     MutableStateFlow<List<ArbigentScenarioAssignment>>(listOf())
@@ -39,7 +40,7 @@ public class ArbigentProject(
    * @return The result of the block execution.
    */
   public suspend fun <T> mcpScope(block: suspend (mcpClient: MCPClient) -> T): T {
-    val mcpClient = MCPClient(settings.mcpJson)
+    val mcpClient = MCPClient(settings.mcpJson, appSettings)
     try {
       arbigentInfoLog("Connecting to MCP server...")
       mcpClient.connect()
@@ -113,6 +114,7 @@ public fun ArbigentProject(
   projectFileContent: ArbigentProjectFileContent,
   aiFactory: () -> ArbigentAi,
   deviceFactory: () -> ArbigentDevice,
+  appSettings: ArbigentAppSettings
 ): ArbigentProject {
   return ArbigentProject(
     settings = projectFileContent.settings,
@@ -122,9 +124,11 @@ public fun ArbigentProject(
         scenario = it,
         aiFactory = aiFactory,
         deviceFactory = deviceFactory,
-        aiDecisionCache = projectFileContent.settings.cacheStrategy.aiDecisionCacheStrategy.toCache()
+        aiDecisionCache = projectFileContent.settings.cacheStrategy.aiDecisionCacheStrategy.toCache(),
+        appSettings = appSettings
       )
     },
+    appSettings = appSettings
   )
 }
 
@@ -132,9 +136,10 @@ public fun ArbigentProject(
   file: File,
   aiFactory: () -> ArbigentAi,
   deviceFactory: () -> ArbigentDevice,
+  appSettings: ArbigentAppSettings
 ): ArbigentProject {
   val projectContentFileContent = ArbigentProjectSerializer().load(file)
-  return ArbigentProject(projectContentFileContent, aiFactory, deviceFactory)
+  return ArbigentProject(projectContentFileContent, aiFactory, deviceFactory, appSettings)
 }
 
 public data class ArbigentScenario(

@@ -11,6 +11,7 @@ import kotlinx.io.asSource
 import kotlinx.io.buffered
 import kotlinx.serialization.json.JsonObject
 import org.slf4j.LoggerFactory
+import java.io.File
 import java.util.concurrent.TimeUnit
 
 /**
@@ -25,7 +26,8 @@ public class ClientConnection(
   public val serverName: String,
   public val command: String,
   public val args: List<String>,
-  public val env: Map<String, String>
+  public val env: Map<String, String>,
+  public val appSettings: ArbigentAppSettings
 ) {
   private val logger = LoggerFactory.getLogger(ClientConnection::class.java)
   private var mcpClient: Client? = null
@@ -52,6 +54,23 @@ public class ClientConnection(
         val processEnv = processBuilder.environment()
         env.forEach { (key, value) -> processEnv[key] = value }
 
+        // Set working directory if provided in appSettings
+        try {
+          // Use the interface method directly
+          val workingDirectory = appSettings.workingDirectory
+          if (!workingDirectory.isNullOrBlank()) {
+            val workingDirectoryFile = File(workingDirectory)
+            if (workingDirectoryFile.exists() && workingDirectoryFile.isDirectory) {
+              processBuilder.directory(workingDirectoryFile)
+              logger.info("Setting working directory: $workingDirectory")
+            } else {
+              logger.warn("Working directory does not exist or is not a directory: $workingDirectory")
+            }
+          }
+        } catch (e: Exception) {
+          logger.warn("Failed to get working directory from appSettings: ${e.message}")
+        }
+
         serverProcess = processBuilder.start()
         logger.info("Server process started (PID: ${serverProcess?.pid() ?: "unknown"})")
 
@@ -70,11 +89,13 @@ public class ClientConnection(
       } catch (e: Exception) {
         logger.warn("Failed to start or connect to MCP server: ${e.message}, continuing without MCP")
         close() // Clean up resources if connection fails
+        throw e
         return false
       }
     } catch (e: Exception) {
       logger.warn("Error connecting to MCP server: ${e.message}, continuing without MCP")
       close() // Clean up resources if connection fails
+      throw e
       return false
     }
   }

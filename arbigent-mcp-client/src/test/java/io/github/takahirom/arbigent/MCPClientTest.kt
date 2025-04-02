@@ -24,7 +24,7 @@ class MCPClientTest {
         }
         """.trimIndent()
 
-        val mcpClient = MCPClient(jsonString)
+        val mcpClient = MCPClient(jsonString, DefaultArbigentAppSettings)
         assertEquals(jsonString, mcpClient.jsonString)
     }
 
@@ -44,7 +44,7 @@ class MCPClientTest {
             arguments = JsonObject(mapOf("param" to JsonPrimitive("value")))
         )
 
-        val mcpClient = MCPClient("{}")
+        val mcpClient = MCPClient()
 
         // This should return a default result because we haven't connected
         val result = runBlocking {
@@ -55,7 +55,7 @@ class MCPClientTest {
 
     @Test
     fun `test tools when not connected`() {
-        val mcpClient = MCPClient("{}")
+        val mcpClient = MCPClient()
 
         // This should return an empty list because we haven't connected
         val tools = runBlocking { mcpClient.tools() }
@@ -79,7 +79,7 @@ class MCPClientTest {
             arguments = JsonObject(mapOf("param" to JsonPrimitive("value")))
         )
 
-        val mcpClient = MCPClient("{}")
+        val mcpClient = MCPClient()
 
         // This should return a default result because we haven't connected
         val result = runBlocking {
