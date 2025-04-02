@@ -42,7 +42,7 @@ scenarios:
   initializationMethods:
   - type: "Back"
 - id: "6998f5c6-b84e-474e-90e2-fb488d4d70fc"
-  goal: "Launch com.android.settings using tool and see the device name"
+  goal: "Launch com.android.settings using mcp launch_app and see the device name"
   initializationMethods:
   - type: "Back"
 settings:
@@ -60,7 +60,7 @@ settings:
         },
         "android-adb": {
           "command": "npx",
-          "args": ["-y", "@landicefu/android-adb-mcp-server@github:landicefu/android-adb-mcp-server#8a4552d"],
+          "args": ["-y", "@landicefu/android-adb-mcp-server"],
           "env": {},
           "disabled": false,
           "alwaysAllow": []
