@@ -9,8 +9,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.io.asSink
 import kotlinx.io.asSource
 import kotlinx.io.buffered
-import kotlinx.serialization.json.JsonObject
 import co.touchlab.kermit.Logger
+import kotlinx.serialization.json.*
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -151,10 +151,44 @@ public class ClientConnection(
         Tool(
           name = tool.name,
           description = tool.description,
-          inputSchema = tool.inputSchema?.let { schema ->
+          inputSchema = tool.inputSchema.let { schema ->
             ToolSchema(
-              properties = schema.properties ?: JsonObject(emptyMap()),
-              required = schema.required ?: emptyList()
+              properties = JsonObject(schema.properties.mapValues { entry: Map.Entry<String, JsonElement> ->
+                if (schema.required?.contains(entry.key) == true) {
+                  entry.value
+                } else {
+                  // OpenAI API doesn't support optional parameters
+                  // So we need to add null type to optional parameters
+                  val overrideType: Pair<String, JsonArray> = when (val type = entry.value.jsonObject.get("type")) {
+                    is JsonArray -> {
+                      "type" to
+                        if (type.contains(JsonPrimitive("null"))) {
+                          type
+                        } else {
+                          JsonArray(
+                            type + JsonPrimitive("null")
+                          )
+                        }
+                    }
+
+                    is JsonObject -> TODO("Handle JsonObject type")
+                    is JsonPrimitive -> {
+                      "type" to JsonArray(listOf(type, JsonPrimitive("null")))
+                    }
+
+                    JsonNull ->
+                      "type" to JsonArray(listOf(JsonPrimitive("null")))
+
+                    else -> TODO("Handle unknown type: $type")
+                  }
+                  JsonObject(
+                    entry.value.jsonObject
+                      + overrideType
+                  )
+                }
+              }),
+              //              required = schema.required ?: emptyList()
+              required = schema.properties.entries.map { it.key }
             )
           }
         )

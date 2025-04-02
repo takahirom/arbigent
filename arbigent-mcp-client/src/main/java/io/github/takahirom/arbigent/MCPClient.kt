@@ -4,6 +4,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import co.touchlab.kermit.Logger
+import kotlinx.serialization.json.jsonArray
 
 /**
  * Client for interacting with Model Context Protocol (MCP) servers.
@@ -49,7 +50,7 @@ public class MCPClient(
           continue
         }
 
-        val args = serverConfigObj["args"]?.jsonObject?.values?.map {
+        val args = serverConfigObj["args"]?.jsonArray?.map {
           it.jsonPrimitive.content
         } ?: emptyList()
 
@@ -151,38 +152,6 @@ public class MCPClient(
       logger.w { "Error executing tool ${mcpTool.name} on server ${mcpTool.serverName}: ${e.message}" }
       return ExecuteToolResult(content = "[Error executing tool on server ${mcpTool.serverName}: ${e.message}]")
     }
-  }
-
-  /**
-   * Executes a tool with the given arguments.
-   * This method is provided for backward compatibility.
-   * It will try to execute the tool on each connection until one succeeds.
-   *
-   * @param tool The tool to execute.
-   * @param executeToolArgs The arguments for the tool.
-   * @return The result of executing the tool, or a default result if not connected to any MCP server.
-   */
-  public suspend fun executeTool(tool: Tool, executeToolArgs: ExecuteToolArgs): ExecuteToolResult {
-    if (connections.isEmpty()) {
-      logger.w { "Not connected to any MCP server, returning default result for tool: ${tool.name}" }
-      return ExecuteToolResult(content = "[MCP server not available]")
-    }
-
-    // Try each connection until one succeeds
-    for (connection in connections) {
-      try {
-        val result = connection.executeTool(tool, executeToolArgs)
-        // If we got a result that's not the default error message, return it
-        if (result.content != "[MCP server not available]") {
-          return result
-        }
-      } catch (e: Exception) {
-        logger.w { "Error executing tool ${tool.name} on server ${connection.serverName}: ${e.message}" }
-      }
-    }
-
-    // If we get here, all connections failed
-    return ExecuteToolResult(content = "[Error executing tool: No available MCP server could execute the tool]")
   }
 
   /**
