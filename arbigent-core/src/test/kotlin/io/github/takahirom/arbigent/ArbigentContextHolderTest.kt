@@ -48,7 +48,6 @@ class ArbigentContextHolderTest {
         val prompt = contextHolder.prompt(
             uiElements = "Button1: Click me",
             focusedTree = "Tree Structure",
-            actionTemplates = "Action1\nAction2",
             aiOptions = defaultAiOptions
         )
 
@@ -60,8 +59,6 @@ class ArbigentContextHolderTest {
         // Verify UI elements
         assertEquals(true, prompt.contains("Button1: Click me"))
         assertEquals(true, prompt.contains("Tree Structure"))
-        assertEquals(true, prompt.contains("Action1"))
-        assertEquals(true, prompt.contains("Action2"))
     }
 
     @Test
@@ -133,7 +130,6 @@ class ArbigentContextHolderTest {
         val prompt = contextHolder.prompt(
             uiElements = "Button1: Click me",
             focusedTree = "Tree Structure",
-            actionTemplates = "Action1\nAction2",
             aiOptions = limitedAiOptions
         )
 

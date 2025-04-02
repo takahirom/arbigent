@@ -1,6 +1,8 @@
 package io.github.takahirom.arbigent
 
+import com.oracle.truffle.regex.tregex.util.json.JsonString
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonPrimitive
 import maestro.KeyCode
 import maestro.MaestroException
 import maestro.orchestra.*
@@ -23,7 +25,30 @@ public sealed interface ArbigentAgentAction {
 
 public interface AgentActionType {
   public val actionName: String
-  public fun templateForAI(): String
+
+  /**
+   * Returns a description of the action.
+   */
+  public fun actionDescription(): String
+
+  public data class Argument(
+    val name: String,
+    val type: String,
+    val description: String
+  ) {
+    public fun toJson(): String {
+      val description = JsonPrimitive(description)
+      return """
+        "$name": { "type": "$type", "description": $description }
+      """.trimIndent()
+    }
+  }
+
+  /**
+   * Returns a list of argument descriptions for the action.
+   */
+  public fun arguments(): List<Argument>
+
   public fun isSupported(deviceOs: ArbigentDeviceOs): Boolean = true
 }
 
@@ -35,7 +60,7 @@ private fun getRegexToIndex(text: String): Pair<String, String> {
 }
 
 @Serializable
-public data class ClickWithIndex(val index: Int): ArbigentAgentAction {
+public data class ClickWithIndex(val index: Int) : ArbigentAgentAction {
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
@@ -58,16 +83,16 @@ public data class ClickWithIndex(val index: Int): ArbigentAgentAction {
   public companion object : AgentActionType {
     override val actionName: String = "ClickWithIndex"
 
-    override fun templateForAI(): String {
-      return """
-        {
-            "action": "$actionName",
-            // Should be index like 1 or 2 should NOT be text or id
-            "text": "1"
-        }
-        """.trimIndent()
-    }
+    override fun arguments(): List<AgentActionType.Argument> =
+      listOf(
+        AgentActionType.Argument(
+          name = "text",
+          type = "string",
+          description = "The index of the element to click on. Should be a number like 1 or 2, NOT text or ID."
+        )
+      )
 
+    override fun actionDescription(): String = "Click on an element by its index in the UI hierarchy"
   }
 }
 
@@ -112,18 +137,16 @@ public data class ClickWithTextAgentAction(val textRegex: String) : ArbigentAgen
   public companion object : AgentActionType {
     override val actionName: String = "ClickWithText"
 
-    override fun templateForAI(): String {
-      return """
-        {
-            "action": "$actionName",
-            // the text with index should be clickable text, or content description. should be in UI hierarchy. should not resource id
-            // You can use Regex.
-            // If you want to click second button, you can use text[index] e.g.: "text[0]". Try different index if the first one doesn't work.
-            "text": "...[index]" 
-        }
-        """.trimIndent()
-    }
+    override fun actionDescription(): String = "Click on an element by its text content"
 
+    override fun arguments(): List<AgentActionType.Argument> =
+      listOf(
+        AgentActionType.Argument(
+          name = "text",
+          type = "string",
+          description = "The text with index should be clickable text, or content description. Should be in UI hierarchy, not a resource id. You can use Regex. If you want to click second button, you can use text[index] e.g.: \"text[0]\". Try different index if the first one doesn't work."
+        )
+      )
   }
 }
 
@@ -153,18 +176,16 @@ public data class ClickWithIdAgentAction(val textRegex: String) : ArbigentAgentA
   public companion object : AgentActionType {
     override val actionName: String = "ClickWithId"
 
-    override fun templateForAI(): String {
-      return """
-        {
-            "action": "$actionName",
-            // the text should be id, should be in UI hierarchy
-            // You can use Regex
-            // If you want to click second button, you can use "button[1]"
-            "text": "..." 
-        }
-        """.trimIndent()
-    }
+    override fun actionDescription(): String = "Click on an element by its ID"
 
+    override fun arguments(): List<AgentActionType.Argument> =
+      listOf(
+        AgentActionType.Argument(
+          name = "text",
+          type = "string",
+          description = "The text should be an ID that exists in the UI hierarchy. You can use Regex. If you want to click the second button, you can use \"button[1]\"."
+        )
+      )
   }
 }
 
@@ -191,16 +212,16 @@ public data class DpadDownArrowAgentAction(val count: Int) : ArbigentAgentAction
   public companion object : AgentActionType {
     override val actionName: String = "DpadDownArrow"
 
-    override fun templateForAI(): String {
-      return """
-        {
-            "action": "$actionName",
-            // Count of down arrow key press
-            "text": "1"
-        }
-        """.trimIndent()
-    }
+    override fun actionDescription(): String = "Press the down arrow key on a D-pad"
 
+    override fun arguments(): List<AgentActionType.Argument> =
+      listOf(
+        AgentActionType.Argument(
+          name = "text",
+          type = "string",
+          description = "The number of times to press the down arrow key"
+        )
+      )
   }
 }
 
@@ -227,16 +248,16 @@ public data class DpadUpArrowAgentAction(val count: Int) : ArbigentAgentAction {
   public companion object : AgentActionType {
     override val actionName: String = "DpadUpArrow"
 
-    override fun templateForAI(): String {
-      return """
-        {
-            "action": "$actionName",
-            // Count of up arrow key press
-            "text": "1"
-        }
-        """.trimIndent()
-    }
+    override fun actionDescription(): String = "Press the up arrow key on a D-pad"
 
+    override fun arguments(): List<AgentActionType.Argument> =
+      listOf(
+        AgentActionType.Argument(
+          name = "text",
+          type = "string",
+          description = "The number of times to press the up arrow key"
+        )
+      )
   }
 }
 
@@ -263,16 +284,16 @@ public data class DpadRightArrowAgentAction(val count: Int) : ArbigentAgentActio
   public companion object : AgentActionType {
     override val actionName: String = "DpadRightArrow"
 
-    override fun templateForAI(): String {
-      return """
-        {
-            "action": "$actionName",
-            // Count of right arrow key press
-            "text": "1"
-        }
-        """.trimIndent()
-    }
+    override fun actionDescription(): String = "Press the right arrow key on a D-pad"
 
+    override fun arguments(): List<AgentActionType.Argument> =
+      listOf(
+        AgentActionType.Argument(
+          name = "text",
+          type = "string",
+          description = "The number of times to press the right arrow key"
+        )
+      )
   }
 }
 
@@ -299,16 +320,16 @@ public data class DpadLeftArrowAgentAction(val count: Int) : ArbigentAgentAction
   public companion object : AgentActionType {
     override val actionName: String = "DpadLeftArrow"
 
-    override fun templateForAI(): String {
-      return """
-        {
-            "action": "$actionName",
-            // Count of left arrow key press
-            "text": "1"
-        }
-        """.trimIndent()
-    }
+    override fun actionDescription(): String = "Press the left arrow key on a D-pad"
 
+    override fun arguments(): List<AgentActionType.Argument> =
+      listOf(
+        AgentActionType.Argument(
+          name = "text",
+          type = "string",
+          description = "The number of times to press the left arrow key"
+        )
+      )
   }
 }
 
@@ -335,16 +356,16 @@ public data class DpadCenterAgentAction(val count: Int) : ArbigentAgentAction {
   public companion object : AgentActionType {
     override val actionName: String = "DpadCenter"
 
-    override fun templateForAI(): String {
-      return """
-        {
-            "action": "$actionName",
-            // Count of center key press
-            "text": "1"
-        }
-        """.trimIndent()
-    }
+    override fun actionDescription(): String = "Press the center key on a D-pad"
 
+    override fun arguments(): List<AgentActionType.Argument> =
+      listOf(
+        AgentActionType.Argument(
+          name = "text",
+          type = "string",
+          description = "The number of times to press the center key"
+        )
+      )
   }
 }
 
@@ -357,24 +378,24 @@ public data class DpadAutoFocusWithIdAgentAction(val id: String) : ArbigentAgent
   }
 
   override fun runDeviceAction(runInput: ArbigentAgentAction.RunInput) {
-    val tvCompatibleDevice = (runInput.device as? ArbigentTvCompatDevice)?: throw NotImplementedError(message = "This action is only available for TV device")
+    val tvCompatibleDevice = (runInput.device as? ArbigentTvCompatDevice)
+      ?: throw NotImplementedError(message = "This action is only available for TV device")
     tvCompatibleDevice.moveFocusToElement(ArbigentTvCompatDevice.Selector.ById.fromId(id))
   }
 
   public companion object : AgentActionType {
     override val actionName: String = "DpadTryAutoFocusById"
 
-    override fun templateForAI(): String {
-      return """
-        {
-            "action": "$actionName",
-            // the text should be id, should be in UI hierarchy
-            // You can use Regex
-            // If you want to click second button, you can use text[index] e.g.: "text[0]". Try different index if the first one doesn't work.
-            "text": "...[index]"
-        }
-        """.trimIndent()
-    }
+    override fun actionDescription(): String = "Try to focus on an element by its ID using D-pad navigation"
+
+    override fun arguments(): List<AgentActionType.Argument> =
+      listOf(
+        AgentActionType.Argument(
+          name = "text",
+          type = "string",
+          description = "The ID of the element to focus on. Should be in UI hierarchy. You can use Regex. If you want to focus on the second button, you can use text[index] e.g.: \"text[0]\". Try different index if the first one doesn't work."
+        )
+      )
   }
 }
 
@@ -387,29 +408,29 @@ public data class DpadAutoFocusWithTextAgentAction(val text: String) : ArbigentA
   }
 
   override fun runDeviceAction(runInput: ArbigentAgentAction.RunInput) {
-    val tvCompatibleDevice = (runInput.device as? ArbigentTvCompatDevice)?: throw NotImplementedError(message = "This action is only available for TV device")
+    val tvCompatibleDevice = (runInput.device as? ArbigentTvCompatDevice)
+      ?: throw NotImplementedError(message = "This action is only available for TV device")
     tvCompatibleDevice.moveFocusToElement(ArbigentTvCompatDevice.Selector.ByText.fromText(text))
   }
 
   public companion object : AgentActionType {
     override val actionName: String = "DpadTryAutoFocusByText"
 
-    override fun templateForAI(): String {
-      return """
-        {
-            "action": "$actionName",
-            // the text should be clickable text, or content description. should be in UI hierarchy. should not resource id
-            // You can use Regex
-            // If you want to click second button, you can use text[index] e.g.: "text[0]". Try different index if the first one doesn't work.
-            "text": "...[index]"
-        }
-        """.trimIndent()
-    }
+    override fun actionDescription(): String = "Try to focus on an element by its text content using D-pad navigation"
+
+    override fun arguments(): List<AgentActionType.Argument> =
+      listOf(
+        AgentActionType.Argument(
+          name = "text",
+          type = "string",
+          description = "The text content or content description of the element to focus on. Should be in UI hierarchy, not a resource ID. You can use Regex. If you want to focus on the second button, you can use text[index] e.g.: \"text[0]\". Try different index if the first one doesn't work."
+        )
+      )
   }
 }
 
 @Serializable
-public data class DpadAutoFocusWithIndexAgentAction(val index: Int): ArbigentAgentAction {
+public data class DpadAutoFocusWithIndexAgentAction(val index: Int) : ArbigentAgentAction {
   override val actionName: String = Companion.actionName
 
   public override fun stepLogText(): String {
@@ -418,22 +439,25 @@ public data class DpadAutoFocusWithIndexAgentAction(val index: Int): ArbigentAge
 
   public override fun runDeviceAction(runInput: ArbigentAgentAction.RunInput) {
     val elements = runInput.elements
-    val tvCompatibleDevice = (runInput.device as? ArbigentTvCompatDevice)?: throw NotImplementedError(message = "This action is only available for TV device")
+    val tvCompatibleDevice = (runInput.device as? ArbigentTvCompatDevice)
+      ?: throw NotImplementedError(message = "This action is only available for TV device")
     tvCompatibleDevice.moveFocusToElement(elements.elements[index])
   }
 
   public companion object : AgentActionType {
     override val actionName: String = "DPadTryAutoFocusByIndex"
 
-    override fun templateForAI(): String {
-      return """
-        {
-            "action": "$actionName",
-            // Should be index like 1 or 2 should NOT be text or id
-            "text": "1"
-        }
-        """.trimIndent()
-    }
+    override fun actionDescription(): String =
+      "Try to focus on an element by its index in the UI hierarchy using D-pad navigation"
+
+    override fun arguments(): List<AgentActionType.Argument> =
+      listOf(
+        AgentActionType.Argument(
+          name = "text",
+          type = "string",
+          description = "The index of the element to focus on. Should be a number like 1 or 2, NOT text or ID."
+        )
+      )
   }
 }
 
@@ -460,16 +484,16 @@ public data class InputTextAgentAction(val text: String) : ArbigentAgentAction {
   public companion object : AgentActionType {
     override val actionName: String = "InputText"
 
-    override fun templateForAI(): String {
-      return """
-        {
-            // You have to **Click** on a text field before sending this action
-            "action": "$actionName",
-            "text": "..."
-        }
-        """.trimIndent()
-    }
+    override fun actionDescription(): String = "Input text into a text field"
 
+    override fun arguments(): List<AgentActionType.Argument> =
+      listOf(
+        AgentActionType.Argument(
+          name = "text",
+          type = "string",
+          description = "The text to input. You must click on a text field before sending this action."
+        )
+      )
   }
 }
 
@@ -494,18 +518,13 @@ public class BackPressAgentAction : ArbigentAgentAction {
   public companion object : AgentActionType {
     override val actionName: String = "BackPress"
 
+    override fun actionDescription(): String = "Press the back button on the device"
+
+    override fun arguments(): List<AgentActionType.Argument> = emptyList()
+
     override fun isSupported(deviceOs: ArbigentDeviceOs): Boolean {
       return !deviceOs.isIos()
     }
-
-    override fun templateForAI(): String {
-      return """
-        {
-            "action": "$actionName"
-        }
-        """.trimIndent()
-    }
-
   }
 }
 
@@ -530,14 +549,9 @@ public class ScrollAgentAction : ArbigentAgentAction {
   public companion object : AgentActionType {
     override val actionName: String = "Scroll"
 
-    override fun templateForAI(): String {
-      return """
-        {
-            "action": "$actionName"
-        }
-        """.trimIndent()
-    }
+    override fun actionDescription(): String = "Scroll down on the current screen"
 
+    override fun arguments(): List<AgentActionType.Argument> = emptyList()
   }
 }
 
@@ -566,14 +580,16 @@ public data class KeyPressAgentAction(val keyName: String) : ArbigentAgentAction
   public companion object : AgentActionType {
     override val actionName: String = "KeyPress"
 
-    override fun templateForAI(): String {
-      return """
-        {
-            "action": "$actionName",
-            "text": "..."
-        }
-        """.trimIndent()
-    }
+    override fun actionDescription(): String = "Press a specific key on the device"
+
+    override fun arguments(): List<AgentActionType.Argument> =
+      listOf(
+        AgentActionType.Argument(
+          name = "text",
+          type = "string",
+          description = "The name of the key to press (e.g., ENTER, TAB, etc.)"
+        )
+      )
   }
 }
 
@@ -592,15 +608,16 @@ public class WaitAgentAction(private val timeMs: Int) : ArbigentAgentAction {
   public companion object : AgentActionType {
     override val actionName: String = "Wait"
 
-    override fun templateForAI(): String {
-      return """
-        {
-            "action": "$actionName",
-            // Time in milliseconds "text": "1000"
-            "text": "..."
-        }
-        """.trimIndent()
-    }
+    override fun actionDescription(): String = "Wait for a specified amount of time"
+
+    override fun arguments(): List<AgentActionType.Argument> =
+      listOf(
+        AgentActionType.Argument(
+          name = "text",
+          type = "string",
+          description = "Time to wait in milliseconds (e.g., \"1000\" for 1 second)"
+        )
+      )
   }
 }
 
@@ -618,14 +635,10 @@ public class GoalAchievedAgentAction : ArbigentAgentAction {
   public companion object : AgentActionType {
     override val actionName: String = "GoalAchieved"
 
-    override fun templateForAI(): String {
-      return """
-        {
-            "action": "$actionName"
-        }
-        """.trimIndent()
-    }
+    override fun actionDescription(): String =
+      "Indicate that the goal has been achieved and the test scenario is complete"
 
+    override fun arguments(): List<AgentActionType.Argument> = emptyList()
   }
 }
 
@@ -643,15 +656,15 @@ public class FailedAgentAction : ArbigentAgentAction {
   public companion object : AgentActionType {
     override val actionName: String = "Failed"
 
-    override fun templateForAI(): String {
-      return """
-        {
-            "action": "$actionName"
-            // Please write the reason why it failed
-            "text": "..."
-        }
-        """.trimIndent()
-    }
+    override fun actionDescription(): String = "Indicate that the test scenario has failed"
 
+    override fun arguments(): List<AgentActionType.Argument> =
+      listOf(
+        AgentActionType.Argument(
+          name = "text",
+          type = "string",
+          description = "The reason why the test scenario failed"
+        )
+      )
   }
 }

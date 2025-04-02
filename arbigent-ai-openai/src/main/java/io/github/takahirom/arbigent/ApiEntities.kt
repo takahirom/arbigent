@@ -3,6 +3,7 @@ package io.github.takahirom.arbigent
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonElement
 
 
 @Serializable
@@ -34,8 +35,10 @@ public fun List<ChatMessage>.toHumanReadableString(): String {
 public data class ChatCompletionRequest(
   val model: String,
   val messages: List<ChatMessage>,
-  @SerialName("response_format") val responseFormat: ResponseFormat?,
+  @SerialName("response_format") val responseFormat: ResponseFormat? = null,
   val temperature: Double? = null,
+  val tools: List<ToolDefinition>? = null,
+  @SerialName("tool_choice") val toolChoice: ToolChoice.Function? = null,
 )
 
 @Serializable
@@ -63,7 +66,8 @@ public data class Choice(
 @Serializable
 public data class MessageContent(
   val role: String,
-  val content: String
+  val content: String? = null,
+  @SerialName("tool_calls") val toolCalls: List<ToolCall>? = null
 )
 
 @Serializable
@@ -95,3 +99,65 @@ public class ApiCall(
 
 @Serializable
 public class ApiCallMetadata
+
+@Serializable
+public data class ToolDefinition(
+  val type: String = "function",
+  val function: FunctionDefinition
+)
+
+@Serializable
+public data class FunctionDefinition(
+  val name: String,
+  val description: String? = null,
+  val parameters: JsonObject,
+  val strict: Boolean = true
+)
+
+@Serializable
+public sealed class ToolChoice {
+  @Serializable
+  public data class Auto(
+    val type: String = "auto"
+  ) : ToolChoice()
+
+  @Serializable
+  public data class Required(
+    val type: String = "required"
+  ) : ToolChoice()
+
+  @Serializable
+  public data class None(
+    val type: String = "none"
+  ) : ToolChoice()
+
+  @Serializable
+  public data class Function(
+    val type: String = "function",
+    val function: FunctionChoice
+  ) : ToolChoice()
+
+  public companion object {
+    public val Auto: ToolChoice = Auto()
+    public val Required: ToolChoice = Required()
+    public val None: ToolChoice = None()
+  }
+}
+
+@Serializable
+public data class FunctionChoice(
+  val name: String
+)
+
+@Serializable
+public data class FunctionCall(
+  val name: String,
+  val arguments: String
+)
+
+@Serializable
+public data class ToolCall(
+  val id: String,
+  val type: String = "function_call",
+  val function: FunctionCall
+)

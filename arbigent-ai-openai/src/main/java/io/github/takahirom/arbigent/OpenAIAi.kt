@@ -1,34 +1,28 @@
 package io.github.takahirom.arbigent
 
-import com.github.takahirom.roborazzi.*
+import com.github.takahirom.roborazzi.AiAssertionOptions
 import com.github.takahirom.roborazzi.AiAssertionOptions.AiAssertionModel.TargetImage
 import com.github.takahirom.roborazzi.AiAssertionOptions.AiAssertionModel.TargetImages
+import com.github.takahirom.roborazzi.AnySerializer
+import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
+import com.github.takahirom.roborazzi.OpenAiAiAssertionModel
 import io.github.takahirom.arbigent.ConfidentialInfo.removeConfidentialInfo
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
-import io.ktor.client.HttpClient
+import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.HttpTimeoutConfig.Companion.INFINITE_TIMEOUT_MS
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.plugins.logging.LogLevel
-import io.ktor.client.plugins.logging.Logger
-import io.ktor.client.plugins.logging.Logging
-import io.ktor.client.request.HttpRequestBuilder
-import io.ktor.client.request.header
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import io.ktor.client.statement.HttpResponse
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.ContentType
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.contentType
-import io.ktor.serialization.kotlinx.json.json
-import io.ktor.util.encodeBase64
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.plugins.logging.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
+import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.MissingFieldException
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.modules.SerializersModule
@@ -166,10 +160,8 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     val completionRequest = ChatCompletionRequest(
       model = modelName,
       messages = messages,
-      ResponseFormat(
-        type = "json_schema",
-        jsonSchema = buildActionSchema(agentActionTypes = agentActionTypes),
-      ),
+      tools = buildTools(agentActionTypes = agentActionTypes),
+      toolChoice = null
     )
     val responseText = try {
       chatCompletion(
@@ -247,57 +239,14 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     aiOptions: ArbigentAiOptions,
     tools: List<Tool>? = null,
   ): String {
-    val templates = agentActionTypes.joinToString("\nor\n") { it.templateForAI() }
     val focusedTreeText = focusedTree.orEmpty().ifBlank { "No focused tree" }
     val uiElements = elements.getPromptTexts().ifBlank { "No UI elements to select. Please check the image." }
-
-    // Format tools if available and include them in the action templates
-    val actionTemplatesWithTools = if (!tools.isNullOrEmpty()) {
-      val toolsText = formatToolsForPrompt(tools)
-      "$templates\n\n$toolsText"
-    } else {
-      templates
-    }
 
     return contextHolder.prompt(
       uiElements = uiElements,
       focusedTree = focusedTreeText,
-      actionTemplates = actionTemplatesWithTools,
       aiOptions = aiOptions
     )
-  }
-
-  private fun formatToolsForPrompt(tools: List<Tool>): String {
-    val sb = StringBuilder("<TOOLS>\n")
-
-    tools.forEach { tool ->
-      sb.append("  <TOOL name=\"${tool.name}\">\n")
-      if (tool.description != null) {
-        sb.append("    <DESCRIPTION>${tool.description}</DESCRIPTION>\n")
-      }
-
-      val schema = tool.inputSchema
-      if (schema != null) {
-        val properties = schema.properties
-        val requiredParams = schema.required
-
-        if (properties.isNotEmpty()) {
-          sb.append("    <PARAMETERS>\n")
-          properties.forEach { (name, detailsJsonElement) ->
-            val isRequired = name in requiredParams
-            sb.append("      <PARAMETER name=\"$name\"")
-            if (isRequired) sb.append(" required=\"true\"")
-            sb.append("/>\n")
-          }
-          sb.append("    </PARAMETERS>\n")
-        }
-      }
-
-      sb.append("  </TOOL>\n")
-    }
-
-    sb.append("</TOOLS>")
-    return sb.toString()
   }
 
   private fun parseResponse(
@@ -313,64 +262,91 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
       "AI usage: ${chatCompletionResponse.usage}"
     }
 
-    val content = chatCompletionResponse.choices.firstOrNull()?.message?.content ?: ""
     return try {
-      val jsonElement = json.parseToJsonElement(content)
-      val jsonObject = jsonElement.jsonObject
-      val action =
-        jsonObject["action"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Action not found")
+      val message = chatCompletionResponse.choices.firstOrNull()?.message
+        ?: throw IllegalArgumentException("No message in response")
+
+      // Parse the response and extract the action and parameters
+      val (jsonData, action) = if (message.toolCalls != null && message.toolCalls.isNotEmpty()) {
+        // Handle function calling response
+        val toolCall = message.toolCalls.first()
+        val functionName = toolCall.function.name
+
+        // Extract action name from function name (e.g., "perform_clickwithindex" -> "ClickWithIndex")
+        if (!functionName.startsWith("perform_")) {
+          throw IllegalArgumentException("Unknown function: $functionName")
+        }
+
+        val actionKey = functionName.removePrefix("perform_")
+        // Convert action key to proper case if needed (e.g., "clickwithindex" -> "ClickWithIndex")
+        val actionName = agentActionList.find {
+          it.actionName.equals(actionKey, ignoreCase = true)
+        }?.actionName ?: actionKey
+
+        json.parseToJsonElement(toolCall.function.arguments).jsonObject to actionName
+      } else if (message.content != null) {
+        // Handle regular response (legacy format)
+        val jsonObj = json.parseToJsonElement(message.content).jsonObject
+        val actionName = jsonObj["action"]?.jsonPrimitive?.content
+          ?: throw IllegalArgumentException("Action not found in response content")
+        jsonObj to actionName
+      } else {
+        throw IllegalArgumentException("No content or tool calls in response")
+      }
+
       val agentActionMap = agentActionList.associateBy { it.actionName }
-      val actionPrototype = agentActionMap[action] ?: throw IllegalArgumentException("Unknown action: $action")
+      val actionPrototype = agentActionMap[action]
+        ?: throw IllegalArgumentException("Unknown action: $action. Available actions: ${agentActionMap.keys.joinToString()}")
       val agentAction: ArbigentAgentAction = when (actionPrototype) {
         GoalAchievedAgentAction -> GoalAchievedAgentAction()
         FailedAgentAction -> FailedAgentAction()
         ClickWithTextAgentAction -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
+          val text = jsonData["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           ClickWithTextAgentAction(text)
         }
 
         ClickWithIdAgentAction -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
+          val text = jsonData["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           ClickWithIdAgentAction(text)
         }
 
         DpadUpArrowAgentAction -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
+          val text = jsonData["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           DpadUpArrowAgentAction(text.toIntOrNull() ?: 1)
         }
 
         DpadDownArrowAgentAction -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
+          val text = jsonData["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           DpadDownArrowAgentAction(text.toIntOrNull() ?: 1)
         }
 
         DpadLeftArrowAgentAction -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
+          val text = jsonData["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           DpadLeftArrowAgentAction(text.toIntOrNull() ?: 1)
         }
 
         DpadRightArrowAgentAction -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
+          val text = jsonData["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           DpadRightArrowAgentAction(text.toIntOrNull() ?: 1)
         }
 
         DpadCenterAgentAction -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
+          val text = jsonData["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           DpadCenterAgentAction(text.toIntOrNull() ?: 1)
         }
 
         DpadAutoFocusWithIdAgentAction -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
+          val text = jsonData["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           DpadAutoFocusWithIdAgentAction(text)
         }
 
         DpadAutoFocusWithTextAgentAction -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
+          val text = jsonData["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           DpadAutoFocusWithTextAgentAction(text)
         }
 
         DpadAutoFocusWithIndexAgentAction -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
+          val text = jsonData["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           val index = text.toIntOrNull()
             ?: throw IllegalArgumentException("text should be a number for ${DpadAutoFocusWithIndexAgentAction.actionName}")
           if (elements.elements.size <= index) {
@@ -380,12 +356,12 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
         }
 
         InputTextAgentAction -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
+          val text = jsonData["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           InputTextAgentAction(text)
         }
 
         ClickWithIndex -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
+          val text = jsonData["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           val index = text.toIntOrNull()
             ?: throw IllegalArgumentException("text should be a number for ${ClickWithIndex.actionName}")
           if (elements.elements.size <= index) {
@@ -399,12 +375,12 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
         BackPressAgentAction -> BackPressAgentAction()
 
         KeyPressAgentAction -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
+          val text = jsonData["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           KeyPressAgentAction(text)
         }
 
         WaitAgentAction -> {
-          val text = jsonObject["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
+          val text = jsonData["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
           WaitAgentAction(text.toIntOrNull() ?: 1000)
         }
 
@@ -416,10 +392,10 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
         stepId = decisionInput.stepId,
         agentAction = agentAction,
         action = action,
-        imageDescription = jsonObject["image-description"]?.jsonPrimitive?.content ?: "",
-        memo = jsonObject["memo"]?.jsonPrimitive?.content ?: "",
+        imageDescription = jsonData["image-description"]?.jsonPrimitive?.content ?: "",
+        memo = jsonData["memo"]?.jsonPrimitive?.content ?: "",
         aiRequest = messages.toHumanReadableString(),
-        aiResponse = content,
+        aiResponse = message.content ?: (message.toolCalls?.firstOrNull()?.function?.arguments ?: ""),
         screenshotFilePath = screenshotFilePath,
         apiCallJsonLFilePath = decisionInput.apiCallJsonLFilePath,
         uiTreeStrings = decisionInput.uiTreeStrings,
@@ -465,37 +441,47 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     }
   }
 
-  private fun buildActionSchema(agentActionTypes: List<AgentActionType>): JsonObject {
-    val actions = agentActionTypes.map { it.actionName }.joinToString { "\"$it\"" }
-    val schemaJson = """
-    {
-      "name": "ActionSchema",
-      "description": "Schema for user actions",
-      "strict": true,
-      "schema": {
-        "type": "object",
-        "required": ["image-description","memo",  "action", "text"],
-        "additionalProperties": false,
-        "properties": {
-          "image-description": {
-            "type": "string"
-          },
-          "memo": {
-            "type": "string"
-          },
-          "action": {
-            "type": "string",
-            "enum": [$actions]
-          },
-          "text": {
-            "type": "string",
-            "nullable": true
-          }
-        }
+  private fun buildTools(agentActionTypes: List<AgentActionType>): List<ToolDefinition> {
+    return agentActionTypes.map { actionType ->
+      val jsonString = """
+          {
+            "type": "object",
+            "required": ["image-description", "memo"${
+        if (actionType.arguments().isNotEmpty()) ", \"text\"" else ""
+      }],
+            "additionalProperties": false,
+            "properties": {
+              "image-description": {
+                "type": "string",
+                "description": "Description of what is visible in the image"
+              },
+              "memo": {
+                "type": "string",
+                "description": "Additional notes or observations"
+              }${
+        if (actionType.arguments().isNotEmpty()) {
+          ",\n" + actionType.arguments().joinToString(",\n") { it.toJson() }
+        } else ""
       }
+            }
+          }
+          """
+      arbigentDebugLog {
+        "AI action type: ${actionType.actionName} $jsonString"
+      }
+      val parameters = Json.parseToJsonElement(
+        jsonString
+      )
+      ToolDefinition(
+        type = "function",
+        function = FunctionDefinition(
+          name = "perform_${actionType.actionName.lowercase()}",
+          description = actionType.actionDescription(),
+          parameters = parameters.jsonObject,
+          strict = true
+        )
+      )
     }
-    """.trimIndent()
-    return Json.parseToJsonElement(schemaJson).jsonObject
   }
 
   @OptIn(ExperimentalRoborazziApi::class)

@@ -38,10 +38,6 @@ $FOCUSED_TREE
 <INSTRUCTIONS>
 Based on the above, decide on the next action to achieve the goal. Please ensure not to repeat the same action. The action must be one of the following:
 </INSTRUCTIONS>
-
-<ACTION_OPTIONS>
-$ACTION_TEMPLATES
-</ACTION_OPTIONS>
 """.trimIndent()
     }
 
@@ -58,8 +54,7 @@ $ACTION_TEMPLATES
         )
         val optionalPlaceholders = listOf(
             UI_ELEMENTS,
-            FOCUSED_TREE,
-            ACTION_TEMPLATES
+            FOCUSED_TREE
         )
         val missingRequiredPlaceholders = requiredPlaceholders.filter { !template.contains(it) }
         if (missingRequiredPlaceholders.isNotEmpty()) {
@@ -88,7 +83,6 @@ $ACTION_TEMPLATES
         steps: String,
         uiElements: String = "",
         focusedTree: String = "",
-        actionTemplates: String = ""
     ): String {
         return template
             .replace(USER_INPUT_GOAL, goal)
@@ -97,6 +91,5 @@ $ACTION_TEMPLATES
             .replace(STEPS, steps)
             .replace(UI_ELEMENTS, uiElements)
             .replace(FOCUSED_TREE, focusedTree)
-            .replace(ACTION_TEMPLATES, actionTemplates)
     }
 }
