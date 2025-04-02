@@ -60,7 +60,7 @@ settings:
         },
         "android-adb": {
           "command": "npx",
-          "args": ["-y", "@landicefu/android-adb-mcp-server"],
+          "args": ["-y", "@landicefu/android-adb-mcp-server@github:landicefu/android-adb-mcp-server#8a4552db7dd2ec586a3d73effea4c9aba39458fc"],
           "env": {},
           "disabled": false,
           "alwaysAllow": []
