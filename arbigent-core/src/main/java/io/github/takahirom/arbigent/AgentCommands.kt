@@ -355,7 +355,7 @@ public data class DpadCenterAgentAction(val count: Int) : ArbigentAgentAction {
   public companion object : AgentActionType {
     override val actionName: String = "DpadCenter"
 
-    override fun actionDescription(): String = "Press the center key on a D-pad"
+    override fun actionDescription(): String = "Press the center key on a D-pad. Please refer to FOCUSED_TREE to know what will be clicked."
 
     override fun arguments(): List<AgentActionType.Argument> =
       listOf(
@@ -447,7 +447,7 @@ public data class DpadAutoFocusWithIndexAgentAction(val index: Int) : ArbigentAg
     override val actionName: String = "DPadTryAutoFocusByIndex"
 
     override fun actionDescription(): String =
-      "Try to focus on an element by its index in the UI hierarchy using D-pad navigation"
+      "Try to focus on an element by its index in the ELEMENTS using D-pad navigation"
 
     override fun arguments(): List<AgentActionType.Argument> =
       listOf(
