@@ -41,7 +41,7 @@ private enum class ArbigentAiAnswerItems(
   val description: String,
 ) {
   Memo("arbigent-memo", "string", "Memo for the agent"),
-  ImageDescription("arbigent-mage-description", "string", "Description of what is visible in the image");
+  ImageDescription("arbigent-image-description", "string", "Description of what is visible in the image");
 
   fun toJsonString(): String {
     return """"$key": {
