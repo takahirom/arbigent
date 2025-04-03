@@ -70,6 +70,14 @@ Furthermore, I wanted to make Arbigent accessible to QA engineers by offering a 
 
 *   **Flexible Code Interface:**
     *   **Custom Hooks:** Offers a code interface for adding custom initialization and cleanup methods, providing greater control over scenario execution.
+* **Model Context Protocol (MCP) Support:**
+    * Introduced initial support for MCP, enabling Arbigent to leverage external tools and services defined via MCP servers. This significantly extends testing capabilities beyond direct UI interaction.
+    * You can configure MCP servers using a JSON string in the Project Settings.
+    * **Example MCP Use Cases:**
+        * Install and launch applications
+        * Check server logs (e.g., user behavior) using external tools
+        * Retrieve debug logs
+        * Interact with various other custom tools and services
 
 **VI. Community & Open Source**
 
