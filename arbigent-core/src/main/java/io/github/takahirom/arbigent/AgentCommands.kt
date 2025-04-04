@@ -63,7 +63,7 @@ public data class ClickWithIndex(val index: Int) : ArbigentAgentAction {
   override val actionName: String = Companion.actionName
 
   override fun stepLogText(): String {
-    return "Click on index: $index"
+    return "Click on index: $index in the ELEMENTS"
   }
 
   override fun runDeviceAction(runInput: ArbigentAgentAction.RunInput) {
