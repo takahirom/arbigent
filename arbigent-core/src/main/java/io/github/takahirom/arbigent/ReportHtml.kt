@@ -123,7 +123,7 @@ public class ArbigentHtmlReport {
     val resourceFileSystem = this::class.java.classLoader
       .asResourceFileSystem()
     resourceFileSystem
-      .list("/arbigent-core-web-report-resources".toPath()).forEach { path: Path ->
+      .list((File.separator + "arbigent-core-web-report-resources").toPath()).forEach { path: Path ->
         resourceFileSystem.source(path)
           .use { fromSource ->
             // Copy to File(outputDir, path.name)
