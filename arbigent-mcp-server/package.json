@@ -11,7 +11,9 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "postinstall": "chmod +x dist/index.js",
+    "prepack": "npm run build && chmod +x dist/index.js"
   },
   "keywords": [
     "arbigent",
@@ -31,6 +33,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.10.5",
     "@types/yargs": "^17.0.32",
+    "@types/yargs-parser": "^21.0.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
   }
