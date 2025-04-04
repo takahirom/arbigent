@@ -212,3 +212,228 @@ The arbigent-cli executable is either present in the system PATH or its path is 
 The provided project.yaml and config.yaml files are valid and accessible by the server process.
 
 The arbigent-cli itself functions correctly when called with the appropriate arguments.
+
+8. Implementation Example (TypeScript)
+   Below is a basic implementation example in TypeScript, demonstrating the core concepts outlined in this specification. Note that this is a simplified example and requires further development, particularly in argument parsing and error handling.
+
+#!/usr/bin/env node
+// Import necessary packages
+import { McpServer, McpRequest, McpResponse, McpTool } from "@modelcontextprotocol/sdk/server";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio";
+import { z } from "zod"; // For parameter validation
+import { spawn } from "child_process"; // For executing external commands
+import * as fs from "fs"; // For file system operations
+import * as yaml from "js-yaml"; // For YAML parsing
+import * as path from "path"; // For path manipulation
+// import { ArgumentParser } from 'argparse'; // Consider using an argument parser like yargs or commander
+
+// --- Constants ---
+// (Define constants if needed)
+
+// --- Argument Parsing (Example) ---
+// TODO: Implement robust argument parsing using yargs, commander, or similar
+// Example:
+// const args = {
+//   project: process.argv[2] || 'arbigent-project.yaml', // Temporary default
+//   config: process.argv[3] || 'arbigent-config.yaml',   // Temporary default
+//   arbigentBinPath: process.argv[4] || null             // Temporary default
+// };
+// console.error("Arguments:", args); // For debugging
+
+// --- Helper Functions ---
+
+/**
+* Resolves the executable path for arbigent-cli.
+* @param explicitPath Path provided via --arbigent-bin-path (or null).
+* @returns The executable path string, or null if not found.
+  */
+  function resolveArbigentCliPath(explicitPath: string | null): string | null {
+  if (explicitPath) {
+  // TODO: Verify if explicitPath actually exists and is executable
+  console.error(`Using explicit path: ${explicitPath}`);
+  return explicitPath;
+  }
+
+// Search in PATH environment variable (may need cross-platform handling)
+const command = "arbigent-cli"; // Or the actual command name
+const paths = process.env.PATH?.split(path.delimiter) || [];
+for (const p of paths) {
+const fullPath = path.join(p, command);
+// TODO: Consider .exe suffix on Windows
+try {
+fs.accessSync(fullPath, fs.constants.X_OK); // Check for execute permission
+console.error(`Found in PATH: ${fullPath}`);
+return fullPath;
+} catch (e) {
+// Not found or not executable
+}
+}
+console.error(`${command} not found in PATH.`);
+return null;
+}
+
+/**
+* Extracts tags from project.yaml (Placeholder implementation).
+* @param projectYamlPath Path to the project YAML file.
+* @returns An array of tag names.
+  */
+  function extractTagsFromYaml(projectYamlPath: string): string[] {
+  try {
+  const fileContents = fs.readFileSync(projectYamlPath, 'utf8');
+  const data = yaml.load(fileContents) as any; // Adjust type based on YAML structure
+  const tags = new Set<string>();
+  // TODO: Implement logic to extract tags based on the actual YAML structure
+  // Example: data.scenarios?.forEach(s => s.tags?.forEach(t => tags.add(t)));
+  console.error("Extracted tags:", Array.from(tags));
+  return Array.from(tags);
+  } catch (error) {
+  console.error(`Error reading or parsing project YAML: ${projectYamlPath}`, error);
+  return []; // Return empty array on error
+  }
+  }
+
+/**
+* Executes the arbigent-cli command.
+* @param cliPath Path to the arbigent-cli executable.
+* @param projectYaml Path to the project YAML.
+* @param configYaml Path to the config YAML.
+* @param tag Optional tag to execute.
+* @returns A promise resolving with the execution result.
+  */
+  function runArbigentCli(
+  cliPath: string,
+  projectYaml: string,
+  configYaml: string,
+  tag?: string
+  ): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
+  return new Promise((resolve) => {
+  const args = ['--project', projectYaml, '--config', configYaml];
+  if (tag) {
+  args.push('--tag', tag);
+  }
+  console.error(`Executing: ${cliPath} ${args.join(' ')}`);
+
+  const process = spawn(cliPath, args);
+  let stdout = '';
+  let stderr = '';
+
+  process.stdout.on('data', (data) => {
+  stdout += data.toString();
+  console.log(`stdout: ${data}`); // Real-time log (optional)
+  });
+
+  process.stderr.on('data', (data) => {
+  stderr += data.toString();
+  console.error(`stderr: ${data}`); // Real-time log (optional)
+  });
+
+  process.on('close', (code) => {
+  console.error(`arbigent-cli process exited with code ${code}`);
+  resolve({ stdout, stderr, exitCode: code });
+  });
+
+  process.on('error', (err) => {
+  console.error('Failed to start subprocess.', err);
+  // Error during process spawning itself
+  resolve({ stdout: '', stderr: `Failed to start subprocess: ${err.message}`, exitCode: -1 });
+  });
+  });
+  }
+
+
+// --- Main Execution ---
+async function main() {
+// --- Argument Parsing (Actual Implementation) ---
+// Use yargs or commander to parse --project, --config, --arbigent-bin-path
+// Using placeholder values for this example
+const args = {
+project: 'arbigent-project.yaml', // Replace with actual parsed value
+config: 'arbigent-config.yaml',   // Replace with actual parsed value
+arbigentBinPath: null             // Replace with actual parsed value (can be null)
+};
+console.error("Parsed Arguments (Example):", args);
+
+if (!args.project || !args.config) {
+console.error("Error: --project and --config arguments are required.");
+process.exit(1);
+}
+
+// --- Resolve CLI Path ---
+const cliPath = resolveArbigentCliPath(args.arbigentBinPath);
+if (!cliPath) {
+console.error("Error: Could not find arbigent-cli executable.");
+process.exit(1); // Exit on error
+}
+
+// --- Extract Tags ---
+const tags = extractTagsFromYaml(args.project);
+if (!tags) {
+console.error("Error: Could not read or parse project YAML.");
+// Decide whether to continue without tag-specific tools or exit
+// process.exit(1);
+}
+
+
+// --- Create MCP Server Instance ---
+const server = new McpServer({
+name: "arbigent-runner", // Server name
+version: "0.1.0",       // Server version
+capabilities: {
+resources: {}, // Not using resources in this example
+tools: {},     // Tools will be registered dynamically
+},
+});
+
+// --- Dynamic Tool Registration ---
+
+// 'run-arbigent-test-all' tool
+server.tool(
+"run-arbigent-test-all", // Tool name
+"Runs all Arbigent tests defined in the project YAML.", // Tool description
+{}, // No input parameters
+async (params: z.infer<typeof z.object({}) >): Promise<McpResponse> => {
+console.error("Executing tool: run-arbigent-test-all");
+const result = await runArbigentCli(cliPath, args.project, args.config);
+const outputText = `Exit Code: ${result.exitCode}\n\nSTDOUT:\n${result.stdout}\n\nSTDERR:\n${result.stderr}`;
+return {
+content: [{ type: "text", text: outputText }],
+};
+}
+);
+
+// Tools for each tag
+tags.forEach(tag => {
+const toolName = `run-arbigent-test-${tag.replace(/[^a-zA-Z0-9_]/g, '_')}`; // Sanitize tag for tool name
+server.tool(
+toolName,
+`Runs Arbigent tests with the tag '${tag}'.`,
+{}, // No input parameters
+async (params: z.infer<typeof z.object({})>): Promise<McpResponse> => {
+console.error(`Executing tool: ${toolName} (tag: ${tag})`);
+const result = await runArbigentCli(cliPath, args.project, args.config, tag);
+const outputText = `Exit Code: ${result.exitCode}\n\nSTDOUT:\n${result.stdout}\n\nSTDERR:\n${result.stderr}`;
+return {
+content: [{ type: "text", text: outputText }],
+};
+}
+);
+console.error(`Registered tool: ${toolName}`);
+});
+
+
+// --- Connect Server & Run ---
+const transport = new StdioServerTransport();
+try {
+await server.connect(transport);
+console.error("Arbigent MCP Server running on stdio...");
+} catch (error) {
+console.error("Failed to connect server:", error);
+process.exit(1);
+}
+}
+
+// Run the main function
+main().catch((error) => {
+console.error("Fatal error in main():", error);
+process.exit(1);
+});
