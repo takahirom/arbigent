@@ -1,0 +1,37 @@
+{
+  "name": "arbigent-mcp-server",
+  "version": "0.1.0",
+  "description": "MCP Server for Arbigent - Bridge between MCP clients and arbigent-cli",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "arbigent-mcp-server": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "arbigent",
+    "mcp",
+    "server",
+    "testing"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.8.0",
+    "js-yaml": "^4.1.0",
+    "yargs": "^17.7.2",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.10.5",
+    "@types/yargs": "^17.0.32",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
