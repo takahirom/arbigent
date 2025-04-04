@@ -52,13 +52,22 @@ function extractTagsFromYaml(projectYamlPath: string): string[] {
     if (data.scenarios && Array.isArray(data.scenarios)) {
       data.scenarios.forEach((scenario: any) => {
         if (scenario.tags && Array.isArray(scenario.tags)) {
-          scenario.tags.forEach((tag: string) => tags.add(tag));
+          scenario.tags.forEach((tag: any) => {
+            // Handle case where tag is an object with a name property
+            if (typeof tag === 'object' && tag !== null && 'name' in tag) {
+              tags.add(tag.name);
+            } else {
+              tags.add(tag);
+            }
+          });
         }
       });
     }
 
-    console.error("Extracted tags:", Array.from(tags));
-    return Array.from(tags);
+    // Convert to array of strings
+    const tagArray = Array.from(tags).map(tag => String(tag));
+    console.error("Extracted tags:", tagArray);
+    return tagArray;
   } catch (error) {
     console.error(`Error reading or parsing project YAML: ${projectYamlPath}`, error);
     return []; // Return empty array on error
@@ -80,9 +89,9 @@ function runArbigentCli(
   tag?: string
 ): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
   return new Promise((resolve) => {
-    const args = ['--project', projectYaml, `@${argfilePath}`];
+    const args = ['--project-file', projectYaml, `@${argfilePath}`];
     if (tag) {
-      args.push('--tag', tag);
+      args.push('--tags', tag);
     }
     console.error(`Executing: ${cliPath} ${args.join(' ')}`);
 
