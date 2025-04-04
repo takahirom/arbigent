@@ -1,5 +1,5 @@
 Specification: Arbigent MCP Server
-Version: 1.0
+Version: 1.2 (Revised @argfile handling)
 Date: 2025-04-04
 
 1. Introduction
@@ -9,22 +9,24 @@ Date: 2025-04-04
 1.2. Scope
 Defining the server's startup mechanism via npx.
 
-Handling command-line arguments for configuration (project.yaml, config.yaml) and the arbigent-cli path.
+Handling specific command-line arguments: --project <path>, --argfile <path>, and --arbigent-bin-path <path>.
 
 Locating the arbigent-cli executable.
 
-Dynamically discovering test tags from the specified project.yaml.
+Dynamically discovering test tags using the --project argument.
 
 Exposing MCP tools to run all tests or tests associated with specific tags.
 
-Executing arbigent-cli as a subprocess.
+Executing arbigent-cli as a subprocess, passing the @<argfile_path> argument for arbigent-cli to process.
 
 Returning test results or errors back to the MCP client.
 
 1.3. Goals
-Provide a seamless way for LLMs/MCP clients to execute Arbigent tests.
+Provide a seamless way for LLMs/MCP clients to execute Arbigent tests via arbigent-cli.
 
-Offer flexibility by allowing users to run all tests or specific test suites (tags).
+Leverage arbigent-cli's potential @argfile capability for argument management.
+
+Offer flexibility by allowing users to run all tests or specific test suites (tags) discovered by the MCP server.
 
 Ensure robust handling of the arbigent-cli dependency.
 
@@ -37,210 +39,175 @@ Users of MCP clients who want to integrate Arbigent testing.
 
 2. Requirements
    2.1. Functional Requirements
-   FR-01: Server Startup: The server MUST be launchable using npx <package-name> [options]. It will operate as an MCP server communicating via standard input/output (StdioServerTransport).
+   FR-01: Server Startup: The server MUST be launchable using npx <package-name> --project <path> --argfile <path> [--arbigent-bin-path <path>]. It will operate as an MCP server communicating via standard input/output (StdioServerTransport).
 
-FR-02: Argument Parsing: The server MUST accept the following command-line arguments:
+FR-02: Argument Parsing:
 
---project <path>: (Required) Path to the Arbigent project YAML file.
+The server MUST accept the following command-line arguments:
 
---config <path>: (Required) Path to the Arbigent config YAML file (containing API keys, etc.).
+--project <path>: (Required) Path to the Arbigent project YAML file. Used by the MCP server for tag discovery.
+
+--argfile <path>: (Required) Path to the argument file that will be passed to arbigent-cli.
 
 --arbigent-bin-path <path>: (Optional) Explicit path to the arbigent-cli executable.
 
+The MCP server DOES NOT parse the content of the file specified by --argfile.
+
 FR-03: CLI Path Resolution:
 
-If --arbigent-bin-path is provided, the server MUST use that path to locate arbigent-cli.
+The server MUST determine the path to arbigent-cli based on the --arbigent-bin-path argument if provided.
 
-If --arbigent-bin-path is not provided, the server MUST attempt to find arbigent-cli in the system's PATH environment variable.
+Otherwise, the server MUST attempt to find arbigent-cli in the system's PATH.
 
-If arbigent-cli cannot be found using either method, the server MUST log a fatal error and exit immediately upon startup or connection attempt.
+If arbigent-cli cannot be found, the server MUST log a fatal error and exit.
 
-FR-04: Dynamic Tool Discovery: Upon startup, the server MUST parse the project.yaml file specified by the --project argument to extract all unique test tags defined within the scenarios.
+FR-04: Dynamic Tool Discovery: Upon startup, using the --project <path> argument provided directly to the MCP server, the server MUST parse the specified project YAML file to extract unique test tags.
 
-FR-05: MCP Tool Exposure: The server MUST expose the following tools to the connected MCP client:
+FR-05: MCP Tool Exposure: The server MUST expose the following tools:
 
-run-arbigent-test-all: A tool to run all tests defined in the project YAML.
+run-arbigent-test-all: Runs all tests (by invoking arbigent-cli with @argfile).
 
-run-arbigent-test-[tag_name]: Dynamically generated tools for each unique tag discovered in FR-04. (e.g., run-arbigent-test-login, run-arbigent-test-purchase). The description should indicate which tag it runs.
+run-arbigent-test-[tag_name]: Dynamically generated tools for each unique tag (by invoking arbigent-cli with @argfile and --tag).
 
-FR-06: Test Execution: When an MCP tool is invoked by the client:
+FR-06: Test Execution: When an MCP tool is invoked:
 
-The server MUST execute the arbigent-cli as a subprocess.
+The server MUST execute the resolved arbigent-cli as a subprocess.
 
-The necessary arguments (--project, --config, and potentially --tag <tag_name> for tag-specific tools) MUST be passed to arbigent-cli.
+The arguments passed to arbigent-cli MUST include @<path_specified_by_--argfile>.
 
-The server MUST capture the standard output and standard error streams from the arbigent-cli process.
+If a tag-specific tool (e.g., run-arbigent-test-login) is invoked, the server MUST also pass the corresponding --tag <tag_name> argument to arbigent-cli. Note: This assumes arbigent-cli handles precedence correctly if --tag is also present inside the argfile.
 
-FR-07: Result Reporting:
+The server MUST capture standard output and standard error from arbigent-cli.
 
-Upon successful completion of arbigent-cli, the server MUST return the captured standard output (summary of test results) as text content to the MCP client.
+FR-07: Result Reporting: (Unchanged) Reports results based on arbigent-cli output and exit code.
 
-If arbigent-cli exits with a non-zero status code (indicating failure), the server MUST return the captured standard output and standard error as text content, clearly indicating a failure.
+FR-08: Error Handling: (Updated) The server MUST handle and report errors, including:
 
-FR-08: Error Handling: The server MUST handle and report errors, including:
+Missing required arguments (--project, --argfile).
 
-Failure to find arbigent-cli (FR-03).
+File specified by --argfile not found or not readable by the MCP server (basic check).
 
-Failure to parse project.yaml.
+Failure to find arbigent-cli.
 
-Errors during the execution of arbigent-cli (e.g., invalid config, runtime errors during tests).
+Failure to parse the project YAML specified by --project.
 
-Errors should be reported back to the MCP client as informative text content.
+Errors during arbigent-cli execution (reported back from the subprocess).
+
+Note: Errors related to the content or parsing of the argfile are the responsibility of arbigent-cli.
 
 2.2. Non-Functional Requirements
-NFR-01: Performance: The overhead introduced by the MCP server itself should be minimal. The primary execution time will be determined by arbigent-cli.
+NFR-01: Performance: MCP server overhead is minimal. Performance depends on arbigent-cli's startup and execution time, including its argfile parsing.
 
-NFR-02: Reliability: The server should reliably manage the arbigent-cli subprocess and handle its termination signals correctly.
+NFR-02: Reliability: (Unchanged) Reliable subprocess management.
 
-NFR-03: Security: The --config file path is passed as an argument. The server itself does not need to handle secrets directly, but relies on arbigent-cli's handling. Ensure no sensitive information from the config file is inadvertently logged or exposed by the MCP server itself.
+NFR-03: Security: (Unchanged) Relies on arbigent-cli. File permissions of the argfile are the user's responsibility.
 
-NFR-04: Configurability: The paths to project/config files and the optional CLI path are configurable via command-line arguments.
+NFR-04: Configurability: Configuration primarily managed via the argfile passed to arbigent-cli. MCP server requires --project, --argfile, and optional --arbigent-bin-path.
 
-NFR-05: Logging: The server SHOULD log key events to standard error for debugging purposes (e.g., server start, CLI path resolved, executing CLI command, CLI completion/error).
+NFR-05: Logging: (Unchanged) Log key events.
 
 2.3. Compatibility Requirements
-CR-01: MCP Protocol: Must be compatible with the version used by @modelcontextprotocol/sdk.
-
-CR-02: Node.js: Requires Node.js version [Specify Minimum Version, e.g., 18.x or higher].
-
-CR-03: Arbigent CLI: Designed to work with arbigent-cli version [Specify Target Version Range, if known, e.g., 1.x]. Compatibility with future versions depends on the stability of the CLI's arguments and output.
+(Unchanged)
 
 3. High-Level Design
-   The server will be a Node.js application using the @modelcontextprotocol/sdk.
+   (Updated) Argument parsing layer is simplified, only needing to handle --project, --argfile, --arbigent-bin-path. No complex expansion logic needed in the MCP server.
 
-It will utilize StdioServerTransport for communication.
-
-Command-line arguments will be parsed using a library like yargs or commander.
-
-YAML parsing will be done using a library like js-yaml.
-
-The child_process module (specifically spawn or execFile) will be used to run arbigent-cli.
-
-Tool definitions will be dynamically generated based on parsed YAML tags during server initialization.
+(Rest unchanged)
 
 4. Implementation Steps
    Phase 1: Setup & Core Server
-   Initialize Node.js project (npm init).
+   Initialize Node.js project.
 
-Install dependencies: @modelcontextprotocol/sdk, zod, js-yaml, argument parsing library (e.g., yargs), TypeScript and types (typescript, @types/node, @types/js-yaml, etc.) if using TypeScript.
+Install dependencies (@modelcontextprotocol/sdk, zod, js-yaml, argument parser like yargs).
 
-Set up tsconfig.json and package.json (including type: "module", build script, and bin entry for npx).
+Set up tsconfig.json and package.json.
 
-Implement basic MCP server structure using McpServer and StdioServerTransport.
+Implement Argument Parsing: Use the chosen library to strictly parse --project, --argfile, and optional --arbigent-bin-path. Ensure required arguments are present. Perform a basic check if the --argfile path exists.
 
-Implement command-line argument parsing.
+Implement basic MCP server structure.
 
 Phase 2: CLI Interaction & Tool Discovery
-Implement arbigent-cli path resolution logic (check argument, then PATH). Add error handling if not found.
+Implement arbigent-cli path resolution using the parsed --arbigent-bin-path or PATH.
 
-Implement project.yaml parsing logic to extract unique tags. Add error handling for file reading/parsing.
+Implement project.yaml parsing using the parsed --project path to extract tags.
 
-Dynamically register MCP tools (run-arbigent-test-all and run-arbigent-test-[tag]) with appropriate names, descriptions, and input schemas (likely no input parameters needed for these tools initially).
+Dynamically register MCP tools.
 
 Phase 3: Test Execution Logic
-Implement the execution handler for the MCP tools.
+Implement the execution handler.
 
-Inside the handler, construct the correct arguments for arbigent-cli based on the invoked tool (e.g., add --tag argument if needed).
+Construct arguments for arbigent-cli: Always include @<argfile_path>. If it's a tag-specific tool, also include --tag <tag_name>.
 
-Use child_process.spawn to execute arbigent-cli with the resolved path and constructed arguments.
+Use child_process.spawn to execute arbigent-cli.
 
-Capture stdout and stderr from the subprocess.
+Capture output streams.
 
-Wait for the subprocess to exit and check its exit code.
+Wait for exit.
 
 Phase 4: Result Formatting & Error Handling
-Implement logic to format the captured stdout/stderr into the MCP response content (text).
+Implement result formatting.
 
-Distinguish between successful runs (exit code 0) and failures (non-zero exit code) in the response.
+Implement error handling for MCP server specific issues (missing args, CLI not found, project YAML parse error, argfile path not found).
 
-Implement comprehensive error handling for subprocess errors (e.g., command not found even after path resolution, execution permissions).
-
-Add logging for diagnostics.
+Add logging.
 
 Phase 5: Testing & Packaging
-Write unit tests for argument parsing, tag extraction, and CLI path resolution.
+Write unit tests for argument parsing and tag extraction.
 
-Write integration tests (potentially requiring a mock arbigent-cli or specific test YAMLs) to verify tool registration and execution flow.
+Write integration tests verifying that @<argfile_path> and --tag are correctly passed to the (mocked or real) arbigent-cli.
 
-Test manually with a real arbigent-cli and an MCP client (like Claude for Desktop or a custom client).
+Test manually, ensuring arbigent-cli handles the @argfile correctly.
 
-Prepare the package for publishing to npm (if intended).
+Prepare package.
 
 5. MCP Tool Specification
    5.1. run-arbigent-test-all
-   Name: run-arbigent-test-all
 
-Description: Runs all Arbigent tests defined in the configured project YAML file.
-
-Input Schema: None (No parameters needed).
-
-Output: Text content containing the summary output from arbigent-cli. Indicates success or failure.
-
-Execution: Calls arbigent-cli --project <path> --config <path>.
+Execution: Calls arbigent-cli @<argfile_path>
 
 5.2. run-arbigent-test-[tag_name]
-Name: run-arbigent-test-[tag_name] (e.g., run-arbigent-test-login)
 
-Description: Runs Arbigent tests associated with the '[tag_name]' tag from the configured project YAML file.
-
-Input Schema: None (No parameters needed).
-
-Output: Text content containing the summary output from arbigent-cli. Indicates success or failure.
-
-Execution: Calls arbigent-cli --project <path> --config <path> --tag [tag_name].
+Execution: Calls arbigent-cli @<argfile_path> --tag <tag_name>
 
 6. Error Handling Summary
    Startup:
 
-Missing required arguments (--project, --config): Error message and exit.
+Missing required arguments (--project, --argfile).
 
-Cannot find arbigent-cli: Error message and exit.
+File specified by --argfile not found/readable.
 
-Cannot read/parse project.yaml: Error message and exit.
+Cannot find arbigent-cli.
+
+Cannot read/parse project YAML specified by --project.
 
 Tool Execution:
 
-arbigent-cli execution fails (e.g., permission denied): Report error via MCP response.
-
-arbigent-cli exits non-zero: Report failure and include stdout/stderr via MCP response.
+Errors reported by arbigent-cli (via stderr or non-zero exit code).
 
 7. Assumptions & Dependencies
-   The environment running the MCP server has Node.js installed (version specified in CR-02).
+   (Updated) Crucially assumes that arbigent-cli correctly implements and handles the @argfile syntax specified by the --argfile path.
 
-The arbigent-cli executable is either present in the system PATH or its path is provided via the --arbigent-bin-path argument.
+(Updated) Assumes arbigent-cli handles potential conflicts if --tag is passed both on the command line (by MCP server) and within the argfile.
 
-The provided project.yaml and config.yaml files are valid and accessible by the server process.
-
-The arbigent-cli itself functions correctly when called with the appropriate arguments.
+(Rest unchanged)
 
 8. Implementation Example (TypeScript)
-   Below is a basic implementation example in TypeScript, demonstrating the core concepts outlined in this specification. Note that this is a simplified example and requires further development, particularly in argument parsing and error handling.
+   (Note: This example reflects the simplified argument handling in the MCP server.)
 
 #!/usr/bin/env node
 // Import necessary packages
-import { McpServer, McpRequest, McpResponse, McpTool } from "@modelcontextprotocol/sdk/server";
+import { McpServer, McpResponse } from "@modelcontextprotocol/sdk/server";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio";
-import { z } from "zod"; // For parameter validation
-import { spawn } from "child_process"; // For executing external commands
-import * as fs from "fs"; // For file system operations
-import * as yaml from "js-yaml"; // For YAML parsing
-import * as path from "path"; // For path manipulation
-// import { ArgumentParser } from 'argparse'; // Consider using an argument parser like yargs or commander
-
-// --- Constants ---
-// (Define constants if needed)
-
-// --- Argument Parsing (Example) ---
-// TODO: Implement robust argument parsing using yargs, commander, or similar
-// Example:
-// const args = {
-//   project: process.argv[2] || 'arbigent-project.yaml', // Temporary default
-//   config: process.argv[3] || 'arbigent-config.yaml',   // Temporary default
-//   arbigentBinPath: process.argv[4] || null             // Temporary default
-// };
-// console.error("Arguments:", args); // For debugging
+import { z } from "zod";
+import { spawn } from "child_process";
+import * as fs from "fs";
+import * as yaml from "js-yaml";
+import * as path from "path";
+import yargs from 'yargs'; // Recommended for robust parsing
+import { hideBin } from 'yargs/helpers';
 
 // --- Helper Functions ---
+// resolveArbigentCliPath, extractTagsFromYaml, runArbigentCli (modified)
 
 /**
 * Resolves the executable path for arbigent-cli.
@@ -248,34 +215,35 @@ import * as path from "path"; // For path manipulation
 * @returns The executable path string, or null if not found.
   */
   function resolveArbigentCliPath(explicitPath: string | null): string | null {
+  // (Implementation remains the same as previous version)
   if (explicitPath) {
-  // TODO: Verify if explicitPath actually exists and is executable
+  try {
+  fs.accessSync(explicitPath, fs.constants.X_OK);
   console.error(`Using explicit path: ${explicitPath}`);
   return explicitPath;
+  } catch (e) {
+  console.error(`Explicit path not found or not executable: ${explicitPath}`);
+  return null;
+  }
+  }
+  const command = "arbigent-cli";
+  const paths = process.env.PATH?.split(path.delimiter) || [];
+  for (const p of paths) {
+  const fullPath = path.join(p, command);
+  try {
+  fs.accessSync(fullPath, fs.constants.X_OK);
+  console.error(`Found in PATH: ${fullPath}`);
+  return fullPath;
+  } catch (e) {}
+  }
+  console.error(`${command} not found in PATH.`);
+  return null;
   }
 
-// Search in PATH environment variable (may need cross-platform handling)
-const command = "arbigent-cli"; // Or the actual command name
-const paths = process.env.PATH?.split(path.delimiter) || [];
-for (const p of paths) {
-const fullPath = path.join(p, command);
-// TODO: Consider .exe suffix on Windows
-try {
-fs.accessSync(fullPath, fs.constants.X_OK); // Check for execute permission
-console.error(`Found in PATH: ${fullPath}`);
-return fullPath;
-} catch (e) {
-// Not found or not executable
-}
-}
-console.error(`${command} not found in PATH.`);
-return null;
-}
-
 /**
-* Extracts tags from project.yaml (Placeholder implementation).
+* Extracts tags from project.yaml.
 * @param projectYamlPath Path to the project YAML file.
-* @returns An array of tag names.
+* @returns An array of tag names. Throws error if file cannot be read/parsed.
   */
   function extractTagsFromYaml(projectYamlPath: string): string[] {
   try {
@@ -283,143 +251,138 @@ return null;
   const data = yaml.load(fileContents) as any; // Adjust type based on YAML structure
   const tags = new Set<string>();
   // TODO: Implement logic to extract tags based on the actual YAML structure
-  // Example: data.scenarios?.forEach(s => s.tags?.forEach(t => tags.add(t)));
+  // Example: data.scenarios?.forEach((s: any) => s.tags?.forEach((t: string) => tags.add(t)));
   console.error("Extracted tags:", Array.from(tags));
   return Array.from(tags);
-  } catch (error) {
+  } catch (error: any) {
   console.error(`Error reading or parsing project YAML: ${projectYamlPath}`, error);
-  return []; // Return empty array on error
+  throw new Error(`Failed to read or parse project YAML: ${projectYamlPath}`); // Throw error
   }
   }
 
 /**
-* Executes the arbigent-cli command.
+* Executes the arbigent-cli command, passing the @argfile argument.
 * @param cliPath Path to the arbigent-cli executable.
-* @param projectYaml Path to the project YAML.
-* @param configYaml Path to the config YAML.
-* @param tag Optional tag to execute.
+* @param argfilePath Path to the argument file.
+* @param tag Optional tag to execute (passed in addition to @argfile).
 * @returns A promise resolving with the execution result.
   */
   function runArbigentCli(
   cliPath: string,
-  projectYaml: string,
-  configYaml: string,
+  argfilePath: string,
   tag?: string
   ): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
   return new Promise((resolve) => {
-  const args = ['--project', projectYaml, '--config', configYaml];
+  // Arguments for arbigent-cli: @argfile and potentially --tag
+  const args = [`@${argfilePath}`];
   if (tag) {
   args.push('--tag', tag);
   }
   console.error(`Executing: ${cliPath} ${args.join(' ')}`);
 
-  const process = spawn(cliPath, args);
+  const proc = spawn(cliPath, args);
   let stdout = '';
   let stderr = '';
 
-  process.stdout.on('data', (data) => {
-  stdout += data.toString();
-  console.log(`stdout: ${data}`); // Real-time log (optional)
-  });
-
-  process.stderr.on('data', (data) => {
-  stderr += data.toString();
-  console.error(`stderr: ${data}`); // Real-time log (optional)
-  });
-
-  process.on('close', (code) => {
+  proc.stdout.on('data', (data) => { stdout += data.toString(); });
+  proc.stderr.on('data', (data) => { stderr += data.toString(); console.error(`stderr: ${data}`); }); // Log stderr immediately
+  proc.on('close', (code) => {
   console.error(`arbigent-cli process exited with code ${code}`);
   resolve({ stdout, stderr, exitCode: code });
   });
-
-  process.on('error', (err) => {
-  console.error('Failed to start subprocess.', err);
-  // Error during process spawning itself
-  resolve({ stdout: '', stderr: `Failed to start subprocess: ${err.message}`, exitCode: -1 });
+  proc.on('error', (err) => {
+  console.error('Failed to start arbigent-cli subprocess.', err);
+  resolve({ stdout: '', stderr: `MCP Server Error: Failed to start arbigent-cli subprocess: ${err.message}`, exitCode: -1 });
   });
   });
   }
 
-
 // --- Main Execution ---
 async function main() {
-// --- Argument Parsing (Actual Implementation) ---
-// Use yargs or commander to parse --project, --config, --arbigent-bin-path
-// Using placeholder values for this example
-const args = {
-project: 'arbigent-project.yaml', // Replace with actual parsed value
-config: 'arbigent-config.yaml',   // Replace with actual parsed value
-arbigentBinPath: null             // Replace with actual parsed value (can be null)
-};
-console.error("Parsed Arguments (Example):", args);
+// --- Argument Parsing using yargs ---
+const argv = await yargs(hideBin(process.argv))
+.option('project', {
+alias: 'p',
+type: 'string',
+description: 'Path to the Arbigent project YAML file (for tag discovery)',
+demandOption: true, // Make it required
+})
+.option('argfile', {
+alias: 'a',
+type: 'string',
+description: 'Path to the argument file for arbigent-cli (@ syntax)',
+demandOption: true, // Make it required
+})
+.option('arbigent-bin-path', {
+type: 'string',
+description: 'Optional path to the arbigent-cli executable',
+nargs: 1, // Expects one argument
+})
+.help()
+.alias('h', 'help')
+.strict() // Report errors for unknown options
+.argv;
 
-if (!args.project || !args.config) {
-console.error("Error: --project and --config arguments are required.");
+const projectPath = argv.project;
+const argfilePath = argv.argfile;
+const explicitCliPath = argv.arbigentBinPath || null;
+
+console.error("Parsed Arguments:", { projectPath, argfilePath, explicitCliPath });
+
+// --- Basic check if argfile exists ---
+try {
+fs.accessSync(argfilePath, fs.constants.R_OK); // Check read access
+} catch (error) {
+console.error(`Error: Cannot access argfile: ${argfilePath}`);
 process.exit(1);
 }
 
+
 // --- Resolve CLI Path ---
-const cliPath = resolveArbigentCliPath(args.arbigentBinPath);
+const cliPath = resolveArbigentCliPath(explicitCliPath);
 if (!cliPath) {
-console.error("Error: Could not find arbigent-cli executable.");
+console.error("Error: Could not find or access arbigent-cli executable.");
 process.exit(1); // Exit on error
 }
 
 // --- Extract Tags ---
-const tags = extractTagsFromYaml(args.project);
-if (!tags) {
-console.error("Error: Could not read or parse project YAML.");
-// Decide whether to continue without tag-specific tools or exit
-// process.exit(1);
+let tags: string[] = [];
+try {
+tags = extractTagsFromYaml(projectPath);
+} catch (error: any) {
+console.error(error.message); // Error already logged in function
+process.exit(1); // Exit if project file is invalid
 }
-
 
 // --- Create MCP Server Instance ---
 const server = new McpServer({
-name: "arbigent-runner", // Server name
-version: "0.1.0",       // Server version
-capabilities: {
-resources: {}, // Not using resources in this example
-tools: {},     // Tools will be registered dynamically
-},
+name: "arbigent-runner", version: "1.2.0", // Updated version
+capabilities: { resources: {}, tools: {} },
 });
 
 // --- Dynamic Tool Registration ---
-
 // 'run-arbigent-test-all' tool
-server.tool(
-"run-arbigent-test-all", // Tool name
-"Runs all Arbigent tests defined in the project YAML.", // Tool description
-{}, // No input parameters
-async (params: z.infer<typeof z.object({}) >): Promise<McpResponse> => {
+server.tool( "run-arbigent-test-all", "Runs Arbigent tests using the provided argfile.", {},
+async (): Promise<McpResponse> => {
 console.error("Executing tool: run-arbigent-test-all");
-const result = await runArbigentCli(cliPath, args.project, args.config);
+const result = await runArbigentCli(cliPath, argfilePath); // Pass argfilePath
 const outputText = `Exit Code: ${result.exitCode}\n\nSTDOUT:\n${result.stdout}\n\nSTDERR:\n${result.stderr}`;
-return {
-content: [{ type: "text", text: outputText }],
-};
+return { content: [{ type: "text", text: outputText }] };
 }
 );
-
 // Tools for each tag
 tags.forEach(tag => {
-const toolName = `run-arbigent-test-${tag.replace(/[^a-zA-Z0-9_]/g, '_')}`; // Sanitize tag for tool name
-server.tool(
-toolName,
-`Runs Arbigent tests with the tag '${tag}'.`,
-{}, // No input parameters
-async (params: z.infer<typeof z.object({})>): Promise<McpResponse> => {
+const toolName = `run-arbigent-test-${tag.replace(/[^a-zA-Z0-9_]/g, '_')}`;
+server.tool( toolName, `Runs Arbigent tests with tag '${tag}' using the provided argfile.`, {},
+async (): Promise<McpResponse> => {
 console.error(`Executing tool: ${toolName} (tag: ${tag})`);
-const result = await runArbigentCli(cliPath, args.project, args.config, tag);
+const result = await runArbigentCli(cliPath, argfilePath, tag); // Pass argfilePath and tag
 const outputText = `Exit Code: ${result.exitCode}\n\nSTDOUT:\n${result.stdout}\n\nSTDERR:\n${result.stderr}`;
-return {
-content: [{ type: "text", text: outputText }],
-};
+return { content: [{ type: "text", text: outputText }] };
 }
 );
 console.error(`Registered tool: ${toolName}`);
 });
-
 
 // --- Connect Server & Run ---
 const transport = new StdioServerTransport();

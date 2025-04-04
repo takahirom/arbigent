@@ -19,14 +19,14 @@ const argv = yargs(hideBin(process.argv))
     description: "Path to the Arbigent project YAML file",
     demandOption: true
   })
-  .option("config", {
-    alias: "c",
+  .option("argfile", {
+    alias: "a",
     type: "string",
-    description: "Path to the Arbigent config YAML file",
+    description: "Path to the argument file for arbigent-cli (@ syntax)",
     demandOption: true
   })
   .option("arbigent-bin-path", {
-    alias: "a",
+    alias: "b",
     type: "string",
     description: "Explicit path to the arbigent-cli executable",
     demandOption: false
@@ -69,18 +69,18 @@ function extractTagsFromYaml(projectYamlPath: string): string[] {
  * Executes the arbigent-cli command.
  * @param cliPath Path to the arbigent-cli executable.
  * @param projectYaml Path to the project YAML.
- * @param configYaml Path to the config YAML.
+ * @param argfilePath Path to the argument file.
  * @param tag Optional tag to execute.
  * @returns A promise resolving with the execution result.
  */
 function runArbigentCli(
   cliPath: string,
   projectYaml: string,
-  configYaml: string,
+  argfilePath: string,
   tag?: string
 ): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
   return new Promise((resolve) => {
-    const args = ['--project', projectYaml, '--config', configYaml];
+    const args = ['--project', projectYaml, `@${argfilePath}`];
     if (tag) {
       args.push('--tag', tag);
     }
@@ -165,7 +165,7 @@ async function main() {
 
   // --- Extract Tags from Project YAML ---
   const projectPath = argv.project as string;
-  const configPath = argv.config as string;
+  const argfilePath = argv.argfile as string;
 
   console.error(`Reading project YAML: ${projectPath}`);
   const tags = extractTagsFromYaml(projectPath);
@@ -192,7 +192,7 @@ async function main() {
     {}, // No input parameters
     async (): Promise<CallToolResult> => {
       console.error("Executing tool: run-arbigent-test-all");
-      const result = await runArbigentCli(cliPath, projectPath, configPath);
+      const result = await runArbigentCli(cliPath, projectPath, argfilePath);
 
       // Format the response
       const status = result.exitCode === 0 ? "Success" : "Failure";
@@ -213,7 +213,7 @@ async function main() {
       {}, // No input parameters
       async (): Promise<CallToolResult> => {
         console.error(`Executing tool: ${toolName} (tag: ${tag})`);
-        const result = await runArbigentCli(cliPath, projectPath, configPath, tag);
+        const result = await runArbigentCli(cliPath, projectPath, argfilePath, tag);
 
         // Format the response
         const status = result.exitCode === 0 ? "Success" : "Failure";
