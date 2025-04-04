@@ -74,6 +74,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
   },
   @property:ArbigentInternalApi
   public val loggingEnabled: Boolean,
+  public val jsonSchemaType: ArbigentAi.JsonSchemaType = ArbigentAi.JsonSchemaType.OpenAI,
   private val httpClient: HttpClient = HttpClient(OkHttp) {
     install(HttpRequestRetry) {
       maxRetries = 3
@@ -632,6 +633,8 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     }
     return assert()
   }
+
+  override fun jsonSchemaType(): ArbigentAi.JsonSchemaType = jsonSchemaType
 }
 
 private fun File.getResizedIamgeBase64(scale: Float): String {

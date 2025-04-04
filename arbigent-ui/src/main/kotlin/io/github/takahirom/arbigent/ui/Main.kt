@@ -16,6 +16,7 @@ import androidx.compose.ui.window.MenuBar
 import androidx.compose.ui.window.WindowExceptionHandler
 import androidx.compose.ui.window.WindowExceptionHandlerFactory
 import androidx.compose.ui.window.application
+import io.github.takahirom.arbigent.ArbigentAi
 import io.github.takahirom.arbigent.OpenAIAi
 import io.github.takahirom.arbigent.ui.ArbigentAppStateHolder.ProjectDialogState
 import io.ktor.client.request.header
@@ -43,6 +44,11 @@ fun main() {
               modelName = aiProviderSetting.modelName,
               baseUrl = aiProviderSetting.baseUrl,
               loggingEnabled = aiSetting.loggingEnabled,
+              jsonSchemaType = if(aiProviderSetting is AiProviderSetting.Gemini) {
+                ArbigentAi.JsonSchemaType.GeminiOpenAICompatible
+              } else {
+                ArbigentAi.JsonSchemaType.OpenAI
+              }
             )
           } else if (aiProviderSetting is AiProviderSetting.AzureOpenAi) {
             OpenAIAi(
