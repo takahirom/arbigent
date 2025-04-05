@@ -87,11 +87,11 @@ public data class ClickWithIndex(val index: Int) : ArbigentAgentAction {
         AgentActionType.Argument(
           name = "text",
           type = "string",
-          description = "The index of the element to click on. Should be a number like 1 or 2, NOT text or ID."
+          description = "The index of the ELEMENTS to click on. Should be a number like 1 or 2, NOT text or ID."
         )
       )
 
-    override fun actionDescription(): String = "Click on an element by its index in the UI hierarchy"
+    override fun actionDescription(): String = "Click on an element by its index in the ELEMENTS"
   }
 }
 
@@ -454,7 +454,7 @@ public data class DpadAutoFocusWithIndexAgentAction(val index: Int) : ArbigentAg
         AgentActionType.Argument(
           name = "text",
           type = "string",
-          description = "The index of the element to focus on. Should be a number like 1 or 2, NOT text or ID."
+          description = "The index of the ELEMENTS to focus on. Should be a number like 1 or 2, NOT text or ID."
         )
       )
   }
