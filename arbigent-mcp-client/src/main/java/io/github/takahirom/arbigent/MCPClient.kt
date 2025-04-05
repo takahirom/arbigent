@@ -113,7 +113,7 @@ public class MCPClient(
    *
    * @return List of available tools with server information, or an empty list if not connected to any MCP server.
    */
-  public suspend fun tools(): List<MCPTool> {
+  public suspend fun tools(jsonSchemaType: ClientConnection.JsonSchemaType): List<MCPTool> {
     if (connections.isEmpty()) {
       logger.w { "Not connected to any MCP server, returning empty tools list" }
       return emptyList()
@@ -124,7 +124,7 @@ public class MCPClient(
     // Collect tools from all connections and wrap them with server information
     for (connection in connections) {
       try {
-        val tools = connection.tools()
+        val tools = connection.tools(jsonSchemaType)
         // Wrap each tool with the server name
         val mcpTools = tools.map { tool -> MCPTool(tool, connection.serverName) }
         allTools.addAll(mcpTools)
