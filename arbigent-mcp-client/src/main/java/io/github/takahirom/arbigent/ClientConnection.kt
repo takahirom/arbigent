@@ -10,6 +10,7 @@ import kotlinx.io.asSink
 import kotlinx.io.asSource
 import kotlinx.io.buffered
 import co.touchlab.kermit.Logger
+import io.modelcontextprotocol.kotlin.sdk.Tool.Input
 import kotlinx.serialization.json.*
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -139,71 +140,163 @@ public class ClientConnection(
       return false
     }
   }
+  public enum class JsonSchemaType {
+    OpenAI,
+    GeminiOpenAICompatible;
+  }
 
   /**
-   * Returns the list of tools available from the connected MCP server.
+   * Returns the list of tools available from the connected MCP server,
+   * adapting the schema based on the target AI platform's requirements.
    *
-   * @return List of available tools, or an empty list if not connected to an MCP server.
+   * @param jsonSchemaType Specifies the target API (OpenAI or Gemini) to format the schema for.
+   * @return List of available tools with adapted schemas, or an empty list if an error occurs or not connected.
    */
-  public suspend fun tools(): List<Tool> {
-    if (mcpClient == null) {
-      logger.w { "Not connected to an MCP server, returning empty tools list" }
-      return emptyList()
-    }
+  public suspend fun tools(jsonSchemaType: JsonSchemaType): List<Tool> {
+    // Disabled MCP check for standalone compilation - uncomment in your environment
+    val mcpClient = mcpClient
+     if (mcpClient == null) {
+       logger.w { "Not connected to an MCP server, returning empty tools list" }
+       return emptyList()
+     }
 
     try {
-      val toolsResponse = mcpClient!!.listTools()
-      val tools = toolsResponse?.tools ?: emptyList()
+      // Replace with your actual client call
+      val toolsResponse = mcpClient.listTools()
+      // Use mapNotNull to safely handle potential null tools or schemas
+      val mcpTools = toolsResponse?.tools ?: emptyList()
 
-      return tools.map { tool ->
+      return mcpTools.mapNotNull { mcpTool ->
+        val originalSchema = mcpTool.inputSchema ?: return@mapNotNull null // Skip tool if it has no schema
+
+        // Transform properties and determine required list based on the target API type
+        val (transformedProperties, finalRequiredList) = when (jsonSchemaType) {
+          JsonSchemaType.GeminiOpenAICompatible -> transformSchemaForGemini(originalSchema)
+          JsonSchemaType.OpenAI -> transformSchemaForOpenAI(originalSchema)
+        }
+
+        // Create the final Tool object with the transformed schema
         Tool(
-          name = tool.name,
-          description = tool.description,
-          inputSchema = tool.inputSchema.let { schema ->
-            ToolSchema(
-              properties = JsonObject(schema.properties.mapValues { entry: Map.Entry<String, JsonElement> ->
-                if (schema.required?.contains(entry.key) == true) {
-                  entry.value
-                } else {
-                  // OpenAI API doesn't support optional parameters
-                  // So we need to add null type to optional parameters
-                  val overrideType: Pair<String, JsonArray> = when (val type = entry.value.jsonObject.get("type")) {
-                    is JsonArray -> {
-                      "type" to
-                        if (type.contains(JsonPrimitive("null"))) {
-                          type
-                        } else {
-                          JsonArray(
-                            type + JsonPrimitive("null")
-                          )
-                        }
-                    }
-
-                    is JsonObject -> TODO("Handle JsonObject type")
-                    is JsonPrimitive -> {
-                      "type" to JsonArray(listOf(type, JsonPrimitive("null")))
-                    }
-
-                    JsonNull ->
-                      "type" to JsonArray(listOf(JsonPrimitive("null")))
-
-                    else -> TODO("Handle unknown type: $type")
-                  }
-                  JsonObject(
-                    entry.value.jsonObject
-                      + overrideType
-                  )
-                }
-              }),
-              //              required = schema.required ?: emptyList()
-              required = schema.properties.entries.map { it.key }
-            )
-          }
+          name = mcpTool.name,
+          description = mcpTool.description,
+          inputSchema = ToolSchema(
+            properties = transformedProperties,
+            required = finalRequiredList
+          )
         )
       }
     } catch (e: Exception) {
-      logger.w { "Error listing tools: ${e.message}, returning empty list" }
+      logger.w { "Error listing or transforming tools: ${e.message}, returning empty list" }
       return emptyList()
+    }
+  }
+
+  /**
+   * Transforms the tool schema to be compatible with Gemini API requirements.
+   * - Adds 'format: "enum"' for string enums.
+   * - Uses 'nullable: true' for optional parameters.
+   * - Keeps the original 'required' list.
+   */
+  private fun transformSchemaForGemini(originalSchema: Input): Pair<JsonObject, List<String>> {
+    val transformedProperties = JsonObject(originalSchema.properties.mapValues { entry ->
+      val propertyName = entry.key
+      val originalProperties = entry.value.jsonObject
+      // Use elvis operator here for safe check, assuming null means not required
+      val isRequired = originalSchema.required?.contains(propertyName) == true
+
+      val hasEnum = originalProperties.containsKey("enum")
+      val originalType = originalProperties["type"]
+      val isStringType = originalType is JsonPrimitive && originalType.isString && originalType.content == "string"
+
+      val newProps = originalProperties.toMutableMap()
+
+      if (isStringType && hasEnum) {
+        // --- Handle STRING properties WITH enums for Gemini ---
+        newProps["format"] = JsonPrimitive("enum")
+        if (!isRequired) {
+          newProps["nullable"] = JsonPrimitive(true)
+          newProps["type"] = JsonPrimitive("string") // Ensure base type
+        } else {
+          newProps.remove("nullable")
+          newProps["type"] = JsonPrimitive("string") // Ensure base type
+        }
+      } else if (!isRequired) {
+        // --- Handle OPTIONAL properties WITHOUT string enums for Gemini ---
+        val originalTypeElement = originalProperties["type"] ?: JsonPrimitive("string") // Default if missing
+        val baseType = getBaseType(originalTypeElement)
+        newProps["type"] = baseType // Set single base type
+        newProps["nullable"] = JsonPrimitive(true) // Add nullable: true
+        newProps.remove("format") // Clean up format if not string+enum
+      } else {
+        // --- Handle REQUIRED properties WITHOUT string enums for Gemini ---
+        val originalTypeElement = originalProperties["type"] ?: JsonPrimitive("string") // Default if missing
+        newProps["type"] = getBaseType(originalTypeElement) // Ensure single base type
+        newProps.remove("nullable") // Ensure not nullable
+        if (!(isStringType && hasEnum)) { // Clean up format if not string+enum
+          newProps.remove("format")
+        }
+      }
+      JsonObject(newProps)
+    })
+    // Gemini uses the original required list. Return emptyList if originalSchema.required is null.
+    return Pair(transformedProperties, originalSchema.required ?: emptyList()) // Use Elvis operator here
+  }
+
+  /**
+   * Transforms the tool schema to be compatible with OpenAI API requirements.
+   * - Makes ALL parameters required.
+   * - Represents optionality using 'type: ["<type>", "null"]'.
+   * - Removes 'nullable: true' and 'format: "enum"'.
+   */
+  private fun transformSchemaForOpenAI(originalSchema: Input): Pair<JsonObject, List<String>> {
+    // Handle nullable original required list safely
+    val originalRequiredList = originalSchema.required ?: emptyList()
+    val transformedProperties = JsonObject(originalSchema.properties.mapValues { entry ->
+      val propertyName = entry.key
+      val originalProperties = entry.value.jsonObject
+      // Use the safe originalRequiredList for checking original optionality
+      val isOriginallyRequired = originalRequiredList.contains(propertyName)
+
+      val newProps = originalProperties.toMutableMap()
+      val originalTypeElement = originalProperties["type"] ?: JsonPrimitive("string") // Default if missing
+      val baseType = getBaseType(originalTypeElement) // Get the non-null base type
+
+      if (!isOriginallyRequired) {
+        // --- Handle ORIGINALLY OPTIONAL properties for OpenAI ---
+        // Use type: [baseType, "null"] to represent optionality
+        newProps["type"] = JsonArray(listOf(baseType, JsonPrimitive("null")))
+      } else {
+        // --- Handle ORIGINALLY REQUIRED properties for OpenAI ---
+        // Ensure type is the single base type
+        newProps["type"] = baseType
+      }
+
+      // Clean up fields not used or potentially problematic for OpenAI
+      newProps.remove("nullable")
+      newProps.remove("format")
+
+      JsonObject(newProps)
+    })
+    // OpenAI requires ALL properties to be listed in 'required'
+    val allPropertiesRequired = originalSchema.properties.keys.toList()
+    return Pair(transformedProperties, allPropertiesRequired)
+  }
+
+  /**
+   * Helper function to extract the base (non-null) primitive type from a JsonElement.
+   * Handles cases where the input might be a primitive, an array (like ["string", "null"]),
+   * null, or missing. Defaults to "string" as a fallback.
+   */
+  private fun getBaseType(originalTypeElement: JsonElement): JsonPrimitive {
+    return when (originalTypeElement) {
+      is JsonPrimitive -> if (originalTypeElement.contentOrNull == "null") JsonPrimitive("string") else originalTypeElement // If primitive is "null", fallback
+      is JsonArray -> {
+        // Find the first non-null primitive type in the array
+        originalTypeElement.firstOrNull { it is JsonPrimitive && it.contentOrNull != "null" }?.jsonPrimitive
+          ?: JsonPrimitive("string") // Fallback if only null or empty/invalid array
+      }
+      // Default to string for null, JsonObject, or other unexpected types.
+      else -> JsonPrimitive("string")
     }
   }
 
