@@ -59,7 +59,7 @@ class MCPClientTest {
         val mcpClient = MCPClient()
 
         // This should return an empty list because we haven't connected
-        val tools = runBlocking { mcpClient.tools() }
+        val tools = runBlocking { mcpClient.tools(ClientConnection.JsonSchemaType.OpenAI) }
         assertEquals(emptyList<MCPTool>(), tools)
     }
 

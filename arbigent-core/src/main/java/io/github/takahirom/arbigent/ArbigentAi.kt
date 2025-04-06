@@ -50,4 +50,12 @@ public interface ArbigentAi {
   public fun assertImage(
     imageAssertionInput: ImageAssertionInput
   ): ImageAssertionOutput
+
+  public enum class JsonSchemaType {
+    OpenAI,
+    GeminiOpenAICompatible;
+  }
+
+  public fun jsonSchemaType(): JsonSchemaType = JsonSchemaType.OpenAI
+
 }
