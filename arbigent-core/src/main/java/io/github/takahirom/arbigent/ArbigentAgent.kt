@@ -1019,7 +1019,7 @@ private suspend fun step(
   val uiTreeHash = uiTreeStrings.optimizedTreeString.hashCode().toString().replace("-", "")
   val contextHash = contextHolder.context(aiOptions).hashCode().toString().replace("-", "")
   val cacheKey = "v${BuildConfig.VERSION_NAME}-uitree-${uiTreeHash}-context-${contextHash}"
-  arbigentInfoLog("cacheKey: $cacheKey")
+  arbigentDebugLog("cacheKey: $cacheKey")
   val originalScreenshotFilePath =
     ArbigentFiles.screenshotsDir.absolutePath + File.separator + "$stepId.png"
   if (File(originalScreenshotFilePath).exists().not()) {
