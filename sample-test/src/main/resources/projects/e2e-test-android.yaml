@@ -39,10 +39,14 @@ scenarios:
 - id: "96eea9f9-b099-4b4e-b98b-ee3caf84bc49"
   goal: "Just check the weather in Japan using the tool. Include the result in the\
     \ memo. If you can see the execution result, must archive the goal"
+  tags:
+    - name: "MCP"
   initializationMethods:
   - type: "Back"
 - id: "6998f5c6-b84e-474e-90e2-fb488d4d70fc"
   goal: "All you have to do is launch com.android.settings using mcp launch_app"
+  tags:
+    - name: "MCP"
   initializationMethods:
   - type: "Back"
 settings:

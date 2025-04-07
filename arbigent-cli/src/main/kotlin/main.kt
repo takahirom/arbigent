@@ -172,6 +172,9 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
     printLogger = {
       echo(it)
     }
+    arbigentInfoLog {
+      "Arbigent CLI start"
+    }
     val resultDir = file(workingDirectory, defaultResultPath)
     resultDir.mkdirs()
     ArbigentFiles.screenshotsDir = File(resultDir, "screenshots")
@@ -179,6 +182,27 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
     ArbigentFiles.logFile = file(workingDirectory, logFile)
     ArbigentFiles.cacheDir = file(workingDirectory, defaultCachePath + File.separator + BuildConfig.VERSION_NAME)
     ArbigentFiles.cacheDir.mkdirs()
+    arbigentInfoLog {
+      "Result directory: ${resultDir.absolutePath}"
+    }
+    arbigentDebugLog {
+      "File cache directory: ${ArbigentFiles.cacheDir.absolutePath}"
+    }
+    arbigentDebugLog {
+      "Screenshots directory: ${ArbigentFiles.screenshotsDir.absolutePath}"
+    }
+    arbigentDebugLog {
+      "JSONLS directory: ${ArbigentFiles.jsonlsDir.absolutePath}"
+    }
+    arbigentDebugLog {
+      "Log file: ${ArbigentFiles.logFile?.absolutePath}"
+    }
+    arbigentDebugLog {
+      "Project file: ${File(projectFile).absolutePath}"
+    }
+    arbigentDebugLog {
+      "Working directory: ${workingDirectory ?: System.getProperty("user.dir")}"
+    }
     val resultFile = File(resultDir, "result.yml")
     val ai: ArbigentAi = aiType.let { aiType ->
       when (aiType) {
@@ -269,6 +293,9 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
           }")
     Runtime.getRuntime().addShutdownHook(object : Thread() {
       override fun run() {
+        arbigentInfoLog("Shutting down...")
+        device.close()
+        arbigentInfoLog("Device closed")
         arbigentProject.cancel()
         ArbigentProjectSerializer().save(arbigentProject.getResult(scenarios), resultFile)
         ArbigentHtmlReport().saveReportHtml(
@@ -276,7 +303,7 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
           arbigentProject.getResult(scenarios),
           needCopy = false
         )
-        device.close()
+        arbigentInfoLog("Report saved to ${resultDir.absolutePath}")
       }
     })
 
