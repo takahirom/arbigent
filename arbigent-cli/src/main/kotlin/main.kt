@@ -151,17 +151,33 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
     }
     .default(ArbigentShard(1, 1))
 
+  private fun file(workingDirectory: String?, fileName: String): File {
+    return if (workingDirectory.isNullOrBlank()) {
+      File(fileName)
+    } else {
+      File(workingDirectory, fileName)
+    }
+  }
+
+  private fun file(workingDirectory: String?, fileDir: String, fileName: String): File {
+    return if (workingDirectory.isNullOrBlank()) {
+      File(fileDir, fileName)
+    } else {
+      File(workingDirectory, fileDir + File.separator + fileName)
+    }
+  }
+
   @OptIn(ArbigentInternalApi::class)
   override fun run() {
     printLogger = {
       echo(it)
     }
-    val resultDir = File(defaultResultPath)
+    val resultDir = file(workingDirectory, defaultResultPath)
     resultDir.mkdirs()
     ArbigentFiles.screenshotsDir = File(resultDir, "screenshots")
     ArbigentFiles.jsonlsDir = File(resultDir, "jsonls")
-    ArbigentFiles.logFile = File(logFile)
-    ArbigentFiles.cacheDir = File(defaultCachePath + File.separator + BuildConfig.VERSION_NAME)
+    ArbigentFiles.logFile = file(workingDirectory, logFile)
+    ArbigentFiles.cacheDir = file(workingDirectory, defaultCachePath + File.separator + BuildConfig.VERSION_NAME)
     ArbigentFiles.cacheDir.mkdirs()
     val resultFile = File(resultDir, "result.yml")
     val ai: ArbigentAi = aiType.let { aiType ->
@@ -178,6 +194,7 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
           baseUrl = aiType.geminiEndpoint,
           modelName = aiType.geminiModelName,
           loggingEnabled = aiApiLoggingEnabled,
+          jsonSchemaType = ArbigentAi.JsonSchemaType.GeminiOpenAICompatible
         )
 
         is AzureOpenAiConfig -> OpenAIAi(

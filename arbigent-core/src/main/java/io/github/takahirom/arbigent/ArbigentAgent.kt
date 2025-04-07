@@ -1071,7 +1071,12 @@ private suspend fun step(
   }
 
   // Get tools from MCPClient if available
-  val tools = stepInput.mcpClient?.tools()
+  val tools = stepInput.mcpClient?.tools(
+    when (stepInput.ai.jsonSchemaType()) {
+      ArbigentAi.JsonSchemaType.OpenAI -> ClientConnection.JsonSchemaType.OpenAI
+      ArbigentAi.JsonSchemaType.GeminiOpenAICompatible -> ClientConnection.JsonSchemaType.GeminiOpenAICompatible
+    }
+  )
 
   val decisionInput = ArbigentAi.DecisionInput(
     stepId = stepId,
