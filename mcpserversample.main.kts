@@ -5,7 +5,6 @@
 @file:DependsOn("io.modelcontextprotocol:kotlin-sdk-jvm:0.4.0")       // MCP SDK JVM specifics
 @file:DependsOn("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1") // Coroutines for async operations
 @file:DependsOn("org.jetbrains.kotlinx:kotlinx-io-core:0.7.0")        // kotlinx-io for stream handling
-@file:DependsOn("org.slf4j:slf4j-api:2.0.9")                          // SLF4J API (optional logging framework)
 
 import io.modelcontextprotocol.kotlin.sdk.*
 import io.modelcontextprotocol.kotlin.sdk.server.Server

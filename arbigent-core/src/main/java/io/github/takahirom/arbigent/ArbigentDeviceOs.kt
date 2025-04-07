@@ -42,7 +42,20 @@ public sealed interface ArbigentAvailableDevice {
         dadb.close()
         throw e
       }
-      return MaestroDevice(maestro)
+      while (true) {
+        val result = dadb.shell("getprop ro.build.version.sdk")
+        if (result.output.trim { c -> c.isWhitespace() }.toIntOrNull() != null && result.exitCode == 0) {
+          break
+        }
+        arbigentInfoLog { "Waiting for device to be ready... ${result}" }
+        Thread.sleep(1000)
+      }
+      arbigentInfoLog { "Device is ready dadb:$dadb maestro:$maestro" }
+      return MaestroDevice(maestro, closer = {
+        driver.close()
+        dadb.close()
+        arbigentInfoLog("Closed Android driver and dadb")
+      })
     }
   }
 

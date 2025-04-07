@@ -4,12 +4,50 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod"; // For parameter validation
-import { spawn } from "child_process"; // For executing external commands
+import { spawn, ChildProcess } from "child_process"; // For executing external commands
 import * as fs from "fs"; // For file system operations
 import * as yaml from "js-yaml"; // For YAML parsing
 import * as path from "path"; // For path manipulation
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
+
+// Track all child processes to ensure they're terminated when the parent process exits
+const childProcesses: ChildProcess[] = [];
+
+// Function to kill all child processes
+function killAllChildProcesses() {
+  console.error(`Terminating ${childProcesses.length} child processes...`);
+  for (const childProcess of childProcesses) {
+    try {
+      if (!childProcess.killed) {
+        console.error(`Killing child process with PID: ${childProcess.pid}`);
+        childProcess.kill('SIGTERM');
+      }
+    } catch (err) {
+      console.error(`Error killing child process: ${err}`);
+    }
+  }
+}
+
+// Register process exit handlers to kill child processes when parent exits
+process.on('exit', () => {
+  console.error('Parent process exiting, killing child processes...');
+  killAllChildProcesses();
+});
+
+// Handle SIGINT (Ctrl+C)
+process.on('SIGINT', () => {
+  console.error('Received SIGINT, shutting down...');
+  killAllChildProcesses();
+  process.exit(0);
+});
+
+// Handle SIGTERM
+process.on('SIGTERM', () => {
+  console.error('Received SIGTERM, shutting down...');
+  killAllChildProcesses();
+  process.exit(0);
+});
 
 // --- Argument Parsing ---
 const argv = yargs(hideBin(process.argv))
@@ -95,13 +133,24 @@ function runArbigentCli(
     }
     console.error(`Executing: ${cliPath} ${args.join(' ')}`);
 
-    const process = spawn(cliPath, args);
+    const process = spawn(cliPath, args, { detached: false });
     let stdout = '';
     let stderr = '';
 
+    // Add to tracked child processes
+    childProcesses.push(process);
+
+    // Helper function to remove process from tracking array
+    const removeFromTracking = () => {
+      const index = childProcesses.indexOf(process);
+      if (index !== -1) {
+        childProcesses.splice(index, 1);
+      }
+    };
+
     process.stdout.on('data', (data) => {
       stdout += data.toString();
-      console.log(`stdout: ${data}`); // Real-time log (optional)
+      console.error(`stdout: ${data}`); // Real-time log (optional)
     });
 
     process.stderr.on('data', (data) => {
@@ -111,11 +160,13 @@ function runArbigentCli(
 
     process.on('close', (code) => {
       console.error(`arbigent-cli process exited with code ${code}`);
+      removeFromTracking();
       resolve({ stdout, stderr, exitCode: code });
     });
 
     process.on('error', (err) => {
       console.error('Failed to start subprocess.', err);
+      removeFromTracking();
       // Error during process spawning itself
       resolve({ stdout: '', stderr: `Failed to start subprocess: ${err.message}`, exitCode: -1 });
     });
