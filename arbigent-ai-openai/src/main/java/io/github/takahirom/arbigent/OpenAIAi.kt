@@ -117,9 +117,11 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     loggingEnabled = loggingEnabled,
     requestBuilderModifier = requestBuilderModifier,
     seed = null,
-    jsonSchemaType = when(jsonSchemaType){
-      ArbigentAi.JsonSchemaType.OpenAI -> OpenAiAiAssertionModel.JsonSchemaType.OpenAI
-      ArbigentAi.JsonSchemaType.GeminiOpenAICompatible -> OpenAiAiAssertionModel.JsonSchemaType.Gemini
+    maxTokens = null,
+    temperature = null,
+    apiType = when(jsonSchemaType) {
+      ArbigentAi.JsonSchemaType.OpenAI -> OpenAiAiAssertionModel.ApiType.OpenAI
+      ArbigentAi.JsonSchemaType.GeminiOpenAICompatible -> OpenAiAiAssertionModel.ApiType.Gemini
     },
     httpClient = httpClient
   ),

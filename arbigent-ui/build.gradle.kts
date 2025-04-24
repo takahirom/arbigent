@@ -39,7 +39,7 @@ dependencies {
   testImplementation(compose.uiTest)
   testImplementation("io.github.takahirom.robospec:robospec:0.2.0")
   // roborazzi
-  testImplementation("io.github.takahirom.roborazzi:roborazzi-compose-desktop:1.44.0-alpha02")
+  testImplementation("io.github.takahirom.roborazzi:roborazzi-compose-desktop:1.44.0-alpha03")
   implementation(project(":arbigent-core"))
   implementation(project(":arbigent-ai-openai"))
   implementation("io.github.takahirom.rin:rin:0.3.0")
