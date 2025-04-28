@@ -21,13 +21,14 @@ import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.ActionButton
 import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.Alignment
+import org.jetbrains.jewel.ui.component.Checkbox
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun GenerateScenarioDialog(
   appStateHolder: ArbigentAppStateHolder, 
   onCloseRequest: () -> Unit,
-  onGenerate: (scenariosToGenerate: String, appUiStructure: String) -> Unit
+  onGenerate: (scenariosToGenerate: String, appUiStructure: String, useExistingScenarios: Boolean) -> Unit
 ) {
   TestCompatibleDialog(
     onCloseRequest = onCloseRequest,
@@ -43,6 +44,9 @@ fun GenerateScenarioDialog(
       val appUiStructure: TextFieldState = remember {
         TextFieldState("")
       }
+
+      // State for the checkbox
+      var useExistingScenarios by remember { mutableStateOf(false) }
 
       Column {
         Column(
@@ -76,6 +80,22 @@ fun GenerateScenarioDialog(
           )
         }
 
+        // Checkbox for using existing scenarios
+        Row(
+          modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          Checkbox(
+            checked = useExistingScenarios,
+            onCheckedChange = { useExistingScenarios = it },
+            modifier = Modifier.testTag("use_existing_scenarios_checkbox")
+          )
+          Text(
+            "Use existing scenarios as examples",
+            modifier = Modifier.padding(start = 8.dp)
+          )
+        }
+
         // Buttons
         Row(
           modifier = Modifier.padding(8.dp),
@@ -85,7 +105,8 @@ fun GenerateScenarioDialog(
             onClick = {
               onGenerate(
                 scenariosToGenerate.text.toString(),
-                appUiStructure.text.toString()
+                appUiStructure.text.toString(),
+                useExistingScenarios
               )
               onCloseRequest()
             },
