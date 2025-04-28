@@ -410,4 +410,34 @@ class ArbigentAppStateHolder(
       }
     }
   }
+
+  fun onGenerateScenarios(
+    scenariosToGenerate: String,
+    appUiStructure: String,
+    useExistingScenarios: Boolean
+  ) {
+    val ai = getAi()
+    val generatedScenarios = ai.generateScenarios(
+      scenariosToGenerate,
+      appUiStructure,
+      if (useExistingScenarios) {
+        allScenarioStateHoldersStateFlow.value.map{
+          it.createArbigentScenarioContent()
+        }
+      } else {
+        emptyList()
+      }
+    )
+    allScenarioStateHoldersStateFlow.value.forEach { it.cancel() }
+    allScenarioStateHoldersStateFlow.value =
+      allScenarioStateHoldersStateFlow.value + generatedScenarios.scenarios.map {
+        ArbigentScenarioStateHolder(tagManager = tagManager).apply {
+          load(it)
+        }
+      }
+  }
+
+  fun getAi(): ArbigentAi {
+    return aiFactory()
+  }
 }

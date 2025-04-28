@@ -889,6 +889,21 @@ class FakeAi : ArbigentAi {
           )
         )
       }
+
+      override fun generateScenarios(
+        scenariosToGenerate: String,
+        appUiStructure: String,
+        scenariosToBeUsedAsContext: List<ArbigentScenarioContent>,
+      ): GeneratedScenariosContent {
+        arbigentDebugLog("FakeAi.Normal.generateScenarios")
+        val scenarioContent = ArbigentScenarioContent(
+          goal = scenariosToGenerate,
+          type = ArbigentScenarioType.Scenario
+        )
+        return GeneratedScenariosContent(
+          scenarios = listOf(scenarioContent)
+        )
+      }
     }
 
     class ImageAssertionFailed() : AiStatus {
@@ -917,6 +932,21 @@ class FakeAi : ArbigentAi {
           )
         )
       }
+
+      override fun generateScenarios(
+        scenariosToGenerate: String,
+        appUiStructure: String,
+        scenariosToBeUsedAsContext: List<ArbigentScenarioContent>,
+      ): GeneratedScenariosContent {
+        arbigentDebugLog("FakeAi.ImageAssertionFailed.generateScenarios")
+        val scenarioContent = ArbigentScenarioContent(
+          goal = scenariosToGenerate,
+          type = ArbigentScenarioType.Scenario
+        )
+        return GeneratedScenariosContent(
+          scenarios = listOf(scenarioContent)
+        )
+      }
     }
   }
 
@@ -927,5 +957,20 @@ class FakeAi : ArbigentAi {
 
   override fun assertImage(imageAssertionInput: ArbigentAi.ImageAssertionInput): ArbigentAi.ImageAssertionOutput {
     return status.assertImage(imageAssertionInput)
+  }
+
+  override fun generateScenarios(
+    scenariosToGenerate: String,
+    appUiStructure: String,
+    scenariosToBeUsedAsContext: List<ArbigentScenarioContent>
+  ): GeneratedScenariosContent {
+    arbigentDebugLog("FakeAi.generateScenarios")
+    val scenarioContent = ArbigentScenarioContent(
+      goal = scenariosToGenerate,
+      type = ArbigentScenarioType.Scenario
+    )
+    return GeneratedScenariosContent(
+      scenarios = listOf(scenarioContent)
+    )
   }
 }

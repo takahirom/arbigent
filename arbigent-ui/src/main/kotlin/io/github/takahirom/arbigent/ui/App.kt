@@ -25,10 +25,14 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import io.github.takahirom.arbigent.ArbigentDeviceOs
+import io.github.takahirom.arbigent.ArbigentScenarioContent
+import io.github.takahirom.arbigent.ArbigentScenarioType
 import io.github.takahirom.arbigent.arbigentDebugLog
+import io.github.takahirom.arbigent.serialization.generateRootJsonSchema
 import io.github.takahirom.arbigent.ui.ArbigentAppStateHolder.DeviceConnectionState
 import io.github.takahirom.arbigent.ui.ArbigentAppStateHolder.ProjectDialogState
 import kotlinx.coroutines.launch
+import kotlinx.serialization.serializer
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.Orientation
 import org.jetbrains.jewel.ui.component.ComboBox
@@ -108,11 +112,11 @@ private fun MainScreen(
         appStateHolder.projectDialogState.value = ProjectDialogState.NotSelected
       },
       onGenerate = { scenariosToGenerate, appUiStructure, useExistingScenarios ->
-        // Here you would implement the actual generation logic
-        // For now, we're just passing the information as required
-        println("Generate scenarios: $scenariosToGenerate")
-        println("App UI structure: $appUiStructure")
-        println("Use existing scenarios: $useExistingScenarios")
+        appStateHolder.onGenerateScenarios(
+        scenariosToGenerate,
+          appUiStructure,
+          useExistingScenarios
+        )
       }
     )
   }

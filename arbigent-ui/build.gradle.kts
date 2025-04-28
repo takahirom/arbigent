@@ -32,6 +32,7 @@ dependencies {
   implementation("org.jetbrains.jewel:jewel-int-ui-decorated-window-243:0.27.0")
   implementation("com.jetbrains.intellij.platform:icons:243.22562.218")
   implementation("com.charleskorn.kaml:kaml:0.67.0")
+  implementation(libs.kotlinx.serialization.json)
   implementation("com.github.javakeyring:java-keyring:1.0.4")
   // kotlin-test
   testImplementation(kotlin("test"))
