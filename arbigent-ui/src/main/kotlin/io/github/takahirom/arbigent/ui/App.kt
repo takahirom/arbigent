@@ -294,16 +294,6 @@ fun ScenarioControls(appStateHolder: ArbigentAppStateHolder) {
       }
     }
     IconActionButton(
-      key = AllIconsKeys.FileTypes.AddAny,
-      onClick = {
-        appStateHolder.addScenario()
-      },
-      contentDescription = "Add",
-      hint = Size(28)
-    ) {
-      Text("Add scenario")
-    }
-    IconActionButton(
       key = AllIconsKeys.Actions.RunAll,
       onClick = {
         appStateHolder.runAll()
