@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.takahirom.arbigent.ArbigentTag
+import io.github.takahirom.arbigent.ui.ArbigentAppStateHolder.ProjectDialogState
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.Orientation
 import org.jetbrains.jewel.ui.component.CircularProgressIndicator
@@ -64,16 +65,31 @@ internal fun LeftScenariosPanel(
         }
       },
   ) {
-    IconActionButton(
-      key = AllIconsKeys.FileTypes.AddAny,
-      onClick = {
-        appStateHolder.addScenario()
-      },
-      contentDescription = "Add",
-      hint = Size(28),
+    Row(
       modifier = Modifier.padding(8.dp)
     ) {
-      Text("Add scenario")
+      IconActionButton(
+        key = AllIconsKeys.FileTypes.AddAny,
+        onClick = {
+          appStateHolder.addScenario()
+        },
+        contentDescription = "Add",
+        hint = Size(28),
+        modifier = Modifier.padding(end = 8.dp)
+      ) {
+        Text("Add scenario")
+      }
+
+      IconActionButton(
+        key = AllIconsKeys.Diff.MagicResolve,
+        onClick = {
+          appStateHolder.projectDialogState.value = ProjectDialogState.ShowGenerateScenarioDialog
+        },
+        contentDescription = "Generate",
+        hint = Size(28)
+      ) {
+        Text("Generate scenario")
+      }
     }
     Box {
       if (scenarioAndDepths.isNotEmpty()) {
