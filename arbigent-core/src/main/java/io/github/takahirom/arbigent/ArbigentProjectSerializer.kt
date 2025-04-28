@@ -100,6 +100,8 @@ public data class ArbigentProjectSettings(
   public val aiOptions: ArbigentAiOptions? = null,
   @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
   public val mcpJson: String = DefaultMcpJson,
+  @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
+  public val appUiStructure: String = "",
 ) {
   public companion object {
     public const val DefaultMcpJson: String = "{}"

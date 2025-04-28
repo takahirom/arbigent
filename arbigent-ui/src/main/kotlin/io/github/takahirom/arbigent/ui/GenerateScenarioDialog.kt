@@ -42,7 +42,15 @@ fun GenerateScenarioDialog(
         TextFieldState("")
       }
       val appUiStructure: TextFieldState = remember {
-        TextFieldState("")
+        TextFieldState(appStateHolder.appUiStructureFlow.value)
+      }
+
+      LaunchedEffect(Unit) {
+        snapshotFlow { appUiStructure.text }.collect { text ->
+          if (text.isNotBlank()) {
+            appStateHolder.onAppUiStructureChanged(text.toString())
+          }
+        }
       }
 
       // State for the checkbox
