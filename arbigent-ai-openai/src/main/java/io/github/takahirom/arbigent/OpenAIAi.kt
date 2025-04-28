@@ -22,13 +22,9 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.MissingFieldException
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.serializer
 import java.awt.image.BufferedImage.TYPE_INT_RGB
@@ -649,26 +645,124 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     appUiStructure: String,
     scenariosToBeUsedAsContext: List<ArbigentScenarioContent>,
   ): GeneratedScenariosContent {
-    // Get the serialization descriptor for ArbigentScenarioContent
+    // Get the serialization descriptor for GeneratedScenariosContent
     val descriptor = serializer<GeneratedScenariosContent>().descriptor
+    val serializersModule = SerializersModule {
+      contextual(
+        kClass = ArbigentScenarioType::class,
+        serializer = ArbigentScenarioType.Scenario.serializer() as KSerializer<ArbigentScenarioType>
+      )
+    }
+
+    // Parse the response
+    val json = Json {
+      ignoreUnknownKeys = true
+      isLenient = true
+      this.serializersModule = serializersModule
+    }
 
     // Generate JSON Schema from the descriptor
-    val jsonSchema = generateRootJsonSchema(descriptor)
-
-    // Create an ArbigentScenarioContent from the input
-    val scenarioContent = ArbigentScenarioContent(
-      goal = scenariosToGenerate,
-      type = ArbigentScenarioType.Scenario
+    val jsonSchema = generateRootJsonSchema(
+      descriptor,
     )
 
     // Log the input parameters
     arbigentDebugLog("Generate scenarios: $scenariosToGenerate")
     arbigentDebugLog("App UI structure: $appUiStructure")
+    arbigentDebugLog("JsonSchema: $jsonSchema")
 
-    // Return a GeneratedScenariosContent containing the scenario
-    return GeneratedScenariosContent(
-      scenarios = listOf(scenarioContent)
+    // Create system and user messages
+    var messages = listOf(
+      ChatMessage(
+        role = "system",
+        contents = listOf(
+          Content(
+            type = "text",
+            text = "You are an AI assistant that generates test scenarios for Android applications. " +
+                  "Generate scenarios based on the app UI structure and the user's request. " +
+                  "Each scenario should have a clear goal and be executable by an automated testing system."
+          )
+        )
+      ),
+      ChatMessage(
+        role = "user",
+        contents = listOf(
+          Content(
+            type = "text",
+            text = "Generate scenarios for the following app UI structure:\n\n$appUiStructure\n\n" +
+                  "Scenarios to generate: $scenariosToGenerate"
+          )
+        )
+      )
     )
+
+    // Add context scenarios if available
+    if (scenariosToBeUsedAsContext.isNotEmpty()) {
+      val contextMessage = ChatMessage(
+        role = "user",
+        contents = listOf(
+          Content(
+            type = "text",
+            text = "Here are some existing scenarios for reference:\n\n" +
+                  scenariosToBeUsedAsContext.joinToString("\n\n") {
+                    json.encodeToString(it)
+                  }
+          )
+        )
+      )
+      messages = messages + contextMessage
+    }
+
+    // Create the request with JSON schema for structured output
+    val completionRequest = ChatCompletionRequest(
+      model = modelName,
+      messages = messages,
+      toolChoice = null,
+      responseFormat = ResponseFormat(
+        type = "json_schema",
+        jsonSchema = jsonSchema
+      )
+    )
+
+    try {
+      // Make the API call
+      val responseText = chatCompletion(completionRequest)
+
+
+      try {
+        // First, decode the ChatCompletionResponse to get the content
+        val responseObj = json.decodeFromString<ChatCompletionResponse>(responseText)
+
+        // Extract the content from the response
+        val content = responseObj.choices.firstOrNull()?.message?.content
+
+        if (content != null) {
+          // Parse the content as GeneratedScenariosContent
+          return json.decodeFromString<GeneratedScenariosContent>(content)
+        } else {
+          arbigentDebugLog("No content in response")
+          // Throw an exception if no content
+          throw ArbigentAi.FailedToParseResponseException("No content in response", IllegalStateException("No content in response"))
+        }
+      } catch (e: Exception) {
+        arbigentDebugLog("Failed to parse response: ${e.message}")
+        // Throw an exception if parsing fails
+        throw ArbigentAi.FailedToParseResponseException("Failed to parse response: ${e.message}", e)
+      }
+    } catch (e: ArbigentAiRateLimitExceededException) {
+      // Handle rate limit exceeded
+      val waitMs = 10000L
+      arbigentInfoLog("Rate limit exceeded. Waiting for ${waitMs / 1000} seconds.")
+      ArbigentGlobalStatus.onAiRateLimitWait(waitSec = waitMs / 1000) {
+        Thread.sleep(waitMs)
+      }
+      // Retry after waiting
+      return generateScenarios(scenariosToGenerate, appUiStructure, scenariosToBeUsedAsContext)
+    } catch (e: Exception) {
+      arbigentDebugLog("Error calling OpenAI API: ${e.message}")
+      // Throw an exception if API call fails
+      throw ArbigentAi.FailedToParseResponseException("Error calling OpenAI API: ${e.message}", e)
+    }
   }
 }
 

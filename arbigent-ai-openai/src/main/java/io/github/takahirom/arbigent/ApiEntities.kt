@@ -45,7 +45,7 @@ public data class ChatCompletionRequest(
   @SerialName("response_format") val responseFormat: ResponseFormat? = null,
   val temperature: Double? = null,
   val tools: List<ToolDefinition>? = null,
-  @SerialName("tool_choice") val toolChoice: String = "required",
+  @SerialName("tool_choice") val toolChoice: String? = "required",
 )
 
 @Serializable
