@@ -137,6 +137,55 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
             }
           }
 
+          describe("Generate Scenario Dialog") {
+            doIt {
+              clickGenerateScenarioButton()
+            }
+
+            itShould("show dialog with input fields") {
+              capture(it)
+              assertGenerateDialogExists()
+            }
+
+            describe("when entering scenario information") {
+              val scenarioToGenerate = "Login to the app and check profile"
+              val appUiStructure = """
+                Main screen:
+                - Login button
+                - Register button
+
+                Profile screen:
+                - Username field
+                - Email field
+                - Settings button
+              """.trimIndent()
+
+              doIt {
+                enterScenariosToGenerate(scenarioToGenerate)
+                enterAppUiStructure(appUiStructure)
+                toggleUseExistingScenarios()
+              }
+
+              itShould("show entered information") {
+                capture(it)
+                assertScenariosToGenerateContains(scenarioToGenerate)
+                assertAppUiStructureContains("Main screen:")
+              }
+
+              describe("when generating scenarios") {
+                doIt {
+                  clickGenerateButton()
+                  waitALittle() // Wait for generation to complete
+                }
+
+                itShould("create new scenarios") {
+                  capture(it)
+                  assertScenarioGenerated(scenarioToGenerate)
+                }
+              }
+            }
+          }
+
           describe("Project Settings") {
             describe("Additional System Prompt") {
               val multiLineText = """
@@ -372,6 +421,55 @@ class TestRobot(
   fun clickAddScenarioButton() {
     composeUiTest.onNode(hasContentDescription("Add")).performClick()
     waitALittle()
+  }
+
+  fun clickGenerateScenarioButton() {
+    composeUiTest.onNode(hasContentDescription("Generate")).performClick()
+    waitALittle()
+  }
+
+  fun enterScenariosToGenerate(scenarios: String) {
+    composeUiTest.onNode(hasTestTag("scenarios_to_generate")).performTextInput(scenarios)
+    waitALittle()
+  }
+
+  fun enterAppUiStructure(structure: String) {
+    composeUiTest.onNode(hasTestTag("app_ui_structure")).performTextInput(structure)
+    waitALittle()
+  }
+
+  fun toggleUseExistingScenarios() {
+    composeUiTest.onNode(hasTestTag("use_existing_scenarios_checkbox")).performClick()
+    waitALittle()
+  }
+
+  fun clickGenerateButton() {
+    // Find the Generate button in the dialog - it's the first ActionButton in the dialog
+    composeUiTest.onAllNodes(hasText("Generate"))
+      .onFirst()
+      .performClick()
+    waitALittle()
+  }
+
+  fun assertScenarioGenerated(scenarioText: String) {
+    composeUiTest.onNode(hasText("Goal: $scenarioText", substring = true)).assertExists()
+  }
+
+  fun assertGenerateDialogExists() {
+    composeUiTest.onNode(hasTestTag("scenarios_to_generate")).assertExists()
+    composeUiTest.onNode(hasTestTag("app_ui_structure")).assertExists()
+    composeUiTest.onNode(hasTestTag("use_existing_scenarios_checkbox")).assertExists()
+  }
+
+  fun assertScenariosToGenerateContains(text: String) {
+    composeUiTest.onNode(hasTestTag("scenarios_to_generate")).assertTextContains(text)
+  }
+
+  fun assertAppUiStructureContains(text: String) {
+    // Get the text from the node and check if it contains the expected text
+    val nodeText = composeUiTest.onNode(hasTestTag("app_ui_structure"))
+      .fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.EditableText]
+    assert(nodeText.toString().contains(text)) { "Expected text to contain '$text', but was '$nodeText'" }
   }
 
   fun enterGoal(goal: String) {
