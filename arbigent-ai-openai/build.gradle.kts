@@ -26,6 +26,7 @@ dependencies {
   implementation(libs.kotlinx.io.core)
   implementation(libs.kotlinx.serialization.json)
   implementation(libs.identity.jvm)
+  implementation("com.github.mrmike:ok2curl:0.8.0")
 
   testImplementation(libs.junit)
 }
