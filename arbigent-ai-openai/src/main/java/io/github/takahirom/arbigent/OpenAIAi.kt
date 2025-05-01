@@ -692,8 +692,16 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
         contents = listOf(
           Content(
             type = "text",
-            text = "Generate scenarios for the following app UI structure:\n\n$appUiStructure\n\n" +
-                  "Scenarios to generate: $scenariosToGenerate"
+            text = "Scenarios to generate: $scenariosToGenerate"
+          )
+        )
+      ),
+      ChatMessage(
+        role = "user",
+        contents = listOf(
+          Content(
+            type = "text",
+            text = "App UI structure: $appUiStructure"
           )
         )
       )
@@ -741,6 +749,9 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
 
         if (content != null) {
           // Parse the content as GeneratedScenariosContent
+          arbigentDebugLog {
+            "Generated scenarios content: $content"
+          }
           return json.decodeFromString<GeneratedScenariosContent>(content)
         } else {
           arbigentDebugLog("No content in response")

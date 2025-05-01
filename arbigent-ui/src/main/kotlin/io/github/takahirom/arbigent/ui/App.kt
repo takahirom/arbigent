@@ -91,7 +91,7 @@ private fun MainScreen(
       },
       onGenerate = { scenariosToGenerate, appUiStructure, useExistingScenarios ->
         appStateHolder.onGenerateScenarios(
-        scenariosToGenerate,
+          scenariosToGenerate,
           appUiStructure,
           useExistingScenarios
         )
@@ -175,8 +175,6 @@ private fun MainScreen(
     }
   }
 }
-
-
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
