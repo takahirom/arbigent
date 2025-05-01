@@ -3,7 +3,6 @@ package io.github.takahirom.arbigent.ui
 import com.charleskorn.kaml.PolymorphismStyle
 import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
-import com.github.javakeyring.Keyring
 import com.github.javakeyring.PasswordAccessException
 import kotlin.reflect.KProperty
 
@@ -92,26 +91,22 @@ private fun defaultAiProviderSettings() = listOf(
 )
 
 
-internal var globalKeyStoreFactory: () -> KeyStore = {
-  object : KeyStore {
-    override fun getPassword(domain: String, account: String): String {
-      val keying = Keyring.create()
-      return keying.use {
-        it.getPassword(domain, account)
-      }
-    }
+internal var globalKeyStoreFactory: () -> KeyStore = OnMemoryKeyStoreFactory()
 
-    override fun setPassword(domain: String, account: String, password: String) {
-      val keying = Keyring.create()
-      keying.use {
-        it.setPassword(domain, account, password)
+private class OnMemoryKeyStoreFactory : () -> KeyStore {
+  private val keys = mutableMapOf<String, String>()
+  override fun invoke(): KeyStore {
+    return object : KeyStore {
+      override fun getPassword(domain: String, account: String): String {
+        return keys["$domain-$account"] ?: throw PasswordAccessException("Not found")
       }
-    }
 
-    override fun deletePassword(domain: String, account: String) {
-      val keying = Keyring.create()
-      keying.use {
-        it.deletePassword(domain, account)
+      override fun setPassword(domain: String, account: String, password: String) {
+        keys["$domain-$account"] = password
+      }
+
+      override fun deletePassword(domain: String, account: String) {
+        keys.remove("$domain-$account")
       }
     }
   }
