@@ -24,7 +24,7 @@ internal object Preference {
           serializer = AiSetting.serializer(),
           value = AiSetting(
             selectedId = "defaultOpenAi",
-            aiSettings = defaultAiProviderSettings(),
+            aiSettings = listOf(),
             loggingEnabled = false
           ),
         )
@@ -48,10 +48,7 @@ internal object Preference {
     get() = yaml.decodeFromString(AiSetting.serializer(), aiSetting)
       .let { savedAiSetting: AiSetting ->
         savedAiSetting.copy(
-          aiSettings = savedAiSetting.aiSettings + defaultAiProviderSettings()
-            .filter { defaultAiProviderSetting ->
-              savedAiSetting.aiSettings.none { it.id == defaultAiProviderSetting.id }
-            }
+          aiSettings = savedAiSetting.aiSettings
         )
       }
     set(value) {
@@ -64,33 +61,6 @@ internal object Preference {
       appSetting = yaml.encodeToString(AppSettings.serializer(), value)
     }
 }
-
-private fun defaultAiProviderSettings() = listOf(
-  AiProviderSetting.OpenAi(
-    id = "defaultOpenAi",
-    apiKey = "",
-    modelName = "gpt-4o-mini"
-  ),
-  AiProviderSetting.CustomOpenAiApiBasedAi(
-    id = "defaultCustomOpenAiApiBasedAi",
-    apiKey = "",
-    modelName = "(e.g. llama3.2-vision)",
-    baseUrl = "https://"
-  ),
-  AiProviderSetting.Gemini(
-    id = "defaultGemini",
-    apiKey = "",
-    modelName = "gemini-1.5-flash"
-  ),
-  AiProviderSetting.AzureOpenAi(
-    id = "defaultAzureOpenAi",
-    apiKey = "",
-    modelName = "gpt-4o-mini",
-    endpoint = "https://YOUR_RESOURCE_NAME.openai.azure.com/openai/deployments/YOUR_DEPLOYMENT_NAME/",
-    apiVersion = "2024-10-21"
-  )
-)
-
 
 internal var globalKeyStoreFactory: () -> KeyStore = {
   object : KeyStore {

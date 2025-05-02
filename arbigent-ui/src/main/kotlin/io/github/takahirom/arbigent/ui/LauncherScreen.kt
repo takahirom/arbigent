@@ -157,7 +157,7 @@ private fun AiProviderSetting(modifier: Modifier) {
   FlowRow(modifier = modifier) {
     aiSetting.aiSettings.forEach { aiProviderSetting: AiProviderSetting ->
       RadioButtonRow(
-        text = aiProviderSetting.name,
+        text = aiProviderSetting.name + "(${aiProviderSetting.id})",
         selected = aiSetting.selectedId == aiProviderSetting.id,
         onClick = {
           aiSettingStateHolder.onSelectedAiProviderSettingChanged(aiProviderSetting)
