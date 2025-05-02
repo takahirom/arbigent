@@ -75,7 +75,9 @@ class ArbigentAppStateHolder(
   val aiOptionsFlow = MutableStateFlow<ArbigentAiOptions?>(null)
   val mcpJsonFlow = MutableStateFlow("{}")
   val appUiStructureFlow = MutableStateFlow("")
-  val defaultDeviceFormFactorFlow = MutableStateFlow<ArbigentScenarioDeviceFormFactor>(ArbigentScenarioDeviceFormFactor.Unspecified)
+  val scenarioGenerationCustomInstructionFlow = MutableStateFlow("")
+  val defaultDeviceFormFactorFlow =
+    MutableStateFlow<ArbigentScenarioDeviceFormFactor>(ArbigentScenarioDeviceFormFactor.Unspecified)
   val decisionCache = cacheStrategyFlow
     .map {
       val decisionCacheStrategy = it.aiDecisionCacheStrategy
@@ -179,6 +181,7 @@ class ArbigentAppStateHolder(
           this@ArbigentAppStateHolder.aiOptionsFlow.value,
           this@ArbigentAppStateHolder.mcpJsonFlow.value,
           this@ArbigentAppStateHolder.appUiStructureFlow.value,
+          this@ArbigentAppStateHolder.scenarioGenerationCustomInstructionFlow.value,
           this@ArbigentAppStateHolder.defaultDeviceFormFactorFlow.value
         ),
         scenario = createArbigentScenarioContent(),
@@ -273,6 +276,7 @@ class ArbigentAppStateHolder(
           aiOptionsFlow.value,
           mcpJsonFlow.value,
           appUiStructureFlow.value,
+          scenarioGenerationCustomInstructionFlow.value,
           defaultDeviceFormFactorFlow.value
         ),
         scenarioContents = sortedScenarios.map {
@@ -308,6 +312,7 @@ class ArbigentAppStateHolder(
     aiOptionsFlow.value = projectFile.settings.aiOptions
     mcpJsonFlow.value = projectFile.settings.mcpJson
     appUiStructureFlow.value = projectFile.settings.appUiStructure
+    scenarioGenerationCustomInstructionFlow.value = projectFile.settings.scenarioGenerationCustomInstruction
     projectStateFlow.value = ArbigentProject(
       settings = projectFile.settings,
       initialScenarios = arbigentScenarioStateHolders.map {
@@ -402,6 +407,10 @@ class ArbigentAppStateHolder(
     appUiStructureFlow.value = structure
   }
 
+  fun onScenarioGenerationCustomInstructionChanged(instruction: String) {
+    scenarioGenerationCustomInstructionFlow.value = instruction
+  }
+
   fun onDefaultDeviceFormFactorChanged(formFactor: ArbigentScenarioDeviceFormFactor) {
     defaultDeviceFormFactorFlow.value = formFactor
   }
@@ -433,19 +442,23 @@ class ArbigentAppStateHolder(
   fun onGenerateScenarios(
     scenariosToGenerate: String,
     appUiStructure: String,
+    customInstruction: String,
     useExistingScenarios: Boolean
   ) {
     val ai = getAi()
     val generatedScenarios = ai.generateScenarios(
-      scenariosToGenerate,
-      appUiStructure,
-      if (useExistingScenarios) {
-        allScenarioStateHoldersStateFlow.value.map {
-          it.createArbigentScenarioContent()
+      ArbigentAi.ScenarioGenerationInput(
+        scenariosToGenerate,
+        appUiStructure,
+        customInstruction,
+        if (useExistingScenarios) {
+          allScenarioStateHoldersStateFlow.value.map {
+            it.createArbigentScenarioContent()
+          }
+        } else {
+          emptyList()
         }
-      } else {
-        emptyList()
-      }
+      )
     )
     allScenarioStateHoldersStateFlow.value.forEach { it.cancel() }
     val scenarios = allScenarioStateHoldersStateFlow.value + generatedScenarios.scenarios.map {

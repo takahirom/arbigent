@@ -9,6 +9,7 @@ import com.github.takahirom.roborazzi.OpenAiAiAssertionModel
 import com.moczul.ok2curl.CurlCommandGenerator
 import io.github.takahirom.arbigent.ConfidentialInfo.removeConfidentialInfo
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
+import io.github.takahirom.arbigent.serialization.GenerateJsonSchemaApiType
 import io.github.takahirom.arbigent.serialization.generateRootJsonSchema
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
@@ -679,10 +680,12 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
   override fun jsonSchemaType(): ArbigentAi.JsonSchemaType = jsonSchemaType
 
   override fun generateScenarios(
-    scenariosToGenerate: String,
-    appUiStructure: String,
-    scenariosToBeUsedAsContext: List<ArbigentScenarioContent>,
+    scenarioGenerationInput: ArbigentAi.ScenarioGenerationInput,
   ): GeneratedScenariosContent {
+    val scenariosToGenerate = scenarioGenerationInput.scenariosToGenerate
+    val appUiStructure = scenarioGenerationInput.appUiStructure
+    val customInstruction = scenarioGenerationInput.customInstruction
+    val scenariosToBeUsedAsContext = scenarioGenerationInput.scenariosToBeUsedAsContext
     // Get the serialization descriptor for GeneratedScenariosContent
     val descriptor = serializer<GeneratedScenariosContent>().descriptor
     val serializersModule = SerializersModule {
@@ -703,6 +706,10 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     // Generate JSON Schema from the descriptor
     val jsonSchema = generateRootJsonSchema(
       descriptor,
+      apiType = when (jsonSchemaType) {
+        ArbigentAi.JsonSchemaType.OpenAI -> GenerateJsonSchemaApiType.OpenAI
+        ArbigentAi.JsonSchemaType.GeminiOpenAICompatible -> GenerateJsonSchemaApiType.Gemini
+      }
     )
 
     // Log the input parameters
@@ -725,6 +732,21 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
           )
         )
       ),
+    )
+    if (customInstruction.isNotEmpty()) {
+      messages.add(
+        ChatMessage(
+          role = "user",
+          contents = listOf(
+            Content(
+              type = "text",
+              text = "Custom instruction: $customInstruction"
+            )
+          )
+        )
+      )
+    }
+    messages.add(
       ChatMessage(
         role = "user",
         contents = listOf(
@@ -818,7 +840,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
         Thread.sleep(waitMs)
       }
       // Retry after waiting
-      return generateScenarios(scenariosToGenerate, appUiStructure, scenariosToBeUsedAsContext)
+      return generateScenarios(scenarioGenerationInput)
     } catch (e: Exception) {
       arbigentDebugLog("Error calling OpenAI API: ${e.message}")
       // Throw an exception if API call fails

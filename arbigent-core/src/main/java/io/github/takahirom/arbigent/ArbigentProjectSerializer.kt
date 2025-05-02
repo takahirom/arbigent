@@ -102,6 +102,8 @@ public data class ArbigentProjectSettings(
   public val mcpJson: String = DefaultMcpJson,
   @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
   public val appUiStructure: String = "",
+  @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
+  public val scenarioGenerationCustomInstruction: String = "",
   public val defaultDeviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Unspecified,
 ) {
   public companion object {
