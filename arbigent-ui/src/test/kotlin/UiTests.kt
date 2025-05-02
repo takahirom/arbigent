@@ -414,7 +414,6 @@ class TestRobot(
 
   fun clickConnectToDeviceButton() {
     waitALittle()
-    debugCapture()
     composeUiTest.onNode(hasText("Connect to device")).performClick()
     waitALittle()
   }
@@ -666,7 +665,7 @@ class TestRobot(
     val currentSettings = Preference.aiSettingValue
     Preference.aiSettingValue = currentSettings.copy(
       selectedId = openAiProvider.id,
-      aiSettings = currentSettings.aiSettings + openAiProvider
+      aiSettings = listOf(openAiProvider),
     )
   }
 
