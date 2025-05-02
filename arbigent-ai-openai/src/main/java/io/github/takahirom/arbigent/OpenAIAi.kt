@@ -8,6 +8,7 @@ import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.OpenAiAiAssertionModel
 import io.github.takahirom.arbigent.ConfidentialInfo.removeConfidentialInfo
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
+import io.github.takahirom.arbigent.serialization.generateRootJsonSchema
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.*
@@ -29,6 +30,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.serializer
 import java.awt.image.BufferedImage.TYPE_INT_RGB
 import java.io.File
 import java.nio.charset.Charset
@@ -641,6 +643,33 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
   }
 
   override fun jsonSchemaType(): ArbigentAi.JsonSchemaType = jsonSchemaType
+
+  override fun generateScenarios(
+    scenariosToGenerate: String,
+    appUiStructure: String,
+    scenariosToBeUsedAsContext: List<ArbigentScenarioContent>,
+  ): GeneratedScenariosContent {
+    // Get the serialization descriptor for ArbigentScenarioContent
+    val descriptor = serializer<GeneratedScenariosContent>().descriptor
+
+    // Generate JSON Schema from the descriptor
+    val jsonSchema = generateRootJsonSchema(descriptor)
+
+    // Create an ArbigentScenarioContent from the input
+    val scenarioContent = ArbigentScenarioContent(
+      goal = scenariosToGenerate,
+      type = ArbigentScenarioType.Scenario
+    )
+
+    // Log the input parameters
+    arbigentDebugLog("Generate scenarios: $scenariosToGenerate")
+    arbigentDebugLog("App UI structure: $appUiStructure")
+
+    // Return a GeneratedScenariosContent containing the scenario
+    return GeneratedScenariosContent(
+      scenarios = listOf(scenarioContent)
+    )
+  }
 }
 
 private fun File.getResizedIamgeBase64(scale: Float): String {

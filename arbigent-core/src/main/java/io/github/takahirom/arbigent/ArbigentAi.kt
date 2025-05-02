@@ -4,6 +4,11 @@ import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import io.github.takahirom.arbigent.result.ArbigentUiTreeStrings
 import kotlinx.serialization.Serializable
 
+@Serializable
+public data class GeneratedScenariosContent(
+  val scenarios: List<ArbigentScenarioContent>
+)
+
 public interface ArbigentAi {
   public data class DecisionInput(
     val stepId: String,
@@ -21,6 +26,12 @@ public interface ArbigentAi {
     val aiOptions: ArbigentAiOptions?,
     val mcpTools: List<MCPTool>? = null,
   )
+
+  public fun generateScenarios(
+    scenariosToGenerate: String,
+    appUiStructure: String,
+    scenariosToBeUsedAsContext: List<ArbigentScenarioContent>
+  ): GeneratedScenariosContent
   @Serializable
   public data class DecisionOutput(
     val agentActions: List<ArbigentAgentAction>,

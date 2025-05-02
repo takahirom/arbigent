@@ -165,4 +165,19 @@ class FakeAi : ArbigentAi {
       )
     )
   }
+
+  override fun generateScenarios(
+    scenariosToGenerate: String,
+    appUiStructure: String,
+    scenariosToBeUsedAsContext: List<ArbigentScenarioContent>
+  ): GeneratedScenariosContent {
+    arbigentDebugLog("FakeAi.generateScenarios")
+    val scenarioContent = ArbigentScenarioContent(
+      goal = scenariosToGenerate,
+      type = ArbigentScenarioType.Scenario
+    )
+    return GeneratedScenariosContent(
+      scenarios = listOf(scenarioContent)
+    )
+  }
 }
