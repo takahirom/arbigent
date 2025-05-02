@@ -414,6 +414,7 @@ class TestRobot(
 
   fun clickConnectToDeviceButton() {
     waitALittle()
+    debugCapture()
     composeUiTest.onNode(hasText("Connect to device")).performClick()
     waitALittle()
   }
@@ -648,7 +649,25 @@ class TestRobot(
   }
 
   fun setContent() {
+    // Add a default AI provider to make the "Connect to device" button enabled
+    addDefaultAiProvider()
     composeUiTest.setContent()
+  }
+
+  fun addDefaultAiProvider() {
+    // Create a default OpenAI provider
+    val openAiProvider = AiProviderSetting.OpenAi(
+      id = "testOpenAi",
+      apiKey = "test-api-key",
+      modelName = "gpt-4o-mini"
+    )
+
+    // Update the AI settings with the new provider and select it
+    val currentSettings = Preference.aiSettingValue
+    Preference.aiSettingValue = currentSettings.copy(
+      selectedId = openAiProvider.id,
+      aiSettings = currentSettings.aiSettings + openAiProvider
+    )
   }
 
   @OptIn(ExperimentalTestApi::class)
@@ -899,6 +918,7 @@ class FakeDevice : ArbigentDevice {
   private var isClosed = false
   override fun close() {
     arbigentDebugLog("FakeDevice.close")
+    isClosed = true
   }
 
   override fun isClosed(): Boolean {
@@ -907,8 +927,9 @@ class FakeDevice : ArbigentDevice {
   }
 }
 
-class FakeKeyStore : KeyStore {
-  private val keys = mutableMapOf<String, String>()
+class FakeKeyStore(
+  private val keys:MutableMap<String, String>
+) : KeyStore {
   override fun getPassword(domain: String, account: String): String {
     return keys["$domain:$account"] ?: ""
   }
@@ -923,8 +944,9 @@ class FakeKeyStore : KeyStore {
 }
 
 internal class TestKeyStoreFactory : () -> KeyStore {
+  val keys = mutableMapOf<String, String>()
   override fun invoke(): KeyStore {
-    return FakeKeyStore()
+    return FakeKeyStore(keys)
   }
 }
 
