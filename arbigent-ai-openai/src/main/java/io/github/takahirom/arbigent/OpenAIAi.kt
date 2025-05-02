@@ -658,6 +658,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     val json = Json {
       ignoreUnknownKeys = true
       isLenient = true
+      coerceInputValues = true
       this.serializersModule = serializersModule
     }
 
@@ -680,7 +681,9 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
             type = "text",
             text = "You are an AI assistant that generates test scenarios for Android applications. " +
                   "Generate scenarios based on the app UI structure and the user's request. " +
-                  "Each scenario should have a clear goal and be executable by an automated testing system."
+                  "Each scenario should have a clear goal and be executable by an automated testing system. " +
+                  "Please split scenarios into appropriately sized chunks that won't confuse the AI. " +
+                  "Set any unrelated items to null."
           )
         )
       ),
