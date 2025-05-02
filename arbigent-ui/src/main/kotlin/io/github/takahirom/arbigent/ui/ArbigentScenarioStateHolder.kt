@@ -51,7 +51,7 @@ constructor(
   val initializationMethodStateFlow: StateFlow<List<ArbigentScenarioContent.InitializationMethod>> =
     _initializationMethodStateFlow
   val deviceFormFactorStateFlow: MutableStateFlow<ArbigentScenarioDeviceFormFactor> =
-    MutableStateFlow(ArbigentScenarioDeviceFormFactor.Mobile)
+    MutableStateFlow(ArbigentScenarioDeviceFormFactor.Unspecified)
   fun deviceFormFactor() = deviceFormFactorStateFlow.value
   val scenarioTypeStateFlow: MutableStateFlow<ArbigentScenarioType> =
     MutableStateFlow(ArbigentScenarioType.Scenario)

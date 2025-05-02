@@ -341,6 +341,18 @@ private fun ScenarioFundamentalOptions(
           }
         )
       }
+      Row(
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        RadioButtonRow(
+          text = "Unspecified",
+          selected = inputActionType.isUnspecified(),
+          onClick = {
+            updatedScenarioStateHolder.deviceFormFactorStateFlow.value =
+              ArbigentScenarioDeviceFormFactor.Unspecified
+          }
+        )
+      }
     }
     // Max retry and step count
     Column(

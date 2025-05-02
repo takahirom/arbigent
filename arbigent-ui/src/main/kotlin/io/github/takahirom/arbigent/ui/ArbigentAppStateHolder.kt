@@ -1,6 +1,7 @@
 package io.github.takahirom.arbigent.ui
 
 import io.github.takahirom.arbigent.*
+import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import io.github.takahirom.arbigent.result.StepFeedback
 import io.github.takahirom.arbigent.result.StepFeedbackEvent
 import kotlinx.coroutines.*
@@ -74,6 +75,7 @@ class ArbigentAppStateHolder(
   val aiOptionsFlow = MutableStateFlow<ArbigentAiOptions?>(null)
   val mcpJsonFlow = MutableStateFlow("{}")
   val appUiStructureFlow = MutableStateFlow("")
+  val defaultDeviceFormFactorFlow = MutableStateFlow<ArbigentScenarioDeviceFormFactor>(ArbigentScenarioDeviceFormFactor.Unspecified)
   val decisionCache = cacheStrategyFlow
     .map {
       val decisionCacheStrategy = it.aiDecisionCacheStrategy
@@ -146,7 +148,9 @@ class ArbigentAppStateHolder(
         prompt = promptFlow.value,
         cacheStrategy = cacheStrategyFlow.value,
         aiOptions = aiOptionsFlow.value,
-        mcpJson = mcpJsonFlow.value
+        mcpJson = mcpJsonFlow.value,
+        appUiStructure = appUiStructureFlow.value,
+        defaultDeviceFormFactor = defaultDeviceFormFactorFlow.value
       ),
       initialScenarios = allScenarioStateHoldersStateFlow.value.map { scenario ->
         scenario.createScenario(allScenarioStateHoldersStateFlow.value)
@@ -173,7 +177,9 @@ class ArbigentAppStateHolder(
           this@ArbigentAppStateHolder.promptFlow.value,
           this@ArbigentAppStateHolder.cacheStrategyFlow.value,
           this@ArbigentAppStateHolder.aiOptionsFlow.value,
-          this@ArbigentAppStateHolder.mcpJsonFlow.value
+          this@ArbigentAppStateHolder.mcpJsonFlow.value,
+          this@ArbigentAppStateHolder.appUiStructureFlow.value,
+          this@ArbigentAppStateHolder.defaultDeviceFormFactorFlow.value
         ),
         scenario = createArbigentScenarioContent(),
         aiFactory = aiFactory,
@@ -266,7 +272,8 @@ class ArbigentAppStateHolder(
           cacheStrategyFlow.value,
           aiOptionsFlow.value,
           mcpJsonFlow.value,
-          appUiStructureFlow.value
+          appUiStructureFlow.value,
+          defaultDeviceFormFactorFlow.value
         ),
         scenarioContents = sortedScenarios.map {
           it.createArbigentScenarioContent()
@@ -393,6 +400,10 @@ class ArbigentAppStateHolder(
 
   fun onAppUiStructureChanged(structure: String) {
     appUiStructureFlow.value = structure
+  }
+
+  fun onDefaultDeviceFormFactorChanged(formFactor: ArbigentScenarioDeviceFormFactor) {
+    defaultDeviceFormFactorFlow.value = formFactor
   }
 
   fun scenarioCountById(newScenarioId: String): Int {

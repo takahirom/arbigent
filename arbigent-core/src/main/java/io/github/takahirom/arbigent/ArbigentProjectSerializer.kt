@@ -102,6 +102,7 @@ public data class ArbigentProjectSettings(
   public val mcpJson: String = DefaultMcpJson,
   @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
   public val appUiStructure: String = "",
+  public val defaultDeviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Unspecified,
 ) {
   public companion object {
     public const val DefaultMcpJson: String = "{}"
@@ -163,16 +164,33 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
       val dependencyScenario = first { it.id == dependency }
       dfs(dependencyScenario)
     }
+    // Determine which device form factor to use
+    val effectiveDeviceFormFactor = if (nodeScenario.deviceFormFactor is ArbigentScenarioDeviceFormFactor.Unspecified) {
+      if (projectSettings.defaultDeviceFormFactor is ArbigentScenarioDeviceFormFactor.Unspecified) {
+        ArbigentScenarioDeviceFormFactor.Mobile
+      } else {
+        // If the scenario is from the YAML file and doesn't specify a device form factor,
+        // use Mobile as the default (for backward compatibility)
+        if (nodeScenario.id == "default-not-using-project") {
+          ArbigentScenarioDeviceFormFactor.Mobile
+        } else {
+          projectSettings.defaultDeviceFormFactor
+        }
+      }
+    } else {
+      nodeScenario.deviceFormFactor
+    }
+
     result.add(
       ArbigentAgentTask(
         scenarioId = nodeScenario.id,
         goal = nodeScenario.goal,
         maxStep = nodeScenario.maxStep,
-        deviceFormFactor = nodeScenario.deviceFormFactor,
+        deviceFormFactor = effectiveDeviceFormFactor,
         agentConfig = AgentConfigBuilder(
           prompt = projectSettings.prompt,
           scenarioType = nodeScenario.type,
-          deviceFormFactor = nodeScenario.deviceFormFactor,
+          deviceFormFactor = effectiveDeviceFormFactor,
           initializationMethods = nodeScenario.initializationMethods.ifEmpty { listOf(nodeScenario.initializeMethods) },
           imageAssertions = ArbigentImageAssertions(
             nodeScenario.imageAssertions,
@@ -195,13 +213,30 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
   }
   dfs(scenario)
   arbigentDebugLog("executing:$result")
+  // Determine which device form factor to use for the scenario
+  val effectiveScenarioDeviceFormFactor = if (scenario.deviceFormFactor is ArbigentScenarioDeviceFormFactor.Unspecified) {
+    if (projectSettings.defaultDeviceFormFactor is ArbigentScenarioDeviceFormFactor.Unspecified) {
+      ArbigentScenarioDeviceFormFactor.Mobile
+    } else {
+      // If the scenario is from the YAML file and doesn't specify a device form factor,
+      // use Mobile as the default (for backward compatibility)
+      if (scenario.id == "default-not-using-project") {
+        ArbigentScenarioDeviceFormFactor.Mobile
+      } else {
+        projectSettings.defaultDeviceFormFactor
+      }
+    }
+  } else {
+    scenario.deviceFormFactor
+  }
+
   return ArbigentScenario(
     id = scenario.id,
     agentTasks = result,
     maxRetry = scenario.maxRetry,
     maxStepCount = scenario.maxStep,
     tags = scenario.tags,
-    deviceFormFactor = scenario.deviceFormFactor,
+    deviceFormFactor = effectiveScenarioDeviceFormFactor,
     isLeaf = this.none { it.dependencyId == scenario.id },
     cacheOptions = scenario.cacheOptions
   )
@@ -237,7 +272,7 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
   public val maxRetry: Int = 3,
   public val maxStep: Int = 10,
   public val tags: ArbigentContentTags = setOf(),
-  public val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Mobile,
+  public val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Unspecified,
   // This is no longer used and will be removed in the future.
   public val cleanupData: CleanupData = CleanupData.Noop,
   public val imageAssertionHistoryCount: Int = 1,
