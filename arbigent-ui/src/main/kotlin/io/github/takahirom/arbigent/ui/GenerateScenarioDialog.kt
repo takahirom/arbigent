@@ -75,14 +75,14 @@ fun GenerateScenarioDialog(
           )
 
           // App UI structure
-          GroupHeader("App UI structure")
+          GroupHeader("App UI structure (Optional)")
           TextArea(
             state = appUiStructure,
             modifier = Modifier
               .padding(8.dp)
               .height(120.dp)
               .testTag("app_ui_structure"),
-            placeholder = { Text("Enter app UI structure") },
+            placeholder = { Text("Enter app UI structure (Optional)") },
             decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
           )
         }
@@ -110,9 +110,10 @@ fun GenerateScenarioDialog(
         ) {
           ActionButton(
             onClick = {
+              val appUiStructureText = appUiStructure.text.toString()
               onGenerate(
                 scenariosToGenerate.text.toString(),
-                appUiStructure.text.toString(),
+                if (appUiStructureText.isBlank()) "" else appUiStructureText,
                 useExistingScenarios
               )
               onCloseRequest()
