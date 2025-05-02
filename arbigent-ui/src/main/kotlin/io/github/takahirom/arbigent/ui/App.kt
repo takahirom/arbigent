@@ -84,7 +84,7 @@ private fun MainScreen(
       }
     )
   } else if (projectDialogState is ProjectDialogState.ShowGenerateScenarioDialog) {
-    GenerateScenarioDialog(
+    ScenarioGenerationDialog(
       appStateHolder = appStateHolder,
       onCloseRequest = {
         appStateHolder.projectDialogState.value = ProjectDialogState.NotSelected

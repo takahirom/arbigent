@@ -1,9 +1,6 @@
 package io.github.takahirom.arbigent.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -11,7 +8,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -25,8 +21,8 @@ import org.jetbrains.jewel.ui.component.Checkbox
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun GenerateScenarioDialog(
-  appStateHolder: ArbigentAppStateHolder, 
+fun ScenarioGenerationDialog(
+  appStateHolder: ArbigentAppStateHolder,
   onCloseRequest: () -> Unit,
   onGenerate: (scenariosToGenerate: String, appUiStructure: String, useExistingScenarios: Boolean) -> Unit
 ) {
