@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class AiSetting(
-  val selectedId: String,
+  val selectedId: String? = null,
   val aiSettings: List<AiProviderSetting>,
   val loggingEnabled: Boolean = false
 )
