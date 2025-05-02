@@ -37,6 +37,7 @@ class ArbigentAppStateHolder(
     data object SaveProjectContent : ProjectDialogState
     data object SaveProjectResult : ProjectDialogState
     data object ShowProjectSettings : ProjectDialogState
+    data object ShowGenerateScenarioDialog : ProjectDialogState
   }
 
   val deviceConnectionState: MutableStateFlow<DeviceConnectionState> =
