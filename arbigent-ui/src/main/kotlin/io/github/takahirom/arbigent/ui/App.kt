@@ -107,11 +107,12 @@ private fun MainScreen(
       onCloseRequest = {
         appStateHolder.projectDialogState.value = ProjectDialogState.NotSelected
       },
-      onGenerate = { scenariosToGenerate, appUiStructure ->
+      onGenerate = { scenariosToGenerate, appUiStructure, useExistingScenarios ->
         // Here you would implement the actual generation logic
         // For now, we're just passing the information as required
         println("Generate scenarios: $scenariosToGenerate")
         println("App UI structure: $appUiStructure")
+        println("Use existing scenarios: $useExistingScenarios")
       }
     )
   }
