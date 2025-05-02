@@ -6,6 +6,7 @@ import com.github.takahirom.roborazzi.AiAssertionOptions.AiAssertionModel.Target
 import com.github.takahirom.roborazzi.AnySerializer
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.OpenAiAiAssertionModel
+import com.moczul.ok2curl.CurlCommandGenerator
 import io.github.takahirom.arbigent.ConfidentialInfo.removeConfidentialInfo
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import io.github.takahirom.arbigent.serialization.generateRootJsonSchema
@@ -27,6 +28,10 @@ import kotlinx.serialization.MissingFieldException
 import kotlinx.serialization.json.*
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.serializer
+import okhttp3.Interceptor
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
+import okio.Buffer
 import java.awt.image.BufferedImage.TYPE_INT_RGB
 import java.io.File
 import java.nio.charset.Charset
@@ -74,6 +79,39 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
   public val loggingEnabled: Boolean,
   public val jsonSchemaType: ArbigentAi.JsonSchemaType = ArbigentAi.JsonSchemaType.OpenAI,
   private val httpClient: HttpClient = HttpClient(OkHttp) {
+    engine {
+      config {
+        if (loggingEnabled) {
+          this.addNetworkInterceptor(
+            object : Interceptor {
+              private val curlGenerator = CurlCommandGenerator(com.moczul.ok2curl.Configuration())
+
+              override fun intercept(chain: Interceptor.Chain): Response {
+                val request = chain.request()
+
+                // escape '
+                val oldBody = request.body
+                val contentType = oldBody?.contentType()
+                val charset = contentType?.charset() ?: Charsets.UTF_8
+                val sink = Buffer()
+                oldBody?.writeTo(sink)
+                val bodyText = sink.readString(charset)
+                val logBodyText = bodyText.replace("'", "'\"'\"'")
+                val logRequest = request.newBuilder()
+                  .method(request.method, body = logBodyText.toRequestBody(contentType))
+                  .build()
+                val curl = curlGenerator.generate(logRequest)
+                val log = curl
+                  .removeConfidentialInfo()
+                arbigentDebugLog(log)
+
+                return chain.proceed(request)
+              }
+            }
+          )
+        }
+      }
+    }
     install(HttpRequestRetry) {
       maxRetries = 3
       exponentialDelay()
@@ -117,7 +155,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     seed = null,
     maxTokens = null,
     temperature = null,
-    apiType = when(jsonSchemaType) {
+    apiType = when (jsonSchemaType) {
       ArbigentAi.JsonSchemaType.OpenAI -> OpenAiAiAssertionModel.ApiType.OpenAI
       ArbigentAi.JsonSchemaType.GeminiOpenAICompatible -> OpenAiAiAssertionModel.ApiType.Gemini
     },
@@ -680,10 +718,10 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
           Content(
             type = "text",
             text = "You are an AI assistant that generates test scenarios for Android applications. " +
-                  "Generate scenarios based on the app UI structure and the user's request. " +
-                  "Each scenario should have a clear goal and be executable by an automated testing system. " +
-                  "Please split scenarios into appropriately sized chunks that won't confuse the AI. " +
-                  "Set any unrelated items to null."
+              "Generate scenarios based on the app UI structure and the user's request. " +
+              "Each scenario should have a clear goal and be executable by an automated testing system. " +
+              "Please split scenarios into appropriately sized chunks that won't confuse the AI. " +
+              "Set any unrelated items to null."
           )
         )
       ),
@@ -715,9 +753,9 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
           Content(
             type = "text",
             text = "Here are some existing scenarios for reference:\n\n" +
-                  scenariosToBeUsedAsContext.joinToString("\n\n") {
-                    json.encodeToString(it)
-                  }
+              scenariosToBeUsedAsContext.joinToString("\n\n") {
+                json.encodeToString(it)
+              }
           )
         )
       )
@@ -756,7 +794,10 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
         } else {
           arbigentDebugLog("No content in response")
           // Throw an exception if no content
-          throw ArbigentAi.FailedToParseResponseException("No content in response", IllegalStateException("No content in response"))
+          throw ArbigentAi.FailedToParseResponseException(
+            "No content in response",
+            IllegalStateException("No content in response")
+          )
         }
       } catch (e: Exception) {
         arbigentDebugLog("Failed to parse response: ${e.message}")
