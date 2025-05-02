@@ -73,6 +73,7 @@ class ArbigentAppStateHolder(
   val cacheStrategyFlow = MutableStateFlow(CacheStrategy())
   val aiOptionsFlow = MutableStateFlow<ArbigentAiOptions?>(null)
   val mcpJsonFlow = MutableStateFlow("{}")
+  val appUiStructureFlow = MutableStateFlow("")
   val decisionCache = cacheStrategyFlow
     .map {
       val decisionCacheStrategy = it.aiDecisionCacheStrategy
@@ -264,7 +265,8 @@ class ArbigentAppStateHolder(
           promptFlow.value,
           cacheStrategyFlow.value,
           aiOptionsFlow.value,
-          mcpJsonFlow.value
+          mcpJsonFlow.value,
+          appUiStructureFlow.value
         ),
         scenarioContents = sortedScenarios.map {
           it.createArbigentScenarioContent()
@@ -298,6 +300,7 @@ class ArbigentAppStateHolder(
     cacheStrategyFlow.value = projectFile.settings.cacheStrategy
     aiOptionsFlow.value = projectFile.settings.aiOptions
     mcpJsonFlow.value = projectFile.settings.mcpJson
+    appUiStructureFlow.value = projectFile.settings.appUiStructure
     projectStateFlow.value = ArbigentProject(
       settings = projectFile.settings,
       initialScenarios = arbigentScenarioStateHolders.map {
@@ -386,6 +389,10 @@ class ArbigentAppStateHolder(
 
   fun onMcpJsonChanged(json: String) {
     mcpJsonFlow.value = json
+  }
+
+  fun onAppUiStructureChanged(structure: String) {
+    appUiStructureFlow.value = structure
   }
 
   fun scenarioCountById(newScenarioId: String): Int {
