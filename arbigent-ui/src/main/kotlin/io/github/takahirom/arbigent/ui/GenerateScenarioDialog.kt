@@ -24,13 +24,26 @@ import androidx.compose.ui.Alignment
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun GenerateScenarioDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest: () -> Unit) {
+fun GenerateScenarioDialog(
+  appStateHolder: ArbigentAppStateHolder, 
+  onCloseRequest: () -> Unit,
+  onGenerate: (scenariosToGenerate: String, appUiStructure: String) -> Unit
+) {
   TestCompatibleDialog(
     onCloseRequest = onCloseRequest,
     title = "Generate Scenario",
     resizable = false,
     content = {
       val scrollState = rememberScrollState()
+
+      // Define the TextFieldState variables at this level so they're accessible to the buttons
+      val scenariosToGenerate: TextFieldState = remember {
+        TextFieldState("")
+      }
+      val appUiStructure: TextFieldState = remember {
+        TextFieldState("")
+      }
+
       Column {
         Column(
           modifier = Modifier
@@ -40,9 +53,6 @@ fun GenerateScenarioDialog(appStateHolder: ArbigentAppStateHolder, onCloseReques
         ) {
           // Scenarios to generate
           GroupHeader("Scenarios to generate")
-          val scenariosToGenerate: TextFieldState = remember {
-            TextFieldState("")
-          }
           TextArea(
             state = scenariosToGenerate,
             modifier = Modifier
@@ -55,9 +65,6 @@ fun GenerateScenarioDialog(appStateHolder: ArbigentAppStateHolder, onCloseReques
 
           // App UI structure
           GroupHeader("App UI structure")
-          val appUiStructure: TextFieldState = remember {
-            TextFieldState("")
-          }
           TextArea(
             state = appUiStructure,
             modifier = Modifier
@@ -68,7 +75,7 @@ fun GenerateScenarioDialog(appStateHolder: ArbigentAppStateHolder, onCloseReques
             decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
           )
         }
-        
+
         // Buttons
         Row(
           modifier = Modifier.padding(8.dp),
@@ -76,14 +83,17 @@ fun GenerateScenarioDialog(appStateHolder: ArbigentAppStateHolder, onCloseReques
         ) {
           ActionButton(
             onClick = {
-              // This is just UI implementation, no functionality yet
+              onGenerate(
+                scenariosToGenerate.text.toString(),
+                appUiStructure.text.toString()
+              )
               onCloseRequest()
             },
             modifier = Modifier.padding(end = 8.dp)
           ) {
             Text("Generate")
           }
-          
+
           ActionButton(
             onClick = onCloseRequest,
             modifier = Modifier.padding(start = 8.dp)
