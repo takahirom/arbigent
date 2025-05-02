@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.window.rememberDialogState
 import io.github.takahirom.arbigent.ArbigentAiOptions
 import io.github.takahirom.arbigent.ui.components.AiOptionsComponent
+import org.jetbrains.jewel.ui.component.OutlinedButton
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -271,7 +272,7 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
           )
         }
         // Close Button
-        ActionButton(
+        OutlinedButton(
           onClick = onCloseRequest,
           modifier = Modifier.padding(8.dp)
         ) {

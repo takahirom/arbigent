@@ -12,7 +12,7 @@ val yaml = Yaml(
   configuration = YamlConfiguration(
     encodeDefaults = false,
     strictMode = false,
-    polymorphismStyle = PolymorphismStyle.Property
+    polymorphismStyle = PolymorphismStyle.Property,
   )
 )
 
@@ -23,7 +23,7 @@ internal object Preference {
         .encodeToString(
           serializer = AiSetting.serializer(),
           value = AiSetting(
-            selectedId = "defaultOpenAi",
+            selectedId = null,
             aiSettings = listOf(),
             loggingEnabled = false
           ),
