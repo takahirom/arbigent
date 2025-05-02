@@ -59,6 +59,8 @@ constructor(
 
   val dependencyScenarioStateHolderStateFlow = MutableStateFlow<ArbigentScenarioStateHolder?>(null)
   val arbigentScenarioExecutorStateFlow = MutableStateFlow<ArbigentScenarioExecutor?>(null)
+  val isNewlyGenerated = MutableStateFlow(false)
+
   private val coroutineScope = CoroutineScope(
     ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob()
   )

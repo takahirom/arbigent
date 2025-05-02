@@ -6,6 +6,7 @@ import io.github.takahirom.arbigent.result.StepFeedbackEvent
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.io.File
+import kotlin.collections.firstOrNull
 
 @OptIn(ArbigentInternalApi::class)
 class ArbigentAppStateHolder(
@@ -421,7 +422,7 @@ class ArbigentAppStateHolder(
       scenariosToGenerate,
       appUiStructure,
       if (useExistingScenarios) {
-        allScenarioStateHoldersStateFlow.value.map{
+        allScenarioStateHoldersStateFlow.value.map {
           it.createArbigentScenarioContent()
         }
       } else {
@@ -429,12 +430,18 @@ class ArbigentAppStateHolder(
       }
     )
     allScenarioStateHoldersStateFlow.value.forEach { it.cancel() }
-    allScenarioStateHoldersStateFlow.value =
-      allScenarioStateHoldersStateFlow.value + generatedScenarios.scenarios.map {
-        ArbigentScenarioStateHolder(tagManager = tagManager).apply {
-          load(it)
-        }
+    val scenarios = allScenarioStateHoldersStateFlow.value + generatedScenarios.scenarios.map {
+      ArbigentScenarioStateHolder(tagManager = tagManager).apply {
+        load(it)
+        isNewlyGenerated.value = true
       }
+    }
+    generatedScenarios.scenarios.forEach { generatedScenario ->
+      val scenario = scenarios.firstOrNull { it.id == generatedScenario.id }
+      val dependencyScenario = scenarios.firstOrNull { it.id == generatedScenario.dependencyId }
+      scenario?.dependencyScenarioStateHolderStateFlow?.value = dependencyScenario
+    }
+    allScenarioStateHoldersStateFlow.value = scenarios
   }
 
   fun getAi(): ArbigentAi {

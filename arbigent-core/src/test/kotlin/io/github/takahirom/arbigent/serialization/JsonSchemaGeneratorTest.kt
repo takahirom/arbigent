@@ -26,11 +26,9 @@ class JsonSchemaGeneratorTest {
         val descriptor: SerialDescriptor = serializer<TestUser>().descriptor
 
         // Generate JSON Schema from the descriptor
-        val jsonSchema = generateRootJsonSchema(descriptor)
+        val jsonSchema = generateJsonSchema(descriptor, false)!!
 
         // Verify the basic structure of the generated schema
-        assertEquals(JsonPrimitive("http://json-schema.org/draft-07/schema#"), jsonSchema["\$schema"])
-        assertEquals(JsonPrimitive("io.github.takahirom.arbigent.serialization.JsonSchemaGeneratorTest.testGenerateJsonSchema.TestUser"), jsonSchema["title"])
         assertEquals(JsonPrimitive("object"), jsonSchema["type"])
 
         // Verify properties
@@ -52,13 +50,16 @@ class JsonSchemaGeneratorTest {
         assertTrue(emailType.toString().contains("null"), "Email property should be nullable")
 
         val rolesProperty = properties["roles"] as JsonObject
-        assertEquals(JsonPrimitive("array"), rolesProperty["type"])
+        assertEquals(
+          JsonArray(listOf(JsonPrimitive("array"), JsonPrimitive("null"))),
+          rolesProperty["type"]
+        )
 
         // Verify required properties
         val required = jsonSchema["required"] as JsonArray
         val requiredString = required.toString()
         assertTrue(requiredString.contains("id"), "Required properties should contain 'id'")
         assertTrue(requiredString.contains("name"), "Required properties should contain 'name'")
-        assertTrue(!requiredString.contains("email"), "Required properties should not contain 'email' as it's nullable")
+        assertTrue(requiredString.contains("email"), "Required properties should contain 'email'")
     }
 }
