@@ -711,7 +711,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     arbigentDebugLog("JsonSchema: $jsonSchema")
 
     // Create system and user messages
-    var messages = listOf(
+    val messages = mutableListOf(
       ChatMessage(
         role = "system",
         contents = listOf(
@@ -733,17 +733,23 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
             text = "Scenarios to generate: $scenariosToGenerate"
           )
         )
-      ),
-      ChatMessage(
-        role = "user",
-        contents = listOf(
-          Content(
-            type = "text",
-            text = "App UI structure: $appUiStructure"
+      )
+    )
+
+    // Only add App UI structure if it's not empty
+    if (appUiStructure.isNotBlank()) {
+      messages.add(
+        ChatMessage(
+          role = "user",
+          contents = listOf(
+            Content(
+              type = "text",
+              text = "App UI structure: $appUiStructure"
+            )
           )
         )
       )
-    )
+    }
 
     // Add context scenarios if available
     if (scenariosToBeUsedAsContext.isNotEmpty()) {
@@ -759,7 +765,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
           )
         )
       )
-      messages = messages + contextMessage
+      messages.add(contextMessage)
     }
 
     // Create the request with JSON schema for structured output
