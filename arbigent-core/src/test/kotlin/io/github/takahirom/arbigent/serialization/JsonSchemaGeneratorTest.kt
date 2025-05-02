@@ -26,7 +26,7 @@ class JsonSchemaGeneratorTest {
         val descriptor: SerialDescriptor = serializer<TestUser>().descriptor
 
         // Generate JSON Schema from the descriptor
-        val jsonSchema = generateJsonSchema(descriptor, false)!!
+        val jsonSchema = generateJsonSchema(descriptor, false, apiType = GenerateJsonSchemaApiType.OpenAI)!!
 
         // Verify the basic structure of the generated schema
         assertEquals(JsonPrimitive("object"), jsonSchema["type"])

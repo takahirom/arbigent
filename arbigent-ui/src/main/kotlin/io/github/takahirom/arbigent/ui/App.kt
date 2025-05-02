@@ -89,10 +89,11 @@ private fun MainScreen(
       onCloseRequest = {
         appStateHolder.projectDialogState.value = ProjectDialogState.NotSelected
       },
-      onGenerate = { scenariosToGenerate, appUiStructure, useExistingScenarios ->
+      onGenerate = { scenariosToGenerate, appUiStructure, customInstruction, useExistingScenarios ->
         appStateHolder.onGenerateScenarios(
           scenariosToGenerate,
           appUiStructure,
+          customInstruction,
           useExistingScenarios
         )
       }

@@ -27,10 +27,15 @@ public interface ArbigentAi {
     val mcpTools: List<MCPTool>? = null,
   )
 
+  public data class ScenarioGenerationInput(
+    val scenariosToGenerate: String,
+    val appUiStructure: String,
+    val customInstruction: String,
+    val scenariosToBeUsedAsContext: List<ArbigentScenarioContent>
+  )
+
   public fun generateScenarios(
-    scenariosToGenerate: String,
-    appUiStructure: String,
-    scenariosToBeUsedAsContext: List<ArbigentScenarioContent>
+    scenarioGenerationInput: ScenarioGenerationInput
   ): GeneratedScenariosContent
   @Serializable
   public data class DecisionOutput(

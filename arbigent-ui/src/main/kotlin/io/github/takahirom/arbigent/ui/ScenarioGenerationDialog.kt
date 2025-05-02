@@ -24,7 +24,7 @@ import org.jetbrains.jewel.ui.component.Checkbox
 fun ScenarioGenerationDialog(
   appStateHolder: ArbigentAppStateHolder,
   onCloseRequest: () -> Unit,
-  onGenerate: (scenariosToGenerate: String, appUiStructure: String, useExistingScenarios: Boolean) -> Unit
+  onGenerate: (scenariosToGenerate: String, appUiStructure: String, customInstruction: String, useExistingScenarios: Boolean) -> Unit
 ) {
   TestCompatibleDialog(
     onCloseRequest = onCloseRequest,
@@ -39,11 +39,22 @@ fun ScenarioGenerationDialog(
       val appUiStructure: TextFieldState = remember {
         TextFieldState(appStateHolder.appUiStructureFlow.value)
       }
+      val customInstruction: TextFieldState = remember {
+        TextFieldState(appStateHolder.scenarioGenerationCustomInstructionFlow.value)
+      }
 
       LaunchedEffect(Unit) {
         snapshotFlow { appUiStructure.text }.collect { text ->
           if (text.isNotBlank()) {
             appStateHolder.onAppUiStructureChanged(text.toString())
+          }
+        }
+      }
+
+      LaunchedEffect(Unit) {
+        snapshotFlow { customInstruction.text }.collect { text ->
+          if (text.isNotBlank()) {
+            appStateHolder.onScenarioGenerationCustomInstructionChanged(text.toString())
           }
         }
       }
@@ -81,6 +92,18 @@ fun ScenarioGenerationDialog(
             placeholder = { Text("Enter app UI structure (Optional)") },
             decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
           )
+
+          // Custom instruction
+          GroupHeader("Custom instruction (Optional)")
+          TextArea(
+            state = customInstruction,
+            modifier = Modifier
+              .padding(8.dp)
+              .height(120.dp)
+              .testTag("custom_instruction"),
+            placeholder = { Text("Enter custom instruction (Optional)") },
+            decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
+          )
         }
 
         // Checkbox for using existing scenarios
@@ -107,10 +130,12 @@ fun ScenarioGenerationDialog(
           ActionButton(
             onClick = {
               val appUiStructureText = appUiStructure.text.toString()
+              val customInstructionText = customInstruction.text.toString()
               onGenerate(
                 scenariosToGenerate.text.toString(),
-                if (appUiStructureText.isBlank()) "" else appUiStructureText,
-                useExistingScenarios
+                appUiStructureText,
+                customInstructionText,
+                useExistingScenarios,
               )
               onCloseRequest()
             },

@@ -2,12 +2,22 @@ package io.github.takahirom.arbigent.serialization
 
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.json.*
-import kotlinx.serialization.modules.SerializersModule
 
+public sealed interface GenerateJsonSchemaApiType{
+    public object OpenAI: GenerateJsonSchemaApiType
+    public object Gemini: GenerateJsonSchemaApiType
+}
 
-public fun generateRootJsonSchema(descriptor: SerialDescriptor): JsonObject {
+public fun generateRootJsonSchema(
+    descriptor: SerialDescriptor,
+    apiType: GenerateJsonSchemaApiType,
+): JsonObject {
     val definitions = mutableMapOf<String, JsonObject>()
-    val mainSchema = generateJsonSchema(descriptor, false)
+    val mainSchema = generateJsonSchema(
+        descriptor = descriptor,
+        isOptional = false,
+        apiType = apiType,
+    )
 
     return buildJsonObject {
 //        put("\$schema", JsonPrimitive("http://json-schema.org/draft-07/schema#"))
@@ -21,15 +31,21 @@ public fun generateRootJsonSchema(descriptor: SerialDescriptor): JsonObject {
 }
 
 public fun generateJsonSchema(
+    name: String = "root",
     descriptor: SerialDescriptor,
     isOptional: Boolean,
     definitions: MutableMap<String, JsonObject> = mutableMapOf(),
+    apiType: GenerateJsonSchemaApiType,
 ): JsonObject? {
     if (descriptor.kind is PolymorphicKind) {
         // OpenAI json schema doesn't support allOf so we need to ignore it for now
         return null
     }
-    val serialName = descriptor.serialName
+    if( descriptor.kind is StructureKind.LIST && descriptor.getElementDescriptor(0).kind is PolymorphicKind) {
+        // Contextual types are not supported in this implementation
+        return null
+    }
+    val serialName = name
 
     // Check if we've already processed this descriptor to handle recursive types
     if (definitions.containsKey(serialName)) {
@@ -57,12 +73,10 @@ public fun generateJsonSchema(
                     PrimitiveKind.CHAR, PrimitiveKind.STRING -> "string"
                     else -> "string" // Default fallback
                 }
+                putNullableIfNeeded(descriptor.isNullable, apiType)
 
                 if (descriptor.isNullable || isOptional) {
-                    putJsonArray("type") {
-                        add(JsonPrimitive(type))
-                        add(JsonPrimitive("null"))
-                    }
+                    putType(type, apiType)
                 } else {
                     put("type", JsonPrimitive(type))
                 }
@@ -72,10 +86,7 @@ public fun generateJsonSchema(
             // Handle class and object structures
             StructureKind.CLASS, StructureKind.OBJECT -> {
                 if (descriptor.isNullable || isOptional) {
-                    putJsonArray("type") {
-                        add(JsonPrimitive("object"))
-                        add(JsonPrimitive("null"))
-                    }
+                    putType("object", apiType)
                 } else {
                     put("type", JsonPrimitive("object"))
                 }
@@ -84,7 +95,13 @@ public fun generateJsonSchema(
                     for (i in 0 until descriptor.elementsCount) {
                         val elementName = descriptor.getElementName(i)
                         val elementDescriptor = descriptor.getElementDescriptor(i)
-                        val schema = generateJsonSchema(elementDescriptor, descriptor.isElementOptional(i), definitions)
+                        val schema = generateJsonSchema(
+                            name = name +"_" +elementName,
+                            elementDescriptor,
+                            descriptor.isElementOptional(i),
+                            definitions,
+                            apiType,
+                        )
                         schema?.let {
                             put(elementName, schema)
                         }
@@ -101,10 +118,18 @@ public fun generateJsonSchema(
                 val requiredProperties = buildJsonArray {
                     for (i in 0 until descriptor.elementsCount) {
                         // According to OpenAI docs, all properties must be required for strict mode
-                        add(JsonPrimitive(descriptor.getElementName(i)))
-//                        if (!descriptor.getElementDescriptor(i).isNullable) { // Previous logic commented out
-//                            add(JsonPrimitive(descriptor.getElementName(i)))
-//                        }
+                        when (apiType) {
+                            GenerateJsonSchemaApiType.OpenAI -> {
+                                add(JsonPrimitive(descriptor.getElementName(i)))
+                            }
+
+                            GenerateJsonSchemaApiType.Gemini -> {
+                                // Gemini might have different requirements, adjust as needed
+                                if (!descriptor.isElementOptional(i)) {
+                                    add(JsonPrimitive(descriptor.getElementName(i)))
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -119,19 +144,18 @@ public fun generateJsonSchema(
             // Handle lists and arrays
             StructureKind.LIST -> {
                 if (descriptor.isNullable || isOptional) {
-                    putJsonArray("type") {
-                        add(JsonPrimitive("array"))
-                        add(JsonPrimitive("null"))
-                    }
+                    putType("array", apiType)
                 } else {
                     put("type", JsonPrimitive("array"))
                 }
 
                 if (descriptor.elementsCount > 0) {
                     val itemsSchema = generateJsonSchema(
+                        name = name +"_" + descriptor.getElementName(0),
                         descriptor.getElementDescriptor(0),
                         descriptor.isElementOptional(0),
                         definitions,
+                        apiType,
                     )
                     itemsSchema?.let {
                         put("items", itemsSchema)
@@ -145,10 +169,7 @@ public fun generateJsonSchema(
             // Handle maps
             StructureKind.MAP -> {
                 if (descriptor.isNullable || isOptional) {
-                    putJsonArray("type") {
-                        add(JsonPrimitive("object"))
-                        add(JsonPrimitive("null"))
-                    }
+                    putType("object", apiType)
                 } else {
                     put("type", JsonPrimitive("object"))
                 }
@@ -157,9 +178,11 @@ public fun generateJsonSchema(
                 // Assumes String keys, element at index 1 is the value type
                 if (descriptor.elementsCount > 1) {
                     val valueSchema = generateJsonSchema(
+                        name = name +"_" + descriptor.getElementName(1),
                         descriptor.getElementDescriptor(1),
                         descriptor.isElementOptional(1),
                         definitions,
+                        apiType,
                     )
                     valueSchema?.let {
                         put("additionalProperties", valueSchema)
@@ -178,10 +201,7 @@ public fun generateJsonSchema(
             // Handle enums
             SerialKind.ENUM -> {
                 if (descriptor.isNullable || isOptional) {
-                    putJsonArray("type") {
-                        add(JsonPrimitive("string"))
-                        add(JsonPrimitive("null"))
-                    }
+                    putType("string", apiType)
                 } else {
                     put("type", JsonPrimitive("string"))
                 }
@@ -198,10 +218,7 @@ public fun generateJsonSchema(
                 // Contextual can resolve to anything, often treated as any type or requires specific handling
                 if (descriptor.isNullable || isOptional) {
                     // Representing as potentially null and any type (object allows flexibility)
-                    putJsonArray("type") {
-                        add(JsonPrimitive("object")) // Or more specific if context known, fallback to object/any
-                        add(JsonPrimitive("null"))
-                    }
+                    putType("object", apiType)
                 } else {
                     put("type", JsonPrimitive("object")) // Fallback
                 }
@@ -240,10 +257,7 @@ public fun generateJsonSchema(
             // Default fallback for unsupported kinds
             else -> {
                 if (descriptor.isNullable || isOptional) {
-                    putJsonArray("type") {
-                        add(JsonPrimitive("object")) // Fallback to object
-                        add(JsonPrimitive("null"))
-                    }
+                    putType("object", apiType)
                 } else {
                     put("type", JsonPrimitive("object")) // Fallback
                 }
@@ -286,6 +300,26 @@ public fun generateJsonSchema(
 
 
     return schema
+}
+
+private fun JsonObjectBuilder.putNullableIfNeeded(
+    nullable: Boolean,
+    apiType: io.github.takahirom.arbigent.serialization.GenerateJsonSchemaApiType
+) {
+    if (apiType is GenerateJsonSchemaApiType.Gemini && nullable) {
+        put("nullable", true)
+    }
+}
+
+private fun JsonObjectBuilder.putType(type: String, apiType: GenerateJsonSchemaApiType) {
+    when(apiType) {
+        GenerateJsonSchemaApiType.OpenAI -> putJsonArray("type") {
+            add(JsonPrimitive(type))
+            add(JsonPrimitive("null"))
+        }
+
+        GenerateJsonSchemaApiType.Gemini -> put("type", JsonPrimitive(type))
+    }
 }
 
 
