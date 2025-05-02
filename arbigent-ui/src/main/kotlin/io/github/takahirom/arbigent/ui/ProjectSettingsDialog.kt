@@ -34,6 +34,7 @@ import org.jetbrains.jewel.ui.component.Checkbox
 import org.jetbrains.jewel.ui.component.RadioButtonRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.window.rememberDialogState
 import io.github.takahirom.arbigent.ArbigentAiOptions
 import io.github.takahirom.arbigent.ui.components.AiOptionsComponent
 
@@ -43,7 +44,6 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
   TestCompatibleDialog(
     onCloseRequest = onCloseRequest,
     title = "Project Settings",
-    resizable = false,
     content = {
       val scrollState = rememberScrollState()
       Column {
@@ -286,7 +286,7 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
 fun TestCompatibleDialog(
   onCloseRequest: () -> Unit,
   title: String,
-  resizable: Boolean = false,
+  resizable: Boolean = true,
   content: @Composable () -> Unit
 ) {
   val isUiTest = LocalIsUiTest.current
@@ -302,6 +302,10 @@ fun TestCompatibleDialog(
     DialogWindow(
       onCloseRequest = onCloseRequest,
       title = title,
+      state = rememberDialogState(
+        width = 520.dp,
+        height = 520.dp
+      ),
       resizable = resizable,
       content = {
         content()
