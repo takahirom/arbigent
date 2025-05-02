@@ -33,7 +33,6 @@ fun GenerateScenarioDialog(
   TestCompatibleDialog(
     onCloseRequest = onCloseRequest,
     title = "Generate Scenario",
-    resizable = false,
     content = {
       val scrollState = rememberScrollState()
 
