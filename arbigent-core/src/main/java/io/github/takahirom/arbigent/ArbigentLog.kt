@@ -120,7 +120,7 @@ public var printLogger: (String) -> Unit = { println(it) }
 private fun printLog(level: ArbigentLogLevel, rawLog: String, instance: Any? = null) {
   val log = rawLog.removeConfidentialInfo()
   val logContent =
-    if (instance != null) {
+    if (instance != null && instance::class.simpleName != null) {
       "${level.shortName()}: $log (${instance::class.simpleName})"
     } else {
       "${level.shortName()}: $log"
