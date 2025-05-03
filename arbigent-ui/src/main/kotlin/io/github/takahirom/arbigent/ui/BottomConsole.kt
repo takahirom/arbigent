@@ -134,7 +134,7 @@ fun BottomConsole() {
                 text = timeText,
               )
               Text(
-                text = "$status",
+                text = status.replace(";base64,.*?\"".toRegex(), ";base64,[omitted]\""),
                 modifier = Modifier.weight(1f)
                   .padding(start = 4.dp)
                   .clickable {
