@@ -74,8 +74,6 @@ class ArbigentAppStateHolder(
   val cacheStrategyFlow = MutableStateFlow(CacheStrategy())
   val aiOptionsFlow = MutableStateFlow<ArbigentAiOptions?>(null)
   val mcpJsonFlow = MutableStateFlow("{}")
-  val appUiStructureFlow = MutableStateFlow("")
-  val scenarioGenerationCustomInstructionFlow = MutableStateFlow("")
   val defaultDeviceFormFactorFlow =
     MutableStateFlow<ArbigentScenarioDeviceFormFactor>(ArbigentScenarioDeviceFormFactor.Unspecified)
   val decisionCache = cacheStrategyFlow
@@ -151,7 +149,6 @@ class ArbigentAppStateHolder(
         cacheStrategy = cacheStrategyFlow.value,
         aiOptions = aiOptionsFlow.value,
         mcpJson = mcpJsonFlow.value,
-        appUiStructure = appUiStructureFlow.value,
         defaultDeviceFormFactor = defaultDeviceFormFactorFlow.value
       ),
       initialScenarios = allScenarioStateHoldersStateFlow.value.map { scenario ->
@@ -176,13 +173,11 @@ class ArbigentAppStateHolder(
     allScenarioStateHolder.map { it.createArbigentScenarioContent() }
       .createArbigentScenario(
         projectSettings = ArbigentProjectSettings(
-          this@ArbigentAppStateHolder.promptFlow.value,
-          this@ArbigentAppStateHolder.cacheStrategyFlow.value,
-          this@ArbigentAppStateHolder.aiOptionsFlow.value,
-          this@ArbigentAppStateHolder.mcpJsonFlow.value,
-          this@ArbigentAppStateHolder.appUiStructureFlow.value,
-          this@ArbigentAppStateHolder.scenarioGenerationCustomInstructionFlow.value,
-          this@ArbigentAppStateHolder.defaultDeviceFormFactorFlow.value
+          prompt = this@ArbigentAppStateHolder.promptFlow.value,
+          cacheStrategy = this@ArbigentAppStateHolder.cacheStrategyFlow.value,
+          aiOptions = this@ArbigentAppStateHolder.aiOptionsFlow.value,
+          mcpJson = this@ArbigentAppStateHolder.mcpJsonFlow.value,
+          defaultDeviceFormFactor = this@ArbigentAppStateHolder.defaultDeviceFormFactorFlow.value
         ),
         scenario = createArbigentScenarioContent(),
         aiFactory = aiFactory,
@@ -271,13 +266,11 @@ class ArbigentAppStateHolder(
     arbigentProjectSerializer.save(
       projectFileContent = ArbigentProjectFileContent(
         settings = ArbigentProjectSettings(
-          promptFlow.value,
-          cacheStrategyFlow.value,
-          aiOptionsFlow.value,
-          mcpJsonFlow.value,
-          appUiStructureFlow.value,
-          scenarioGenerationCustomInstructionFlow.value,
-          defaultDeviceFormFactorFlow.value
+          prompt = promptFlow.value,
+          cacheStrategy = cacheStrategyFlow.value,
+          aiOptions = aiOptionsFlow.value,
+          mcpJson = mcpJsonFlow.value,
+          defaultDeviceFormFactor = defaultDeviceFormFactorFlow.value
         ),
         scenarioContents = sortedScenarios.map {
           it.createArbigentScenarioContent()
@@ -311,8 +304,6 @@ class ArbigentAppStateHolder(
     cacheStrategyFlow.value = projectFile.settings.cacheStrategy
     aiOptionsFlow.value = projectFile.settings.aiOptions
     mcpJsonFlow.value = projectFile.settings.mcpJson
-    appUiStructureFlow.value = projectFile.settings.appUiStructure
-    scenarioGenerationCustomInstructionFlow.value = projectFile.settings.scenarioGenerationCustomInstruction
     projectStateFlow.value = ArbigentProject(
       settings = projectFile.settings,
       initialScenarios = arbigentScenarioStateHolders.map {
@@ -404,11 +395,11 @@ class ArbigentAppStateHolder(
   }
 
   fun onAppUiStructureChanged(structure: String) {
-    appUiStructureFlow.value = structure
+    promptFlow.value = promptFlow.value.copy(appUiStructure = structure)
   }
 
   fun onScenarioGenerationCustomInstructionChanged(instruction: String) {
-    scenarioGenerationCustomInstructionFlow.value = instruction
+    promptFlow.value = promptFlow.value.copy(scenarioGenerationCustomInstruction = instruction)
   }
 
   fun onDefaultDeviceFormFactorChanged(formFactor: ArbigentScenarioDeviceFormFactor) {
