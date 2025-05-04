@@ -285,7 +285,7 @@ Previous steps:
     val projectSettings = projectWithDeviceFormFactor.settings
     assertEquals(
       io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor.Tv, 
-      projectSettings.defaultDeviceFormFactor, 
+      projectSettings.deviceFormFactor,
       "Project defaultDeviceFormFactor should be Tv"
     )
 

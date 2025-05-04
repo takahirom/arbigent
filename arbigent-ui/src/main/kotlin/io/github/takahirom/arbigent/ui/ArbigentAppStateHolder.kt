@@ -149,7 +149,7 @@ class ArbigentAppStateHolder(
         cacheStrategy = cacheStrategyFlow.value,
         aiOptions = aiOptionsFlow.value,
         mcpJson = mcpJsonFlow.value,
-        defaultDeviceFormFactor = defaultDeviceFormFactorFlow.value
+        deviceFormFactor = defaultDeviceFormFactorFlow.value
       ),
       initialScenarios = allScenarioStateHoldersStateFlow.value.map { scenario ->
         scenario.createScenario(allScenarioStateHoldersStateFlow.value)
@@ -177,7 +177,7 @@ class ArbigentAppStateHolder(
           cacheStrategy = this@ArbigentAppStateHolder.cacheStrategyFlow.value,
           aiOptions = this@ArbigentAppStateHolder.aiOptionsFlow.value,
           mcpJson = this@ArbigentAppStateHolder.mcpJsonFlow.value,
-          defaultDeviceFormFactor = this@ArbigentAppStateHolder.defaultDeviceFormFactorFlow.value
+          deviceFormFactor = this@ArbigentAppStateHolder.defaultDeviceFormFactorFlow.value
         ),
         scenario = createArbigentScenarioContent(),
         aiFactory = aiFactory,
@@ -270,7 +270,7 @@ class ArbigentAppStateHolder(
           cacheStrategy = cacheStrategyFlow.value,
           aiOptions = aiOptionsFlow.value,
           mcpJson = mcpJsonFlow.value,
-          defaultDeviceFormFactor = defaultDeviceFormFactorFlow.value
+          deviceFormFactor = defaultDeviceFormFactorFlow.value
         ),
         scenarioContents = sortedScenarios.map {
           it.createArbigentScenarioContent()
