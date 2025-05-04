@@ -37,10 +37,10 @@ fun ScenarioGenerationDialog(
         TextFieldState("")
       }
       val appUiStructure: TextFieldState = remember {
-        TextFieldState(appStateHolder.appUiStructureFlow.value)
+        TextFieldState(appStateHolder.promptFlow.value.appUiStructure)
       }
       val customInstruction: TextFieldState = remember {
-        TextFieldState(appStateHolder.scenarioGenerationCustomInstructionFlow.value)
+        TextFieldState(appStateHolder.promptFlow.value.scenarioGenerationCustomInstruction)
       }
 
       LaunchedEffect(Unit) {

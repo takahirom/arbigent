@@ -100,15 +100,21 @@ public data class ArbigentProjectSettings(
   public val aiOptions: ArbigentAiOptions? = null,
   @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
   public val mcpJson: String = DefaultMcpJson,
-  @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
-  public val appUiStructure: String = "",
-  @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
-  public val scenarioGenerationCustomInstruction: String = "",
   public val defaultDeviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Unspecified,
 ) {
   public companion object {
     public const val DefaultMcpJson: String = "{}"
   }
+
+  // For backward compatibility
+  @Deprecated("Use prompt.appUiStructure instead", ReplaceWith("prompt.appUiStructure"))
+  public val appUiStructure: String
+    get() = prompt.appUiStructure
+
+  // For backward compatibility
+  @Deprecated("Use prompt.scenarioGenerationCustomInstruction instead", ReplaceWith("prompt.scenarioGenerationCustomInstruction"))
+  public val scenarioGenerationCustomInstruction: String
+    get() = prompt.scenarioGenerationCustomInstruction
 }
 
 @Serializable
@@ -118,7 +124,11 @@ public data class ArbigentPrompt(
   @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
   public val additionalSystemPrompts: List<String> = listOf(),
   @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
-  public val userPromptTemplate: String = UserPromptTemplate.DEFAULT_TEMPLATE
+  public val userPromptTemplate: String = UserPromptTemplate.DEFAULT_TEMPLATE,
+  @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
+  public val appUiStructure: String = "",
+  @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
+  public val scenarioGenerationCustomInstruction: String = ""
 )
 
 @Serializable
