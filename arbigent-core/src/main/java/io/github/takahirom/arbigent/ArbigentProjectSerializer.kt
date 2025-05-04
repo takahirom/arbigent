@@ -100,21 +100,11 @@ public data class ArbigentProjectSettings(
   public val aiOptions: ArbigentAiOptions? = null,
   @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
   public val mcpJson: String = DefaultMcpJson,
-  public val defaultDeviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Unspecified,
+  public val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Unspecified,
 ) {
   public companion object {
     public const val DefaultMcpJson: String = "{}"
   }
-
-  // For backward compatibility
-  @Deprecated("Use prompt.appUiStructure instead", ReplaceWith("prompt.appUiStructure"))
-  public val appUiStructure: String
-    get() = prompt.appUiStructure
-
-  // For backward compatibility
-  @Deprecated("Use prompt.scenarioGenerationCustomInstruction instead", ReplaceWith("prompt.scenarioGenerationCustomInstruction"))
-  public val scenarioGenerationCustomInstruction: String
-    get() = prompt.scenarioGenerationCustomInstruction
 }
 
 @Serializable
@@ -178,7 +168,7 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
     }
     // Determine which device form factor to use
     val effectiveDeviceFormFactor = if (nodeScenario.deviceFormFactor is ArbigentScenarioDeviceFormFactor.Unspecified) {
-      if (projectSettings.defaultDeviceFormFactor is ArbigentScenarioDeviceFormFactor.Unspecified) {
+      if (projectSettings.deviceFormFactor is ArbigentScenarioDeviceFormFactor.Unspecified) {
         ArbigentScenarioDeviceFormFactor.Mobile
       } else {
         // If the scenario is from the YAML file and doesn't specify a device form factor,
@@ -186,7 +176,7 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
         if (nodeScenario.id == "default-not-using-project") {
           ArbigentScenarioDeviceFormFactor.Mobile
         } else {
-          projectSettings.defaultDeviceFormFactor
+          projectSettings.deviceFormFactor
         }
       }
     } else {
@@ -227,7 +217,7 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
   arbigentDebugLog("executing:$result")
   // Determine which device form factor to use for the scenario
   val effectiveScenarioDeviceFormFactor = if (scenario.deviceFormFactor is ArbigentScenarioDeviceFormFactor.Unspecified) {
-    if (projectSettings.defaultDeviceFormFactor is ArbigentScenarioDeviceFormFactor.Unspecified) {
+    if (projectSettings.deviceFormFactor is ArbigentScenarioDeviceFormFactor.Unspecified) {
       ArbigentScenarioDeviceFormFactor.Mobile
     } else {
       // If the scenario is from the YAML file and doesn't specify a device form factor,
@@ -235,7 +225,7 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
       if (scenario.id == "default-not-using-project") {
         ArbigentScenarioDeviceFormFactor.Mobile
       } else {
-        projectSettings.defaultDeviceFormFactor
+        projectSettings.deviceFormFactor
       }
     }
   } else {
