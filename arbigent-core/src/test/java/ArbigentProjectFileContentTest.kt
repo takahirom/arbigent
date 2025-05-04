@@ -263,7 +263,7 @@ Previous steps:
   private val projectWithDeviceFormFactor = ArbigentProjectSerializer().load(
     """
     settings:
-      defaultDeviceFormFactor:
+      deviceFormFactor:
         type: "Tv"
     scenarios:
     - id: "default-form-factor"
