@@ -171,10 +171,11 @@ fun Scenario(
         title = "Options",
         modifier = Modifier.fillMaxWidth()
           .heightIn(max = maxHeight * 0.7f)
+          .verticalScroll(rememberScrollState())
       ) {
         Column(
-          modifier = Modifier.verticalScroll(rememberScrollState())
-            .testTag("scenario_options")
+          modifier = Modifier.testTag("scenario_options")
+            .wrapContentHeight(unbounded = true)
         ) {
           ScenarioOptions(scenarioStateHolder, scenarioCountById, dependencyScenarioMenu)
         }
@@ -395,7 +396,7 @@ private fun ScenarioOptions(
   GroupHeader("Fundamental options")
   ScenarioFundamentalOptions(scenarioStateHolder, scenarioCountById, dependencyScenarioMenu)
   GroupHeader("Other options")
-  FlowRow(modifier = Modifier.padding(4.dp).height(320.dp)) {
+  FlowRow(modifier = Modifier.padding(4.dp)) {
     Column(
       modifier = Modifier.padding(8.dp).width(240.dp)
     ) {
