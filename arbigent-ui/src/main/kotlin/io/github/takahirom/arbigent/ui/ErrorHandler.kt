@@ -62,7 +62,7 @@ ${e.stackTraceToString()}"""
 
     dialog.defaultCloseOperation = WindowConstants.DISPOSE_ON_CLOSE
     dialog.pack()
-    dialog.setLocationRelativeTo(null) // 画面中央に表示
+    dialog.setLocationRelativeTo(null)
     dialog.isVisible = true
   }
 }
