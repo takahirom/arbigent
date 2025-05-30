@@ -309,6 +309,13 @@ private fun StepView(step: ArbigentAgentTaskStepResult) {
             whiteSpace("pre-wrap")
           }
         }) {
+          if (step.apiCallJsonPath != null) {
+            Div {
+              A(href = step.apiCallJsonPath) {
+                Text("API Call JSON: ${step.apiCallJsonPath}")
+              }
+            }
+          }
           Text(step.aiRequest ?: "N/A")
         }
       }
