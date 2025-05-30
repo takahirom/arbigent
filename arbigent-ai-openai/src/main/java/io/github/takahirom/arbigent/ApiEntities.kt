@@ -99,7 +99,7 @@ public data class Usage(
 
 @Serializable
 public class ApiCall(
-  public val requestBody: ChatCompletionRequest,
+  public val curl: String,
   public val responseBody: ChatCompletionResponse,
   public val metadata: ApiCallMetadata
 )

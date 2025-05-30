@@ -7,6 +7,7 @@ import io.github.takahirom.arbigent.result.StepFeedbackEvent
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.io.File
+import java.util.UUID
 import kotlin.collections.firstOrNull
 
 @OptIn(ArbigentInternalApi::class)
@@ -437,12 +438,14 @@ class ArbigentAppStateHolder(
     useExistingScenarios: Boolean
   ) {
     val ai = getAi()
+    val requestUuid = UUID.randomUUID().toString()
     val generatedScenarios = ai.generateScenarios(
       ArbigentAi.ScenarioGenerationInput(
-        scenariosToGenerate,
-        appUiStructure,
-        customInstruction,
-        if (useExistingScenarios) {
+        requestUuid = requestUuid,
+        scenariosToGenerate = scenariosToGenerate,
+        appUiStructure = appUiStructure,
+        customInstruction = customInstruction,
+        scenariosToBeUsedAsContext = if (useExistingScenarios) {
           allScenarioStateHoldersStateFlow.value.map {
             it.createArbigentScenarioContent()
           }
