@@ -147,21 +147,38 @@ fun AddAiProviderDialog(
             "CustomOpenAiApiBasedAi" -> {
               GroupHeader("Base URL")
               val baseUrlState = remember { TextFieldState("") }
+              val baseUrlText = baseUrlState.text.toString()
+              val isBaseUrlEndsWithSlash = baseUrlText.isEmpty() || baseUrlText.endsWith("/")
+
               TextField(
                 state = baseUrlState,
                 modifier = Modifier.padding(8.dp).fillMaxWidth(),
                 placeholder = { Text("Enter base URL (e.g., http://localhost:11434/v1/)") }
               )
 
+              if (!isBaseUrlEndsWithSlash) {
+                Text(
+                  text = "Warning: URL should end with a slash (/)",
+                  color = Color(0xFFF57C00), // Orange warning color
+                  modifier = Modifier.padding(horizontal = 8.dp)
+                )
+              }
+
               // Add button
               OutlinedButton(
                 onClick = {
                   if (isIdValid && modelNameState.text.isNotEmpty() && baseUrlState.text.isNotEmpty()) {
+                    // Ensure URL ends with a slash
+                    var baseUrl = baseUrlState.text.toString()
+                    if (!baseUrl.endsWith("/")) {
+                      baseUrl += "/"
+                    }
+
                     val newProvider = AiProviderSetting.CustomOpenAiApiBasedAi(
                       id = idState.text.toString(),
                       apiKey = apiKeyState.text.toString(),
                       modelName = modelNameState.text.toString(),
-                      baseUrl = baseUrlState.text.toString()
+                      baseUrl = baseUrl
                     )
                     aiSettingStateHolder.addAiProvider(newProvider)
                     onCloseRequest()
@@ -177,11 +194,22 @@ fun AddAiProviderDialog(
             "AzureOpenAi" -> {
               GroupHeader("Endpoint")
               val endpointState = remember { TextFieldState("") }
+              val endpointText = endpointState.text.toString()
+              val isEndpointEndsWithSlash = endpointText.isEmpty() || endpointText.endsWith("/")
+
               TextField(
                 state = endpointState,
                 modifier = Modifier.padding(8.dp).fillMaxWidth(),
-                placeholder = { Text("Enter endpoint URL") }
+                placeholder = { Text("Enter endpoint URL (e.g., https://{endpoint}/openai/deployments/{deployment-id}/)") }
               )
+
+              if (!isEndpointEndsWithSlash) {
+                Text(
+                  text = "Warning: URL should end with a slash (/)",
+                  color = Color(0xFFF57C00), // Orange warning color
+                  modifier = Modifier.padding(horizontal = 8.dp)
+                )
+              }
 
               GroupHeader("API Version")
               val apiVersionState = remember { TextFieldState("2025-01-01-preview") }
@@ -197,11 +225,17 @@ fun AddAiProviderDialog(
                   if (isIdValid && modelNameState.text.isNotEmpty() &&
                     endpointState.text.isNotEmpty() && apiVersionState.text.isNotEmpty()
                   ) {
+                    // Ensure URL ends with a slash
+                    var endpoint = endpointState.text.toString()
+                    if (!endpoint.endsWith("/")) {
+                      endpoint += "/"
+                    }
+
                     val newProvider = AiProviderSetting.AzureOpenAi(
                       id = idState.text.toString(),
                       apiKey = apiKeyState.text.toString(),
                       modelName = modelNameState.text.toString(),
-                      endpoint = endpointState.text.toString(),
+                      endpoint = endpoint,
                       apiVersion = apiVersionState.text.toString()
                     )
                     aiSettingStateHolder.addAiProvider(newProvider)
