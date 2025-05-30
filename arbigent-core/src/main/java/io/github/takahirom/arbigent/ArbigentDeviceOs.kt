@@ -37,6 +37,10 @@ public sealed interface ArbigentAvailableDevice {
         Maestro.android(
           driver
         )
+      } catch (e: java.util.concurrent.TimeoutException) {
+        driver.close()
+        dadb.close()
+        throw RuntimeException("Arbigent can not connect to device in time. The likely reason why we can't connect is that you have multiple instance of Arbigent like UI and CLI of Arbigent", e)
       } catch (e: Exception) {
         driver.close()
         dadb.close()
