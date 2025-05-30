@@ -39,7 +39,7 @@ public var arbigentLogLevel: ArbigentLogLevel
   }
 
 private fun updateKermit(level: ArbigentLogLevel) {
-  Logger.setLogWriters(object : LogWriter(){
+  Logger.setLogWriters(object : LogWriter() {
     override fun log(severity: Severity, message: String, tag: String, throwable: Throwable?) {
       if (severity == Severity.Debug) {
         printLog(ArbigentLogLevel.DEBUG, message)
@@ -135,20 +135,20 @@ private fun printLog(level: ArbigentLogLevel, rawLog: String, instance: Any? = n
 
 public object ConfidentialInfo {
   @ArbigentInternalApi
-  private val _shouldBeRemovedStrings: MutableSet<String> = mutableSetOf()
-  public val shouldBeRemovedStrings: Set<String> get() = _shouldBeRemovedStrings
+  private val _shouldBeRemovedStrings: MutableMap<String, String> = mutableMapOf()
+  public val shouldBeRemovedStrings: Map<String, String> get() = _shouldBeRemovedStrings
 
-  public fun addStringToBeRemoved(string: String) {
+  public fun addStringToBeRemoved(string: String, replaceTo: String = "****") {
     if (string.isBlank()) {
       return
     }
-    _shouldBeRemovedStrings.add(string)
+    _shouldBeRemovedStrings[string] = replaceTo
   }
 
   @ArbigentInternalApi
   public fun String.removeConfidentialInfo(): String {
-    return shouldBeRemovedStrings.fold(this) { acc, s ->
-      acc.replace(s, "****")
+    return shouldBeRemovedStrings.entries.fold(this) { acc, s ->
+      acc.replace(s.key, s.value, ignoreCase = true)
     }
   }
 }

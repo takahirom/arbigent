@@ -19,6 +19,7 @@ public interface ArbigentAi {
     val focusedTreeString: String?,
     val agentActionTypes: List<AgentActionType>,
     val screenshotFilePath: String,
+    val requestUuid: String,
     val apiCallJsonLFilePath: String,
     val elements: ArbigentElementList,
     val prompt: ArbigentPrompt,
@@ -28,6 +29,7 @@ public interface ArbigentAi {
   )
 
   public data class ScenarioGenerationInput(
+    val requestUuid: String,
     val scenariosToGenerate: String,
     val appUiStructure: String,
     val customInstruction: String,

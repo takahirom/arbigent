@@ -68,6 +68,13 @@ private enum class ArbigentAiAnswerItems(
   }
 }
 
+internal class Curl(
+  val requestUuid: String,
+  val command: String,
+)
+
+internal val curls: ArrayDeque<Curl> = ArrayDeque()
+
 @OptIn(ExperimentalRoborazziApi::class, ExperimentalSerializationApi::class)
 public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
   private val apiKey: String,
@@ -82,35 +89,50 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
   private val httpClient: HttpClient = HttpClient(OkHttp) {
     engine {
       config {
-        if (loggingEnabled) {
-          this.addNetworkInterceptor(
-            object : Interceptor {
-              private val curlGenerator = CurlCommandGenerator(com.moczul.ok2curl.Configuration())
+        this.addNetworkInterceptor(
+          object : Interceptor {
+            private val curlGenerator = CurlCommandGenerator(com.moczul.ok2curl.Configuration())
 
-              override fun intercept(chain: Interceptor.Chain): Response {
-                val request = chain.request()
+            override fun intercept(chain: Interceptor.Chain): Response {
+              val request = chain.request()
 
-                // escape '
-                val oldBody = request.body
-                val contentType = oldBody?.contentType()
-                val charset = contentType?.charset() ?: Charsets.UTF_8
-                val sink = Buffer()
-                oldBody?.writeTo(sink)
-                val bodyText = sink.readString(charset)
-                val logBodyText = bodyText.replace("'", "'\"'\"'")
-                val logRequest = request.newBuilder()
-                  .method(request.method, body = logBodyText.toRequestBody(contentType))
-                  .build()
-                val curl = curlGenerator.generate(logRequest)
-                val log = curl
-                  .removeConfidentialInfo()
-                arbigentDebugLog(log)
-
-                return chain.proceed(request)
+              // escape '
+              val oldBody = request.body
+              val contentType = oldBody?.contentType()
+              val charset = contentType?.charset() ?: Charsets.UTF_8
+              val sink = Buffer()
+              oldBody?.writeTo(sink)
+              val bodyText = sink.readString(charset)
+              val logBodyText = bodyText.replace("'", "'\"'\"'")
+              val logRequest = request.newBuilder()
+                .method(request.method, body = logBodyText.toRequestBody(contentType))
+                .build()
+              val curl = curlGenerator.generate(logRequest)
+              val log = curl
+                .removeConfidentialInfo()
+              curls.add(
+                Curl(
+                  requestUuid = logRequest.url.queryParameter("requestUuid") ?: "unknown",
+                  command = log
+                )
+              )
+              if (curls.size > 10) {
+                curls.removeFirst()
               }
+
+              if (loggingEnabled) {
+                arbigentDebugLog(log)
+              }
+
+              return chain.proceed(
+                request
+                  .newBuilder()
+                  .url(request.url.newBuilder().removeAllQueryParameters("requestUuid").build())
+                  .build()
+              )
             }
-          )
-        }
+          }
+        )
       }
     }
     install(HttpRequestRetry) {
@@ -164,7 +186,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
   ),
 ) : ArbigentAi {
   init {
-    ConfidentialInfo.addStringToBeRemoved(apiKey)
+    ConfidentialInfo.addStringToBeRemoved(apiKey, "{{API_KEY}}")
   }
 
   private var retried = 0
@@ -241,8 +263,9 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     )
     val responseText = try {
       chatCompletion(
-        completionRequest,
-        decisionInput.aiOptions
+        requestUuid = decisionInput.requestUuid,
+        chatCompletionRequest = completionRequest,
+        aiOptions = decisionInput.aiOptions
       )
     } catch (e: ArbigentAiRateLimitExceededException) {
       val waitMs = 10000L * (1 shl retried)
@@ -264,6 +287,8 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
       )
       throw e
     }
+    val curlString = curls.lastOrNull { it.requestUuid == decisionInput.requestUuid }?.command
+      ?: "No curl command available for requestUuid: ${decisionInput.requestUuid}"
     retried = 0
     val json = Json { ignoreUnknownKeys = true }
     var responseObj: ChatCompletionResponse?
@@ -275,7 +300,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
         file.writeText(
           json.encodeToString(
             ApiCall(
-              requestBody = completionRequest,
+              curl = curlString,
               responseBody = responseObj,
               metadata = ApiCallMetadata()
             )
@@ -521,13 +546,20 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
   }
 
 
+  @OptIn(ArbigentInternalApi::class)
   private fun chatCompletion(
+    requestUuid: String,
     chatCompletionRequest: ChatCompletionRequest,
     aiOptions: ArbigentAiOptions? = null
   ): String {
     return runBlocking {
       val response: HttpResponse =
         httpClient.post(baseUrl + "chat/completions") {
+          if (loggingEnabled) {
+            url {
+              parameters.append("requestUuid", requestUuid)
+            }
+          }
           requestBuilderModifier()
           contentType(ContentType.Application.Json)
           setBody(
@@ -803,7 +835,8 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
 
     try {
       // Make the API call
-      val responseText = chatCompletion(completionRequest)
+      val requestUuid = scenarioGenerationInput.requestUuid ?: "unknown"
+      val responseText = chatCompletion(requestUuid, completionRequest)
 
 
       try {
