@@ -306,14 +306,20 @@ private fun StepView(step: ArbigentAgentTaskStepResult) {
       ExpandableSection("AI Request") {
         if (step.apiCallJsonPath != null) {
           Div {
-            A(
-              href = step.apiCallJsonPath,
-              attrs = {
-                attr("target", "_blank")
-                attr("rel", "noopener noreferrer")
+            if (!step.cacheHit) {
+              A(
+                href = step.apiCallJsonPath,
+                attrs = {
+                  attr("target", "_blank")
+                  attr("rel", "noopener noreferrer")
+                }
+              ) {
+                Text("API Call JSON: ${step.apiCallJsonPath}")
               }
-            ) {
-              Text("API Call JSON: ${step.apiCallJsonPath}")
+            } else {
+              Div {
+                Text("API Call JSON: ${step.apiCallJsonPath} (Cache Hit)")
+              }
             }
           }
         }
