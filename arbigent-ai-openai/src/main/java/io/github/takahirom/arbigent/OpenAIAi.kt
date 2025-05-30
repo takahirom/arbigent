@@ -36,6 +36,8 @@ import okio.Buffer
 import java.awt.image.BufferedImage.TYPE_INT_RGB
 import java.io.File
 import java.nio.charset.Charset
+import java.util.Deque
+import java.util.concurrent.ConcurrentLinkedDeque
 
 public class ArbigentAiRateLimitExceededException : Exception("Rate limit exceeded")
 
@@ -73,7 +75,7 @@ internal class Curl(
   val command: String,
 )
 
-internal val curls: ArrayDeque<Curl> = ArrayDeque()
+internal val curls: Deque<Curl> = ConcurrentLinkedDeque()
 
 @OptIn(ExperimentalRoborazziApi::class, ExperimentalSerializationApi::class)
 public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
@@ -201,6 +203,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     val focusedTree = decisionInput.focusedTreeString
     val agentActionTypes = decisionInput.agentActionTypes
     val elements = decisionInput.elements
+    val requestUuid = decisionInput.requestUuid
 
     val original = File(screenshotFilePath)
     val canvas = ArbigentCanvas.load(original, elements.screenWidth, TYPE_INT_RGB)
@@ -263,7 +266,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     )
     val responseText = try {
       chatCompletion(
-        requestUuid = decisionInput.requestUuid,
+        requestUuid = requestUuid,
         chatCompletionRequest = completionRequest,
         aiOptions = decisionInput.aiOptions
       )
@@ -287,8 +290,8 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
       )
       throw e
     }
-    val curlString = curls.lastOrNull { it.requestUuid == decisionInput.requestUuid }?.command
-      ?: "No curl command available for requestUuid: ${decisionInput.requestUuid}"
+    val curlString = curls.lastOrNull { it.requestUuid == requestUuid }?.command
+      ?: "No curl command available for requestUuid: $requestUuid"
     retried = 0
     val json = Json { ignoreUnknownKeys = true }
     var responseObj: ChatCompletionResponse?
@@ -555,10 +558,8 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     return runBlocking {
       val response: HttpResponse =
         httpClient.post(baseUrl + "chat/completions") {
-          if (loggingEnabled) {
-            url {
-              parameters.append("requestUuid", requestUuid)
-            }
+          url {
+            parameters.append("requestUuid", requestUuid)
           }
           requestBuilderModifier()
           contentType(ContentType.Application.Json)
