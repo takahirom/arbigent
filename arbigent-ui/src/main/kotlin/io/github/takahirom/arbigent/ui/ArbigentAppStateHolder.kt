@@ -141,6 +141,24 @@ class ArbigentAppStateHolder(
     }
   }
 
+  fun runDebug(scenarioStateHolder: ArbigentScenarioStateHolder) {
+    job?.cancel()
+    allScenarioStateHoldersStateFlow.value.forEach { it.cancel() }
+    recreateProject()
+    job = coroutineScope.launch {
+      // Create a regular scenario and then modify it to only include the current task
+      val scenario = scenarioStateHolder.createScenario(allScenarioStateHoldersStateFlow.value)
+      // Modify the scenario to only include the last task (the current scenario's task)
+      val lastTask = scenario.agentTasks.last()
+      val debugScenario = scenario.copy(
+        agentTasks = listOf(lastTask)
+      )
+      executeScenario(debugScenario)
+      selectedScenarioIndex.value =
+        sortedScenariosAndDepths().indexOfFirst { it.first.id == scenarioStateHolder.id }
+    }
+  }
+
 
   private fun recreateProject() {
     projectStateFlow.value?.cancel()

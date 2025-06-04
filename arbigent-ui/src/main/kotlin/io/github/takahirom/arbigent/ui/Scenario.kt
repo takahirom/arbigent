@@ -68,6 +68,7 @@ fun Scenario(
   scenarioCountById: (String) -> Int,
   onStepFeedback: (StepFeedbackEvent) -> Unit,
   onExecute: (ArbigentScenarioStateHolder) -> Unit,
+  onDebugExecute: (ArbigentScenarioStateHolder) -> Unit,
   onCancel: (ArbigentScenarioStateHolder) -> Unit,
   onRemove: (ArbigentScenarioStateHolder) -> Unit,
 ) {
@@ -97,7 +98,19 @@ fun Scenario(
         hint = Size(28)
       ) {
         Text(
-          text = "Run",
+          text = "Run with the dependent scenarios",
+        )
+      }
+      IconActionButton(
+        key = AllIconsKeys.Actions.StartDebugger,
+        onClick = {
+          onDebugExecute(scenarioStateHolder)
+        },
+        contentDescription = "Debug Run",
+        hint = Size(28)
+      ) {
+        Text(
+          text = "Run only this scenario",
         )
       }
       IconActionButton(
