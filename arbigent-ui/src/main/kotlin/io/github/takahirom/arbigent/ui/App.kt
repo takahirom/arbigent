@@ -164,6 +164,9 @@ private fun MainScreen(
           onExecute = {
             appStateHolder.run(it)
           },
+          onDebugExecute = {
+            appStateHolder.runDebug(it)
+          },
           onCancel = {
             appStateHolder.cancel()
             scenarioStateHolderAndDepth.first.cancel()
