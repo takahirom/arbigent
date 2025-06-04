@@ -761,7 +761,11 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
               "Generate scenarios based on the app UI structure and the user's request. " +
               "Each scenario should have a clear goal and be executable by an automated testing system. " +
               "Please split scenarios into appropriately sized chunks that won't confuse the AI. " +
-              "Set any unrelated items to null."
+              "Set any unrelated items to null. " +
+              "Note: When a scenario depends on another scenario (using scenario.dependency), " +
+              "you cannot check the execution content of the dependent scenario. For example, " +
+              "if scenario B includes user interactions like button clicks or data entry and scenario C depends on B, " +
+              "you cannot verify the specific interactions or data from scenario B in scenario C."
           )
         )
       ),
