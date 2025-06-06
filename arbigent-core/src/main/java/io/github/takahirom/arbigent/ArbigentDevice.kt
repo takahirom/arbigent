@@ -190,7 +190,8 @@ public data class ArbigentElementList(
 
 public class MaestroDevice(
   private val maestro: Maestro,
-  screenshotsDir: File = ArbigentFiles.screenshotsDir
+  screenshotsDir: File = ArbigentFiles.screenshotsDir,
+  private val closer: () -> Unit = {  }
 ) : ArbigentDevice, ArbigentTvCompatDevice {
   init {
     arbigentInfoLog("MaestroDevice created: screenshotsDir:${screenshotsDir.absolutePath}")
@@ -578,6 +579,7 @@ public class MaestroDevice(
   override fun close() {
     isClosed = true
     maestro.close()
+    closer()
   }
 
   override fun isClosed(): Boolean {
