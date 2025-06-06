@@ -68,6 +68,7 @@ fun Scenario(
   scenarioCountById: (String) -> Int,
   onStepFeedback: (StepFeedbackEvent) -> Unit,
   onExecute: (ArbigentScenarioStateHolder) -> Unit,
+  onDebugExecute: (ArbigentScenarioStateHolder) -> Unit,
   onCancel: (ArbigentScenarioStateHolder) -> Unit,
   onRemove: (ArbigentScenarioStateHolder) -> Unit,
 ) {
@@ -97,7 +98,19 @@ fun Scenario(
         hint = Size(28)
       ) {
         Text(
-          text = "Run",
+          text = "Run with the dependent scenarios",
+        )
+      }
+      IconActionButton(
+        key = AllIconsKeys.Actions.StartDebugger,
+        onClick = {
+          onDebugExecute(scenarioStateHolder)
+        },
+        contentDescription = "Debug Run",
+        hint = Size(28)
+      ) {
+        Text(
+          text = "Run only this scenario",
         )
       }
       IconActionButton(
@@ -171,10 +184,11 @@ fun Scenario(
         title = "Options",
         modifier = Modifier.fillMaxWidth()
           .heightIn(max = maxHeight * 0.7f)
+          .verticalScroll(rememberScrollState())
       ) {
         Column(
-          modifier = Modifier.verticalScroll(rememberScrollState())
-            .testTag("scenario_options")
+          modifier = Modifier.testTag("scenario_options")
+            .wrapContentHeight(unbounded = true)
         ) {
           ScenarioOptions(scenarioStateHolder, scenarioCountById, dependencyScenarioMenu)
         }
@@ -341,6 +355,18 @@ private fun ScenarioFundamentalOptions(
           }
         )
       }
+      Row(
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        RadioButtonRow(
+          text = "Unspecified",
+          selected = inputActionType.isUnspecified(),
+          onClick = {
+            updatedScenarioStateHolder.deviceFormFactorStateFlow.value =
+              ArbigentScenarioDeviceFormFactor.Unspecified
+          }
+        )
+      }
     }
     // Max retry and step count
     Column(
@@ -383,7 +409,7 @@ private fun ScenarioOptions(
   GroupHeader("Fundamental options")
   ScenarioFundamentalOptions(scenarioStateHolder, scenarioCountById, dependencyScenarioMenu)
   GroupHeader("Other options")
-  FlowRow(modifier = Modifier.padding(4.dp).height(320.dp)) {
+  FlowRow(modifier = Modifier.padding(4.dp)) {
     Column(
       modifier = Modifier.padding(8.dp).width(240.dp)
     ) {

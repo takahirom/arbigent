@@ -18,6 +18,7 @@ import androidx.compose.ui.window.DialogWindow
 import io.github.takahirom.arbigent.AiDecisionCacheStrategy
 import io.github.takahirom.arbigent.BuildConfig
 import io.github.takahirom.arbigent.UserPromptTemplate
+import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import androidx.compose.foundation.ExperimentalFoundationApi
 import org.jetbrains.jewel.ui.component.IconActionButton
 import org.jetbrains.jewel.ui.component.TextArea
@@ -30,10 +31,13 @@ import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.TextField
 import org.jetbrains.jewel.ui.component.Slider
 import org.jetbrains.jewel.ui.component.Checkbox
+import org.jetbrains.jewel.ui.component.RadioButtonRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.window.rememberDialogState
 import io.github.takahirom.arbigent.ArbigentAiOptions
 import io.github.takahirom.arbigent.ui.components.AiOptionsComponent
+import org.jetbrains.jewel.ui.component.OutlinedButton
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -41,7 +45,6 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
   TestCompatibleDialog(
     onCloseRequest = onCloseRequest,
     title = "Project Settings",
-    resizable = false,
     content = {
       val scrollState = rememberScrollState()
       Column {
@@ -80,6 +83,63 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
             placeholder = { Text("Additional System Prompt") },
             decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
           )
+
+          GroupHeader("Default Device Form Factor")
+          val defaultDeviceFormFactor by appStateHolder.defaultDeviceFormFactorFlow.collectAsState()
+
+          // Display the current value
+          val formFactorName = when {
+            defaultDeviceFormFactor.isMobile() -> "Mobile"
+            defaultDeviceFormFactor.isTv() -> "TV"
+            else -> "Unspecified"
+          }
+
+          // Create a mutable state to track the selected option
+          var selectedOption by remember { mutableStateOf(formFactorName) }
+
+          Column(
+            modifier = Modifier.padding(8.dp)
+          ) {
+            Row(
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              RadioButtonRow(
+                text = "Mobile",
+                selected = selectedOption == "Mobile",
+                onClick = {
+                  selectedOption = "Mobile"
+                  // Update the defaultDeviceFormFactor using the provided method
+                  appStateHolder.onDefaultDeviceFormFactorChanged(ArbigentScenarioDeviceFormFactor.Mobile)
+                }
+              )
+            }
+            Row(
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              RadioButtonRow(
+                text = "TV",
+                selected = selectedOption == "TV",
+                onClick = {
+                  selectedOption = "TV"
+                  // Update the defaultDeviceFormFactor using the provided method
+                  appStateHolder.onDefaultDeviceFormFactorChanged(ArbigentScenarioDeviceFormFactor.Tv)
+                }
+              )
+            }
+            Row(
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              RadioButtonRow(
+                text = "Unspecified",
+                selected = selectedOption == "Unspecified",
+                onClick = {
+                  selectedOption = "Unspecified"
+                  // Update the defaultDeviceFormFactor using the provided method
+                  appStateHolder.onDefaultDeviceFormFactorChanged(ArbigentScenarioDeviceFormFactor.Unspecified)
+                }
+              )
+            }
+          }
 
           GroupHeader("AI Options")
           val aiOptions by appStateHolder.aiOptionsFlow.collectAsState()
@@ -212,7 +272,7 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
           )
         }
         // Close Button
-        ActionButton(
+        OutlinedButton(
           onClick = onCloseRequest,
           modifier = Modifier.padding(8.dp)
         ) {
@@ -227,7 +287,7 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
 fun TestCompatibleDialog(
   onCloseRequest: () -> Unit,
   title: String,
-  resizable: Boolean = false,
+  resizable: Boolean = true,
   content: @Composable () -> Unit
 ) {
   val isUiTest = LocalIsUiTest.current
@@ -243,6 +303,10 @@ fun TestCompatibleDialog(
     DialogWindow(
       onCloseRequest = onCloseRequest,
       title = title,
+      state = rememberDialogState(
+        width = 520.dp,
+        height = 520.dp
+      ),
       resizable = resizable,
       content = {
         content()

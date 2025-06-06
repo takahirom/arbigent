@@ -45,7 +45,7 @@ public data class ChatCompletionRequest(
   @SerialName("response_format") val responseFormat: ResponseFormat? = null,
   val temperature: Double? = null,
   val tools: List<ToolDefinition>? = null,
-  @SerialName("tool_choice") val toolChoice: String = "required",
+  @SerialName("tool_choice") val toolChoice: String? = "required",
 )
 
 @Serializable
@@ -99,7 +99,7 @@ public data class Usage(
 
 @Serializable
 public class ApiCall(
-  public val requestBody: ChatCompletionRequest,
+  public val curl: String,
   public val responseBody: ChatCompletionResponse,
   public val metadata: ApiCallMetadata
 )

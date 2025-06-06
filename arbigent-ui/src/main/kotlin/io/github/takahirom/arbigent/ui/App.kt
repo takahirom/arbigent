@@ -4,21 +4,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -31,12 +18,7 @@ import io.github.takahirom.arbigent.ui.ArbigentAppStateHolder.ProjectDialogState
 import kotlinx.coroutines.launch
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.Orientation
-import org.jetbrains.jewel.ui.component.ComboBox
-import org.jetbrains.jewel.ui.component.Divider
-import org.jetbrains.jewel.ui.component.IconActionButton
-import org.jetbrains.jewel.ui.component.ListItemState
-import org.jetbrains.jewel.ui.component.SimpleListItem
-import org.jetbrains.jewel.ui.component.Text
+import org.jetbrains.jewel.ui.component.*
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
 import org.jetbrains.jewel.ui.theme.simpleListItemStyle
@@ -99,6 +81,21 @@ private fun MainScreen(
       appStateHolder = appStateHolder,
       onCloseRequest = {
         appStateHolder.projectDialogState.value = ProjectDialogState.NotSelected
+      }
+    )
+  } else if (projectDialogState is ProjectDialogState.ShowGenerateScenarioDialog) {
+    ScenarioGenerationDialog(
+      appStateHolder = appStateHolder,
+      onCloseRequest = {
+        appStateHolder.projectDialogState.value = ProjectDialogState.NotSelected
+      },
+      onGenerate = { scenariosToGenerate, appUiStructure, customInstruction, useExistingScenarios ->
+        appStateHolder.onGenerateScenarios(
+          scenariosToGenerate,
+          appUiStructure,
+          customInstruction,
+          useExistingScenarios
+        )
       }
     )
   }
@@ -167,6 +164,9 @@ private fun MainScreen(
           onExecute = {
             appStateHolder.run(it)
           },
+          onDebugExecute = {
+            appStateHolder.runDebug(it)
+          },
           onCancel = {
             appStateHolder.cancel()
             scenarioStateHolderAndDepth.first.cancel()
@@ -179,8 +179,6 @@ private fun MainScreen(
     }
   }
 }
-
-
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
@@ -292,16 +290,6 @@ fun ScenarioControls(appStateHolder: ArbigentAppStateHolder) {
           )
         }
       }
-    }
-    IconActionButton(
-      key = AllIconsKeys.FileTypes.AddAny,
-      onClick = {
-        appStateHolder.addScenario()
-      },
-      contentDescription = "Add",
-      hint = Size(28)
-    ) {
-      Text("Add scenario")
     }
     IconActionButton(
       key = AllIconsKeys.Actions.RunAll,

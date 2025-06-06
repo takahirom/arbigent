@@ -75,7 +75,7 @@ public data class ArbigentAgentResults(
 public data class ArbigentAgentResult(
   public val goal: String,
   public val maxStep: Int = 10,
-  public val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Mobile,
+  public val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Unspecified,
   public val isGoalAchieved: Boolean,
   public val steps: List<ArbigentAgentTaskStepResult>,
   public val deviceName: String,
@@ -114,6 +114,11 @@ public sealed interface ArbigentScenarioDeviceFormFactor {
   @SerialName("Tv")
   public data object Tv : ArbigentScenarioDeviceFormFactor
 
+  @Serializable
+  @SerialName("Unspecified")
+  public data object Unspecified : ArbigentScenarioDeviceFormFactor
+
   public fun isMobile(): Boolean = this == Mobile
   public fun isTv(): Boolean = this is Tv
+  public fun isUnspecified(): Boolean = this is Unspecified
 }

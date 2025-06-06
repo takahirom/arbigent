@@ -1,7 +1,7 @@
 scenarios:
 - id: "7788d7f4-7276-4cb3-8e98-7d3ad1d1cd47"
-  goal: "Open the Now in Android app from the app list. The goal is to view the list\
-    \ of topics.  Do not interact with the app beyond this."
+  goal: "The goal is to view the list of topics in For you tab.  Do not interact with\
+    \ the app beyond this."
   initializationMethods:
   - type: "CleanupData"
     packageName: "com.google.samples.apps.nowinandroid"
@@ -23,3 +23,54 @@ scenarios:
   imageAssertions:
   - assertionPrompt: "The screen is showing Saved tab"
   - assertionPrompt: "There is an article in the screen"
+- id: "a1b2c3d4-e5f6-7890-ab12-cdef34567890"
+  goal: "Verify that the interest selected during the initial \"For you\" setup is\
+    \ displayed as selected in the \"Interests\" tab. You might have to scroll to\
+    \ find the interest."
+  dependency: "f0ef0129-c764-443f-897d-fc4408e5952b"
+  imageAssertions:
+  - assertionPrompt: "Interests screen is displayed"
+  - assertionPrompt: "Previously selected topic is marked as selected"
+settings:
+  prompt:
+    appUiStructure: |-
+      **1. For you (Initial State - No Interests Set)**
+
+      * **Screen Content:**
+          * Displays a list of available `Topics`.
+          * Allows users to select topics they are interested in (e.g., by tapping a checkmark or plus icon next to each topic).
+          * Includes a `Done` button. Users must select at least one topic before proceeding. Tapping "Done" likely navigates to the main "For you" feed screen.
+      * **Navigation:**
+          * Contains the `Bottom Navigation Bar`.
+
+      **2. For you (Main Feed)**
+
+      * **Screen Content:**
+          * Displays a feed of `Articles` relevant to the user's selected interests.
+          * Each article should have an option (e.g., a bookmark icon) to add it to the `Saved` screen.
+      * **Navigation:**
+          * Contains the `Bottom Navigation Bar`.
+
+      **3. Saved**
+
+      * **Screen Content:**
+          * Displays a list of `Saved Articles` that the user previously bookmarked from the "For you" screen.
+      * **Navigation:**
+          * Contains the `Bottom Navigation Bar`.
+
+      **4. Interests**
+
+      * **Screen Content:**
+          * Accessed via the "Interests" tab in the Bottom Navigation.
+          * Displays the list of all available topics, indicating which ones the user has currently selected.
+          * Allows users to modify their topic selections (add or remove interests).
+      * **Navigation:**
+          * Contains the `Bottom Navigation Bar`.
+
+      **5. Bottom Navigation Bar**
+
+      * **Purpose:** Provides top-level navigation between the main sections of the app.
+      * **Tabs:**
+          * `For you`: Navigates to the "For you" screen (either the initial topic selection or the article feed).
+          * `Saved`: Navigates to the "Saved" screen, showing bookmarked articles.
+          * `Interests`: Navigates to the "Interests" screen, allowing users to manage their selected topics.
