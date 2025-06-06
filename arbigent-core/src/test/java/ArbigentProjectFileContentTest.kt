@@ -259,4 +259,76 @@ Previous steps:
     assertNotNull(scenarioBAiOptions, "Scenario B aiOptions should not be null")
     assertEquals(0.5, scenarioBAiOptions.temperature!!, "Scenario B temperature should be 0.5")
   }
+
+  private val projectWithDeviceFormFactor = ArbigentProjectSerializer().load(
+    """
+    settings:
+      deviceFormFactor:
+        type: "Tv"
+    scenarios:
+    - id: "default-form-factor"
+      goal: "Test default form factor"
+      deviceFormFactor:
+        type: "Unspecified"
+    - id: "custom-form-factor"
+      goal: "Test custom form factor"
+      deviceFormFactor:
+        type: "Mobile"
+    - id: "default-not-using-project"
+      goal: "Test not using project default"
+    """
+  )
+
+  @Test
+  fun testDefaultDeviceFormFactor() {
+    // Test project-level defaultDeviceFormFactor
+    val projectSettings = projectWithDeviceFormFactor.settings
+    assertEquals(
+      io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor.Tv, 
+      projectSettings.deviceFormFactor,
+      "Project defaultDeviceFormFactor should be Tv"
+    )
+
+    // Test scenario using project default
+    val scenarioUsingDefault = projectWithDeviceFormFactor.scenarioContents.createArbigentScenario(
+      projectSettings = projectSettings,
+      scenario = projectWithDeviceFormFactor.scenarioContents[0],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
+    )
+    assertEquals(
+      io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor.Tv,
+      scenarioUsingDefault.deviceFormFactor,
+      "Scenario using project default should have Tv form factor"
+    )
+
+    // Test scenario with custom form factor (should override project default)
+    val scenarioWithCustom = projectWithDeviceFormFactor.scenarioContents.createArbigentScenario(
+      projectSettings = projectSettings,
+      scenario = projectWithDeviceFormFactor.scenarioContents[1],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
+    )
+    assertEquals(
+      io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor.Mobile,
+      scenarioWithCustom.deviceFormFactor,
+      "Scenario with custom form factor should have Mobile form factor"
+    )
+
+    // Test scenario not using project default (should use Mobile as default)
+    val scenarioNotUsingDefault = projectWithDeviceFormFactor.scenarioContents.createArbigentScenario(
+      projectSettings = projectSettings,
+      scenario = projectWithDeviceFormFactor.scenarioContents[2],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
+    )
+    assertEquals(
+      io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor.Mobile,
+      scenarioNotUsingDefault.deviceFormFactor,
+      "Scenario not using project default should have Mobile form factor"
+    )
+  }
 }

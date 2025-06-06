@@ -22,14 +22,11 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-      - name: Setup JBR 17
-        uses: gmitch215/setup-java@main
+      - uses: actions/setup-java@v4
         with:
           distribution: 'jetbrains'
-          java-version: 17
-          cache: 'gradle'
-          package-type: 'jdk+jcef'
-        # For GitHub API (use if you believe you'd run into rate limits)
+          java-version: '17'
+          java-package: 'jdk' # optional (jdk, jre, jdk+jcef, jre+jcef, jdk+ft, or jre+ft) - defaults to jdk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -101,14 +98,11 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-      - name: Setup JBR 17
-        uses: gmitch215/setup-java@main
+      - uses: actions/setup-java@v4
         with:
           distribution: 'jetbrains'
-          java-version: 17
-          cache: 'gradle'
-          package-type: 'jdk+jcef'
-        # For GitHub API (use if you believe you'd run into rate limits)
+          java-version: '17'
+          java-package: 'jdk' # optional (jdk, jre, jdk+jcef, jre+jcef, jdk+ft, or jre+ft) - defaults to jdk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -166,14 +160,11 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-      - name: Setup JBR 17
-        uses: gmitch215/setup-java@main
+      - uses: actions/setup-java@v4
         with:
           distribution: 'jetbrains'
-          java-version: 17
-          cache: 'gradle'
-          package-type: 'jdk+jcef'
-        # For GitHub API (use if you believe you'd run into rate limits)
+          java-version: '17'
+          java-package: 'jdk' # optional (jdk, jre, jdk+jcef, jre+jcef, jdk+ft, or jre+ft) - defaults to jdk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Setup Gradle

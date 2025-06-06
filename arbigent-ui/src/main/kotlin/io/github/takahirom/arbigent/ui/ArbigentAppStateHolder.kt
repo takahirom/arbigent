@@ -1,11 +1,14 @@
 package io.github.takahirom.arbigent.ui
 
 import io.github.takahirom.arbigent.*
+import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import io.github.takahirom.arbigent.result.StepFeedback
 import io.github.takahirom.arbigent.result.StepFeedbackEvent
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.io.File
+import java.util.UUID
+import kotlin.collections.firstOrNull
 
 @OptIn(ArbigentInternalApi::class)
 class ArbigentAppStateHolder(
@@ -37,6 +40,7 @@ class ArbigentAppStateHolder(
     data object SaveProjectContent : ProjectDialogState
     data object SaveProjectResult : ProjectDialogState
     data object ShowProjectSettings : ProjectDialogState
+    data object ShowGenerateScenarioDialog : ProjectDialogState
   }
 
   val deviceConnectionState: MutableStateFlow<DeviceConnectionState> =
@@ -71,6 +75,8 @@ class ArbigentAppStateHolder(
   val cacheStrategyFlow = MutableStateFlow(CacheStrategy())
   val aiOptionsFlow = MutableStateFlow<ArbigentAiOptions?>(null)
   val mcpJsonFlow = MutableStateFlow("{}")
+  val defaultDeviceFormFactorFlow =
+    MutableStateFlow<ArbigentScenarioDeviceFormFactor>(ArbigentScenarioDeviceFormFactor.Unspecified)
   val decisionCache = cacheStrategyFlow
     .map {
       val decisionCacheStrategy = it.aiDecisionCacheStrategy
@@ -135,6 +141,24 @@ class ArbigentAppStateHolder(
     }
   }
 
+  fun runDebug(scenarioStateHolder: ArbigentScenarioStateHolder) {
+    job?.cancel()
+    allScenarioStateHoldersStateFlow.value.forEach { it.cancel() }
+    recreateProject()
+    job = coroutineScope.launch {
+      // Create a regular scenario and then modify it to only include the current task
+      val scenario = scenarioStateHolder.createScenario(allScenarioStateHoldersStateFlow.value)
+      // Modify the scenario to only include the last task (the current scenario's task)
+      val lastTask = scenario.agentTasks.last()
+      val debugScenario = scenario.copy(
+        agentTasks = listOf(lastTask)
+      )
+      executeScenario(debugScenario)
+      selectedScenarioIndex.value =
+        sortedScenariosAndDepths().indexOfFirst { it.first.id == scenarioStateHolder.id }
+    }
+  }
+
 
   private fun recreateProject() {
     projectStateFlow.value?.cancel()
@@ -143,7 +167,8 @@ class ArbigentAppStateHolder(
         prompt = promptFlow.value,
         cacheStrategy = cacheStrategyFlow.value,
         aiOptions = aiOptionsFlow.value,
-        mcpJson = mcpJsonFlow.value
+        mcpJson = mcpJsonFlow.value,
+        deviceFormFactor = defaultDeviceFormFactorFlow.value
       ),
       initialScenarios = allScenarioStateHoldersStateFlow.value.map { scenario ->
         scenario.createScenario(allScenarioStateHoldersStateFlow.value)
@@ -167,10 +192,11 @@ class ArbigentAppStateHolder(
     allScenarioStateHolder.map { it.createArbigentScenarioContent() }
       .createArbigentScenario(
         projectSettings = ArbigentProjectSettings(
-          this@ArbigentAppStateHolder.promptFlow.value,
-          this@ArbigentAppStateHolder.cacheStrategyFlow.value,
-          this@ArbigentAppStateHolder.aiOptionsFlow.value,
-          this@ArbigentAppStateHolder.mcpJsonFlow.value
+          prompt = this@ArbigentAppStateHolder.promptFlow.value,
+          cacheStrategy = this@ArbigentAppStateHolder.cacheStrategyFlow.value,
+          aiOptions = this@ArbigentAppStateHolder.aiOptionsFlow.value,
+          mcpJson = this@ArbigentAppStateHolder.mcpJsonFlow.value,
+          deviceFormFactor = this@ArbigentAppStateHolder.defaultDeviceFormFactorFlow.value
         ),
         scenario = createArbigentScenarioContent(),
         aiFactory = aiFactory,
@@ -259,10 +285,11 @@ class ArbigentAppStateHolder(
     arbigentProjectSerializer.save(
       projectFileContent = ArbigentProjectFileContent(
         settings = ArbigentProjectSettings(
-          promptFlow.value,
-          cacheStrategyFlow.value,
-          aiOptionsFlow.value,
-          mcpJsonFlow.value
+          prompt = promptFlow.value,
+          cacheStrategy = cacheStrategyFlow.value,
+          aiOptions = aiOptionsFlow.value,
+          mcpJson = mcpJsonFlow.value,
+          deviceFormFactor = defaultDeviceFormFactorFlow.value
         ),
         scenarioContents = sortedScenarios.map {
           it.createArbigentScenarioContent()
@@ -386,6 +413,18 @@ class ArbigentAppStateHolder(
     mcpJsonFlow.value = json
   }
 
+  fun onAppUiStructureChanged(structure: String) {
+    promptFlow.value = promptFlow.value.copy(appUiStructure = structure)
+  }
+
+  fun onScenarioGenerationCustomInstructionChanged(instruction: String) {
+    promptFlow.value = promptFlow.value.copy(scenarioGenerationCustomInstruction = instruction)
+  }
+
+  fun onDefaultDeviceFormFactorChanged(formFactor: ArbigentScenarioDeviceFormFactor) {
+    defaultDeviceFormFactorFlow.value = formFactor
+  }
+
   fun scenarioCountById(newScenarioId: String): Int {
     return allScenarioStateHoldersStateFlow.value.count { it.id == newScenarioId }
   }
@@ -408,5 +447,47 @@ class ArbigentAppStateHolder(
         }.toSet()
       }
     }
+  }
+
+  fun onGenerateScenarios(
+    scenariosToGenerate: String,
+    appUiStructure: String,
+    customInstruction: String,
+    useExistingScenarios: Boolean
+  ) {
+    val ai = getAi()
+    val requestUuid = UUID.randomUUID().toString()
+    val generatedScenarios = ai.generateScenarios(
+      ArbigentAi.ScenarioGenerationInput(
+        requestUuid = requestUuid,
+        scenariosToGenerate = scenariosToGenerate,
+        appUiStructure = appUiStructure,
+        customInstruction = customInstruction,
+        scenariosToBeUsedAsContext = if (useExistingScenarios) {
+          allScenarioStateHoldersStateFlow.value.map {
+            it.createArbigentScenarioContent()
+          }
+        } else {
+          emptyList()
+        }
+      )
+    )
+    allScenarioStateHoldersStateFlow.value.forEach { it.cancel() }
+    val scenarios = allScenarioStateHoldersStateFlow.value + generatedScenarios.scenarios.map {
+      ArbigentScenarioStateHolder(tagManager = tagManager).apply {
+        load(it)
+        isNewlyGenerated.value = true
+      }
+    }
+    generatedScenarios.scenarios.forEach { generatedScenario ->
+      val scenario = scenarios.firstOrNull { it.id == generatedScenario.id }
+      val dependencyScenario = scenarios.firstOrNull { it.id == generatedScenario.dependencyId }
+      scenario?.dependencyScenarioStateHolderStateFlow?.value = dependencyScenario
+    }
+    allScenarioStateHoldersStateFlow.value = scenarios
+  }
+
+  fun getAi(): ArbigentAi {
+    return aiFactory()
   }
 }

@@ -137,6 +137,55 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
             }
           }
 
+          describe("Generate Scenario Dialog") {
+            doIt {
+              clickGenerateScenarioButton()
+            }
+
+            itShould("show dialog with input fields") {
+              capture(it)
+              assertGenerateDialogExists()
+            }
+
+            describe("when entering scenario information") {
+              val scenarioToGenerate = "Login to the app and check profile"
+              val appUiStructure = """
+                Main screen:
+                - Login button
+                - Register button
+
+                Profile screen:
+                - Username field
+                - Email field
+                - Settings button
+              """.trimIndent()
+
+              doIt {
+                enterScenariosToGenerate(scenarioToGenerate)
+                enterAppUiStructure(appUiStructure)
+                toggleUseExistingScenarios()
+              }
+
+              itShould("show entered information") {
+                capture(it)
+                assertScenariosToGenerateContains(scenarioToGenerate)
+                assertAppUiStructureContains("Main screen:")
+              }
+
+              describe("when generating scenarios") {
+                doIt {
+                  clickGenerateButton()
+                  waitALittle() // Wait for generation to complete
+                }
+
+                itShould("create new scenarios") {
+                  capture(it)
+                  assertScenarioGenerated(scenarioToGenerate)
+                }
+              }
+            }
+          }
+
           describe("Project Settings") {
             describe("Additional System Prompt") {
               val multiLineText = """
@@ -374,6 +423,55 @@ class TestRobot(
     waitALittle()
   }
 
+  fun clickGenerateScenarioButton() {
+    composeUiTest.onNode(hasContentDescription("Generate")).performClick()
+    waitALittle()
+  }
+
+  fun enterScenariosToGenerate(scenarios: String) {
+    composeUiTest.onNode(hasTestTag("scenarios_to_generate")).performTextInput(scenarios)
+    waitALittle()
+  }
+
+  fun enterAppUiStructure(structure: String) {
+    composeUiTest.onNode(hasTestTag("app_ui_structure")).performTextInput(structure)
+    waitALittle()
+  }
+
+  fun toggleUseExistingScenarios() {
+    composeUiTest.onNode(hasTestTag("use_existing_scenarios_checkbox")).performClick()
+    waitALittle()
+  }
+
+  fun clickGenerateButton() {
+    // Find the Generate button in the dialog - it's the first ActionButton in the dialog
+    composeUiTest.onAllNodes(hasText("Generate"))
+      .onFirst()
+      .performClick()
+    waitALittle()
+  }
+
+  fun assertScenarioGenerated(scenarioText: String) {
+    composeUiTest.onNode(hasText("Goal: $scenarioText", substring = true)).assertExists()
+  }
+
+  fun assertGenerateDialogExists() {
+    composeUiTest.onNode(hasTestTag("scenarios_to_generate")).assertExists()
+    composeUiTest.onNode(hasTestTag("app_ui_structure")).assertExists()
+    composeUiTest.onNode(hasTestTag("use_existing_scenarios_checkbox")).assertExists()
+  }
+
+  fun assertScenariosToGenerateContains(text: String) {
+    composeUiTest.onNode(hasTestTag("scenarios_to_generate")).assertTextContains(text)
+  }
+
+  fun assertAppUiStructureContains(text: String) {
+    // Get the text from the node and check if it contains the expected text
+    val nodeText = composeUiTest.onNode(hasTestTag("app_ui_structure"))
+      .fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.EditableText]
+    assert(nodeText.toString().contains(text)) { "Expected text to contain '$text', but was '$nodeText'" }
+  }
+
   fun enterGoal(goal: String) {
     composeUiTest.onNode(hasTestTag("goal")).performTextInput(goal)
     waitALittle()
@@ -550,7 +648,25 @@ class TestRobot(
   }
 
   fun setContent() {
+    // Add a default AI provider to make the "Connect to device" button enabled
+    addDefaultAiProvider()
     composeUiTest.setContent()
+  }
+
+  fun addDefaultAiProvider() {
+    // Create a default OpenAI provider
+    val openAiProvider = AiProviderSetting.OpenAi(
+      id = "testOpenAi",
+      apiKey = "test-api-key",
+      modelName = "gpt-4o-mini"
+    )
+
+    // Update the AI settings with the new provider and select it
+    val currentSettings = Preference.aiSettingValue
+    Preference.aiSettingValue = currentSettings.copy(
+      selectedId = openAiProvider.id,
+      aiSettings = listOf(openAiProvider),
+    )
   }
 
   @OptIn(ExperimentalTestApi::class)
@@ -801,6 +917,7 @@ class FakeDevice : ArbigentDevice {
   private var isClosed = false
   override fun close() {
     arbigentDebugLog("FakeDevice.close")
+    isClosed = true
   }
 
   override fun isClosed(): Boolean {
@@ -809,8 +926,9 @@ class FakeDevice : ArbigentDevice {
   }
 }
 
-class FakeKeyStore : KeyStore {
-  private val keys = mutableMapOf<String, String>()
+class FakeKeyStore(
+  private val keys:MutableMap<String, String>
+) : KeyStore {
   override fun getPassword(domain: String, account: String): String {
     return keys["$domain:$account"] ?: ""
   }
@@ -825,8 +943,9 @@ class FakeKeyStore : KeyStore {
 }
 
 internal class TestKeyStoreFactory : () -> KeyStore {
+  val keys = mutableMapOf<String, String>()
   override fun invoke(): KeyStore {
-    return FakeKeyStore()
+    return FakeKeyStore(keys)
   }
 }
 
@@ -889,6 +1008,19 @@ class FakeAi : ArbigentAi {
           )
         )
       }
+
+      override fun generateScenarios(
+        scenarioGenerationInput: ArbigentAi.ScenarioGenerationInput
+      ): GeneratedScenariosContent {
+        arbigentDebugLog("FakeAi.Normal.generateScenarios")
+        val scenarioContent = ArbigentScenarioContent(
+          goal = scenarioGenerationInput.scenariosToGenerate,
+          type = ArbigentScenarioType.Scenario
+        )
+        return GeneratedScenariosContent(
+          scenarios = listOf(scenarioContent)
+        )
+      }
     }
 
     class ImageAssertionFailed() : AiStatus {
@@ -917,6 +1049,19 @@ class FakeAi : ArbigentAi {
           )
         )
       }
+
+      override fun generateScenarios(
+        scenarioGenerationInput: ArbigentAi.ScenarioGenerationInput
+      ): GeneratedScenariosContent {
+        arbigentDebugLog("FakeAi.ImageAssertionFailed.generateScenarios")
+        val scenarioContent = ArbigentScenarioContent(
+          goal = scenarioGenerationInput.scenariosToGenerate,
+          type = ArbigentScenarioType.Scenario
+        )
+        return GeneratedScenariosContent(
+          scenarios = listOf(scenarioContent)
+        )
+      }
     }
   }
 
@@ -927,5 +1072,18 @@ class FakeAi : ArbigentAi {
 
   override fun assertImage(imageAssertionInput: ArbigentAi.ImageAssertionInput): ArbigentAi.ImageAssertionOutput {
     return status.assertImage(imageAssertionInput)
+  }
+
+  override fun generateScenarios(
+    scenarioGenerationInput: ArbigentAi.ScenarioGenerationInput
+  ): GeneratedScenariosContent {
+    arbigentDebugLog("FakeAi.generateScenarios")
+    val scenarioContent = ArbigentScenarioContent(
+      goal = scenarioGenerationInput.scenariosToGenerate,
+      type = ArbigentScenarioType.Scenario
+    )
+    return GeneratedScenariosContent(
+      scenarios = listOf(scenarioContent)
+    )
   }
 }

@@ -6,8 +6,11 @@ import com.github.takahirom.roborazzi.AiAssertionOptions.AiAssertionModel.Target
 import com.github.takahirom.roborazzi.AnySerializer
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.OpenAiAiAssertionModel
+import com.moczul.ok2curl.CurlCommandGenerator
 import io.github.takahirom.arbigent.ConfidentialInfo.removeConfidentialInfo
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
+import io.github.takahirom.arbigent.serialization.GenerateJsonSchemaApiType
+import io.github.takahirom.arbigent.serialization.generateRootJsonSchema
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.*
@@ -21,17 +24,20 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.MissingFieldException
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.serializer
+import okhttp3.Interceptor
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
+import okio.Buffer
 import java.awt.image.BufferedImage.TYPE_INT_RGB
 import java.io.File
 import java.nio.charset.Charset
+import java.util.Deque
+import java.util.concurrent.ConcurrentLinkedDeque
 
 public class ArbigentAiRateLimitExceededException : Exception("Rate limit exceeded")
 
@@ -64,6 +70,13 @@ private enum class ArbigentAiAnswerItems(
   }
 }
 
+internal class Curl(
+  val requestUuid: String,
+  val command: String,
+)
+
+internal val curls: Deque<Curl> = ConcurrentLinkedDeque()
+
 @OptIn(ExperimentalRoborazziApi::class, ExperimentalSerializationApi::class)
 public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
   private val apiKey: String,
@@ -76,6 +89,54 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
   public val loggingEnabled: Boolean,
   public val jsonSchemaType: ArbigentAi.JsonSchemaType = ArbigentAi.JsonSchemaType.OpenAI,
   private val httpClient: HttpClient = HttpClient(OkHttp) {
+    engine {
+      config {
+        this.addNetworkInterceptor(
+          object : Interceptor {
+            private val curlGenerator = CurlCommandGenerator(com.moczul.ok2curl.Configuration())
+
+            override fun intercept(chain: Interceptor.Chain): Response {
+              val request = chain.request()
+
+              // escape '
+              val oldBody = request.body
+              val contentType = oldBody?.contentType()
+              val charset = contentType?.charset() ?: Charsets.UTF_8
+              val sink = Buffer()
+              oldBody?.writeTo(sink)
+              val bodyText = sink.readString(charset)
+              val logBodyText = bodyText.replace("'", "'\"'\"'")
+              val logRequest = request.newBuilder()
+                .method(request.method, body = logBodyText.toRequestBody(contentType))
+                .build()
+              val curl = curlGenerator.generate(logRequest)
+              val log = curl
+                .removeConfidentialInfo()
+              curls.add(
+                Curl(
+                  requestUuid = logRequest.url.queryParameter("requestUuid") ?: "unknown",
+                  command = log
+                )
+              )
+              if (curls.size > 10) {
+                curls.removeFirst()
+              }
+
+              if (loggingEnabled) {
+                arbigentDebugLog(log)
+              }
+
+              return chain.proceed(
+                request
+                  .newBuilder()
+                  .url(request.url.newBuilder().removeAllQueryParameters("requestUuid").build())
+                  .build()
+              )
+            }
+          }
+        )
+      }
+    }
     install(HttpRequestRetry) {
       maxRetries = 3
       exponentialDelay()
@@ -117,15 +178,17 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     loggingEnabled = loggingEnabled,
     requestBuilderModifier = requestBuilderModifier,
     seed = null,
-    jsonSchemaType = when(jsonSchemaType){
-      ArbigentAi.JsonSchemaType.OpenAI -> OpenAiAiAssertionModel.JsonSchemaType.OpenAI
-      ArbigentAi.JsonSchemaType.GeminiOpenAICompatible -> OpenAiAiAssertionModel.JsonSchemaType.Gemini
+    maxTokens = null,
+    temperature = null,
+    apiType = when (jsonSchemaType) {
+      ArbigentAi.JsonSchemaType.OpenAI -> OpenAiAiAssertionModel.ApiType.OpenAI
+      ArbigentAi.JsonSchemaType.GeminiOpenAICompatible -> OpenAiAiAssertionModel.ApiType.Gemini
     },
     httpClient = httpClient
   ),
 ) : ArbigentAi {
   init {
-    ConfidentialInfo.addStringToBeRemoved(apiKey)
+    ConfidentialInfo.addStringToBeRemoved(apiKey, "{{API_KEY}}")
   }
 
   private var retried = 0
@@ -140,6 +203,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     val focusedTree = decisionInput.focusedTreeString
     val agentActionTypes = decisionInput.agentActionTypes
     val elements = decisionInput.elements
+    val requestUuid = decisionInput.requestUuid
 
     val original = File(screenshotFilePath)
     val canvas = ArbigentCanvas.load(original, elements.screenWidth, TYPE_INT_RGB)
@@ -202,8 +266,9 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     )
     val responseText = try {
       chatCompletion(
-        completionRequest,
-        decisionInput.aiOptions
+        requestUuid = requestUuid,
+        chatCompletionRequest = completionRequest,
+        aiOptions = decisionInput.aiOptions
       )
     } catch (e: ArbigentAiRateLimitExceededException) {
       val waitMs = 10000L * (1 shl retried)
@@ -225,6 +290,8 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
       )
       throw e
     }
+    val curlString = curls.lastOrNull { it.requestUuid == requestUuid }?.command
+      ?: "No curl command available for requestUuid: $requestUuid"
     retried = 0
     val json = Json { ignoreUnknownKeys = true }
     var responseObj: ChatCompletionResponse?
@@ -236,7 +303,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
         file.writeText(
           json.encodeToString(
             ApiCall(
-              requestBody = completionRequest,
+              curl = curlString,
               responseBody = responseObj,
               metadata = ApiCallMetadata()
             )
@@ -482,13 +549,18 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
   }
 
 
+  @OptIn(ArbigentInternalApi::class)
   private fun chatCompletion(
+    requestUuid: String,
     chatCompletionRequest: ChatCompletionRequest,
     aiOptions: ArbigentAiOptions? = null
   ): String {
     return runBlocking {
       val response: HttpResponse =
         httpClient.post(baseUrl + "chat/completions") {
+          url {
+            parameters.append("requestUuid", requestUuid)
+          }
           requestBuilderModifier()
           contentType(ContentType.Application.Json)
           setBody(
@@ -639,6 +711,180 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
   }
 
   override fun jsonSchemaType(): ArbigentAi.JsonSchemaType = jsonSchemaType
+
+  override fun generateScenarios(
+    scenarioGenerationInput: ArbigentAi.ScenarioGenerationInput,
+  ): GeneratedScenariosContent {
+    val scenariosToGenerate = scenarioGenerationInput.scenariosToGenerate
+    val appUiStructure = scenarioGenerationInput.appUiStructure
+    val customInstruction = scenarioGenerationInput.customInstruction
+    val scenariosToBeUsedAsContext = scenarioGenerationInput.scenariosToBeUsedAsContext
+    // Get the serialization descriptor for GeneratedScenariosContent
+    val descriptor = serializer<GeneratedScenariosContent>().descriptor
+    val serializersModule = SerializersModule {
+      contextual(
+        kClass = ArbigentScenarioType::class,
+        serializer = ArbigentScenarioType.Scenario.serializer() as KSerializer<ArbigentScenarioType>
+      )
+    }
+
+    // Parse the response
+    val json = Json {
+      ignoreUnknownKeys = true
+      isLenient = true
+      coerceInputValues = true
+      this.serializersModule = serializersModule
+    }
+
+    // Generate JSON Schema from the descriptor
+    val jsonSchema = generateRootJsonSchema(
+      descriptor,
+      apiType = when (jsonSchemaType) {
+        ArbigentAi.JsonSchemaType.OpenAI -> GenerateJsonSchemaApiType.OpenAI
+        ArbigentAi.JsonSchemaType.GeminiOpenAICompatible -> GenerateJsonSchemaApiType.Gemini
+      }
+    )
+
+    // Log the input parameters
+    arbigentDebugLog("Generate scenarios: $scenariosToGenerate")
+    arbigentDebugLog("App UI structure: $appUiStructure")
+    arbigentDebugLog("JsonSchema: $jsonSchema")
+
+    // Create system and user messages
+    val messages = mutableListOf(
+      ChatMessage(
+        role = "system",
+        contents = listOf(
+          Content(
+            type = "text",
+            text = "You are an AI assistant that generates test scenarios for Android applications. " +
+              "Generate scenarios based on the app UI structure and the user's request. " +
+              "Each scenario should have a clear goal and be executable by an automated testing system. " +
+              "Please split scenarios into appropriately sized chunks that won't confuse the AI. " +
+              "Set any unrelated items to null. " +
+              "Note: When a scenario depends on another scenario (using scenario.dependency), " +
+              "you cannot check the execution content of the dependent scenario. For example, " +
+              "if scenario B includes user interactions like button clicks or data entry and scenario C depends on B, " +
+              "you cannot verify the specific interactions or data from scenario B in scenario C."
+          )
+        )
+      ),
+    )
+    if (customInstruction.isNotEmpty()) {
+      messages.add(
+        ChatMessage(
+          role = "user",
+          contents = listOf(
+            Content(
+              type = "text",
+              text = "Custom instruction: $customInstruction"
+            )
+          )
+        )
+      )
+    }
+    messages.add(
+      ChatMessage(
+        role = "user",
+        contents = listOf(
+          Content(
+            type = "text",
+            text = "Scenarios to generate: $scenariosToGenerate"
+          )
+        )
+      )
+    )
+
+    // Only add App UI structure if it's not empty
+    if (appUiStructure.isNotBlank()) {
+      messages.add(
+        ChatMessage(
+          role = "user",
+          contents = listOf(
+            Content(
+              type = "text",
+              text = "App UI structure: $appUiStructure"
+            )
+          )
+        )
+      )
+    }
+
+    // Add context scenarios if available
+    if (scenariosToBeUsedAsContext.isNotEmpty()) {
+      val contextMessage = ChatMessage(
+        role = "user",
+        contents = listOf(
+          Content(
+            type = "text",
+            text = "Here are some existing scenarios for reference:\n\n" +
+              scenariosToBeUsedAsContext.joinToString("\n\n") {
+                json.encodeToString(it)
+              }
+          )
+        )
+      )
+      messages.add(contextMessage)
+    }
+
+    // Create the request with JSON schema for structured output
+    val completionRequest = ChatCompletionRequest(
+      model = modelName,
+      messages = messages,
+      toolChoice = null,
+      responseFormat = ResponseFormat(
+        type = "json_schema",
+        jsonSchema = jsonSchema
+      )
+    )
+
+    try {
+      // Make the API call
+      val requestUuid = scenarioGenerationInput.requestUuid ?: "unknown"
+      val responseText = chatCompletion(requestUuid, completionRequest)
+
+
+      try {
+        // First, decode the ChatCompletionResponse to get the content
+        val responseObj = json.decodeFromString<ChatCompletionResponse>(responseText)
+
+        // Extract the content from the response
+        val content = responseObj.choices.firstOrNull()?.message?.content
+
+        if (content != null) {
+          // Parse the content as GeneratedScenariosContent
+          arbigentDebugLog {
+            "Generated scenarios content: $content"
+          }
+          return json.decodeFromString<GeneratedScenariosContent>(content)
+        } else {
+          arbigentDebugLog("No content in response")
+          // Throw an exception if no content
+          throw ArbigentAi.FailedToParseResponseException(
+            "No content in response",
+            IllegalStateException("No content in response")
+          )
+        }
+      } catch (e: Exception) {
+        arbigentDebugLog("Failed to parse response: ${e.message}")
+        // Throw an exception if parsing fails
+        throw ArbigentAi.FailedToParseResponseException("Failed to parse response: ${e.message}", e)
+      }
+    } catch (e: ArbigentAiRateLimitExceededException) {
+      // Handle rate limit exceeded
+      val waitMs = 10000L
+      arbigentInfoLog("Rate limit exceeded. Waiting for ${waitMs / 1000} seconds.")
+      ArbigentGlobalStatus.onAiRateLimitWait(waitSec = waitMs / 1000) {
+        Thread.sleep(waitMs)
+      }
+      // Retry after waiting
+      return generateScenarios(scenarioGenerationInput)
+    } catch (e: Exception) {
+      arbigentDebugLog("Error calling OpenAI API: ${e.message}")
+      // Throw an exception if API call fails
+      throw ArbigentAi.FailedToParseResponseException("Error calling OpenAI API: ${e.message}", e)
+    }
+  }
 }
 
 private fun File.getResizedIamgeBase64(scale: Float): String {

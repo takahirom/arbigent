@@ -68,6 +68,12 @@ tasks {
   }
 }
 
+tasks.named<CreateStartScripts>("startScripts") {
+  doLast {
+    windowsScript.writeText(windowsScript.readText().replace(Regex("set CLASSPATH=.*"), "set CLASSPATH=%APP_HOME%\\\\lib\\\\*"))
+  }
+}
+
 tasks.distTar {
   compression = Compression.GZIP
   archiveExtension.set("tar.gz")

@@ -32,6 +32,7 @@ dependencies {
   implementation("org.jetbrains.jewel:jewel-int-ui-decorated-window-243:0.27.0")
   implementation("com.jetbrains.intellij.platform:icons:243.22562.218")
   implementation("com.charleskorn.kaml:kaml:0.67.0")
+  implementation(libs.kotlinx.serialization.json)
   implementation("com.github.javakeyring:java-keyring:1.0.4")
   // kotlin-test
   testImplementation(kotlin("test"))
@@ -39,7 +40,7 @@ dependencies {
   testImplementation(compose.uiTest)
   testImplementation("io.github.takahirom.robospec:robospec:0.2.0")
   // roborazzi
-  testImplementation("io.github.takahirom.roborazzi:roborazzi-compose-desktop:1.44.0-alpha02")
+  testImplementation("io.github.takahirom.roborazzi:roborazzi-compose-desktop:1.44.0-alpha03")
   implementation(project(":arbigent-core"))
   implementation(project(":arbigent-ai-openai"))
   implementation("io.github.takahirom.rin:rin:0.3.0")

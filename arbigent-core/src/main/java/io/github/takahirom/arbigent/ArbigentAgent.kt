@@ -1051,14 +1051,15 @@ private suspend fun step(
     originalImage.flush()
     convertedScreenshotFilePath
   }
-  val decisionJsonlFilePath =
-    ArbigentFiles.jsonlsDir.absolutePath + File.separator + "$stepId.jsonl"
+  val requestUuid = java.util.UUID.randomUUID().toString()
+  val decisionJsonlFilePath = ArbigentFiles.jsonlsDir.absolutePath + File.separator + "$requestUuid.jsonl"
   val lastStepOrNull = contextHolder.steps().lastOrNull()
   val lastScreenshot = lastStepOrNull?.screenshotFilePath
   val newScreenshot = File(screenshotFilePath)
   if (lastStepOrNull?.agentAction !is ExecuteMcpToolAgentAction
     && lastStepOrNull?.feedback == null
-    && detectStuckScreen(lastScreenshot, newScreenshot)) {
+    && detectStuckScreen(lastScreenshot, newScreenshot)
+  ) {
     arbigentDebugLog("Stuck screen detected.")
     contextHolder.addStep(
       ArbigentContextHolder.Step(
@@ -1084,6 +1085,7 @@ private suspend fun step(
     formFactor = deviceFormFactor,
     elements = elements,
     uiTreeStrings = uiTreeStrings,
+    requestUuid = requestUuid,
     apiCallJsonLFilePath = decisionJsonlFilePath,
     focusedTreeString = if (deviceFormFactor.isTv()) {
       // It is important to get focused tree string for TV form factor
