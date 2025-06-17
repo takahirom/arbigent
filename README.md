@@ -141,6 +141,11 @@ This `Open Anyway` button is available for about an hour after you try to open t
 
 Use the intuitive UI to define scenarios. Simply specify the desired goal for the AI agent.
 
+
+### Generate scenarios
+
+You can also generate scenarios from existing test cases. 
+
 ### Maestro YAML Integration
 
 Arbigent allows you to integrate existing Maestro YAML test flows as initialization methods:
