@@ -979,7 +979,6 @@ private fun ContentPanel(
       }
     }
     val tasksToAgent = tasksToAgentHistory[selectedHistory]
-    println("[ArbigentDebug] ContentPanel: Selected history index: $selectedHistory of ${tasksToAgentHistory.size - 1}")
     var selectedStep: ArbigentContextHolder.Step? by remember { mutableStateOf(null) }
     Row(Modifier) {
       val lazyColumnState = rememberLazyListState()
