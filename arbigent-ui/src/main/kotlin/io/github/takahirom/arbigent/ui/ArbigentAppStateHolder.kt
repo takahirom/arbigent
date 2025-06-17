@@ -29,8 +29,32 @@ class ArbigentAppStateHolder(
     _fixedScenariosFlow.value = _fixedScenariosFlow.value + scenario
   }
 
-  fun removeFixedScenario(scenarioId: String) {
-    _fixedScenariosFlow.value = _fixedScenariosFlow.value.filter { it.id != scenarioId }
+  fun removeFixedScenario(fixedScenarioId: String) {
+    // First remove all initialization methods that reference this scenario
+    cleanupInitializationMethodReferences(fixedScenarioId)
+    
+    // Then remove the scenario itself
+    _fixedScenariosFlow.value = _fixedScenariosFlow.value.filter { it.id != fixedScenarioId }
+  }
+  
+  private fun cleanupInitializationMethodReferences(scenarioId: String) {
+    allScenarioStateHoldersStateFlow.value.forEach { scenarioStateHolder ->
+      val methods = scenarioStateHolder.initializationMethodStateFlow.value
+      val cleanedMethods = methods.map { method ->
+        if (method is ArbigentScenarioContent.InitializationMethod.MaestroYaml && 
+            method.scenarioId == scenarioId) {
+          // Replace with Noop instead of removing to maintain indices
+          ArbigentScenarioContent.InitializationMethod.Noop
+        } else {
+          method
+        }
+      }
+      
+      // Update the initialization methods if any changes were made
+      if (cleanedMethods != methods) {
+        scenarioStateHolder.setInitializationMethods(cleanedMethods)
+      }
+    }
   }
 
   fun updateFixedScenario(scenario: FixedScenario) {
@@ -41,6 +65,21 @@ class ArbigentAppStateHolder(
 
   fun getFixedScenarioById(scenarioId: String): FixedScenario? {
     return _fixedScenariosFlow.value.find { it.id == scenarioId }
+  }
+
+  fun getScenarioReferences(scenarioId: String): List<Pair<ArbigentScenarioStateHolder, Int>> {
+    val references = mutableListOf<Pair<ArbigentScenarioStateHolder, Int>>()
+    
+    allScenarioStateHoldersStateFlow.value.forEach { scenarioStateHolder ->
+      scenarioStateHolder.initializationMethodStateFlow.value.forEachIndexed { index, method ->
+        if (method is ArbigentScenarioContent.InitializationMethod.MaestroYaml && 
+            method.scenarioId == scenarioId) {
+          references.add(scenarioStateHolder to index)
+        }
+      }
+    }
+    
+    return references
   }
 
   // Store the current initialization method that needs to be updated
