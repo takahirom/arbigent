@@ -35,7 +35,19 @@ public interface FileSystem {
 public class ArbigentProjectFileContent(
   @SerialName("scenarios")
   public val scenarioContents: List<ArbigentScenarioContent>,
-  public val settings: ArbigentProjectSettings = ArbigentProjectSettings()
+  public val settings: ArbigentProjectSettings = ArbigentProjectSettings(),
+  public val fixedScenarios: List<FixedScenario> = emptyList()
+)
+
+@Serializable
+@OptIn(ExperimentalUuidApi::class)
+public data class FixedScenario(
+  public val id: String = Uuid.random().toString(),
+  public val type: String = "maestro yaml",
+  public val title: String,
+  public val description: String,
+  @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
+  public val yamlText: String
 )
 
 public typealias ArbigentContentTags = Set<ArbigentContentTag>
@@ -153,7 +165,8 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
   aiFactory: () -> ArbigentAi,
   deviceFactory: () -> ArbigentDevice,
   aiDecisionCache: ArbigentAiDecisionCache,
-  appSettings: ArbigentAppSettings = DefaultArbigentAppSettings
+  appSettings: ArbigentAppSettings = DefaultArbigentAppSettings,
+  fixedScenarios: List<FixedScenario> = emptyList()
 ): ArbigentScenario {
   val visited = mutableSetOf<ArbigentScenarioContent>()
   val result = mutableListOf<ArbigentAgentTask>()
@@ -204,7 +217,8 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
             MCPClient(projectSettings.mcpJson, appSettings)
           } else {
             null
-          }
+          },
+          fixedScenarios = fixedScenarios
         ).apply {
           aiOptions(projectSettings.aiOptions?.mergeWith(nodeScenario.aiOptions) ?: nodeScenario.aiOptions)
           ai(aiFactory())
@@ -344,6 +358,13 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
     @Serializable
     @SerialName("OpenLink")
     public data class OpenLink(val link: String) : InitializationMethod
+
+    @Serializable
+    @SerialName("MaestroYaml")
+    public data class MaestroYaml(
+        val scenarioId: String,
+        val yamlContent: String? = null
+    ) : InitializationMethod
   }
 }
 

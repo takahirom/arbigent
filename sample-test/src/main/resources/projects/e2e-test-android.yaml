@@ -8,6 +8,8 @@ scenarios:
     times: 5
   - type: "LaunchApp"
     packageName: "com.android.settings"
+  - type: "MaestroYaml"
+    scenarioId: "3c441e6f-6178-4b4f-b2a2-fbdbf8fa4266"
   tags:
   - name: "Settings"
   - name: "Search"
@@ -67,3 +69,11 @@ settings:
         }
       }
     }
+fixedScenarios:
+- id: "3c441e6f-6178-4b4f-b2a2-fbdbf8fa4266"
+  title: "launch setting by maestro"
+  description: "launch setting by maestro"
+  yamlText: |-
+    appId: "com.android.settings"
+    ----
+    - launchApp

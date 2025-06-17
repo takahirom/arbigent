@@ -22,6 +22,44 @@ class ArbigentAppStateHolder(
     fetchAvailableDevicesByOs(os)
   }
 ) {
+  private val _fixedScenariosFlow = MutableStateFlow<List<FixedScenario>>(emptyList())
+  val fixedScenariosFlow: StateFlow<List<FixedScenario>> = _fixedScenariosFlow.asStateFlow()
+
+  fun addFixedScenario(scenario: FixedScenario) {
+    _fixedScenariosFlow.value = _fixedScenariosFlow.value + scenario
+  }
+
+  fun removeFixedScenario(scenarioId: String) {
+    _fixedScenariosFlow.value = _fixedScenariosFlow.value.filter { it.id != scenarioId }
+  }
+
+  fun getFixedScenarioById(scenarioId: String): FixedScenario? {
+    return _fixedScenariosFlow.value.find { it.id == scenarioId }
+  }
+
+  // Store the current initialization method that needs to be updated
+  private val _currentInitializationMethod = MutableStateFlow<Pair<ArbigentScenarioStateHolder, Int>?>(null)
+
+  fun showFixedScenariosDialog() {
+    projectDialogState.value = ProjectDialogState.ShowFixedScenariosDialog
+  }
+
+  // This function is called from Scenario.kt when the user clicks on the scenario title or browse button
+  fun onShowFixedScenariosDialogWithContext(scenarioStateHolder: ArbigentScenarioStateHolder, index: Int) {
+    _currentInitializationMethod.value = scenarioStateHolder to index
+    showFixedScenariosDialog()
+  }
+
+  fun updateInitializationMethod(scenarioId: String) {
+    val (scenarioStateHolder, index) = _currentInitializationMethod.value ?: return
+
+    scenarioStateHolder.onInitializationMethodChanged(
+      index,
+      ArbigentScenarioContent.InitializationMethod.MaestroYaml(
+        scenarioId = scenarioId
+      )
+    )
+  }
   // AppSettings for working directory
   private val appSettingsStateHolder = AppSettingsStateHolder()
   val appSettings get() = appSettingsStateHolder.appSettings
@@ -41,6 +79,7 @@ class ArbigentAppStateHolder(
     data object SaveProjectResult : ProjectDialogState
     data object ShowProjectSettings : ProjectDialogState
     data object ShowGenerateScenarioDialog : ProjectDialogState
+    data object ShowFixedScenariosDialog : ProjectDialogState
   }
 
   val deviceConnectionState: MutableStateFlow<DeviceConnectionState> =
@@ -207,7 +246,8 @@ class ArbigentAppStateHolder(
           }
         },
         aiDecisionCache = decisionCache.value,
-        appSettings = appSettings
+        appSettings = appSettings,
+        fixedScenarios = this@ArbigentAppStateHolder._fixedScenariosFlow.value
       )
 
   private fun sortedScenarioAndDepth(allScenarios: List<ArbigentScenarioStateHolder>): List<Pair<ArbigentScenarioStateHolder, Int>> {
@@ -294,6 +334,7 @@ class ArbigentAppStateHolder(
         scenarioContents = sortedScenarios.map {
           it.createArbigentScenarioContent()
         },
+        fixedScenarios = _fixedScenariosFlow.value
       ),
       file = file
     )
@@ -323,6 +364,7 @@ class ArbigentAppStateHolder(
     cacheStrategyFlow.value = projectFile.settings.cacheStrategy
     aiOptionsFlow.value = projectFile.settings.aiOptions
     mcpJsonFlow.value = projectFile.settings.mcpJson
+    _fixedScenariosFlow.value = projectFile.fixedScenarios
     projectStateFlow.value = ArbigentProject(
       settings = projectFile.settings,
       initialScenarios = arbigentScenarioStateHolders.map {

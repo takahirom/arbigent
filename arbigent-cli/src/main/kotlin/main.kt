@@ -174,6 +174,7 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
     }
     val resultDir = file(workingDirectory, defaultResultPath)
     resultDir.mkdirs()
+    ArbigentFiles.parentDir = resultDir.absolutePath
     ArbigentFiles.screenshotsDir = File(resultDir, "screenshots")
     ArbigentFiles.jsonlsDir = File(resultDir, "jsonls")
     ArbigentFiles.logFile = file(workingDirectory, logFile)

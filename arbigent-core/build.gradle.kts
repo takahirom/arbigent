@@ -30,11 +30,11 @@ buildConfig {
 
 dependencies {
   implementation(project(":arbigent-core-web-report"))
-  api("dev.mobile:maestro-orchestra:1.39.1")
-  api("dev.mobile:maestro-client:1.39.1")
+  api("dev.mobile:maestro-orchestra:1.40.0")
+  api("dev.mobile:maestro-client:1.40.0")
   implementation("dev.mobile:dadb:1.2.9")
-  api("dev.mobile:maestro-ios:1.39.1")
-  api("dev.mobile:maestro-ios-driver:1.39.1")
+  api("dev.mobile:maestro-ios:1.40.0")
+  api("dev.mobile:maestro-ios-driver:1.40.0")
 
   api(project(":arbigent-core-model"))
   api(project(":arbigent-mcp-client"))

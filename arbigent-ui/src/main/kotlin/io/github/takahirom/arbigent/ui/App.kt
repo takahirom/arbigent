@@ -98,6 +98,18 @@ private fun MainScreen(
         )
       }
     )
+  } else if (projectDialogState is ProjectDialogState.ShowFixedScenariosDialog) {
+    FixedScenariosDialog(
+      appStateHolder = appStateHolder,
+      onCloseRequest = {
+        appStateHolder.projectDialogState.value = ProjectDialogState.NotSelected
+      },
+      onScenarioSelected = { scenarioId ->
+        // Update the initialization method with the selected scenario ID
+        appStateHolder.updateInitializationMethod(scenarioId)
+        appStateHolder.projectDialogState.value = ProjectDialogState.NotSelected
+      }
+    )
   }
   val scenarioIndex by appStateHolder.selectedScenarioIndex.collectAsState()
   var scenariosWidth by remember { mutableStateOf(200.dp) }
@@ -173,6 +185,12 @@ private fun MainScreen(
           },
           onRemove = {
             appStateHolder.removeScenario(it)
+          },
+          onShowFixedScenariosDialog = { scenarioStateHolder, index ->
+            appStateHolder.onShowFixedScenariosDialogWithContext(scenarioStateHolder, index)
+          },
+          getFixedScenarioById = { scenarioId ->
+            appStateHolder.getFixedScenarioById(scenarioId)
           }
         )
       }
