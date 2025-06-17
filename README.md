@@ -145,6 +145,8 @@ Use the intuitive UI to define scenarios. Simply specify the desired goal for th
 ### Generate scenarios
 
 You can also generate scenarios from existing test cases. 
+<img width="632" alt="image" src="https://github.com/user-attachments/assets/cbe078b0-8f2b-44a3-8980-1c5aff022a52" />
+
 
 ### Maestro YAML Integration
 
