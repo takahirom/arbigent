@@ -46,6 +46,9 @@ scenarios:
   initializationMethods:
   - type: "Back"
 settings:
+  prompt:
+    additionalSystemPrompts:
+    - "Please wait some seconds to "
   cacheStrategy:
     aiDecisionCacheStrategy:
       type: "Disk"
@@ -71,7 +74,9 @@ fixedScenarios:
 - id: "3c441e6f-6178-4b4f-b2a2-fbdbf8fa4266"
   title: "launch setting by maestro"
   description: "launch setting by maestro"
-  yamlText: |-
+  yamlText: |
     appId: "com.android.settings"
     ---
     - launchApp
+    - waitForAnimationToEnd:
+          timeout: 500
