@@ -35,8 +35,8 @@ public interface FileSystem {
 public class ArbigentProjectFileContent(
   @SerialName("scenarios")
   public val scenarioContents: List<ArbigentScenarioContent>,
+  public val fixedScenarios: List<FixedScenario> = emptyList(),
   public val settings: ArbigentProjectSettings = ArbigentProjectSettings(),
-  public val fixedScenarios: List<FixedScenario> = emptyList()
 )
 
 @Serializable

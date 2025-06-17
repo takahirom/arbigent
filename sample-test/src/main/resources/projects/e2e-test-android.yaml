@@ -45,6 +45,16 @@ scenarios:
   goal: "All you have to do is launch com.android.settings using mcp launch_app"
   initializationMethods:
   - type: "Back"
+fixedScenarios:
+- id: "3c441e6f-6178-4b4f-b2a2-fbdbf8fa4266"
+  title: "launch setting by maestro"
+  description: "launch setting by maestro"
+  yamlText: |-
+    appId: "com.android.settings"
+    ---
+    - launchApp
+    - waitForAnimationToEnd:
+          timeout: 500
 settings:
   prompt:
     additionalSystemPrompts:
@@ -70,13 +80,3 @@ settings:
         }
       }
     }
-fixedScenarios:
-- id: "3c441e6f-6178-4b4f-b2a2-fbdbf8fa4266"
-  title: "launch setting by maestro"
-  description: "launch setting by maestro"
-  yamlText: |
-    appId: "com.android.settings"
-    ---
-    - launchApp
-    - waitForAnimationToEnd:
-          timeout: 500
