@@ -6,8 +6,6 @@ scenarios:
   initializationMethods:
   - type: "Back"
     times: 5
-  - type: "LaunchApp"
-    packageName: "com.android.settings"
   - type: "MaestroYaml"
     scenarioId: "3c441e6f-6178-4b4f-b2a2-fbdbf8fa4266"
   tags:
