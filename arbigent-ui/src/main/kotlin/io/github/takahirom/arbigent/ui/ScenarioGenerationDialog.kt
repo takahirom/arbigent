@@ -14,7 +14,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import org.jetbrains.jewel.ui.component.TextArea
 import org.jetbrains.jewel.ui.component.GroupHeader
 import org.jetbrains.jewel.ui.component.Text
-import org.jetbrains.jewel.ui.component.ActionButton
+import org.jetbrains.jewel.ui.component.DefaultButton
+import org.jetbrains.jewel.ui.component.OutlinedButton
 import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.Alignment
 import org.jetbrains.jewel.ui.component.Checkbox
@@ -127,7 +128,7 @@ fun ScenarioGenerationDialog(
           modifier = Modifier.padding(8.dp),
           verticalAlignment = Alignment.CenterVertically
         ) {
-          ActionButton(
+          DefaultButton(
             onClick = {
               val appUiStructureText = appUiStructure.text.toString()
               val customInstructionText = customInstruction.text.toString()
@@ -144,7 +145,7 @@ fun ScenarioGenerationDialog(
             Text("Generate")
           }
 
-          ActionButton(
+          OutlinedButton(
             onClick = onCloseRequest,
             modifier = Modifier.padding(start = 8.dp)
           ) {
