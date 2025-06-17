@@ -229,9 +229,8 @@ fun AddFixedScenarioDialog(
                         if (text.isNotBlank()) {
                             yamlError = try {
                                 // Try to parse the YAML to check syntax
-                                MaestroFlowParser.parseFlow(
-                                    flowPath = Path("/tmp"),
-                                    flow = text
+                                MaestroFlowParser.checkSyntax(
+                                    maestroCode = text
                                 )
                                 null
                             } catch (e: Exception) {
@@ -359,9 +358,8 @@ fun EditFixedScenarioDialog(
                         if (text.isNotBlank()) {
                             yamlError = try {
                                 // Try to parse the YAML to check syntax
-                                MaestroFlowParser.parseFlow(
-                                    flowPath = Path("/tmp"),
-                                    flow = text
+                                MaestroFlowParser.checkSyntax(
+                                    maestroCode = text
                                 )
                                 null
                             } catch (e: Exception) {
