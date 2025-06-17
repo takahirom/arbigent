@@ -70,6 +70,14 @@ Furthermore, I wanted to make Arbigent accessible to QA engineers by offering a 
 
 *   **Flexible Code Interface:**
     *   **Custom Hooks:** Offers a code interface for adding custom initialization and cleanup methods, providing greater control over scenario execution.
+*   **Maestro YAML Integration:**
+    *   **Pre-defined Test Flows:** Execute existing Maestro YAML test flows as initialization methods within Arbigent scenarios.
+    *   **Reusable Test Components:** Leverage your existing Maestro test automation scripts to set up complex application states before AI agent testing.
+    *   **Example Use Cases:**
+        * Run login flows using Maestro YAML before AI agent testing
+        * Set up specific application states (e.g., user onboarding completion)
+        * Execute complex setup sequences that require precise timing
+        * Integrate existing Maestro test assets into AI agent testing workflows
 * **Model Context Protocol (MCP) Support:**
     * Introduced initial support for MCP, enabling Arbigent to leverage external tools and services defined via MCP servers. This significantly extends testing capabilities beyond direct UI interaction.
     * You can configure MCP servers using a JSON string in the Project Settings.
@@ -132,6 +140,34 @@ This `Open Anyway` button is available for about an hour after you try to open t
 ### Scenario Creation
 
 Use the intuitive UI to define scenarios. Simply specify the desired goal for the AI agent.
+
+
+### Generate scenarios
+
+You can also generate scenarios from existing test cases. 
+<img width="632" alt="image" src="https://github.com/user-attachments/assets/cbe078b0-8f2b-44a3-8980-1c5aff022a52" />
+
+
+### Maestro YAML Integration
+
+Arbigent allows you to integrate existing Maestro YAML test flows as initialization methods:
+
+1. **Add to Initialization Methods**: Select "Maestro YAML" as an initialization method type in your scenario configuration
+
+<img width="507" alt="Image" src="https://github.com/user-attachments/assets/5b7a5b33-6d8d-4cbd-88a0-f4f922e5ae6d" />
+
+2. **Add Maestro YAML**: Write a Maestro YAML file that defines the steps to be executed before the AI agent starts its task
+
+<img width="632" alt="Image" src="https://github.com/user-attachments/assets/b348afa3-219e-4f3b-8275-ce0c45f882ee" />
+
+3. **Choose Scenario**: Select from your predefined Maestro YAML scenarios to run before AI agent execution
+
+<img width="632" alt="Image" src="https://github.com/user-attachments/assets/929170bb-9376-4fe4-8485-36a007ef07f6" />
+
+This enables you to:
+- Set up complex application states using deterministic Maestro flows
+- Reuse existing Maestro test automation assets
+- Combine precise setup sequences with AI-driven testing
 
 ### Test Execution
 
@@ -323,6 +359,8 @@ scenarios:
         packageName: "com.google.samples.apps.nowinandroid"
       - type: "LaunchApp"
         packageName: "com.google.samples.apps.nowinandroid"
+      - type: "MaestroYaml"
+        scenarioId: "login-flow-maestro"
   - id: "f0ef0129-c764-443f-897d-fc4408e5952b"
     goal: "In the Now in Android app, select an tech topic and complete the form in\
     \ the \"For you\" tab. The goal is reached when articles are displayed.  Do not\
@@ -339,6 +377,21 @@ scenarios:
     imageAssertions:
       - assertionPrompt: "The screen is showing Saved tab"
       - assertionPrompt: "There is an article in the screen"
+
+# Maestro YAML scenarios for initialization
+fixedScenarios:
+  - id: "login-flow-maestro"
+    title: "Login Flow"
+    description: "Performs user login using predefined credentials"
+    yamlText: |
+      appId: com.google.samples.apps.nowinandroid
+      ---
+      - tapOn: "Sign In"
+      - inputText: "test@example.com"
+      - tapOn: "Password"
+      - inputText: "password123"
+      - tapOn: "Login"
+      - assertVisible: "Welcome"
 ```
 
 ## Code Interface
