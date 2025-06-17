@@ -124,6 +124,10 @@ constructor(
       }
   }
 
+  fun setInitializationMethods(methods: List<ArbigentScenarioContent.InitializationMethod>) {
+    _initializationMethodStateFlow.value = methods
+  }
+
   fun onAddImageAssertion() {
     imageAssertionsStateFlow.value += ArbigentImageAssertion("")
   }

@@ -6,8 +6,8 @@ scenarios:
   initializationMethods:
   - type: "Back"
     times: 5
-  - type: "LaunchApp"
-    packageName: "com.android.settings"
+  - type: "MaestroYaml"
+    scenarioId: "3c441e6f-6178-4b4f-b2a2-fbdbf8fa4266"
   tags:
   - name: "Settings"
   - name: "Search"
@@ -46,6 +46,9 @@ scenarios:
   initializationMethods:
   - type: "Back"
 settings:
+  prompt:
+    additionalSystemPrompts:
+    - "Please wait some seconds to "
   cacheStrategy:
     aiDecisionCacheStrategy:
       type: "Disk"
@@ -67,3 +70,13 @@ settings:
         }
       }
     }
+fixedScenarios:
+- id: "3c441e6f-6178-4b4f-b2a2-fbdbf8fa4266"
+  title: "launch setting by maestro"
+  description: "launch setting by maestro"
+  yamlText: |
+    appId: "com.android.settings"
+    ---
+    - launchApp
+    - waitForAnimationToEnd:
+          timeout: 500

@@ -71,6 +71,8 @@ fun Scenario(
   onDebugExecute: (ArbigentScenarioStateHolder) -> Unit,
   onCancel: (ArbigentScenarioStateHolder) -> Unit,
   onRemove: (ArbigentScenarioStateHolder) -> Unit,
+  onShowFixedScenariosDialog: (ArbigentScenarioStateHolder, Int) -> Unit = { _, _ -> },
+  getFixedScenarioById: (String) -> FixedScenario? = { null },
 ) {
   val arbigentScenarioExecutor: ArbigentScenarioExecutor? by scenarioStateHolder.arbigentScenarioExecutorStateFlow.collectAsState()
   val scenarioType by scenarioStateHolder.scenarioTypeStateFlow.collectAsState()
@@ -190,7 +192,7 @@ fun Scenario(
           modifier = Modifier.testTag("scenario_options")
             .wrapContentHeight(unbounded = true)
         ) {
-          ScenarioOptions(scenarioStateHolder, scenarioCountById, dependencyScenarioMenu)
+          ScenarioOptions(scenarioStateHolder, scenarioCountById, dependencyScenarioMenu, onShowFixedScenariosDialog, getFixedScenarioById)
         }
       }
     }
@@ -403,7 +405,9 @@ private fun ScenarioFundamentalOptions(
 private fun ScenarioOptions(
   scenarioStateHolder: ArbigentScenarioStateHolder,
   scenarioCountById: (String) -> Int,
-  dependencyScenarioMenu: MenuScope.() -> Unit
+  dependencyScenarioMenu: MenuScope.() -> Unit,
+  onShowFixedScenariosDialog: (ArbigentScenarioStateHolder, Int) -> Unit = { _, _ -> },
+  getFixedScenarioById: (String) -> FixedScenario? = { null }
 ) {
   val updatedScenarioStateHolder by rememberUpdatedState(scenarioStateHolder)
   GroupHeader("Fundamental options")
@@ -459,7 +463,7 @@ private fun ScenarioOptions(
     }
     val initializeMethods by updatedScenarioStateHolder.initializationMethodStateFlow.collectAsState()
     initializeMethods.forEachIndexed { index, initializeMethod ->
-      InitializationOptions(initializeMethod, updatedScenarioStateHolder, initializeMethods, index)
+      InitializationOptions(initializeMethod, updatedScenarioStateHolder, initializeMethods, index, onShowFixedScenariosDialog, getFixedScenarioById)
     }
     Column(
       modifier = Modifier.padding(8.dp).width(320.dp)
@@ -560,7 +564,8 @@ enum class InitializationMethodMenu(
   CleanupData("Cleanup app data", ArbigentScenarioContent.InitializationMethod.CleanupData("")),
   Back("Back", ArbigentScenarioContent.InitializationMethod.Back(1)),
   OpenLink("Open link", ArbigentScenarioContent.InitializationMethod.OpenLink("")),
-  LaunchApp("Launch app", ArbigentScenarioContent.InitializationMethod.LaunchApp("", emptyMap()))
+  LaunchApp("Launch app", ArbigentScenarioContent.InitializationMethod.LaunchApp("", emptyMap())),
+  MaestroYaml("Maestro YAML", ArbigentScenarioContent.InitializationMethod.MaestroYaml(""))
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -569,7 +574,9 @@ private fun InitializationOptions(
   initializeMethod: ArbigentScenarioContent.InitializationMethod,
   scenarioStateHolder: ArbigentScenarioStateHolder,
   initializeMethods: List<ArbigentScenarioContent.InitializationMethod>,
-  index: Int
+  index: Int,
+  onShowFixedScenariosDialog: (ArbigentScenarioStateHolder, Int) -> Unit = { _, _ -> },
+  getFixedScenarioById: (String) -> FixedScenario? = { null }
 ) {
   Column(
     modifier = Modifier.padding(8.dp).width(240.dp)
@@ -678,6 +685,38 @@ private fun InitializationOptions(
             "ms",
             modifier = Modifier.align(Alignment.CenterVertically)
           )
+        }
+      }
+
+      Row {
+        if (initializeMethod is ArbigentScenarioContent.InitializationMethod.MaestroYaml) {
+          var showDialog by remember { mutableStateOf(false) }
+          val scenarioId = (initializeMethod as? ArbigentScenarioContent.InitializationMethod.MaestroYaml)?.scenarioId ?: ""
+
+          // Look up the scenario title from the FixedScenarios collection
+          val fixedScenario = getFixedScenarioById(scenarioId)
+          val scenarioTitle = fixedScenario?.title ?: scenarioId
+
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+              text = if (scenarioTitle.isNotEmpty()) scenarioTitle else "Select Scenario",
+              modifier = Modifier
+                .padding(4.dp)
+                .width(150.dp)
+                .background(JewelTheme.globalColors.panelBackground)
+                .padding(8.dp)
+                .clickable { onShowFixedScenariosDialog(scenarioStateHolder, index) }
+            )
+
+            // Button to browse fixed scenarios
+            IconActionButton(
+              key = AllIconsKeys.General.OpenDisk,
+              onClick = { onShowFixedScenariosDialog(scenarioStateHolder, index) },
+              contentDescription = "Browse scenarios",
+              hint = Size(16),
+              modifier = Modifier.testTag("browse_scenarios_button")
+            )
+          }
         }
       }
       Column {

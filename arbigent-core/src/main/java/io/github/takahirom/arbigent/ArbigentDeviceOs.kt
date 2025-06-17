@@ -99,7 +99,7 @@ public sealed interface ArbigentAvailableDevice {
     override val name: String = "Chrome"
     public override fun connectToDevice(): ArbigentDevice {
       return MaestroDevice(
-        Maestro.web(false)
+        Maestro.web(false, false)
       )
     }
   }

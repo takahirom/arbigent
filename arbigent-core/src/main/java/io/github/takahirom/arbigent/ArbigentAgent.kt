@@ -19,9 +19,11 @@ import kotlinx.coroutines.flow.shareIn
 import kotlinx.serialization.json.Json
 import maestro.MaestroException
 import maestro.orchestra.*
+import maestro.orchestra.yaml.MaestroFlowParser
 import org.mobilenativefoundation.store.cache5.CacheBuilder
 import java.io.File
 import javax.imageio.ImageIO
+import kotlin.io.path.Path
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 
@@ -521,6 +523,7 @@ public fun AgentConfigBuilder(
   aiDecisionCache: ArbigentAiDecisionCache = ArbigentAiDecisionCache.Disabled,
   cacheOptions: ArbigentScenarioCacheOptions,
   mcpClient: MCPClient? = null,
+  fixedScenarios: List<FixedScenario> = emptyList(),
 ): AgentConfig.Builder = AgentConfigBuilder {
   deviceFormFactor(deviceFormFactor)
   prompt(prompt)
@@ -636,6 +639,32 @@ public fun AgentConfigBuilder(
                 )
               )
             )
+            chain.proceed(device)
+          }
+        })
+      }
+
+      is ArbigentScenarioContent.InitializationMethod.MaestroYaml -> {
+        addInterceptor(object : ArbigentInitializerInterceptor {
+          override fun intercept(
+            device: ArbigentDevice,
+            chain: ArbigentInitializerInterceptor.Chain
+          ) {
+            // Look up the YAML content from the fixed scenarios
+            val fixedScenario = fixedScenarios.find { it.id == initializeMethod.scenarioId }
+            if (fixedScenario == null) {
+              arbigentErrorLog("Fixed scenario with id ${initializeMethod.scenarioId} not found")
+              chain.proceed(device)
+              return
+            }
+            // Use the YAML content from the fixed scenario
+            device.executeActions(
+              MaestroFlowParser.parseFlow(
+                flowPath = Path(ArbigentFiles.parentDir),
+                flow = fixedScenario.yamlText
+              )
+            )
+            arbigentDebugLog("Executing Maestro YAML for scenario: ${fixedScenario.title}")
             chain.proceed(device)
           }
         })
@@ -930,8 +959,23 @@ private suspend fun executeDefault(input: ExecuteInput): ExecutionResult {
     val contextHolder = input.createContextHolder(input.goal, input.maxStep)
     input.addContextHolder(contextHolder)
 
-    ArbigentGlobalStatus.onInitializing {
-      input.initializerChain(input.device)
+    try {
+      ArbigentGlobalStatus.onInitializing {
+        input.initializerChain(input.device)
+      }
+    } catch (e: MaestroException.AssertionFailure) {
+      arbigentInfoLog { "Initialization failed: ${e.stackTraceToString()}" }
+      val stepId = contextHolder.generateStepId()
+      contextHolder.addStep(
+        ArbigentContextHolder.Step(
+          stepId = stepId,
+          feedback = "Failed to assert in initialization: ${e.message}",
+          cacheKey = "init-failure $stepId",
+          screenshotFilePath = ""
+        )
+      )
+      ArbigentGlobalStatus.onFinished()
+      return ExecutionResult.Failed(contextHolder)
     }
 
     var stepRemain = input.maxStep

@@ -128,7 +128,8 @@ public fun ArbigentProject(
         aiFactory = aiFactory,
         deviceFactory = deviceFactory,
         aiDecisionCache = projectFileContent.settings.cacheStrategy.aiDecisionCacheStrategy.toCache(),
-        appSettings = appSettings
+        appSettings = appSettings,
+        fixedScenarios = projectFileContent.fixedScenarios
       )
     },
     appSettings = appSettings
