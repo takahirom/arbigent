@@ -959,8 +959,23 @@ private suspend fun executeDefault(input: ExecuteInput): ExecutionResult {
     val contextHolder = input.createContextHolder(input.goal, input.maxStep)
     input.addContextHolder(contextHolder)
 
-    ArbigentGlobalStatus.onInitializing {
-      input.initializerChain(input.device)
+    try {
+      ArbigentGlobalStatus.onInitializing {
+        input.initializerChain(input.device)
+      }
+    } catch (e: MaestroException.AssertionFailure) {
+      arbigentInfoLog { "Initialization failed: ${e.stackTraceToString()}" }
+      val stepId = contextHolder.generateStepId()
+      contextHolder.addStep(
+        ArbigentContextHolder.Step(
+          stepId = stepId,
+          feedback = "Failed to assert in initialization: ${e.message}",
+          cacheKey = "init-failure $stepId",
+          screenshotFilePath = ""
+        )
+      )
+      ArbigentGlobalStatus.onFinished()
+      return ExecutionResult.Failed(contextHolder)
     }
 
     var stepRemain = input.maxStep

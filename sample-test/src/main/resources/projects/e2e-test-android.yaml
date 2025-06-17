@@ -73,5 +73,5 @@ fixedScenarios:
   description: "launch setting by maestro"
   yamlText: |-
     appId: "com.android.settings"
-    ----
+    ---
     - launchApp
