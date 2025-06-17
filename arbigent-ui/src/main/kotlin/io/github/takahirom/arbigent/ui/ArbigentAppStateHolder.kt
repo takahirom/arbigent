@@ -33,6 +33,12 @@ class ArbigentAppStateHolder(
     _fixedScenariosFlow.value = _fixedScenariosFlow.value.filter { it.id != scenarioId }
   }
 
+  fun updateFixedScenario(scenario: FixedScenario) {
+    _fixedScenariosFlow.value = _fixedScenariosFlow.value.map { 
+      if (it.id == scenario.id) scenario else it 
+    }
+  }
+
   fun getFixedScenarioById(scenarioId: String): FixedScenario? {
     return _fixedScenariosFlow.value.find { it.id == scenarioId }
   }
