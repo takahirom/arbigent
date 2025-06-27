@@ -7,11 +7,13 @@ import androidx.compose.runtime.getValue
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.CliktError
 import com.github.ajalt.clikt.core.main
+import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.parameters.groups.OptionGroup
 import com.github.ajalt.clikt.parameters.groups.defaultByName
 import com.github.ajalt.clikt.parameters.groups.groupChoice
 import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.choice
+import com.github.ajalt.clikt.sources.PropertiesValueSource
 import com.jakewharton.mosaic.layout.background
 import com.jakewharton.mosaic.layout.padding
 import com.jakewharton.mosaic.modifier.Modifier
@@ -45,11 +47,11 @@ sealed class AiConfig(name: String) : OptionGroup(name)
 
 class OpenAIAiConfig : AiConfig("Options for OpenAI API AI") {
   private val defaultEndpoint = "https://api.openai.com/v1/"
-  val openAiEndpoint by option(help = "Endpoint URL (default: $defaultEndpoint)")
+  val openAiEndpoint by option("--openai-endpoint", help = "Endpoint URL (default: $defaultEndpoint)")
     .default(defaultEndpoint, defaultForHelp = defaultEndpoint)
-  val openAiModelName by option(help = "Model name (default: gpt-4o-mini)")
+  val openAiModelName by option("--openai-model-name", help = "Model name (default: gpt-4o-mini)")
     .default("gpt-4o-mini", "gpt-4o-mini")
-  val openAiApiKey by option(envvar = "OPENAI_API_KEY", help = "API key")
+  val openAiApiKey by option("--openai-api-key", "--openai-key", envvar = "OPENAI_API_KEY", help = "API key")
     .prompt("API key")
 }
 
@@ -64,13 +66,13 @@ class GeminiAiConfig : AiConfig("Options for Gemini API AI") {
 }
 
 class AzureOpenAiConfig : AiConfig("Options for Azure OpenAI") {
-  val azureOpenAIEndpoint by option(help = "Endpoint URL")
+  val azureOpenAIEndpoint by option("--azure-openai-endpoint", help = "Endpoint URL")
     .prompt("Endpoint URL")
-  val azureOpenAIApiVersion by option(help = "API version")
+  val azureOpenAIApiVersion by option("--azure-openai-api-version", help = "API version")
     .default("2024-10-21")
-  val azureOpenAIModelName by option(help = "Model name (default: gpt-4o-mini)")
+  val azureOpenAIModelName by option("--azure-openai-model-name", help = "Model name (default: gpt-4o-mini)")
     .default("gpt-4o-mini")
-  val azureOpenAIKey by option(envvar = "AZURE_OPENAI_API_KEY", help = "API key")
+  val azureOpenAIKey by option("--azure-openai-api-key", "--azure-openai-key", envvar = "AZURE_OPENAI_API_KEY", help = "API key")
     .prompt("API key")
 }
 
@@ -78,6 +80,12 @@ private const val defaultResultPath = "arbigent-result"
 private const val defaultCachePath = "arbigent-cache"
 
 class ArbigentCli : CliktCommand(name = "arbigent") {
+  init {
+    context {
+      valueSource = PropertiesValueSource.from("arbigent.properties")
+    }
+  }
+  
   private val aiType by option(help = "Type of AI to use")
     .groupChoice(
       "openai" to OpenAIAiConfig(),
@@ -205,7 +213,7 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
           loggingEnabled = aiApiLoggingEnabled,
           requestBuilderModifier = {
             parameter("api-version", aiType.azureOpenAIApiVersion)
-            header("api-key", System.getenv("AZURE_OPENAI_API_KEY").orEmpty())
+            header("api-key", aiType.azureOpenAIKey)
           }
         )
       }
