@@ -13,7 +13,7 @@ scenarios:
   - name: "Search"
   imageAssertions:
   - assertionPrompt: "The screen should display the \"About emulated device\" page."
-- id: "7c325428-4e0b-4756-ada5-4f53bdc433a2"
+- id: "open-model-page"
   goal: "Scroll and open \"Model\" page in \"About emulated device\" page. Be careful\
     \ not to open other pages"
   dependency: "f9c17741-093e-49f0-ad45-8311ba68c1a6"
