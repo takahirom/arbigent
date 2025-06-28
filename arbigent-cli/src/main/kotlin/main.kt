@@ -48,47 +48,48 @@ data class CliAppSettings(
 
 sealed class AiConfig(name: String) : OptionGroup(name)
 
+
 // Common options shared between commands - with fallback prompt for property file compatibility
-fun CliktCommand.projectFileOption() = option("--project-file", help = "Path to the project YAML file")
+fun CliktCommand.projectFileOption() = defaultOption("--project-file", help = "Path to the project YAML file")
   .prompt("Project file path")
 
-fun CliktCommand.workingDirectoryOption() = option("--working-directory", help = "Working directory for the project")
+fun CliktCommand.workingDirectoryOption() = defaultOption("--working-directory", help = "Working directory for the project")
 
-fun CliktCommand.logLevelOption() = option("--log-level", help = "Log level")
+fun CliktCommand.logLevelOption() = defaultOption("--log-level", help = "Log level")
   .choice("debug", "info", "warn", "error")
   .default("info")
 
-fun CliktCommand.logFileOption() = option("--log-file", help = "Log file path")
+fun CliktCommand.logFileOption() = defaultOption("--log-file", help = "Log file path")
   .default("$defaultResultPath/arbigent.log")
 
 class OpenAIAiConfig : AiConfig("Options for OpenAI API AI") {
   private val defaultEndpoint = "https://api.openai.com/v1/"
-  val openAiEndpoint by option("--openai-endpoint", help = "Endpoint URL (default: $defaultEndpoint)")
+  val openAiEndpoint by defaultOption("--openai-endpoint", help = "Endpoint URL (default: $defaultEndpoint)")
     .default(defaultEndpoint, defaultForHelp = defaultEndpoint)
-  val openAiModelName by option("--openai-model-name", help = "Model name (default: gpt-4o-mini)")
+  val openAiModelName by defaultOption("--openai-model-name", help = "Model name (default: gpt-4o-mini)")
     .default("gpt-4o-mini", "gpt-4o-mini")
-  val openAiApiKey by option("--openai-api-key", "--openai-key", envvar = "OPENAI_API_KEY", help = "API key")
+  val openAiApiKey by defaultOption("--openai-api-key", "--openai-key", envvar = "OPENAI_API_KEY", help = "API key")
     .prompt("API key")
 }
 
 class GeminiAiConfig : AiConfig("Options for Gemini API AI") {
   private val defaultEndpoint = "https://generativelanguage.googleapis.com/v1beta/openai/"
-  val geminiEndpoint by option(help = "Endpoint URL (default: $defaultEndpoint)")
+  val geminiEndpoint by defaultOption(help = "Endpoint URL (default: $defaultEndpoint)")
     .default(defaultEndpoint, defaultForHelp = defaultEndpoint)
-  val geminiModelName by option(help = "Model name (default: gemini-1.5-flash)")
+  val geminiModelName by defaultOption(help = "Model name (default: gemini-1.5-flash)")
     .default("gemini-1.5-flash", "gemini-1.5-flash")
-  val geminiApiKey by option(envvar = "GEMINI_API_KEY", help = "API key")
+  val geminiApiKey by defaultOption(envvar = "GEMINI_API_KEY", help = "API key")
     .prompt("API key")
 }
 
 class AzureOpenAiConfig : AiConfig("Options for Azure OpenAI") {
-  val azureOpenAIEndpoint by option("--azure-openai-endpoint", help = "Endpoint URL")
+  val azureOpenAIEndpoint by defaultOption("--azure-openai-endpoint", help = "Endpoint URL")
     .prompt("Endpoint URL")
-  val azureOpenAIApiVersion by option("--azure-openai-api-version", help = "API version")
+  val azureOpenAIApiVersion by defaultOption("--azure-openai-api-version", help = "API version")
     .default("2024-10-21")
-  val azureOpenAIModelName by option("--azure-openai-model-name", help = "Model name (default: gpt-4o-mini)")
+  val azureOpenAIModelName by defaultOption("--azure-openai-model-name", help = "Model name (default: gpt-4o-mini)")
     .default("gpt-4o-mini")
-  val azureOpenAIKey by option("--azure-openai-api-key", "--azure-openai-key", envvar = "AZURE_OPENAI_API_KEY", help = "API key")
+  val azureOpenAIKey by defaultOption("--azure-openai-api-key", "--azure-openai-key", envvar = "AZURE_OPENAI_API_KEY", help = "API key")
     .prompt("API key")
 }
 
@@ -125,11 +126,11 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     help = "Enable AI API debug logging"
   ).flag(default = false)
 
-  private val os by option(help = "Target operating system")
+  private val os by defaultOption(help = "Target operating system")
     .choice("android", "ios", "web")
     .default("android")
 
-  // Common options using extension functions
+  // Common options using extension functions with automatic property file detection
   private val projectFile by projectFileOption()
   private val logLevel by logLevelOption()
   private val logFile by logFileOption()
@@ -137,24 +138,24 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
 
   private val path by option(help = "Path to a file")
 
-  private val scenarioIds by option(
+  private val scenarioIds by defaultOption(
     "--scenario-ids",
     help = "Scenario IDs to execute (comma-separated or multiple flags)"
   )
     .split(",")
     .multiple()
 
-  private val tags by option(
+  private val tags by defaultOption(
     "--tags",
     help = "Tags to filter scenarios. Use comma-separated values which supports OR operation"
   )
     .split(",")
     .multiple()
 
-  private val dryRun by option("--dry-run", help = "Dry run mode")
+  private val dryRun by defaultOption("--dry-run", help = "Dry run mode")
     .flag()
 
-  private val shard by option("--shard", help = "Shard specification (e.g., 1/5)")
+  private val shard by defaultOption("--shard", help = "Shard specification (e.g., 1/5)")
     .convert { input ->
       val regex = """(\d+)/(\d+)""".toRegex()
       val match = regex.matchEntire(input)
