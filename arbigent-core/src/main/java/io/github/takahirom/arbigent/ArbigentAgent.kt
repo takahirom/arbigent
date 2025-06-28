@@ -30,7 +30,7 @@ import kotlin.time.Duration.Companion.hours
 public class ArbigentAgent(
   agentConfig: AgentConfig
 ) {
-  private val ai by lazy { agentConfig.aiFactory() }
+  private val ai = agentConfig.aiFactory()
   public val device: ArbigentDevice by lazy { agentConfig.deviceFactory() }
   private val interceptors: List<ArbigentInterceptor> = agentConfig.interceptors
   private val deviceFormFactor = agentConfig.deviceFormFactor
@@ -373,7 +373,7 @@ public class AgentConfig(
       builder.addInterceptor(it)
     }
     builder.deviceFactory(deviceFactory)
-    builder.aiFactory { aiFactory() }
+    builder.aiFactory(aiFactory)
     builder.aiOptions(aiOptions)
     return builder
   }
