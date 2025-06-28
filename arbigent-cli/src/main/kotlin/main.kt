@@ -199,7 +199,7 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
       ArbigentLogLevel.entries.find { it.name.toLowerCasePreservingASCIIRules() == logLevel.toLowerCasePreservingASCIIRules() }
         ?: throw IllegalArgumentException(
           "Invalid log level. The log level should be one of ${
-            ArbigentLogLevel.values()
+            ArbigentLogLevel.entries
               .joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
           }")
     
@@ -253,7 +253,7 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     val arbigentProject = ArbigentProject(
       file = File(projectFile),
       aiFactory = { ai },
-      deviceFactory = { device!! },
+      deviceFactory = { device ?: throw UnsupportedOperationException("Device not available in dry-run mode") },
       appSettings = appSettings
     )
     if (scenarioIds.isNotEmpty() && tags.isNotEmpty()) {
@@ -282,15 +282,18 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     arbigentInfoLog("[Execution Plan] Selected scenarios for execution: ${scenarios.map { it.id }}")
     val scenarioIdSet = scenarios.map { it.id }.toSet()
 
-    val os =
-      ArbigentDeviceOs.entries.find { it.name.toLowerCasePreservingASCIIRules() == os.toLowerCasePreservingASCIIRules() }
-        ?: throw IllegalArgumentException(
-          "Invalid OS. The OS should be one of ${
-            ArbigentDeviceOs.values()
-              .joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
-          }")
-    device = fetchAvailableDevicesByOs(os).firstOrNull()?.connectToDevice()
-      ?: throw IllegalArgumentException("No available device found")
+    // Skip device connection in dry-run mode
+    if (!dryRun) {
+      val os =
+        ArbigentDeviceOs.entries.find { it.name.toLowerCasePreservingASCIIRules() == os.toLowerCasePreservingASCIIRules() }
+          ?: throw IllegalArgumentException(
+            "Invalid OS. The OS should be one of ${
+              ArbigentDeviceOs.entries
+                .joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
+            }")
+      device = fetchAvailableDevicesByOs(os).firstOrNull()?.connectToDevice()
+        ?: throw IllegalArgumentException("No available device found")
+    }
     Runtime.getRuntime().addShutdownHook(object : Thread() {
       override fun run() {
         arbigentProject.cancel()
@@ -300,7 +303,7 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
           arbigentProject.getResult(scenarios),
           needCopy = false
         )
-        device.close()
+        device?.close()
       }
     })
 
