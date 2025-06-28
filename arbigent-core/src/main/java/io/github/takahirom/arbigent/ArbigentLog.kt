@@ -27,8 +27,8 @@ public enum class ArbigentLogLevel {
 }
 
 private var _arbigentLogLevel: ArbigentLogLevel = run {
-  updateKermit(ArbigentLogLevel.DEBUG)
-  ArbigentLogLevel.DEBUG
+  updateKermit(ArbigentLogLevel.INFO)
+  ArbigentLogLevel.INFO
 }
 
 public var arbigentLogLevel: ArbigentLogLevel
