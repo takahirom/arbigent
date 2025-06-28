@@ -10,6 +10,7 @@ result.yml
 arbigent-result
 arbigent-cache
 arbigent.properties
+test-arbigent.properties
 
 build/
 

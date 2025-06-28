@@ -12,9 +12,10 @@ class ArbigentScenarioContentExecutorTest {
   @Test
   fun tests() = runTest {
     ArbigentCoroutinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
+    val fakeAi = FakeAi()
     val agentConfig = AgentConfig {
       deviceFactory { FakeDevice() }
-      ai(FakeAi())
+      aiFactory { fakeAi }
     }
     val arbigentScenarioExecutor = ArbigentScenarioExecutor {
     }
@@ -40,9 +41,10 @@ class ArbigentScenarioContentExecutorTest {
   fun lastInitializerInterceptorCalledFirst() = runTest {
     ArbigentCoroutinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
     val order = mutableListOf<String>()
+    val fakeAi = FakeAi()
     val agentConfig = AgentConfig {
       deviceFactory { FakeDevice() }
-      ai(FakeAi())
+      aiFactory { fakeAi }
       addInterceptor(
         object : ArbigentInitializerInterceptor {
           override fun intercept(
@@ -108,9 +110,10 @@ class ArbigentScenarioContentExecutorTest {
   fun lastStepInterceptorCalledFirst() = runTest {
     ArbigentCoroutinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
     val order = mutableListOf<String>()
+    val fakeAi = FakeAi()
     val agentConfig = AgentConfig {
       deviceFactory { FakeDevice() }
-      ai(FakeAi())
+      aiFactory { fakeAi }
       addInterceptor(
         object : ArbigentStepInterceptor {
           override suspend fun intercept(

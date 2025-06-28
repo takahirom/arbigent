@@ -20,7 +20,7 @@ class ArbigentAgentExecutorTest {
 
     val agentConfig = AgentConfig {
       deviceFactory { testDevice }
-      ai(testAi)
+      aiFactory { testAi }
     }
 
     val task = ArbigentAgentTask("id1", "Test goal", agentConfig)
@@ -45,7 +45,7 @@ class ArbigentAgentExecutorTest {
     ArbigentCoroutinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
     val agentConfig = AgentConfig {
       deviceFactory { FakeDevice() }
-      ai(FakeAi())
+      aiFactory { FakeAi() }
     }
 
     val task = ArbigentAgentTask("id1", "goal1", agentConfig)
