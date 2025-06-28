@@ -221,7 +221,7 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
           fixedScenarios = fixedScenarios
         ).apply {
           aiOptions(projectSettings.aiOptions?.mergeWith(nodeScenario.aiOptions) ?: nodeScenario.aiOptions)
-          ai(aiFactory())
+          aiFactory(aiFactory)
           deviceFactory(deviceFactory)
         }.build(),
       )

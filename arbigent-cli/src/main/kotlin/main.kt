@@ -15,6 +15,7 @@ import com.github.ajalt.clikt.parameters.groups.groupChoice
 import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.sources.PropertiesValueSource
+import com.github.ajalt.clikt.sources.ValueSource
 import com.jakewharton.mosaic.layout.background
 import com.jakewharton.mosaic.layout.padding
 import com.jakewharton.mosaic.modifier.Modifier
@@ -46,6 +47,19 @@ data class CliAppSettings(
 ) : ArbigentAppSettings
 
 sealed class AiConfig(name: String) : OptionGroup(name)
+
+// Common options shared between commands - with fallback prompt for property file compatibility
+fun CliktCommand.projectFileOption() = option("--project-file", help = "Path to the project YAML file")
+  .prompt("Project file path")
+
+fun CliktCommand.workingDirectoryOption() = option("--working-directory", help = "Working directory for the project")
+
+fun CliktCommand.logLevelOption() = option("--log-level", help = "Log level")
+  .choice("debug", "info", "warn", "error")
+  .default("info")
+
+fun CliktCommand.logFileOption() = option("--log-file", help = "Log file path")
+  .default("$defaultResultPath/arbigent.log")
 
 class OpenAIAiConfig : AiConfig("Options for OpenAI API AI") {
   private val defaultEndpoint = "https://api.openai.com/v1/"
@@ -86,7 +100,10 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
     context {
       val propertiesFile = File("arbigent.properties")
       if (propertiesFile.exists()) {
-        valueSource = PropertiesValueSource.from(propertiesFile.absolutePath)
+        valueSource = PropertiesValueSource.from(
+          propertiesFile.absolutePath,
+          getKey = ValueSource.getKey(joinSubcommands = null)
+        )
       }
     }
   }
@@ -112,20 +129,11 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     .choice("android", "ios", "web")
     .default("android")
 
-  private val projectFile by option(help = "Path to the project YAML file")
-    .prompt("Project file path")
-
-  private val logLevel by option(help = "Log level")
-    .choice("debug", "info", "warn", "error")
-    .default("info")
-
-  private val logFile by option(help = "Log file path")
-    .default("$defaultResultPath/arbigent.log")
-
-  private val workingDirectory by option(
-    "--working-directory",
-    help = "Working directory for the project"
-  )
+  // Common options using extension functions
+  private val projectFile by projectFileOption()
+  private val logLevel by logLevelOption()
+  private val logFile by logFileOption()
+  private val workingDirectory by workingDirectoryOption()
 
   private val path by option(help = "Path to a file")
 
@@ -365,6 +373,29 @@ private fun logResultsAvailable(resultFile: File, resultDir: File) {
   arbigentInfoLog("  • HTML Report: ${File(resultDir, "report.html").absolutePath}")
 }
 
+class ArbigentScenariosCommand : CliktCommand(name = "scenarios") {
+  // Same common options as run command
+  private val projectFile by projectFileOption()
+  private val workingDirectory by workingDirectoryOption()
+  
+  override fun run() {
+    val arbigentProject = ArbigentProject(
+      file = File(projectFile),
+      aiFactory = { throw UnsupportedOperationException("AI not needed for listing") },
+      deviceFactory = { throw UnsupportedOperationException("Device not needed for listing") },
+      appSettings = CliAppSettings(
+        workingDirectory = workingDirectory,
+        path = null,
+      )
+    )
+    
+    println("Scenarios in $projectFile:")
+    arbigentProject.scenarios.forEach { scenario ->
+      println("- ${scenario.id}: ${scenario.agentTasks.lastOrNull()?.goal?.take(80)}...")
+    }
+  }
+}
+
 fun runNoRawMosaicBlocking(block: @Composable () -> Unit) = runBlocking {
   runMosaicBlocking(onNonInteractive = NonInteractivePolicy.AssumeAndIgnore) {
     block()
@@ -423,6 +454,6 @@ fun main(args: Array<String>) {
   LoggingUtils.suppressSlf4jWarnings()
   
   ArbigentCli()
-    .subcommands(ArbigentRunCommand())
+    .subcommands(ArbigentRunCommand(), ArbigentScenariosCommand())
     .main(args)
 }

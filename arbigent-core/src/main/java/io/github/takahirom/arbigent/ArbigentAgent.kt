@@ -30,7 +30,7 @@ import kotlin.time.Duration.Companion.hours
 public class ArbigentAgent(
   agentConfig: AgentConfig
 ) {
-  private val ai = agentConfig.ai
+  private val ai by lazy { agentConfig.aiFactory() }
   public val device: ArbigentDevice by lazy { agentConfig.deviceFactory() }
   private val interceptors: List<ArbigentInterceptor> = agentConfig.interceptors
   private val deviceFormFactor = agentConfig.deviceFormFactor
@@ -311,7 +311,7 @@ public class ArbigentAgent(
 
 public class AgentConfig(
   internal val interceptors: List<ArbigentInterceptor>,
-  internal val ai: ArbigentAi,
+  internal val aiFactory: () -> ArbigentAi,
   internal val deviceFactory: () -> ArbigentDevice,
   internal val deviceFormFactor: ArbigentScenarioDeviceFormFactor,
   internal val prompt: ArbigentPrompt,
@@ -320,7 +320,7 @@ public class AgentConfig(
   public class Builder {
     private val interceptors = mutableListOf<ArbigentInterceptor>()
     private var deviceFactory: (() -> ArbigentDevice)? = null
-    private var ai: ArbigentAi? = null
+    private var aiFactory: (() -> ArbigentAi)? = null
     private var deviceFormFactor: ArbigentScenarioDeviceFormFactor =
       ArbigentScenarioDeviceFormFactor.Mobile
     private var prompt: ArbigentPrompt = ArbigentPrompt()
@@ -335,8 +335,8 @@ public class AgentConfig(
       this.deviceFactory = deviceFactory
     }
 
-    public fun ai(ai: ArbigentAi) {
-      this.ai = ai
+    public fun aiFactory(aiFactory: () -> ArbigentAi) {
+      this.aiFactory = aiFactory
     }
 
     public fun deviceFormFactor(deviceFormFactor: ArbigentScenarioDeviceFormFactor) {
@@ -358,7 +358,7 @@ public class AgentConfig(
     public fun build(): AgentConfig {
       return AgentConfig(
         interceptors = interceptors,
-        ai = ai!!,
+        aiFactory = aiFactory!!,
         deviceFactory = deviceFactory!!,
         deviceFormFactor = deviceFormFactor,
         prompt = prompt,
@@ -373,7 +373,7 @@ public class AgentConfig(
       builder.addInterceptor(it)
     }
     builder.deviceFactory(deviceFactory)
-    builder.ai(ai)
+    builder.aiFactory { aiFactory() }
     builder.aiOptions(aiOptions)
     return builder
   }
