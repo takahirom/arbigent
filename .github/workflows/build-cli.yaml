@@ -138,7 +138,7 @@ jobs:
           disk-size: 6000M
           heap-size: 600M
           script: |
-            arbigent-cli/build/install/arbigent/bin/arbigent --os=android --project-file=sample-test/src/main/resources/projects/e2e-test-android.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-exp --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
+            arbigent-cli/build/install/arbigent/bin/arbigent run --os=android --project-file=sample-test/src/main/resources/projects/e2e-test-android.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-exp --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
       - name: Check API key leakage
         run: |
           if grep -R --quiet "${{ secrets.GEMINI_FREE_API_KEY }}" arbigent-result/; then
@@ -222,7 +222,7 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_FREE_API_KEY }}
         run: |
-          arbigent-cli/build/install/arbigent/bin/arbigent --os=ios --project-file=sample-test/src/main/resources/projects/e2e-test-ios.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-exp
+          arbigent-cli/build/install/arbigent/bin/arbigent run --os=ios --project-file=sample-test/src/main/resources/projects/e2e-test-ios.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-exp
       - name: Check API key leakage
         run: |
           if grep -R --quiet "${{ secrets.GEMINI_FREE_API_KEY }}" arbigent-result/; then

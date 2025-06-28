@@ -8,6 +8,7 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.CliktError
 import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.context
+import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.groups.OptionGroup
 import com.github.ajalt.clikt.parameters.groups.defaultByName
 import com.github.ajalt.clikt.parameters.groups.groupChoice
@@ -83,9 +84,16 @@ private const val defaultCachePath = "arbigent-cache"
 class ArbigentCli : CliktCommand(name = "arbigent") {
   init {
     context {
-      valueSource = PropertiesValueSource.from("arbigent.properties")
+      val propertiesFile = File("arbigent.properties")
+      if (propertiesFile.exists()) {
+        valueSource = PropertiesValueSource.from(propertiesFile.absolutePath)
+      }
     }
   }
+  override fun run() = Unit
+}
+
+class ArbigentRunCommand : CliktCommand(name = "run") {
   
   private val aiType by option(help = "Type of AI to use")
     .groupChoice(
@@ -411,4 +419,6 @@ fun LogComponent() {
   }
 }
 
-fun main(args: Array<String>) = ArbigentCli().main(args)
+fun main(args: Array<String>) = ArbigentCli()
+  .subcommands(ArbigentRunCommand())
+  .main(args)

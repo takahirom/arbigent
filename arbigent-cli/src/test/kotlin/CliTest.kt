@@ -51,7 +51,7 @@ scenarios:
     val projectFileOption = "--project-file=${yaml.absolutePath}"
 
     val test = command.test(
-      "$projectFileOption --dry-run",
+      "run $projectFileOption --dry-run",
       envvars = mapOf("OPENAI_API_KEY" to "key")
     )
 
@@ -65,7 +65,7 @@ scenarios:
     val option = "--shard=2/2 --scenario-ids=f9c17741-093e-49f0-ad45-8311ba68c1a6,16c24dfc-cbc7-4e17-af68-c97ad0a2aa3f"
 
     val test = command.test(
-      "$projectFileOption --dry-run $option",
+      "run $projectFileOption --dry-run $option",
       envvars = mapOf("OPENAI_API_KEY" to "key")
     )
 
@@ -79,7 +79,7 @@ scenarios:
     val option = "--shard=1/2 --tags=Settings"
 
     val test = command.test(
-      "$projectFileOption --dry-run $option",
+      "run $projectFileOption --dry-run $option",
       envvars = mapOf("OPENAI_API_KEY" to "key")
     )
     assertContains(
