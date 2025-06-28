@@ -297,10 +297,14 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
         // Show the result
         delay(100)
         if (arbigentProject.isScenariosSuccessful(scenarios)) {
-          arbigentInfoLog("All scenarios are succeeded. Executed scenarios:${scenarios.map { it.id }}")
+          val scenarioNames = scenarios.map { it.id }
+          arbigentInfoLog("✅ All scenarios completed successfully: $scenarioNames")
+          logResultsAvailable(resultFile, resultDir)
           exitProcess(0)
         } else {
-          arbigentInfoLog("Some scenarios are failed. Executed scenarios:${scenarios.map { it.id }}")
+          val scenarioNames = scenarios.map { it.id }
+          arbigentInfoLog("❌ Some scenarios failed: $scenarioNames")
+          logResultsAvailable(resultFile, resultDir)
           exitProcess(1)
         }
       }
@@ -316,6 +320,15 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
       }
     }
   }
+}
+
+private fun logResultsAvailable(resultFile: File, resultDir: File) {
+  arbigentInfoLog("")
+  arbigentInfoLog("📊 Results available:")
+  arbigentInfoLog("  • YAML Results: ${resultFile.absolutePath}")
+  arbigentInfoLog("  • Screenshots: ${ArbigentFiles.screenshotsDir.absolutePath}/")
+  arbigentInfoLog("  • API Logs: ${ArbigentFiles.jsonlsDir.absolutePath}/")
+  arbigentInfoLog("  • HTML Report: ${File(resultDir, "report.html").absolutePath}")
 }
 
 fun runNoRawMosaicBlocking(block: @Composable () -> Unit) = runBlocking {
