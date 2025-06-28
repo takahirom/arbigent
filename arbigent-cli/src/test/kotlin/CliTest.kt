@@ -1,5 +1,6 @@
 package io.github.takahirom.arbigent.cli
 
+import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.testing.test
 import java.io.File
 import kotlin.test.BeforeTest
@@ -47,7 +48,7 @@ scenarios:
 
   @Test
   fun `when run scenario it should select leaf scenarios`() {
-    val command = ArbigentCli()
+    val command = ArbigentCli().subcommands(ArbigentRunCommand())
     val projectFileOption = "--project-file=${yaml.absolutePath}"
 
     val test = command.test(
@@ -60,7 +61,7 @@ scenarios:
 
   @Test
   fun `when run scenario specifying id and shard it should run specified scenarios`() {
-    val command = ArbigentCli()
+    val command = ArbigentCli().subcommands(ArbigentRunCommand())
     val projectFileOption = "--project-file=${yaml.absolutePath}"
     val option = "--shard=2/2 --scenario-ids=f9c17741-093e-49f0-ad45-8311ba68c1a6,16c24dfc-cbc7-4e17-af68-c97ad0a2aa3f"
 
@@ -74,7 +75,7 @@ scenarios:
 
   @Test
   fun `when run scenario specifying tags and shard it should run specified scenarios`() {
-    val command = ArbigentCli()
+    val command = ArbigentCli().subcommands(ArbigentRunCommand())
     val projectFileOption = "--project-file=${yaml.absolutePath}"
     val option = "--shard=1/2 --tags=Settings"
 
