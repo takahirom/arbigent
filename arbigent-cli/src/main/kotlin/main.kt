@@ -177,6 +177,15 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
 
   @OptIn(ArbigentInternalApi::class)
   override fun run() {
+    // Set log level early to avoid unwanted debug logs
+    arbigentLogLevel =
+      ArbigentLogLevel.entries.find { it.name.toLowerCasePreservingASCIIRules() == logLevel.toLowerCasePreservingASCIIRules() }
+        ?: throw IllegalArgumentException(
+          "Invalid log level. The log level should be one of ${
+            ArbigentLogLevel.values()
+              .joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
+          }")
+    
     printLogger = {
       echo(it)
     }
@@ -269,13 +278,6 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
           }")
     device = fetchAvailableDevicesByOs(os).firstOrNull()?.connectToDevice()
       ?: throw IllegalArgumentException("No available device found")
-    arbigentLogLevel =
-      ArbigentLogLevel.entries.find { it.name.toLowerCasePreservingASCIIRules() == logLevel.toLowerCasePreservingASCIIRules() }
-        ?: throw IllegalArgumentException(
-          "Invalid log level. The log level should be one of ${
-            ArbigentLogLevel.values()
-              .joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
-          }")
     Runtime.getRuntime().addShutdownHook(object : Thread() {
       override fun run() {
         arbigentProject.cancel()
