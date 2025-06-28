@@ -419,6 +419,10 @@ fun LogComponent() {
   }
 }
 
-fun main(args: Array<String>) = ArbigentCli()
-  .subcommands(ArbigentRunCommand())
-  .main(args)
+fun main(args: Array<String>) {
+  LoggingUtils.suppressSlf4jWarnings()
+  
+  ArbigentCli()
+    .subcommands(ArbigentRunCommand())
+    .main(args)
+}
