@@ -9,6 +9,7 @@ result.yaml
 result.yml
 arbigent-result
 arbigent-cache
+arbigent.properties
 
 build/
 
