@@ -185,7 +185,12 @@ brew install takahirom/repo/arbigent
 ```
 
 ```
-Usage: arbigent [<options>]
+Usage: arbigent [<options>] <command> [<args>]...
+
+Commands:
+  run  Execute test scenarios
+
+Usage: arbigent run [<options>]
 
 Options for OpenAI API AI:
   --open-ai-endpoint=<text>    Endpoint URL (default: https://api.openai.com/v1/)
@@ -216,7 +221,7 @@ You can run tests separately with the `--shard` option. This allows you to split
 
 **Example:**
 
-`arbigent --shard=1/4`
+`arbigent run --shard=1/4`
 
 This command will run the first quarter of your test suite.
 
@@ -238,7 +243,7 @@ Here's an example of how to integrate the `--shard` option with GitHub Actions t
         uses: reactivecircus/android-emulator-runner@v2
 ...
           script: |
-            arbigent --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }} --os=android --project-file=sample-test/src/main/resources/projects/e2e-test-android.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-exp
+            arbigent run --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }} --os=android --project-file=sample-test/src/main/resources/projects/e2e-test-android.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-exp
 ...
 
       - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
