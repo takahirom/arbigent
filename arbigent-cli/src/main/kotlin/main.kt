@@ -17,7 +17,8 @@ import com.github.ajalt.clikt.sources.PropertiesValueSource
 import com.jakewharton.mosaic.layout.background
 import com.jakewharton.mosaic.layout.padding
 import com.jakewharton.mosaic.modifier.Modifier
-import com.jakewharton.mosaic.runMosaic
+import com.jakewharton.mosaic.NonInteractivePolicy
+import com.jakewharton.mosaic.runMosaicBlocking
 import com.jakewharton.mosaic.ui.Color.Companion
 import com.jakewharton.mosaic.ui.Color.Companion.Black
 import com.jakewharton.mosaic.ui.Color.Companion.Green
@@ -187,7 +188,7 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
           }")
     
     printLogger = {
-      echo(it)
+      // Disable direct console output to display logs in mosaic instead
     }
     val resultDir = file(workingDirectory, defaultResultPath)
     resultDir.mkdirs()
@@ -264,10 +265,6 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
     arbigentDebugLog("[Sharding Configuration] Active shard: $shard")
     arbigentInfoLog("[Execution Plan] Selected scenarios for execution: ${scenarios.map { it.id }}")
     val scenarioIdSet = scenarios.map { it.id }.toSet()
-    if (dryRun) {
-      arbigentInfoLog("Dry run mode is enabled. Exiting without executing scenarios.")
-      return
-    }
 
     val os =
       ArbigentDeviceOs.entries.find { it.name.toLowerCasePreservingASCIIRules() == os.toLowerCasePreservingASCIIRules() }
@@ -293,6 +290,15 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
 
     runNoRawMosaicBlocking {
       LaunchedEffect(Unit) {
+        // Log result locations early for coding agents
+        logResultsLocation(resultFile, resultDir)
+        
+        if (dryRun) {
+          arbigentInfoLog("🧪 Dry run mode is enabled. Exiting without executing scenarios.")
+          delay(500) // Give time for logs to be displayed
+          exitProcess(0)
+        }
+        
         arbigentProject.executeScenarios(scenarios)
         // Show the result
         delay(100)
@@ -300,15 +306,26 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
           val scenarioNames = scenarios.map { it.id }
           arbigentInfoLog("✅ All scenarios completed successfully: $scenarioNames")
           logResultsAvailable(resultFile, resultDir)
+          // Give time for logs to be displayed before exit
+          delay(100)
           exitProcess(0)
         } else {
           val scenarioNames = scenarios.map { it.id }
           arbigentInfoLog("❌ Some scenarios failed: $scenarioNames")
           logResultsAvailable(resultFile, resultDir)
+          // Give time for logs to be displayed before exit
+          delay(100)
           exitProcess(1)
         }
       }
       Column {
+        // Display logs in mosaic UI (top section - scrollable)
+        LogComponent()
+        
+        // Separator
+        Text("─".repeat(80), color = White)
+        
+        // Status section (bottom section - fixed)
         val assignments by arbigentProject.scenarioAssignmentsFlow.collectAsState(arbigentProject.scenarioAssignments())
         assignments
           .filter { it.scenario.id in scenarioIdSet }
@@ -322,6 +339,15 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
   }
 }
 
+private fun logResultsLocation(resultFile: File, resultDir: File) {
+  arbigentInfoLog("")
+  arbigentInfoLog("📁 Results will be saved to:")
+  arbigentInfoLog("  • YAML Results: ${resultFile.absolutePath}")
+  arbigentInfoLog("  • Screenshots: ${ArbigentFiles.screenshotsDir.absolutePath}/")
+  arbigentInfoLog("  • API Logs: ${ArbigentFiles.jsonlsDir.absolutePath}/")
+  arbigentInfoLog("  • HTML Report: ${File(resultDir, "report.html").absolutePath}")
+}
+
 private fun logResultsAvailable(resultFile: File, resultDir: File) {
   arbigentInfoLog("")
   arbigentInfoLog("📊 Results available:")
@@ -332,7 +358,7 @@ private fun logResultsAvailable(resultFile: File, resultDir: File) {
 }
 
 fun runNoRawMosaicBlocking(block: @Composable () -> Unit) = runBlocking {
-  runMosaic(enterRawMode = false) {
+  runMosaicBlocking(onNonInteractive = NonInteractivePolicy.AssumeAndIgnore) {
     block()
   }
 }
@@ -366,6 +392,21 @@ fun ScenarioRow(scenario: ArbigentScenario, scenarioExecutor: ArbigentScenarioEx
     Text(
       "Goal:" + scenario.agentTasks.lastOrNull()?.goal?.take(80) + "...",
       modifier = Modifier.padding(horizontal = 1),
+    )
+  }
+}
+
+@Composable
+fun LogComponent() {
+  val logs by ArbigentGlobalStatus.console.collectAsState(emptyList())
+  
+  // Show all logs - infinite scrolling
+  logs.forEach { (instant, message) ->
+    val timeText = instant.toString().substring(11, 19) // Extract HH:mm:ss from timestamp
+    Text(
+      "$timeText $message",
+      color = White,
+      modifier = Modifier.padding(horizontal = 1)
     )
   }
 }
