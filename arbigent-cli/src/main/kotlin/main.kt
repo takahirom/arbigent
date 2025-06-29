@@ -400,6 +400,39 @@ class ArbigentScenariosCommand : CliktCommand(name = "scenarios") {
   }
 }
 
+class ArbigentTagsCommand : CliktCommand(name = "tags") {
+  // Same common options as run command
+  private val projectFile by projectFileOption()
+  private val workingDirectory by workingDirectoryOption()
+  
+  override fun run() {
+    val arbigentProject = ArbigentProject(
+      file = File(projectFile),
+      aiFactory = { throw UnsupportedOperationException("AI not needed for listing") },
+      deviceFactory = { throw UnsupportedOperationException("Device not needed for listing") },
+      appSettings = CliAppSettings(
+        workingDirectory = workingDirectory,
+        path = null,
+      )
+    )
+    
+    val allTags = arbigentProject.scenarios
+      .flatMap { it.tags }
+      .map { it.name }
+      .distinct()
+      .sorted()
+    
+    if (allTags.isEmpty()) {
+      println("No tags found in $projectFile")
+    } else {
+      println("Tags in $projectFile:")
+      allTags.forEach { tag ->
+        println("- $tag")
+      }
+    }
+  }
+}
+
 fun runNoRawMosaicBlocking(block: @Composable () -> Unit) = runBlocking {
   runMosaicBlocking(onNonInteractive = NonInteractivePolicy.AssumeAndIgnore) {
     block()
@@ -458,6 +491,6 @@ fun main(args: Array<String>) {
   LoggingUtils.suppressSlf4jWarnings()
   
   ArbigentCli()
-    .subcommands(ArbigentRunCommand(), ArbigentScenariosCommand())
+    .subcommands(ArbigentRunCommand(), ArbigentScenariosCommand(), ArbigentTagsCommand())
     .main(args)
 }
