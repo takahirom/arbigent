@@ -92,8 +92,6 @@ public data class ArbigentAgentTaskStepResult(
   public val agentAction: String?,
   // UiTree is too big to store in the yaml file.
 //  public val uiTreeStrings: ArbigentUiTreeStrings?,
-  public val aiRequest: String?,
-  public val aiResponse: String?,
   public val timestamp: Long,
   public val cacheHit: Boolean
 )

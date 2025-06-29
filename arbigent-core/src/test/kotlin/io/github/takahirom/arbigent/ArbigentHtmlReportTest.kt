@@ -58,14 +58,24 @@ class ArbigentHtmlReportTest(private val behavior: DescribedBehavior<ArbigentHtm
                             assertReportFileExists()
                         }
                     }
-                    describe("with XML content in aiRequest") {
+                    describe("with JSONL file path") {
                         doIt {
                             createScreenshotFile()
-                            generateReportWithXmlContent()
+                            generateReportWithJsonl()
                         }
-                        itShould("contain XML tags in YAML") {
+                        itShould("contain JSONL link") {
                             capture(it)
-                            assertReportContainsXml()
+                            assertReportContainsJsonlLink()
+                        }
+                    }
+                    describe("with JSONL file path and cache hit") {
+                        doIt {
+                            createScreenshotFile()
+                            generateReportWithJsonlCacheHit()
+                        }
+                        itShould("contain cache hit text") {
+                            capture(it)
+                            assertReportContainsJsonlCacheHit()
                         }
                     }
                 }
@@ -124,32 +134,67 @@ class ArbigentHtmlReportRobot(private val tempFolder: TemporaryFolder) {
         return this
     }
 
-    fun generateReportWithXmlContent(): ArbigentHtmlReportRobot {
-        val xmlContent = "<PROMPT><CONTEXT>This is a test XML content</CONTEXT></PROMPT>"
-        val step = createTestStep(aiRequest = xmlContent)
+    fun generateReportWithJsonl(): ArbigentHtmlReportRobot {
+        // Create a temporary JSONL file
+        val jsonlFile = tempFolder.newFile("test.jsonl")
+        jsonlFile.writeText("""{"request": "test request", "response": "test response"}""")
+        
+        val step = createTestStep().copy(apiCallJsonPath = jsonlFile.absolutePath, cacheHit = false)
         result = createTestProjectExecutionResult(step)
-        outputDir = tempFolder.newFolder("output")
+        outputDir = tempFolder.newFolder("output-jsonl")
         ArbigentHtmlReport().saveReportHtml(outputDir.absolutePath, result)
         return this
     }
 
-    fun assertReportContainsXml(): ArbigentHtmlReportRobot {
-        val reportContent = File(outputDir, "report.html").readText()
-        println("[DEBUG_LOG] Report content: $reportContent")
-        println("[DEBUG_LOG] Looking for XML tags in YAML content")
-        assertTrue(reportContent.contains("<PROMPT>"), "Report should contain XML opening tag")
-        assertTrue(reportContent.contains("</PROMPT>"), "Report should contain XML closing tag")
+    fun generateReportWithJsonlCacheHit(): ArbigentHtmlReportRobot {
+        // Create a temporary JSONL file
+        val jsonlFile = tempFolder.newFile("cache.jsonl")
+        jsonlFile.writeText("""{"request": "cache request", "response": "cache response"}""")
+        
+        val step = createTestStep().copy(apiCallJsonPath = jsonlFile.absolutePath, cacheHit = true)
+        result = createTestProjectExecutionResult(step)
+        outputDir = tempFolder.newFolder("output-cache")
+        ArbigentHtmlReport().saveReportHtml(outputDir.absolutePath, result)
         return this
     }
 
-    private fun createTestStep(aiRequest: String? = null) = ArbigentAgentTaskStepResult(
+    fun assertReportContainsJsonlLink(): ArbigentHtmlReportRobot {
+        val reportContent = File(outputDir, "report.html").readText()
+        assertTrue(
+            reportContent.contains("apiCallJsonPath: \"jsonls/test.jsonl\"") && 
+            reportContent.contains("cacheHit: false"),
+            "Report should contain JSONL path in YAML and cacheHit false"
+        )
+        // Also verify the JSONL file was copied to the output directory
+        assertTrue(
+            File(outputDir, "jsonls/test.jsonl").exists(),
+            "JSONL file should be copied to output directory"
+        )
+        return this
+    }
+
+    fun assertReportContainsJsonlCacheHit(): ArbigentHtmlReportRobot {
+        val reportContent = File(outputDir, "report.html").readText()
+        assertTrue(
+            reportContent.contains("apiCallJsonPath: \"jsonls/cache.jsonl\"") && 
+            reportContent.contains("cacheHit: true"),
+            "Report should contain JSONL path in YAML and cacheHit true"
+        )
+        // Also verify the JSONL file was copied to the output directory
+        assertTrue(
+            File(outputDir, "jsonls/cache.jsonl").exists(),
+            "JSONL file should be copied to output directory"
+        )
+        return this
+    }
+
+
+    private fun createTestStep() = ArbigentAgentTaskStepResult(
         stepId = "test_step",
         summary = "Test step",
         screenshotFilePath = screenshotFile.absolutePath,
         apiCallJsonPath = null,
         agentAction = null,
-        aiRequest = aiRequest,
-        aiResponse = null,
         timestamp = System.currentTimeMillis(),
         cacheHit = false
     )

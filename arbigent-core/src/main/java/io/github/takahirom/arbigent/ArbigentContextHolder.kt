@@ -56,8 +56,6 @@ public class ArbigentContextHolder(
         apiCallJsonPath = apiCallJsonLFilePath,
         agentAction = agentAction?.stepLogText(),
 //        uiTreeStrings = uiTreeStrings,
-        aiRequest = aiRequest,
-        aiResponse = aiResponse,
         cacheHit = cacheHit
       )
     }
