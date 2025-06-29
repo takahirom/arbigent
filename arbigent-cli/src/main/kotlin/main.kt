@@ -113,7 +113,7 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
 
 class ArbigentRunCommand : CliktCommand(name = "run") {
   
-  private val aiType by option("--ai-type", help = "Type of AI to use")
+  private val aiType by defaultOption("--ai-type", help = "Type of AI to use")
     .groupChoice(
       "openai" to OpenAIAiConfig(),
       "gemini" to GeminiAiConfig(),
@@ -121,7 +121,7 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     )
     .defaultByName("openai")
 
-  private val aiApiLoggingEnabled by option(
+  private val aiApiLoggingEnabled by defaultOption(
     "--ai-api-logging",
     help = "Enable AI API debug logging"
   ).flag(default = false)
@@ -136,7 +136,7 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
   private val logFile by logFileOption()
   private val workingDirectory by workingDirectoryOption()
 
-  private val path by option(help = "Path to a file")
+  private val path by defaultOption("--path",help = "Path to a file")
 
   private val scenarioIds by defaultOption(
     "--scenario-ids",
