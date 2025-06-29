@@ -74,11 +74,11 @@ class OpenAIAiConfig : AiConfig("Options for OpenAI API AI") {
 
 class GeminiAiConfig : AiConfig("Options for Gemini API AI") {
   private val defaultEndpoint = "https://generativelanguage.googleapis.com/v1beta/openai/"
-  val geminiEndpoint by defaultOption(help = "Endpoint URL (default: $defaultEndpoint)")
+  val geminiEndpoint by defaultOption("--gemini-endpoint", help = "Endpoint URL (default: $defaultEndpoint)")
     .default(defaultEndpoint, defaultForHelp = defaultEndpoint)
-  val geminiModelName by defaultOption(help = "Model name (default: gemini-1.5-flash)")
+  val geminiModelName by defaultOption("--gemini-model-name", help = "Model name (default: gemini-1.5-flash)")
     .default("gemini-1.5-flash", "gemini-1.5-flash")
-  val geminiApiKey by defaultOption(envvar = "GEMINI_API_KEY", help = "API key")
+  val geminiApiKey by defaultOption("--gemini-api-key", envvar = "GEMINI_API_KEY", help = "API key")
     .prompt("API key")
 }
 
@@ -113,7 +113,7 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
 
 class ArbigentRunCommand : CliktCommand(name = "run") {
   
-  private val aiType by option(help = "Type of AI to use")
+  private val aiType by defaultOption("--ai-type", help = "Type of AI to use")
     .groupChoice(
       "openai" to OpenAIAiConfig(),
       "gemini" to GeminiAiConfig(),
@@ -121,12 +121,12 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     )
     .defaultByName("openai")
 
-  private val aiApiLoggingEnabled by option(
+  private val aiApiLoggingEnabled by defaultOption(
     "--ai-api-logging",
     help = "Enable AI API debug logging"
   ).flag(default = false)
 
-  private val os by defaultOption(help = "Target operating system")
+  private val os by defaultOption("--os", help = "Target operating system")
     .choice("android", "ios", "web")
     .default("android")
 
@@ -136,7 +136,7 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
   private val logFile by logFileOption()
   private val workingDirectory by workingDirectoryOption()
 
-  private val path by option(help = "Path to a file")
+  private val path by defaultOption("--path",help = "Path to a file")
 
   private val scenarioIds by defaultOption(
     "--scenario-ids",
