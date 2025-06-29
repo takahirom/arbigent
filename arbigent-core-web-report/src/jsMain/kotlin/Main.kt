@@ -303,39 +303,31 @@ private fun StepView(step: ArbigentAgentTaskStepResult) {
 //        }
 //      }
 
-      ExpandableSection("AI Request") {
-        if (step.apiCallJsonPath != null) {
-          Div {
-            if (!step.cacheHit) {
-              A(
-                href = step.apiCallJsonPath,
-                attrs = {
-                  attr("target", "_blank")
-                  attr("rel", "noopener noreferrer")
+      if (step.apiCallJsonPath != null) {
+        Div({
+          style {
+            marginBottom(10.px)
+          }
+        }) {
+          if (!step.cacheHit) {
+            A(
+              href = step.apiCallJsonPath,
+              attrs = {
+                attr("target", "_blank")
+                attr("rel", "noopener noreferrer")
+                style {
+                  color(Color.blue)
+                  textDecoration("underline")
                 }
-              ) {
-                Text("API Call JSON: ${step.apiCallJsonPath}")
               }
-            } else {
-              Div {
-                Text("API Call JSON: ${step.apiCallJsonPath} (Cache Hit)")
-              }
+            ) {
+              Text("View AI Request/Response (JSONL): ${step.apiCallJsonPath}")
+            }
+          } else {
+            Div {
+              Text("AI Request/Response (JSONL): ${step.apiCallJsonPath} (Cache Hit)")
             }
           }
-        }
-        Pre({
-          style { whiteSpace("pre-wrap") }
-        }) {
-          Text(step.aiRequest ?: "N/A")
-        }
-      }
-      ExpandableSection("AI Response") {
-        Pre({
-          style {
-            whiteSpace("pre-wrap")
-          }
-        }) {
-          Text(step.aiResponse ?: "N/A")
         }
       }
     }
