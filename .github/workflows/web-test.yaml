@@ -62,7 +62,15 @@ jobs:
         run: |
           # Install Chrome
           curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/google-linux-signing-keyring.gpg
-          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-linux-signing-keyring.gpg] \
+          
+          # Determine deb-arch that matches the runner
+          case "$(uname -m)" in
+            x86_64) DEB_ARCH="amd64" ;;
+            aarch64|arm64) DEB_ARCH="arm64" ;;
+            *) DEB_ARCH="amd64" ;;   # fallback
+          esac
+          
+          echo "deb [arch=${DEB_ARCH} signed-by=/usr/share/keyrings/google-linux-signing-keyring.gpg] \
                 http://dl.google.com/linux/chrome/deb/ stable main" | \
                 sudo tee /etc/apt/sources.list.d/google-chrome.list
 
