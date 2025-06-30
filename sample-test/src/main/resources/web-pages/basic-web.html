@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Button Success Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 40px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        button {
+            margin: 20px;
+            padding: 15px 30px;
+            font-size: 18px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #007bff;
+            color: white;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #status {
+            margin-top: 30px;
+            padding: 20px;
+            font-size: 24px;
+            font-weight: bold;
+            border-radius: 5px;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .hidden {
+            display: none !important;
+            visibility: hidden !important;
+        }
+        .success {
+            background-color: #28a745;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Button Success Test</h1>
+        <p>Click the button below to see success message</p>
+        
+        <button id="success-button">Click Me for Success</button>
+        
+        <div id="status" class="hidden">
+            Button clicked successfully! ✓
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('success-button').addEventListener('click', function() {
+            const statusDiv = document.getElementById('status');
+            statusDiv.classList.remove('hidden');
+            statusDiv.classList.add('success');
+            statusDiv.textContent = 'Button clicked successfully! ✓';
+            console.log('Success button clicked!');
+        });
+    </script>
+</body>
+</html>

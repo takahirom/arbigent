@@ -1,0 +1,15 @@
+name: "Button Success Test"
+aiModel: "gpt-4.1"
+aiOptions:
+  temperature: 0.0
+  imageFormat: "png"
+
+scenarios:
+- id: "basic-web"
+  goal: "Click the 'Click Me for Success' button and verify that the success message appears"
+  initializationMethods:
+  - type: "OpenLink"
+    link: "http://localhost:8080/basic-web.html"
+  imageAssertions:
+  - assertionPrompt: "The page should show 'Button clicked successfully! ✓' message after clicking the button"
+  maxStep: 3

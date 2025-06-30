@@ -1,0 +1,105 @@
+name: Web Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+env:
+  GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx6g -Dorg.gradle.daemon=false -Dkotlin.incremental=false"
+
+permissions:
+  contents: write
+
+jobs:
+  cli-e2e-web:
+    runs-on: macos-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'jetbrains'
+          java-version: '17'
+          java-package: 'jdk'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: build
+        id: build
+        run: |
+          ./gradlew arbigent-cli:installDist --stacktrace
+
+      - name: Cache arbigent
+        uses: actions/cache@v4
+        with:
+          key: arbigent-web-${{ github.sha }}
+          restore-keys: arbigent-web-
+          path: arbigent-cache
+
+      - name: Set up Python for HTTP server
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Start HTTP server for test pages
+        run: |
+          python3 -m http.server 8080 --directory sample-test/src/main/resources/web-pages &
+          echo $! > server.pid
+          sleep 2
+
+      - name: Setup Chrome and ChromeDriver
+        run: |
+          # Install Chrome if not present
+          if ! command -v google-chrome &> /dev/null; then
+            brew install --cask google-chrome
+          fi
+          
+          # Download latest stable ChromeDriver
+          LATEST_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json" | jq -r '.channels.Stable.version')
+          echo "Using ChromeDriver version: $LATEST_VERSION"
+          
+          curl -L "https://storage.googleapis.com/chrome-for-testing-public/$LATEST_VERSION/mac-arm64/chromedriver-mac-arm64.zip" -o chromedriver.zip
+          unzip chromedriver.zip
+          chmod +x chromedriver-mac-arm64/chromedriver
+          echo "$PWD/chromedriver-mac-arm64" >> $GITHUB_PATH
+
+      - name: CLI E2E test for Web
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_FREE_API_KEY }}
+        run: |
+          export PATH="$PWD/chromedriver-mac-arm64:$PATH"
+          ./arbigent-cli/build/install/arbigent/bin/arbigent run --project-file=sample-test/src/main/resources/projects/e2e-test-web.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-exp --scenario-ids="basic-web"
+      
+      - name: Check API key leakage
+        run: |
+          if grep -R --quiet "${{ secrets.GEMINI_FREE_API_KEY }}" arbigent-result/; then
+            echo "::error::API key leaked in results!"
+            exit 1
+          fi
+
+      - name: Stop HTTP server
+        if: always()
+        run: |
+          if [ -f server.pid ]; then
+            kill $(cat server.pid) || true
+            rm server.pid
+          fi
+
+      - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
+        if: ${{ always() }}
+        with:
+          name: cli-web-report
+          path: |
+            arbigent-result/*
+          retention-days: 120
