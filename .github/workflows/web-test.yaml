@@ -60,6 +60,12 @@ jobs:
 
       - name: Setup Chrome and ChromeDriver
         run: |
+          # Install Chrome
+          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+          
           # Download latest stable ChromeDriver for Linux
           LATEST_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json" | jq -r '.channels.Stable.version')
           echo "Using ChromeDriver version: $LATEST_VERSION"
@@ -68,11 +74,20 @@ jobs:
           unzip chromedriver.zip
           chmod +x chromedriver-linux64/chromedriver
           echo "$PWD/chromedriver-linux64" >> $GITHUB_PATH
+          
+          # Verify installation
+          google-chrome --version
+          chromedriver-linux64/chromedriver --version
 
       - name: CLI E2E test for Web
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_FREE_API_KEY }}
+          DISPLAY: :99
         run: |
+          # Start virtual display for headless Chrome
+          export DISPLAY=:99
+          Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+          
           export PATH="$PWD/chromedriver-linux64:$PATH"
           ./arbigent-cli/build/install/arbigent/bin/arbigent run --project-file=sample-test/src/main/resources/projects/e2e-test-web.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-exp --scenario-ids="basic-web"
       
