@@ -48,7 +48,7 @@ jobs:
           path: arbigent-cache
 
       - name: Set up Python for HTTP server
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.x'
 
@@ -61,10 +61,13 @@ jobs:
       - name: Setup Chrome and ChromeDriver
         run: |
           # Install Chrome
-          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-          echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo install -m 644 <(curl -fsSL https://dl.google.com/linux/linux_signing_key.pub) /usr/share/keyrings/google-linux-signing-keyring.gpg
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-linux-signing-keyring.gpg] \
+                http://dl.google.com/linux/chrome/deb/ stable main" | \
+                sudo tee /etc/apt/sources.list.d/google-chrome.list
+
           sudo apt-get update
-          sudo apt-get install -y google-chrome-stable
+          sudo apt-get install -y google-chrome-stable jq
           
           # Download latest stable ChromeDriver for Linux
           LATEST_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json" | jq -r '.channels.Stable.version')
@@ -93,7 +96,7 @@ jobs:
       
       - name: Check API key leakage
         run: |
-          if grep -R --quiet "${{ secrets.GEMINI_FREE_API_KEY }}" arbigent-result/; then
+          if [ -d arbigent-result ] && grep -R --quiet "${{ secrets.GEMINI_FREE_API_KEY }}" arbigent-result/; then
             echo "::error::API key leaked in results!"
             exit 1
           fi
