@@ -69,11 +69,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y google-chrome-stable jq
           
-          # Download latest stable ChromeDriver for Linux
-          LATEST_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json" | jq -r '.channels.Stable.version')
-          echo "Using ChromeDriver version: $LATEST_VERSION"
-          
-          curl -L "https://storage.googleapis.com/chrome-for-testing-public/$LATEST_VERSION/linux64/chromedriver-linux64.zip" -o chromedriver.zip
+          # Download ChromeDriver matching the installed Chrome version
+          CHROME_MAJOR=$(google-chrome --version | grep -oP '\d+' | head -1)
+          DRIVER_VERSION=$(curl -s \
+              https://googlechromelabs.github.io/chrome-for-testing/latest-patch-versions-per-build-with-downloads.json |
+              jq -r --arg m "$CHROME_MAJOR" '.builds[] | select(.milestone==($m|tonumber)) | .version')
+
+          echo "Using ChromeDriver version: $DRIVER_VERSION (for Chrome $CHROME_MAJOR)"
+          curl -L "https://storage.googleapis.com/chrome-for-testing-public/${DRIVER_VERSION}/linux64/chromedriver-linux64.zip" -o chromedriver.zip
           unzip chromedriver.zip
           chmod +x chromedriver-linux64/chromedriver
           echo "$PWD/chromedriver-linux64" >> $GITHUB_PATH
