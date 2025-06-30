@@ -1,3 +1,5 @@
+@file:OptIn(ArbigentInternalApi::class)
+
 package io.github.takahirom.arbigent.cli
 
 import androidx.compose.runtime.Composable
@@ -21,6 +23,7 @@ import com.jakewharton.mosaic.layout.padding
 import com.jakewharton.mosaic.modifier.Modifier
 import com.jakewharton.mosaic.NonInteractivePolicy
 import com.jakewharton.mosaic.runMosaicBlocking
+import com.jakewharton.mosaic.LocalTerminalState
 import com.jakewharton.mosaic.ui.Color.Companion
 import com.jakewharton.mosaic.ui.Color.Companion.Black
 import com.jakewharton.mosaic.ui.Color.Companion.Green
@@ -34,8 +37,10 @@ import io.github.takahirom.arbigent.*
 import io.ktor.client.request.*
 import io.ktor.util.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.io.File
+import kotlin.math.min
 import kotlin.system.exitProcess
 
 /**
@@ -111,6 +116,7 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
   override fun run() = Unit
 }
 
+@ArbigentInternalApi
 class ArbigentRunCommand : CliktCommand(name = "run") {
   
   private val aiType by defaultOption("--ai-type", help = "Type of AI to use")
@@ -193,7 +199,6 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     }
   }
 
-  @OptIn(ArbigentInternalApi::class)
   override fun run() {
     // Set log level early to avoid unwanted debug logs
     arbigentLogLevel =
@@ -204,9 +209,6 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
               .joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
           }")
     
-    printLogger = {
-      // Disable direct console output to display logs in mosaic instead
-    }
     val resultDir = file(workingDirectory, defaultResultPath)
     resultDir.mkdirs()
     ArbigentFiles.parentDir = resultDir.absolutePath
@@ -308,54 +310,180 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
       }
     })
 
+    val isTerminal = System.console() != null
+    if (isTerminal) {
+      runInteractiveMode(arbigentProject, scenarios, scenarioIdSet, shard, resultFile, resultDir, dryRun)
+    } else {
+      runNonInteractiveMode(arbigentProject, scenarios, resultFile, resultDir, dryRun)
+    }
+  }
+
+  private fun runInteractiveMode(
+    arbigentProject: ArbigentProject,
+    scenarios: List<ArbigentScenario>,
+    scenarioIdSet: Set<String>,
+    shard: ArbigentShard,
+    resultFile: File,
+    resultDir: File,
+    dryRun: Boolean
+  ) {
+    // Disable console output for Mosaic UI - logs will be displayed in mosaic instead
+    printLogger = {}
+
     runNoRawMosaicBlocking {
       LaunchedEffect(Unit) {
-        // Log result locations early for coding agents
         logResultsLocation(resultFile, resultDir)
         
         if (dryRun) {
           arbigentInfoLog("🧪 Dry run mode is enabled. Exiting without executing scenarios.")
-          delay(500) // Give time for logs to be displayed
+          delay(500)
           exitProcess(0)
         }
         
         arbigentProject.executeScenarios(scenarios)
-        // Show the result
         delay(100)
+        
         if (arbigentProject.isScenariosSuccessful(scenarios)) {
           val scenarioNames = scenarios.map { it.id }
           arbigentInfoLog("✅ All scenarios completed successfully: $scenarioNames")
           logResultsAvailable(resultFile, resultDir)
-          // Give time for logs to be displayed before exit
           delay(100)
           exitProcess(0)
         } else {
           val scenarioNames = scenarios.map { it.id }
           arbigentInfoLog("❌ Some scenarios failed: $scenarioNames")
           logResultsAvailable(resultFile, resultDir)
-          // Give time for logs to be displayed before exit
           delay(100)
           exitProcess(1)
         }
       }
+      
       Column {
-        // Display logs in mosaic UI (top section - scrollable)
         LogComponent()
-        
-        // Separator
         Text("─".repeat(80), color = White)
         
-        // Status section (bottom section - fixed)
         val assignments by arbigentProject.scenarioAssignmentsFlow.collectAsState(arbigentProject.scenarioAssignments())
         assignments
           .filter { it.scenario.id in scenarioIdSet }
           .shard(shard)
           .forEach { (scenario, scenarioExecutor) ->
-            // Show only leaf scenarios
             ScenarioRow(scenario, scenarioExecutor)
           }
       }
     }
+  }
+
+  private fun runNonInteractiveMode(
+    arbigentProject: ArbigentProject,
+    scenarios: List<ArbigentScenario>,
+    resultFile: File,
+    resultDir: File,
+    dryRun: Boolean
+  ) {
+    // Keep default printLogger for console output
+    runBlocking {
+      logResultsLocation(resultFile, resultDir)
+      
+      if (dryRun) {
+        arbigentInfoLog("🧪 Dry run mode is enabled. Exiting without executing scenarios.")
+        delay(500)
+        exitProcess(0)
+      }
+      
+      // Start progress monitoring
+      val progressJob = launch {
+        while (true) {
+          delay(5000) // Check every 5 seconds
+          logScenarioProgress(arbigentProject, scenarios)
+        }
+      }
+      
+      arbigentProject.executeScenarios(scenarios)
+      progressJob.cancel()
+      
+      // Final status log
+      logFinalScenarioStatus(arbigentProject, scenarios)
+      
+      if (arbigentProject.isScenariosSuccessful(scenarios)) {
+        val scenarioNames = scenarios.map { it.id }
+        arbigentInfoLog("✅ All scenarios completed successfully: $scenarioNames")
+        logResultsAvailable(resultFile, resultDir)
+        exitProcess(0)
+      } else {
+        val scenarioNames = scenarios.map { it.id }
+        arbigentInfoLog("❌ Some scenarios failed: $scenarioNames")
+        logResultsAvailable(resultFile, resultDir)
+        exitProcess(1)
+      }
+    }
+  }
+  
+  private fun logScenarioProgress(arbigentProject: ArbigentProject, scenarios: List<ArbigentScenario>) {
+    val assignments = arbigentProject.scenarioAssignments()
+    var hasActiveScenarios = false
+    
+    scenarios.forEach { scenario ->
+      val assignment = assignments.find { it.scenario.id == scenario.id }
+      if (assignment != null) {
+        val state = assignment.scenarioExecutor.scenarioState()
+        val runningInfo = assignment.scenarioExecutor.runningInfo()
+        
+        when (state) {
+          ArbigentScenarioExecutorState.Running -> {
+            hasActiveScenarios = true
+            if (runningInfo != null) {
+              arbigentInfoLog("🔄 Running: ${scenario.id} - ${runningInfo.toString().lines().joinToString(" ")}")
+            } else {
+              arbigentInfoLog("🔄 Running: ${scenario.id}")
+            }
+          }
+          ArbigentScenarioExecutorState.Success -> {
+            arbigentInfoLog("✅ Completed: ${scenario.id}")
+          }
+          ArbigentScenarioExecutorState.Failed -> {
+            arbigentInfoLog("❌ Failed: ${scenario.id}")
+          }
+          else -> {
+            // Idle - don't log to reduce noise
+          }
+        }
+      }
+    }
+    
+    if (!hasActiveScenarios) {
+      // Check if all are completed
+      val allCompleted = scenarios.all { scenario ->
+        val assignment = assignments.find { it.scenario.id == scenario.id }
+        assignment?.scenarioExecutor?.scenarioState() in listOf(
+          ArbigentScenarioExecutorState.Success,
+          ArbigentScenarioExecutorState.Failed
+        )
+      }
+      
+      if (allCompleted) {
+        arbigentInfoLog("📊 All scenarios completed. Finalizing results...")
+      }
+    }
+  }
+  
+  private fun logFinalScenarioStatus(arbigentProject: ArbigentProject, scenarios: List<ArbigentScenario>) {
+    arbigentInfoLog("")
+    arbigentInfoLog("📋 Final Results:")
+    
+    val assignments = arbigentProject.scenarioAssignments()
+    scenarios.forEach { scenario ->
+      val assignment = assignments.find { it.scenario.id == scenario.id }
+      if (assignment != null) {
+        val state = assignment.scenarioExecutor.scenarioState()
+        val icon = when (state) {
+          ArbigentScenarioExecutorState.Success -> "✅"
+          ArbigentScenarioExecutorState.Failed -> "❌"
+          else -> "⏸️"
+        }
+        arbigentInfoLog("  $icon ${scenario.id}: ${state.name()}")
+      }
+    }
+    arbigentInfoLog("")
   }
 }
 
@@ -475,9 +603,13 @@ fun ScenarioRow(scenario: ArbigentScenario, scenarioExecutor: ArbigentScenarioEx
 @Composable
 fun LogComponent() {
   val logs by ArbigentGlobalStatus.console.collectAsState(emptyList())
+  val terminal = LocalTerminalState.current
   
-  // Show all logs - infinite scrolling
-  logs.forEach { (instant, message) ->
+  // Calculate available lines for logs (terminal height - status lines - separator)
+  val availableLines = maxOf(10, terminal.size.height - 5) // Reserve space for status and separator, minimum 10 lines
+  
+  // Show logs that fit in terminal and prevent full rerender
+  logs.takeLast(availableLines).forEach { (instant, message) ->
     val timeText = instant.toString().substring(11, 19) // Extract HH:mm:ss from timestamp
     Text(
       "$timeText $message",
