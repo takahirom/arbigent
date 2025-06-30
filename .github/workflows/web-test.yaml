@@ -77,7 +77,7 @@ jobs:
           ARCH=$(uname -m)
           case "$ARCH" in
             x86_64) PLATFORM="linux64" ;;
-            aarch64|arm64) PLATFORM="linux64" ;;  # Use linux64 as fallback since linux-arm64 may not be available
+            aarch64|arm64) PLATFORM="linux-arm64" ;;
             *) PLATFORM="linux64" ;;  # Default fallback
           esac
           echo "Detected architecture: $ARCH, using platform: $PLATFORM"
@@ -112,7 +112,7 @@ jobs:
           export DISPLAY=:99
           Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
           
-          export PATH="$PWD/chromedriver-${PLATFORM}:$PATH"
+          # ChromeDriver path already added to PATH in setup step
           ./arbigent-cli/build/install/arbigent/bin/arbigent run --os=web --project-file=sample-test/src/main/resources/projects/e2e-test-web.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-exp --scenario-ids="basic-web"
       
       - name: Check API key leakage
