@@ -89,7 +89,7 @@ jobs:
           Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
           
           export PATH="$PWD/chromedriver-linux64:$PATH"
-          ./arbigent-cli/build/install/arbigent/bin/arbigent run --project-file=sample-test/src/main/resources/projects/e2e-test-web.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-exp --scenario-ids="basic-web"
+          ./arbigent-cli/build/install/arbigent/bin/arbigent run --os=web --project-file=sample-test/src/main/resources/projects/e2e-test-web.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-exp --scenario-ids="basic-web"
       
       - name: Check API key leakage
         run: |
