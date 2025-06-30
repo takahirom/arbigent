@@ -187,31 +187,107 @@ brew install takahirom/repo/arbigent
 ```
 Usage: arbigent [<options>] <command> [<args>]...
 
-Commands:
-  run  Execute test scenarios
+Options:
+  -h, --help   Show this message and exit
 
+Commands:
+  run        Execute test scenarios
+  scenarios  List available scenarios
+  tags       Manage scenario tags
+```
+
+#### Configuration with arbigent.properties
+
+Arbigent now supports configuration via an `arbigent.properties` file, which simplifies CLI usage by eliminating the need to specify common parameters repeatedly. Place this file in your project root directory.
+
+**Example configuration for Azure OpenAI:**
+```properties
+ai-type=azureopenai
+azure-openai-endpoint=https://xxxxxxxxx.openai.azure.com/openai/deployments/xxxxx/
+azure-openai-api-version=2025-xx-xx
+azure-openai-model-name=gpt-4o
+azure-openai-api-key=xxxxxxxxxxxxxxxxxx
+project-file=tests/arbigent-project.yml
+os=android
+log-level=info
+working-directory=/path/to/your/project
+```
+
+**Example configuration for OpenAI:**
+```properties
+ai-type=openai
+openai-api-key=sk-xxxxxxxxxxxxxxxxxx
+openai-model-name=gpt-4o-mini
+project-file=tests/arbigent-project.yml
+os=android
+```
+
+**Example configuration for Gemini:**
+```properties
+ai-type=gemini
+gemini-api-key=xxxxxxxxxxxxxxxxxx
+gemini-model-name=gemini-1.5-flash
+project-file=tests/arbigent-project.yml
+os=android
+```
+
+When using a properties file, you can run tests with the simplified command:
+
+```bash
+arbigent run
+```
+
+All parameters configured in the properties file will be shown as `(source: already provided by property file)` in the help output, indicating which settings are already configured.
+
+#### arbigent run command
+
+```
 Usage: arbigent run [<options>]
 
 Options for OpenAI API AI:
-  --open-ai-endpoint=<text>    Endpoint URL (default: https://api.openai.com/v1/)
-  --open-ai-model-name=<text>  Model name (default: gpt-4o-mini)
+  --openai-endpoint=<text>    Endpoint URL (default: https://api.openai.com/v1/)
+  --openai-model-name=<text>  Model name (default: gpt-4o-mini)  
+  --openai-api-key, --openai-key=<text> API key
 
 Options for Gemini API AI:
   --gemini-endpoint=<text>    Endpoint URL (default: https://generativelanguage.googleapis.com/v1beta/openai/)
   --gemini-model-name=<text>  Model name (default: gemini-1.5-flash)
+  --gemini-api-key=<text>     API key
 
 Options for Azure OpenAI:
-  --azure-open-aiendpoint=<text>     Endpoint URL
-  --azure-open-aiapi-version=<text>  API version
-  --azure-open-aimodel-name=<text>   Model name (default: gpt-4o-mini)
+  --azure-openai-endpoint=<text>         Endpoint URL
+  --azure-openai-api-version=<text>      API version
+  --azure-openai-model-name=<text>       Model name (default: gpt-4o-mini)  
+  --azure-openai-api-key, --azure-openai-key=<text> API key
 
 Options:
   --ai-type=(openai|gemini|azureopenai)  Type of AI to use
+  --ai-api-logging                       Enable AI API debug logging
   --os=(android|ios|web)                 Target operating system
   --project-file=<text>                  Path to the project YAML file
   --log-level=(debug|info|warn|error)    Log level
+  --log-file=<text>                      Log file path
+  --working-directory=<text>             Working directory for the project
+  --path=<text>                          Path to a file
+  --scenario-ids=<text>                  Scenario IDs to execute (comma-separated)
+  --tags=<text>                          Tags to filter scenarios (comma-separated)
+  --dry-run                              Dry run mode
   --shard=<value>                        Shard specification (e.g., 1/5)
   -h, --help                             Show this message and exit
+```
+
+When parameters are provided via the properties file, the help output will indicate `(source: already provided by property file)` for those options, so you know which parameters are already configured.
+
+#### Other commands
+
+**List scenarios:**
+```bash
+arbigent scenarios
+```
+
+**Manage tags:**
+```bash
+arbigent tags
 ```
 
 
@@ -221,9 +297,25 @@ You can run tests separately with the `--shard` option. This allows you to split
 
 **Example:**
 
-`arbigent run --shard=1/4`
+```bash
+arbigent run --shard=1/4
+```
 
 This command will run the first quarter of your test suite.
+
+#### Running Specific Scenarios
+
+You can run specific scenarios by their IDs:
+
+```bash
+arbigent run --scenario-ids="scenario-1,scenario-2"
+```
+
+Or filter scenarios by tags:
+
+```bash
+arbigent run --tags="smoke,regression"
+```
 
 **Integrating with GitHub Actions:**
 
