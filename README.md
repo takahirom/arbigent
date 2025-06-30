@@ -335,7 +335,7 @@ Here's an example of how to integrate the `--shard` option with GitHub Actions t
         uses: reactivecircus/android-emulator-runner@v2
 ...
           script: |
-            arbigent run --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
+            arbigent run --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }} --os=android --project-file=sample-test/src/main/resources/projects/e2e-test-android.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-exp
 ...
 
       - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
