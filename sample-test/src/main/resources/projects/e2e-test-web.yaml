@@ -11,5 +11,5 @@ scenarios:
   - type: "OpenLink"
     link: "http://localhost:8080/basic-web.html"
   imageAssertions:
-  - assertionPrompt: "The page should show 'Button clicked successfully! ✓' message after clicking the button"
+  - assertionPrompt: "A green success message 'Button clicked successfully! ✓' is visible on the page"
   maxStep: 3
