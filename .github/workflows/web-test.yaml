@@ -73,6 +73,15 @@ jobs:
           CHROME_MAJOR=$(google-chrome --version | grep -oP '\d+' | head -1)
           echo "Detected Chrome major version: $CHROME_MAJOR"
           
+          # Detect architecture for platform selection
+          ARCH=$(uname -m)
+          case "$ARCH" in
+            x86_64) PLATFORM="linux64" ;;
+            aarch64|arm64) PLATFORM="linux64" ;;  # Use linux64 as fallback since linux-arm64 may not be available
+            *) PLATFORM="linux64" ;;  # Default fallback
+          esac
+          echo "Detected architecture: $ARCH, using platform: $PLATFORM"
+          
           # Try to get matching ChromeDriver version
           DRIVER_VERSION=$(curl -s \
               "https://googlechromelabs.github.io/chrome-for-testing/latest-patch-versions-per-build-with-downloads.json" |
@@ -84,15 +93,15 @@ jobs:
             DRIVER_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json" | jq -r '.channels.Stable.version')
           fi
 
-          echo "Using ChromeDriver version: $DRIVER_VERSION (for Chrome $CHROME_MAJOR)"
-          curl -L "https://storage.googleapis.com/chrome-for-testing-public/${DRIVER_VERSION}/linux64/chromedriver-linux64.zip" -o chromedriver.zip
+          echo "Using ChromeDriver version: $DRIVER_VERSION (for Chrome $CHROME_MAJOR on $PLATFORM)"
+          curl -L "https://storage.googleapis.com/chrome-for-testing-public/${DRIVER_VERSION}/${PLATFORM}/chromedriver-${PLATFORM}.zip" -o chromedriver.zip
           unzip chromedriver.zip
-          chmod +x chromedriver-linux64/chromedriver
-          echo "$PWD/chromedriver-linux64" >> $GITHUB_PATH
+          chmod +x "chromedriver-${PLATFORM}/chromedriver"
+          echo "$PWD/chromedriver-${PLATFORM}" >> $GITHUB_PATH
           
           # Verify installation
           google-chrome --version
-          chromedriver-linux64/chromedriver --version
+          "chromedriver-${PLATFORM}/chromedriver" --version
 
       - name: CLI E2E test for Web
         env:
