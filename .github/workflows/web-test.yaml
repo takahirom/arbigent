@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   cli-e2e-web:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 20
 
     steps:
@@ -60,25 +60,20 @@ jobs:
 
       - name: Setup Chrome and ChromeDriver
         run: |
-          # Install Chrome if not present
-          if ! command -v google-chrome &> /dev/null; then
-            brew install --cask google-chrome
-          fi
-          
-          # Download latest stable ChromeDriver
+          # Download latest stable ChromeDriver for Linux
           LATEST_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json" | jq -r '.channels.Stable.version')
           echo "Using ChromeDriver version: $LATEST_VERSION"
           
-          curl -L "https://storage.googleapis.com/chrome-for-testing-public/$LATEST_VERSION/mac-arm64/chromedriver-mac-arm64.zip" -o chromedriver.zip
+          curl -L "https://storage.googleapis.com/chrome-for-testing-public/$LATEST_VERSION/linux64/chromedriver-linux64.zip" -o chromedriver.zip
           unzip chromedriver.zip
-          chmod +x chromedriver-mac-arm64/chromedriver
-          echo "$PWD/chromedriver-mac-arm64" >> $GITHUB_PATH
+          chmod +x chromedriver-linux64/chromedriver
+          echo "$PWD/chromedriver-linux64" >> $GITHUB_PATH
 
       - name: CLI E2E test for Web
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_FREE_API_KEY }}
         run: |
-          export PATH="$PWD/chromedriver-mac-arm64:$PATH"
+          export PATH="$PWD/chromedriver-linux64:$PATH"
           ./arbigent-cli/build/install/arbigent/bin/arbigent run --project-file=sample-test/src/main/resources/projects/e2e-test-web.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-exp --scenario-ids="basic-web"
       
       - name: Check API key leakage
