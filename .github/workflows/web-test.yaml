@@ -71,9 +71,18 @@ jobs:
           
           # Download ChromeDriver matching the installed Chrome version
           CHROME_MAJOR=$(google-chrome --version | grep -oP '\d+' | head -1)
+          echo "Detected Chrome major version: $CHROME_MAJOR"
+          
+          # Try to get matching ChromeDriver version
           DRIVER_VERSION=$(curl -s \
-              https://googlechromelabs.github.io/chrome-for-testing/latest-patch-versions-per-build-with-downloads.json |
-              jq -r --arg m "$CHROME_MAJOR" '.builds[] | select(.milestone==($m|tonumber)) | .version')
+              "https://googlechromelabs.github.io/chrome-for-testing/latest-patch-versions-per-build-with-downloads.json" |
+              jq -r --arg m "$CHROME_MAJOR" '.builds[] | select(.milestone==($m|tonumber)) | .version' | head -1)
+          
+          # Fallback to latest stable if version-specific lookup fails
+          if [ -z "$DRIVER_VERSION" ]; then
+            echo "No specific version found for Chrome $CHROME_MAJOR, using latest stable"
+            DRIVER_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json" | jq -r '.channels.Stable.version')
+          fi
 
           echo "Using ChromeDriver version: $DRIVER_VERSION (for Chrome $CHROME_MAJOR)"
           curl -L "https://storage.googleapis.com/chrome-for-testing-public/${DRIVER_VERSION}/linux64/chromedriver-linux64.zip" -o chromedriver.zip
