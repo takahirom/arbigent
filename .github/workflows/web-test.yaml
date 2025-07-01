@@ -121,7 +121,7 @@ jobs:
           Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
           
           # ChromeDriver path already added to PATH in setup step
-          ./arbigent-cli/build/install/arbigent/bin/arbigent run --os=web --project-file=sample-test/src/main/resources/projects/e2e-test-web.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-exp --scenario-ids="basic-web"
+          ./arbigent-cli/build/install/arbigent/bin/arbigent run --os=web --project-file=sample-test/src/main/resources/projects/e2e-test-web.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-lite --scenario-ids="basic-web"
       
       - name: Check API key leakage
         run: |
