@@ -1,9 +1,12 @@
+@file:OptIn(ArbigentInternalApi::class)
+
 package io.github.takahirom.arbigent.cli
 
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.sources.PropertiesValueSource
 import com.github.ajalt.clikt.testing.test
+import io.github.takahirom.arbigent.ArbigentInternalApi
 import java.io.File
 import kotlin.test.BeforeTest
 import kotlin.test.Test
