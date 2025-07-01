@@ -161,22 +161,59 @@ public class ClientConnection(
      }
 
     try {
+      // Log MCP tools request
+      logger.i { "MCP Tools - Requesting tools from server: $serverName" }
+      logger.i { "MCP Tools - JsonSchema type: $jsonSchemaType" }
+      
       // Replace with your actual client call
       val toolsResponse = mcpClient.listTools()
       // Use mapNotNull to safely handle potential null tools or schemas
       val mcpTools = toolsResponse?.tools ?: emptyList()
 
+      logger.i { "MCP Tools - Received ${mcpTools.size} tools from server: $serverName" }
+
       return mcpTools.mapNotNull { mcpTool ->
-        val originalSchema = mcpTool.inputSchema ?: return@mapNotNull null // Skip tool if it has no schema
+        val originalSchema = mcpTool.inputSchema ?: run {
+          logger.w { "MCP Tools - Skipping tool ${mcpTool.name}: no input schema" }
+          return@mapNotNull null // Skip tool if it has no schema
+        }
+
+        logger.i { "MCP Tools - Processing tool: ${mcpTool.name}" }
+        logger.i { "MCP Tools - Original description: ${mcpTool.description}" }
+        logger.i { "MCP Tools - Original schema properties: ${originalSchema.properties}" }
+        logger.i { "MCP Tools - Original schema required: ${originalSchema.required}" }
+
+        // Extract the actual properties from the JSON Schema format
+        val actualProperties = if (originalSchema.properties.containsKey("properties")) {
+          // Standard JSON Schema format: {"type": "object", "properties": {...}}
+          val propertiesElement = originalSchema.properties["properties"]
+          if (propertiesElement is JsonObject) {
+            propertiesElement
+          } else {
+            logger.w { "MCP Tools - 'properties' field is not a JsonObject: $propertiesElement" }
+            JsonObject(emptyMap())
+          }
+        } else {
+          // Direct properties format (legacy)
+          originalSchema.properties
+        }
+
+        val actualRequired = originalSchema.required ?: emptyList()
+        
+        logger.i { "MCP Tools - Extracted actual properties: $actualProperties" }
+        logger.i { "MCP Tools - Extracted actual required: $actualRequired" }
 
         // Transform properties and determine required list based on the target API type
         val (transformedProperties, finalRequiredList) = when (jsonSchemaType) {
-          JsonSchemaType.GeminiOpenAICompatible -> transformSchemaForGemini(originalSchema)
-          JsonSchemaType.OpenAI -> transformSchemaForOpenAI(originalSchema)
+          JsonSchemaType.GeminiOpenAICompatible -> transformSchemaForGemini(actualProperties, actualRequired)
+          JsonSchemaType.OpenAI -> transformSchemaForOpenAI(actualProperties, actualRequired)
         }
 
+        logger.i { "MCP Tools - Transformed properties: $transformedProperties" }
+        logger.i { "MCP Tools - Final required list: $finalRequiredList" }
+
         // Create the final Tool object with the transformed schema
-        Tool(
+        val finalTool = Tool(
           name = mcpTool.name,
           description = mcpTool.description,
           inputSchema = ToolSchema(
@@ -184,9 +221,14 @@ public class ClientConnection(
             required = finalRequiredList
           )
         )
+
+        logger.i { "MCP Tools - Final tool: ${finalTool.name} with ${finalTool.inputSchema?.required?.size ?: 0} required parameters" }
+        finalTool
       }
     } catch (e: Exception) {
-      logger.w { "Error listing or transforming tools: ${e.message}, returning empty list" }
+      logger.w { "MCP Tools - Error listing or transforming tools from server $serverName: ${e.message}" }
+      logger.w { "MCP Tools - Exception type: ${e.javaClass.simpleName}" }
+      logger.w { "MCP Tools - Stack trace: ${e.stackTraceToString()}" }
       return emptyList()
     }
   }
@@ -197,12 +239,22 @@ public class ClientConnection(
    * - Uses 'nullable: true' for optional parameters.
    * - Keeps the original 'required' list.
    */
-  private fun transformSchemaForGemini(originalSchema: Input): Pair<JsonObject, List<String>> {
-    val transformedProperties = JsonObject(originalSchema.properties.mapValues { entry ->
+  private fun transformSchemaForGemini(properties: JsonObject, required: List<String>): Pair<JsonObject, List<String>> {
+    val transformedProperties = JsonObject(properties.mapValues { entry ->
       val propertyName = entry.key
-      val originalProperties = entry.value.jsonObject
+      
+      // Safely handle cases where entry.value might not be a JsonObject
+      val originalProperties = when (val entryValue = entry.value) {
+        is JsonObject -> entryValue
+        else -> {
+          logger.w { "MCP Tools - Property '$propertyName' is not a JsonObject (${entryValue::class.simpleName}): $entryValue" }
+          // Create a simple string type schema as fallback
+          JsonObject(mapOf("type" to JsonPrimitive("string")))
+        }
+      }
+      
       // Use elvis operator here for safe check, assuming null means not required
-      val isRequired = originalSchema.required?.contains(propertyName) == true
+      val isRequired = required.contains(propertyName)
 
       val hasEnum = originalProperties.containsKey("enum")
       val originalType = originalProperties["type"]
@@ -238,8 +290,8 @@ public class ClientConnection(
       }
       JsonObject(newProps)
     })
-    // Gemini uses the original required list. Return emptyList if originalSchema.required is null.
-    return Pair(transformedProperties, originalSchema.required ?: emptyList()) // Use Elvis operator here
+    // Gemini uses the original required list.
+    return Pair(transformedProperties, required)
   }
 
   /**
@@ -248,14 +300,22 @@ public class ClientConnection(
    * - Represents optionality using 'type: ["<type>", "null"]'.
    * - Removes 'nullable: true' and 'format: "enum"'.
    */
-  private fun transformSchemaForOpenAI(originalSchema: Input): Pair<JsonObject, List<String>> {
-    // Handle nullable original required list safely
-    val originalRequiredList = originalSchema.required ?: emptyList()
-    val transformedProperties = JsonObject(originalSchema.properties.mapValues { entry ->
+  private fun transformSchemaForOpenAI(properties: JsonObject, required: List<String>): Pair<JsonObject, List<String>> {
+    val transformedProperties = JsonObject(properties.mapValues { entry ->
       val propertyName = entry.key
-      val originalProperties = entry.value.jsonObject
-      // Use the safe originalRequiredList for checking original optionality
-      val isOriginallyRequired = originalRequiredList.contains(propertyName)
+      
+      // Safely handle cases where entry.value might not be a JsonObject
+      val originalProperties = when (val entryValue = entry.value) {
+        is JsonObject -> entryValue
+        else -> {
+          logger.w { "MCP Tools - Property '$propertyName' is not a JsonObject (${entryValue::class.simpleName}): $entryValue" }
+          // Create a simple string type schema as fallback
+          JsonObject(mapOf("type" to JsonPrimitive("string")))
+        }
+      }
+      
+      // Use the required list for checking original optionality
+      val isOriginallyRequired = required.contains(propertyName)
 
       val newProps = originalProperties.toMutableMap()
       val originalTypeElement = originalProperties["type"] ?: JsonPrimitive("string") // Default if missing
@@ -278,7 +338,7 @@ public class ClientConnection(
       JsonObject(newProps)
     })
     // OpenAI requires ALL properties to be listed in 'required'
-    val allPropertiesRequired = originalSchema.properties.keys.toList()
+    val allPropertiesRequired = properties.keys.toList()
     return Pair(transformedProperties, allPropertiesRequired)
   }
 
@@ -314,19 +374,37 @@ public class ClientConnection(
     }
 
     try {
+      // Log the MCP request details
+      logger.i { "MCP Request - Tool: ${tool.name}, Server: $serverName" }
+      logger.i { "MCP Request - Arguments: ${executeToolArgs.arguments}" }
+      
       val toolResult: CallToolResultBase? = mcpClient!!.callTool(tool.name, executeToolArgs.arguments)
+
+      // Log the MCP response details
+      logger.i { "MCP Response - Tool: ${tool.name}, Server: $serverName" }
+      logger.i { "MCP Response - Result type: ${toolResult?.javaClass?.simpleName ?: "null"}" }
+      logger.i { "MCP Response - Content count: ${toolResult?.content?.size ?: 0}" }
 
       // Process the tool result
       val resultText = toolResult?.content?.joinToString("\n") { content ->
         when (content) {
-          is TextContent -> content.text ?: "[Empty TextContent]"
-          else -> "[Received non-text content: ${content::class.simpleName}]"
+          is TextContent -> {
+            logger.i { "MCP Response - TextContent: ${content.text}" }
+            content.text ?: "[Empty TextContent]"
+          }
+          else -> {
+            logger.i { "MCP Response - Non-text content: ${content::class.simpleName}" }
+            "[Received non-text content: ${content::class.simpleName}]"
+          }
         }
       } ?: "[No content received from tool execution]"
 
+      logger.i { "MCP Response - Final result: $resultText" }
       return ExecuteToolResult(content = resultText)
     } catch (e: Exception) {
-      logger.w { "Error executing tool: ${tool.name}: ${e.message}, returning default result" }
+      logger.w { "MCP Error - Tool: ${tool.name}, Server: $serverName, Error: ${e.message}" }
+      logger.w { "MCP Error - Exception type: ${e.javaClass.simpleName}" }
+      logger.w { "MCP Error - Stack trace: ${e.stackTraceToString()}" }
       return ExecuteToolResult(content = "[Error executing tool: ${e.message}]")
     }
   }
