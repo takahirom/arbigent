@@ -1,4 +1,5 @@
 @file:OptIn(ArbigentInternalApi::class)
+
 package io.github.takahirom.arbigent.cli
 
 import com.github.ajalt.clikt.core.subcommands
