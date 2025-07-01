@@ -1,0 +1,147 @@
+name: Web Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+env:
+  GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx6g -Dorg.gradle.daemon=false -Dkotlin.incremental=false"
+
+permissions:
+  contents: read
+
+jobs:
+  cli-e2e-web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'jetbrains'
+          java-version: '17'
+          java-package: 'jdk'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: build
+        id: build
+        run: |
+          ./gradlew arbigent-cli:installDist --stacktrace
+
+      - name: Cache arbigent
+        uses: actions/cache@v4
+        with:
+          key: arbigent-web-${{ github.sha }}
+          restore-keys: arbigent-web-
+          path: arbigent-cache
+
+      - name: Set up Python for HTTP server
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Start HTTP server for test pages
+        run: |
+          python3 -m http.server 8080 --directory sample-test/src/main/resources/web-pages &
+          echo $! > server.pid
+          sleep 2
+
+      - name: Setup Chrome and ChromeDriver
+        run: |
+          # Install Chrome
+          curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/google-linux-signing-keyring.gpg
+          
+          # Determine deb-arch that matches the runner
+          case "$(uname -m)" in
+            x86_64) DEB_ARCH="amd64" ;;
+            aarch64|arm64) DEB_ARCH="arm64" ;;
+            *) DEB_ARCH="amd64" ;;   # fallback
+          esac
+          
+          echo "deb [arch=${DEB_ARCH} signed-by=/usr/share/keyrings/google-linux-signing-keyring.gpg] \
+                http://dl.google.com/linux/chrome/deb/ stable main" | \
+                sudo tee /etc/apt/sources.list.d/google-chrome.list
+
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable jq
+          
+          # Download ChromeDriver matching the installed Chrome version
+          CHROME_MAJOR=$(google-chrome --version | grep -oP '\d+' | head -1)
+          echo "Detected Chrome major version: $CHROME_MAJOR"
+          
+          # Detect architecture for platform selection
+          ARCH=$(uname -m)
+          case "$ARCH" in
+            x86_64) PLATFORM="linux64" ;;
+            aarch64|arm64) PLATFORM="linux-arm64" ;;
+            *) PLATFORM="linux64" ;;  # Default fallback
+          esac
+          echo "Detected architecture: $ARCH, using platform: $PLATFORM"
+          
+          # Try to get matching ChromeDriver version
+          DRIVER_VERSION=$(curl -s \
+              "https://googlechromelabs.github.io/chrome-for-testing/latest-patch-versions-per-build-with-downloads.json" |
+              jq -r --arg m "$CHROME_MAJOR" '.builds[] | select(.milestone==($m|tonumber)) | .version' | head -1)
+          
+          # Fallback to latest stable if version-specific lookup fails
+          if [ -z "$DRIVER_VERSION" ]; then
+            echo "No specific version found for Chrome $CHROME_MAJOR, using latest stable"
+            DRIVER_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json" | jq -r '.channels.Stable.version')
+          fi
+
+          echo "Using ChromeDriver version: $DRIVER_VERSION (for Chrome $CHROME_MAJOR on $PLATFORM)"
+          curl -L "https://storage.googleapis.com/chrome-for-testing-public/${DRIVER_VERSION}/${PLATFORM}/chromedriver-${PLATFORM}.zip" -o chromedriver.zip
+          unzip chromedriver.zip
+          chmod +x "chromedriver-${PLATFORM}/chromedriver"
+          echo "$PWD/chromedriver-${PLATFORM}" >> $GITHUB_PATH
+          
+          # Verify installation
+          google-chrome --version
+          "chromedriver-${PLATFORM}/chromedriver" --version
+
+      - name: CLI E2E test for Web
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_FREE_API_KEY }}
+          DISPLAY: :99
+        run: |
+          # Start virtual display for headless Chrome
+          export DISPLAY=:99
+          Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+          
+          # ChromeDriver path already added to PATH in setup step
+          ./arbigent-cli/build/install/arbigent/bin/arbigent run --os=web --project-file=sample-test/src/main/resources/projects/e2e-test-web.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-lite --scenario-ids="basic-web"
+      
+      - name: Check API key leakage
+        run: |
+          if [ -d arbigent-result ] && grep -R --quiet "${{ secrets.GEMINI_FREE_API_KEY }}" arbigent-result/; then
+            echo "::error::API key leaked in results!"
+            exit 1
+          fi
+
+      - name: Stop HTTP server
+        if: always()
+        run: |
+          if [ -f server.pid ]; then
+            kill $(cat server.pid) || true
+            rm server.pid
+          fi
+
+      - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
+        if: ${{ always() }}
+        with:
+          name: cli-web-report
+          path: |
+            arbigent-result/*
+          retention-days: 120
