@@ -87,6 +87,7 @@ tasks.test {
 dependencies {
   implementation("com.github.ajalt.clikt:clikt:5.0.2")
   implementation("com.jakewharton.mosaic:mosaic-runtime:0.17.0")
+  implementation("com.charleskorn.kaml:kaml:0.83.0")
   implementation(project(":arbigent-core"))
   implementation(project(":arbigent-ai-openai"))
   testImplementation(kotlin("test"))

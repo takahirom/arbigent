@@ -38,7 +38,7 @@ dependencies {
 
   api(project(":arbigent-core-model"))
   api(project(":arbigent-mcp-client"))
-  implementation("com.charleskorn.kaml:kaml:0.67.0")
+  implementation("com.charleskorn.kaml:kaml:0.83.0")
   api("org.mobilenativefoundation.store:cache5:5.1.0-alpha05")
   api("com.mayakapps.kache:file-kache:2.1.1")
 

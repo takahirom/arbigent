@@ -4,7 +4,6 @@ package io.github.takahirom.arbigent.cli
 
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.core.context
-import com.github.ajalt.clikt.sources.PropertiesValueSource
 import com.github.ajalt.clikt.testing.test
 import io.github.takahirom.arbigent.ArbigentInternalApi
 import java.io.File
@@ -136,17 +135,17 @@ scenarios:
   }
 
   @Test
-  fun `test properties file with global option - no prefix needed`() {
-    // Create properties file with global option (no prefix)
-    val propsFile = File("build/test-arbigent.properties")
-    propsFile.parentFile.mkdirs()
-    propsFile.writeText("""
-      project-file=${yaml.absolutePath}
+  fun `test settings file with global option - no prefix needed`() {
+    // Create settings file with global option (no prefix)
+    val settingsFile = File("build/test-.arbigent/settings.yml")
+    settingsFile.parentFile.mkdirs()
+    settingsFile.writeText("""
+      project-file: ${yaml.absolutePath}
     """.trimIndent())
 
     val command = ArbigentCli().apply {
       context {
-        valueSource = PropertiesValueSource.from(propsFile.absolutePath)
+        valueSource = YamlValueSource.from(settingsFile.absolutePath)
       }
     }.subcommands(ArbigentRunCommand())
 
@@ -155,12 +154,12 @@ scenarios:
       envvars = mapOf("OPENAI_API_KEY" to "key")
     )
     
-    println("Properties test output: ${globalTest.output}")
-    println("Properties test exit code: ${globalTest.statusCode}")
+    println("Settings test output: ${globalTest.output}")
+    println("Settings test exit code: ${globalTest.statusCode}")
     
-    // Should succeed using properties file value
+    // Should succeed using settings file value
     assertContains(globalTest.output, "Selected scenarios for execution")
     
-    propsFile.delete()
+    settingsFile.delete()
   }
 }

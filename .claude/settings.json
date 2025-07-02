@@ -2,7 +2,8 @@
   "permissions": {
     "deny": [
       "Read(*.properties)",
-      "Update(*.properties)"
+      "Update(*.properties)",
+      "Read(.arbigent/*)"
     ]
   }
 }

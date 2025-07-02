@@ -6,7 +6,6 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.context
 import com.github.ajalt.clikt.core.subcommands
-import com.github.ajalt.clikt.sources.PropertiesValueSource
 import com.github.ajalt.clikt.sources.ValueSource
 import io.github.takahirom.arbigent.ArbigentAppSettings
 import io.github.takahirom.arbigent.ArbigentInternalApi
@@ -23,10 +22,10 @@ data class CliAppSettings(
 class ArbigentCli : CliktCommand(name = "arbigent") {
   init {
     context {
-      val propertiesFile = File("arbigent.properties")
-      if (propertiesFile.exists()) {
-        valueSource = PropertiesValueSource.from(
-          propertiesFile.absolutePath,
+      val settingsFile = File(".arbigent/settings.local.yml")
+      if (settingsFile.exists()) {
+        valueSource = YamlValueSource.from(
+          settingsFile.absolutePath,
           getKey = ValueSource.getKey(joinSubcommands = null)
         )
       }
