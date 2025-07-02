@@ -196,42 +196,42 @@ Commands:
   tags       Manage scenario tags
 ```
 
-#### Configuration with arbigent.properties
+#### Configuration with settings.local.yml
 
-Arbigent now supports configuration via an `arbigent.properties` file, which simplifies CLI usage by eliminating the need to specify common parameters repeatedly. Place this file in your project root directory.
+Arbigent now supports configuration via a `.arbigent/settings.local.yml` file, which simplifies CLI usage by eliminating the need to specify common parameters repeatedly. Create a `.arbigent` directory in your project root and place this file inside.
 
 **Example configuration for Azure OpenAI:**
-```properties
-ai-type=azureopenai
-azure-openai-endpoint=https://xxxxxxxxx.openai.azure.com/openai/deployments/xxxxx/
-azure-openai-api-version=2025-xx-xx
-azure-openai-model-name=gpt-4o
-azure-openai-api-key=xxxxxxxxxxxxxxxxxx
-project-file=tests/arbigent-project.yml
-os=android
-log-level=info
-working-directory=/path/to/your/project
+```yaml
+ai-type: azureopenai
+azure-openai-endpoint: https://xxxxxxxxx.openai.azure.com/openai/deployments/xxxxx/
+azure-openai-api-version: 2025-xx-xx
+azure-openai-model-name: gpt-4o
+azure-openai-api-key: xxxxxxxxxxxxxxxxxx
+project-file: tests/arbigent-project.yml
+os: android
+log-level: info
+working-directory: /path/to/your/project
 ```
 
 **Example configuration for OpenAI:**
-```properties
-ai-type=openai
-openai-api-key=sk-xxxxxxxxxxxxxxxxxx
-openai-model-name=gpt-4o-mini
-project-file=tests/arbigent-project.yml
-os=android
+```yaml
+ai-type: openai
+openai-api-key: sk-xxxxxxxxxxxxxxxxxx
+openai-model-name: gpt-4o-mini
+project-file: tests/arbigent-project.yml
+os: android
 ```
 
 **Example configuration for Gemini:**
-```properties
-ai-type=gemini
-gemini-api-key=xxxxxxxxxxxxxxxxxx
-gemini-model-name=gemini-1.5-flash
-project-file=tests/arbigent-project.yml
-os=android
+```yaml
+ai-type: gemini
+gemini-api-key: xxxxxxxxxxxxxxxxxx
+gemini-model-name: gemini-1.5-flash
+project-file: tests/arbigent-project.yml
+os: android
 ```
 
-When using a properties file, you can run tests with the simplified command:
+When using a settings file, you can run tests with the simplified command:
 
 ```bash
 arbigent run
