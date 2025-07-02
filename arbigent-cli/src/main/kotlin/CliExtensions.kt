@@ -4,7 +4,7 @@ import com.github.ajalt.clikt.core.ParameterHolder
 import com.github.ajalt.clikt.completion.CompletionCandidates
 import com.github.ajalt.clikt.parameters.options.OptionWithValues
 import com.github.ajalt.clikt.parameters.options.option
-import org.yaml.snakeyaml.Yaml
+import com.charleskorn.kaml.*
 import java.io.File
 
 /**
@@ -48,14 +48,14 @@ private fun getHelpTagsForOption(optionKey: String): Map<String, String> {
     val settingsFile = File(".arbigent/settings.local.yml")
     if (settingsFile.exists()) {
         try {
-            val yaml = Yaml()
-            val settings = settingsFile.inputStream().use { 
-                yaml.load<Map<String, Any>>(it) ?: emptyMap()
-            }
+            val content = settingsFile.readText()
+            val yaml = Yaml.default
+            val root = yaml.parseToYamlNode(content)
+            val settings = flattenYamlToMap(root)
             
-            // Check both with and without run prefix (for subcommand-specific options)
-            val hasValue = containsKey(settings, optionKey) || 
-                          containsKey(settings, "run.$optionKey")
+            // Check if the key exists in the flattened map
+            val hasValue = settings.containsKey(optionKey) || 
+                          settings.containsKey("run.$optionKey")
             
             if (hasValue) {
                 return mapOf("source" to "already provided by settings file")
@@ -68,19 +68,44 @@ private fun getHelpTagsForOption(optionKey: String): Map<String, String> {
 }
 
 /**
- * Check if a key exists in a nested map structure.
+ * Flatten a YAML node into a map of string keys to string values.
  */
-private fun containsKey(map: Map<String, Any>, key: String): Boolean {
-    val keys = key.split(".")
-    var current: Any? = map
+private fun flattenYamlToMap(node: YamlNode, prefix: String = ""): Map<String, String> {
+    val result = mutableMapOf<String, String>()
     
-    for (keyPart in keys) {
-        if (current is Map<*, *>) {
-            current = current[keyPart]
-        } else {
-            return false
+    when (node) {
+        is YamlMap -> {
+            // Iterate over map entries
+            for ((key, value) in node.entries) {
+                val keyStr = when (key) {
+                    is YamlScalar -> key.content
+                    else -> key.toString()
+                }
+                val fullKey = if (prefix.isEmpty()) keyStr else "$prefix.$keyStr"
+                result.putAll(flattenYamlToMap(value, fullKey))
+            }
+        }
+        is YamlList -> {
+            // Convert list to comma-separated string
+            val listValues = node.items.map { item ->
+                when (item) {
+                    is YamlScalar -> item.content
+                    else -> item.toString()
+                }
+            }
+            result[prefix] = listValues.joinToString(",")
+        }
+        is YamlScalar -> {
+            result[prefix] = node.content
+        }
+        is YamlNull -> {
+            result[prefix] = ""
+        }
+        is YamlTaggedNode -> {
+            // Recursively process the inner node
+            result.putAll(flattenYamlToMap(node.innerNode, prefix))
         }
     }
     
-    return current != null
+    return result
 }
