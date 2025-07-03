@@ -1,5 +1,6 @@
 package io.github.takahirom.arbigent.cli
 
+import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.ParameterHolder
 import com.github.ajalt.clikt.completion.CompletionCandidates
 import com.github.ajalt.clikt.parameters.options.OptionWithValues
@@ -23,15 +24,34 @@ fun ParameterHolder.defaultOption(
     eager: Boolean = false,
 ): OptionWithValues<String?, String, String> {
     val optionKey = names.firstOrNull()?.removePrefix("--") ?: ""
-    val helpTags = getHelpTagsForOption(optionKey)
+    
+    // Try to get the command name from the ParameterHolder (CliktCommand)
+    val commandName = when (this) {
+        is CliktCommand -> this.commandName
+        else -> null
+    }
+    
+    val settingsInfo = getSettingsInfoForOption(optionKey, commandName)
+    
+    // Append settings info to help text if available
+    val enhancedHelp = if (settingsInfo != null) {
+        val sourceDescription = when {
+            settingsInfo.source.contains(".") -> settingsInfo.source
+            settingsInfo.source == "global settings" -> "global settings"
+            else -> settingsInfo.source
+        }
+        "$help (currently: '${settingsInfo.value}' from $sourceDescription)"
+    } else {
+        help
+    }
     
     return option(
         *names,
-        help = help,
+        help = enhancedHelp,
         metavar = metavar,
         hidden = hidden,
         envvar = envvar,
-        helpTags = helpTags,
+        helpTags = emptyMap(), // Clear help tags since we're using help text
         completionCandidates = completionCandidates,
         valueSourceKey = valueSourceKey,
         eager = eager
@@ -39,13 +59,23 @@ fun ParameterHolder.defaultOption(
 }
 
 /**
- * Checks if an option is provided by the settings file and returns appropriate help tags.
+ * Data class to hold settings information
+ */
+private data class SettingsInfo(
+    val value: String,
+    val source: String
+)
+
+/**
+ * Checks if an option is provided by the settings file and returns settings info.
  * 
  * @param optionKey The option key to check (without -- prefix)
- * @return Map with help tags if the option is provided by settings file, empty map otherwise
+ * @param commandName The name of the current command (e.g., "run", "scenarios")
+ * @return SettingsInfo if the option is provided by settings file, null otherwise
  */
-private fun getHelpTagsForOption(optionKey: String): Map<String, String> {
+private fun getSettingsInfoForOption(optionKey: String, commandName: String?): SettingsInfo? {
     val settingsFile = File(".arbigent/settings.local.yml")
+    
     if (settingsFile.exists()) {
         try {
             val content = settingsFile.readText()
@@ -53,18 +83,30 @@ private fun getHelpTagsForOption(optionKey: String): Map<String, String> {
             val root = yaml.parseToYamlNode(content)
             val settings = flattenYamlToMap(root)
             
-            // Check if the key exists in the flattened map
-            val hasValue = settings.containsKey(optionKey) || 
-                          settings.containsKey("run.$optionKey")
+            // First check command-specific settings if we know the command
+            if (commandName != null) {
+                val commandSpecificKey = "$commandName.$optionKey"
+                if (settings.containsKey(commandSpecificKey)) {
+                    return SettingsInfo(
+                        value = settings[commandSpecificKey] ?: "",
+                        source = commandSpecificKey
+                    )
+                }
+            }
             
-            if (hasValue) {
-                return mapOf("source" to "already provided by settings file")
+            // Then check global setting
+            if (settings.containsKey(optionKey)) {
+                val value = settings[optionKey] ?: ""
+                return SettingsInfo(
+                    value = value,
+                    source = "global settings"
+                )
             }
         } catch (e: Exception) {
             // Ignore parsing errors for help text generation
         }
     }
-    return emptyMap()
+    return null
 }
 
 /**

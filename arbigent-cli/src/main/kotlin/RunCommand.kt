@@ -120,6 +120,34 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
   }
 
   override fun run() {
+    // Check that project-file is provided either via CLI args or settings file
+    if (projectFile == null) {
+      throw CliktError("Missing option '--project-file'. Please provide a project file path via command line argument or in .arbigent/settings.local.yml")
+    }
+    
+    // Validate AI configuration based on selected AI type
+    val currentAiType = aiType
+    when (currentAiType) {
+      is OpenAIAiConfig -> {
+        if (currentAiType.openAiApiKey.isNullOrBlank()) {
+          throw CliktError("Missing OpenAI API key. Please provide via --openai-api-key, OPENAI_API_KEY environment variable, or in .arbigent/settings.local.yml")
+        }
+      }
+      is GeminiAiConfig -> {
+        if (currentAiType.geminiApiKey.isNullOrBlank()) {
+          throw CliktError("Missing Gemini API key. Please provide via --gemini-api-key, GEMINI_API_KEY environment variable, or in .arbigent/settings.local.yml")
+        }
+      }
+      is AzureOpenAiConfig -> {
+        if (currentAiType.azureOpenAIEndpoint.isNullOrBlank()) {
+          throw CliktError("Missing Azure OpenAI endpoint. Please provide via --azure-openai-endpoint or in .arbigent/settings.local.yml")
+        }
+        if (currentAiType.azureOpenAIKey.isNullOrBlank()) {
+          throw CliktError("Missing Azure OpenAI API key. Please provide via --azure-openai-api-key, AZURE_OPENAI_API_KEY environment variable, or in .arbigent/settings.local.yml")
+        }
+      }
+    }
+    
     // Set log level early to avoid unwanted debug logs
     arbigentLogLevel =
       ArbigentLogLevel.entries.find { it.name.toLowerCasePreservingASCIIRules() == logLevel.toLowerCasePreservingASCIIRules() }
@@ -128,6 +156,19 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
             ArbigentLogLevel.entries
               .joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
           }")
+    
+    // Display loaded configuration values for debugging/testing
+    arbigentDebugLog("=== Configuration Priority Demonstration ===")
+    arbigentDebugLog("Command: run")
+    arbigentDebugLog("Loaded configuration values:")
+    arbigentDebugLog("  ai-type: ${when(aiType) {
+      is OpenAIAiConfig -> "openai"
+      is GeminiAiConfig -> "gemini"  
+      is AzureOpenAiConfig -> "azureopenai"
+      else -> "unknown"
+    }} (Expected: run-specific-azure from run.ai-type)")
+    arbigentDebugLog("  log-level: $logLevel (Expected: debug from run.log-level)")
+    arbigentDebugLog("==========================================")
     
     val resultDir = file(workingDirectory, defaultResultPath)
     resultDir.mkdirs()
@@ -141,14 +182,14 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     val ai: ArbigentAi = aiType.let { aiType ->
       when (aiType) {
         is OpenAIAiConfig -> OpenAIAi(
-          apiKey = aiType.openAiApiKey,
+          apiKey = aiType.openAiApiKey!!, // Already validated above
           baseUrl = aiType.openAiEndpoint,
           modelName = aiType.openAiModelName,
           loggingEnabled = aiApiLoggingEnabled,
         )
 
         is GeminiAiConfig -> OpenAIAi(
-          apiKey = aiType.geminiApiKey,
+          apiKey = aiType.geminiApiKey!!, // Already validated above
           baseUrl = aiType.geminiEndpoint,
           modelName = aiType.geminiModelName,
           loggingEnabled = aiApiLoggingEnabled,
@@ -156,13 +197,13 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
         )
 
         is AzureOpenAiConfig -> OpenAIAi(
-          apiKey = aiType.azureOpenAIKey,
-          baseUrl = aiType.azureOpenAIEndpoint,
+          apiKey = aiType.azureOpenAIKey!!, // Already validated above
+          baseUrl = aiType.azureOpenAIEndpoint!!, // Already validated above
           modelName = aiType.azureOpenAIModelName,
           loggingEnabled = aiApiLoggingEnabled,
           requestBuilderModifier = {
             parameter("api-version", aiType.azureOpenAIApiVersion)
-            header("api-key", aiType.azureOpenAIKey)
+            header("api-key", aiType.azureOpenAIKey!!)
           }
         )
       }
