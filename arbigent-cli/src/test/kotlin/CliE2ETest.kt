@@ -9,6 +9,12 @@ import java.io.File
 import java.nio.file.Path
 import kotlin.test.assertTrue
 import kotlin.test.assertEquals
+import kotlin.test.fail
+
+/**
+ * Data class to hold CLI execution results
+ */
+data class CliResult(val output: String, val exitCode: Int)
 
 /**
  * End-to-end tests that verify actual configuration values are used correctly
@@ -37,8 +43,8 @@ class CliE2ETest {
             projectRoot = projectRoot.parentFile
         }
         
-        // Get CLI path
-        cliPath = "${projectRoot.absolutePath}/arbigent-cli/build/install/arbigent/bin/arbigent"
+        // Get CLI path with platform-specific separators
+        cliPath = File(projectRoot, "arbigent-cli/build/install/arbigent/bin/arbigent").absolutePath
         
         // Ensure CLI is built
         if (!File(cliPath).exists()) {
@@ -94,7 +100,8 @@ class CliE2ETest {
         arbigentDebugLog("Settings file content:\n${settingsFile.readText()}")
         
         // Run CLI help command
-        val output = runCli("run", "--help")
+        val result = runCli("run", "--help")
+        val output = result.output
         
         // Debug: print output to see what we're getting
         arbigentDebugLog("Help output:\n$output")
@@ -127,7 +134,8 @@ class CliE2ETest {
         """.trimIndent())
         
         // Run with dry-run and capture output
-        val output = runCli("run", "--scenario-ids=test-scenario-001")
+        val result = runCli("run", "--scenario-ids=test-scenario-001")
+        val output = result.output
         
         // Verify correct project file is loaded
         assertTrue(output.contains("test-scenario-001"), "Should load the correct scenario from project file")
@@ -158,7 +166,8 @@ class CliE2ETest {
         """.trimIndent())
         
         // Run with debug log level to see which AI type is being used
-        val output = runCli("run", "--scenario-ids=test-scenario-001", "--ai-api-logging", "--log-level=debug")
+        val result = runCli("run", "--scenario-ids=test-scenario-001", "--ai-api-logging", "--log-level=debug")
+        val output = result.output
         
         // The output should show it's trying to use Azure OpenAI (even in dry run)
         assertTrue(output.contains("Dry run mode is enabled"))
@@ -181,7 +190,8 @@ class CliE2ETest {
             "Should use azureopenai from run-specific config, not global openai. Output length: ${output.length}")
         
         // Test that help shows Azure settings as provided
-        val helpOutput = runCli("run", "--help")
+        val helpResult = runCli("run", "--help")
+        val helpOutput = helpResult.output
         assertTrue(helpOutput.contains("azure-openai-endpoint"))
     }
     
@@ -206,13 +216,14 @@ class CliE2ETest {
         """.trimIndent())
         
         // Run with command line arguments that should override everything
-        val output = runCli(
+        val result = runCli(
             "run", 
             "--scenario-ids=test-scenario-001",
             "--ai-type=gemini",
             "--log-level=debug",
             "--gemini-api-key=cli-gemini-key"
         )
+        val output = result.output
         
         // Should use gemini from command line, not azureopenai from run config or openai from global
         assertTrue(output.contains("ai-type: gemini"), 
@@ -221,7 +232,8 @@ class CliE2ETest {
             "Should use debug from command line argument, not warn from run config")
         
         // Verify help shows that CLI args override settings
-        val helpOutput = runCli("run", "--help", "--ai-type=gemini")
+        val helpResult = runCli("run", "--help", "--ai-type=gemini")
+        val helpOutput = helpResult.output
         assertTrue(helpOutput.contains("--ai-type"), "Should show ai-type option in help")
     }
     
@@ -247,11 +259,12 @@ class CliE2ETest {
         """.trimIndent())
         
         // Run with only log-level override from CLI
-        val output = runCli(
+        val result = runCli(
             "run", 
             "--scenario-ids=test-scenario-001",
             "--log-level=debug"  // Only override log-level
         )
+        val output = result.output
         
         // Should use:
         // - log-level: debug (from CLI args)
@@ -291,7 +304,8 @@ class CliE2ETest {
         """.trimIndent())
         
         // Check run command help
-        val runHelpOutput = runCli("run", "--help")
+        val runHelpResult = runCli("run", "--help")
+        val runHelpOutput = runHelpResult.output
         assertTrue(
             runHelpOutput.contains("currently: 'debug' from run.log-level") ||
             runHelpOutput.contains("currently: 'debug'"),
@@ -299,7 +313,8 @@ class CliE2ETest {
         )
         
         // Check scenarios command help  
-        val scenariosHelpOutput = runCli("scenarios", "--help")
+        val scenariosHelpResult = runCli("scenarios", "--help")
+        val scenariosHelpOutput = scenariosHelpResult.output
         assertTrue(
             scenariosHelpOutput.contains("currently: 'warn' from scenarios.log-level") ||
             scenariosHelpOutput.contains("currently: 'warn'"),
@@ -307,7 +322,8 @@ class CliE2ETest {
         )
         
         // Actually run the command with debug log level to see Configuration Priority Demonstration
-        val runOutput = runCli("run", "--dry-run", "--scenario-ids=test-scenario-001", "--log-level=debug")
+        val runResult = runCli("run", "--dry-run", "--scenario-ids=test-scenario-001", "--log-level=debug")
+        val runOutput = runResult.output
         
         // The debug output should show the actual values being used
         assertTrue(
@@ -331,7 +347,8 @@ class CliE2ETest {
         }
         
         // Run CLI help command
-        val output = runCli("run", "--help")
+        val result = runCli("run", "--help")
+        val output = result.output
         
         // Should still show help but without "currently:" tags
         assertTrue(output.contains("Usage:"))
@@ -390,7 +407,8 @@ class CliE2ETest {
         """.trimIndent())
         
         // CLI should not crash, should either ignore malformed file or show clear error
-        val output = runCli("run", "--help")
+        val result = runCli("run", "--help")
+        val output = result.output
         
         // Should still show help and not crash
         assertTrue(output.contains("Usage:"), "Should show help even with malformed YAML")
@@ -427,7 +445,8 @@ class CliE2ETest {
         """.trimIndent())
         
         // Run help command to see what values are actually used
-        val runHelpOutput = runCli("run", "--help")
+        val runHelpResult = runCli("run", "--help")
+        val runHelpOutput = runHelpResult.output
         
         // Should use global settings, not the typo sections
         // Check that global openai settings are shown, not azure from "runs" typo
@@ -444,7 +463,8 @@ class CliE2ETest {
         )
         
         // Test scenarios command help too
-        val scenariosHelpOutput = runCli("scenarios", "--help")
+        val scenariosHelpResult = runCli("scenarios", "--help")
+        val scenariosHelpOutput = scenariosHelpResult.output
         assertTrue(
             scenariosHelpOutput.contains("currently: 'info'") ||
             scenariosHelpOutput.contains("log-level") && !scenariosHelpOutput.contains("warn"),
@@ -452,7 +472,8 @@ class CliE2ETest {
         )
         
         // Verify actual execution uses global settings
-        val runOutput = runCli("run", "--scenario-ids=test-scenario-001")
+        val runResult = runCli("run", "--scenario-ids=test-scenario-001")
+        val runOutput = runResult.output
         assertTrue(runOutput.contains("Dry run mode is enabled"), "Should use global dry-run setting")
         assertTrue(runOutput.contains("test-scenario-001"), "Should load scenario from global project-file")
     }
@@ -476,14 +497,15 @@ class CliE2ETest {
         """.trimIndent())
         
         // Run with scenario-ids to avoid filtering complexity
-        val output = runCli("run", "--scenario-ids=test-scenario-001")
+        val result = runCli("run", "--scenario-ids=test-scenario-001")
+        val output = result.output
         
         // Should load the correct project file and scenario
         assertTrue(output.contains("test-scenario-001"), "Should load scenario from settings-specified project file")
         assertTrue(output.contains("Dry run mode is enabled"), "Should respect dry-run setting from config")
     }
     
-    private fun runCli(vararg args: String): String {
+    private fun runCli(vararg args: String, expectSuccess: Boolean = true): CliResult {
         val command = listOf(cliPath) + args
         arbigentDebugLog("Running CLI command: ${command.joinToString(" ")}")
         arbigentDebugLog("Working directory: $tempDir")
@@ -506,9 +528,16 @@ class CliE2ETest {
             output
         }
         
-        if (exitCode != 0 && !args.contains("--help")) {
-            arbigentDebugLog("CLI exited with non-zero code: $exitCode")
+        // Log exit code info
+        if (exitCode != 0) {
+            arbigentDebugLog("CLI exited with code: $exitCode")
         }
+        
+        // Assert on exit code if expected to succeed and not a help command
+        if (expectSuccess && exitCode != 0 && !args.contains("--help")) {
+            fail("CLI command failed with exit code $exitCode. Output:\n$fullOutput")
+        }
+        
         arbigentDebugLog("CLI output length: ${fullOutput.length} chars")
         if (arbigentLogLevel <= ArbigentLogLevel.DEBUG) {
             if (fullOutput.length < 5000) {
@@ -519,6 +548,6 @@ class CliE2ETest {
             }
         }
         
-        return fullOutput
+        return CliResult(fullOutput, exitCode)
     }
 }
