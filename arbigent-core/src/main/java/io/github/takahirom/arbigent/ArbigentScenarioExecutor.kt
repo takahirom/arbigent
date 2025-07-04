@@ -246,7 +246,7 @@ public class ArbigentScenarioExecutor {
     }
     if (!isGoalAchieved()) {
       _isFailedToArchiveFlow.value = true
-      arbigentInfoLog("🔴 ${scenario.id} scenario failed")
+      arbigentErrorLog("🔴 ${scenario.id} scenario failed")
       throw FailedToArchiveException(
         "Failed to archive scenario:" + statusText() + " retryRemain:$retryRemain"
       )

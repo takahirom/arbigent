@@ -98,6 +98,12 @@ public fun arbigentErrorLog(log: String) {
   }
 }
 
+public fun arbigentErrorLog(log: () -> String) {
+  if (arbigentLogLevel <= ArbigentLogLevel.ERROR) {
+    printLog(ArbigentLogLevel.ERROR, log())
+  }
+}
+
 @ArbigentInternalApi
 public val arbigentLogFormatter: DateTimeFormatter = DateTimeFormatterBuilder()
   .appendValue(ChronoField.MONTH_OF_YEAR, 2)

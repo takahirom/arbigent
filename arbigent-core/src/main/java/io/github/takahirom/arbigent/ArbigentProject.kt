@@ -70,7 +70,9 @@ public class ArbigentProject(
         try {
           scenarioExecutor.execute(scenario, mcpClient)
         } catch (e: FailedToArchiveException) {
-          arbigentErrorLog("🔴 ${scenario.id} scenario failed to archive: " + e.stackTraceToString())
+          arbigentErrorLog {
+            "🔴 ${scenario.id} scenario failed to archive: ${e.stackTraceToString()}"
+          }
         }
         arbigentDebugLog(scenarioExecutor.statusText())
       }
