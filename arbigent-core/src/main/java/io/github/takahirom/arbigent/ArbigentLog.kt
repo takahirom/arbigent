@@ -92,6 +92,18 @@ public fun arbigentInfoLog(log: () -> String) {
   }
 }
 
+public fun arbigentWarnLog(log: String) {
+  if (arbigentLogLevel <= ArbigentLogLevel.WARN) {
+    printLog(ArbigentLogLevel.WARN, log)
+  }
+}
+
+public fun arbigentWarnLog(log: () -> String) {
+  if (arbigentLogLevel <= ArbigentLogLevel.WARN) {
+    printLog(ArbigentLogLevel.WARN, log())
+  }
+}
+
 public fun arbigentErrorLog(log: String) {
   if (arbigentLogLevel <= ArbigentLogLevel.ERROR) {
     printLog(ArbigentLogLevel.ERROR, log)
