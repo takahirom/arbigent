@@ -228,7 +228,7 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
     )
   }
   dfs(scenario)
-  arbigentDebugLog("executing:$result")
+  arbigentDebugLog("Built scenario ${scenario.id} with ${result.size} tasks: ${result.map { it.scenarioId }}")
   // Determine which device form factor to use for the scenario
   val effectiveScenarioDeviceFormFactor = if (scenario.deviceFormFactor is ArbigentScenarioDeviceFormFactor.Unspecified) {
     if (projectSettings.deviceFormFactor is ArbigentScenarioDeviceFormFactor.Unspecified) {

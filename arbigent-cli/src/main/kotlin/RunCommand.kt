@@ -306,13 +306,13 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
         
         if (arbigentProject.isScenariosSuccessful(scenarios)) {
           val scenarioNames = scenarios.map { it.id }
-          arbigentInfoLog("✅ All scenarios completed successfully: $scenarioNames")
+          arbigentInfoLog("🟢 All scenarios completed successfully: $scenarioNames")
           logResultsAvailable(resultFile, resultDir)
           delay(100)
           exitProcess(0)
         } else {
           val scenarioNames = scenarios.map { it.id }
-          arbigentInfoLog("❌ Some scenarios failed: $scenarioNames")
+          arbigentInfoLog("🔴 Some scenarios failed: $scenarioNames")
           logResultsAvailable(resultFile, resultDir)
           delay(100)
           exitProcess(1)
@@ -367,12 +367,12 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
       
       if (arbigentProject.isScenariosSuccessful(scenarios)) {
         val scenarioNames = scenarios.map { it.id }
-        arbigentInfoLog("✅ All scenarios completed successfully: $scenarioNames")
+        arbigentInfoLog("🟢 All scenarios completed successfully: $scenarioNames")
         logResultsAvailable(resultFile, resultDir)
         exitProcess(0)
       } else {
         val scenarioNames = scenarios.map { it.id }
-        arbigentInfoLog("❌ Some scenarios failed: $scenarioNames")
+        arbigentInfoLog("🔴 Some scenarios failed: $scenarioNames")
         logResultsAvailable(resultFile, resultDir)
         exitProcess(1)
       }
@@ -399,10 +399,10 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
             }
           }
           ArbigentScenarioExecutorState.Success -> {
-            arbigentInfoLog("✅ Completed: ${scenario.id}")
+            // Completion log is handled in ArbigentScenarioExecutor.execute
           }
           ArbigentScenarioExecutorState.Failed -> {
-            arbigentInfoLog("❌ Failed: ${scenario.id}")
+            // Failure log is handled in ArbigentScenarioExecutor.execute
           }
           else -> {
             // Idle - don't log to reduce noise
@@ -437,8 +437,9 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
       if (assignment != null) {
         val state = assignment.scenarioExecutor.scenarioState()
         val icon = when (state) {
-          ArbigentScenarioExecutorState.Success -> "✅"
-          ArbigentScenarioExecutorState.Failed -> "❌"
+          ArbigentScenarioExecutorState.Success -> "🟢"
+          ArbigentScenarioExecutorState.Failed -> "🔴"
+          ArbigentScenarioExecutorState.Running -> "🔄"
           else -> "⏸️"
         }
         arbigentInfoLog("  $icon ${scenario.id}: ${state.name()}")
