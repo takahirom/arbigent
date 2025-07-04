@@ -170,6 +170,7 @@ public class ArbigentAgent(
     mcpClient: MCPClient
   ) {
     execute(
+      scenarioId = agentTask.scenarioId,
       goal = agentTask.goal,
       maxStep = agentTask.maxStep,
       mcpClient = mcpClient,
@@ -182,12 +183,14 @@ public class ArbigentAgent(
   }
 
   public suspend fun execute(
+    scenarioId: String,
     goal: String,
     maxStep: Int = 10,
     agentActionTypes: List<AgentActionType> = defaultAgentActionTypesForVisualMode(),
     mcpClient: MCPClient
   ) {
     val executeInput = ExecuteInput(
+      scenarioId = scenarioId,
       goal = goal,
       maxStep = maxStep,
       agentActionTypes = agentActionTypes,
@@ -218,13 +221,14 @@ public class ArbigentAgent(
     )
 
     when (executeChain(executeInput)) {
-      ExecutionResult.Success -> arbigentDebugLog("Execution succeeded.")
-      is ExecutionResult.Failed -> arbigentDebugLog("Execution failed.")
-      is ExecutionResult.Cancelled -> arbigentDebugLog("Execution cancelled.")
+      ExecutionResult.Success -> arbigentInfoLog("🟢 ${executeInput.scenarioId}: Execution succeeded.")
+      is ExecutionResult.Failed -> arbigentInfoLog("🔴 ${executeInput.scenarioId}: Execution failed.")
+      is ExecutionResult.Cancelled -> arbigentInfoLog("🟡 ${executeInput.scenarioId}: Execution cancelled.")
     }
   }
 
   public data class ExecuteInput(
+    val scenarioId: String,
     val goal: String,
     val maxStep: Int,
     val agentActionTypes: List<AgentActionType>,
