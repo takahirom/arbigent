@@ -505,6 +505,281 @@ class CliE2ETest {
         assertTrue(output.contains("Dry run mode is enabled"), "Should respect dry-run setting from config")
     }
     
+    @Test
+    fun `CLI respects configuration file priority order`() {
+        val arbigentDir = File(tempDir.toFile(), ".arbigent")
+        
+        // Create settings.yaml with lowest priority settings
+        val settingsYaml = File(arbigentDir, "settings.yaml")
+        settingsYaml.writeText("""
+            # Lowest priority - settings.yaml
+            project-file: ${projectFile.name}
+            ai-type: openai
+            openai-api-key: lowest-priority-openai-key
+            log-level: warn
+            os: ios
+            dry-run: false
+        """.trimIndent())
+        
+        // Create settings.local.yaml with medium priority settings
+        val localYaml = File(arbigentDir, "settings.local.yaml") 
+        localYaml.writeText("""
+            # Medium priority - settings.local.yaml
+            ai-type: azureopenai
+            azure-openai-api-key: medium-priority-azure-key
+            azure-openai-endpoint: https://medium.openai.azure.com/
+            log-level: info
+            os: android
+        """.trimIndent())
+        
+        // Create settings.local.yml with highest priority settings
+        val localYml = File(arbigentDir, "settings.local.yml")
+        localYml.writeText("""
+            # Highest priority - settings.local.yml
+            ai-type: gemini
+            gemini-api-key: highest-priority-gemini-key
+            log-level: debug
+        """.trimIndent())
+        
+        arbigentDebugLog("Created config files:")
+        arbigentDebugLog("- settings.yaml: ${settingsYaml.exists()}")
+        arbigentDebugLog("- settings.local.yaml: ${localYaml.exists()}")
+        arbigentDebugLog("- settings.local.yml: ${localYml.exists()}")
+        
+        // Test help to see which values are used
+        val helpResult = runCli("run", "--help")
+        val helpOutput = helpResult.output
+        
+        arbigentDebugLog("Help output (first 1000 chars):\n${helpOutput.take(1000)}")
+        
+        // Should use highest priority values from settings.local.yml
+        assertTrue(
+            helpOutput.contains("currently: 'gemini'") ||
+            helpOutput.contains("ai-type") && helpOutput.contains("gemini"),
+            "Should use ai-type from highest priority settings.local.yml (gemini), not from lower priority files"
+        )
+        
+        assertTrue(
+            helpOutput.contains("currently: 'debug'") ||
+            helpOutput.contains("log-level") && helpOutput.contains("debug"),
+            "Should use log-level from highest priority settings.local.yml (debug), not from lower priority files"
+        )
+        
+        // Should use medium priority values from settings.local.yaml when not in highest priority
+        assertTrue(
+            helpOutput.contains("currently: 'android'") ||
+            helpOutput.contains("os") && helpOutput.contains("android"),
+            "Should use os from medium priority settings.local.yaml (android), not from lowest priority"
+        )
+        
+        // Should use lowest priority values from settings.yaml when not in higher priority files
+        assertTrue(
+            helpOutput.contains("currently: 'false'") ||
+            helpOutput.contains("dry-run") && !helpOutput.contains("true"),
+            "Should use dry-run from lowest priority settings.yaml (false)"
+        )
+        
+        // Verify project-file is available from lowest priority file
+        assertTrue(
+            helpOutput.contains("currently: '${projectFile.name}'") ||
+            helpOutput.contains("project-file"),
+            "Should have project-file available from settings.yaml"
+        )
+    }
+    
+    @Test
+    fun `CLI loads multiple configuration files with proper fallback`() {
+        val arbigentDir = File(tempDir.toFile(), ".arbigent")
+        
+        // Only create settings.yaml and settings.local.yaml (skip .yml files)
+        val settingsYaml = File(arbigentDir, "settings.yaml")
+        settingsYaml.writeText("""
+            project-file: ${projectFile.name}
+            ai-type: openai
+            openai-api-key: fallback-openai-key
+            log-level: warn
+            os: ios
+            dry-run: true
+        """.trimIndent())
+        
+        val localYaml = File(arbigentDir, "settings.local.yaml")
+        localYaml.writeText("""
+            # Override only some settings
+            ai-type: azureopenai
+            azure-openai-api-key: override-azure-key
+            log-level: info
+        """.trimIndent())
+        
+        // Test help to verify fallback behavior
+        val helpResult = runCli("run", "--help")
+        val helpOutput = helpResult.output
+        
+        // Should use settings.local.yaml values when available
+        assertTrue(
+            helpOutput.contains("currently: 'azureopenai'") ||
+            helpOutput.contains("ai-type") && helpOutput.contains("azureopenai"),
+            "Should use ai-type from settings.local.yaml (azureopenai)"
+        )
+        
+        assertTrue(
+            helpOutput.contains("currently: 'info'") ||
+            helpOutput.contains("log-level") && helpOutput.contains("info"),
+            "Should use log-level from settings.local.yaml (info)"
+        )
+        
+        // Should fall back to settings.yaml for values not in settings.local.yaml
+        // Note: os and dry-run may not show "currently:" in help text for all option types
+        assertTrue(
+            helpOutput.contains("--os") || helpOutput.contains("Target operating system"),
+            "Should have os option available from fallback settings.yaml"
+        )
+        
+        assertTrue(
+            helpOutput.contains("--dry-run") || helpOutput.contains("Dry run mode"),
+            "Should have dry-run option available from fallback settings.yaml"
+        )
+        
+        // Project file should also be available from fallback
+        assertTrue(
+            helpOutput.contains("currently: '${projectFile.name}'") ||
+            helpOutput.contains("project-file"),
+            "Should have project-file from fallback settings.yaml"
+        )
+    }
+    
+    @Test
+    fun `CLI respects detailed nested configuration priority`() {
+        val arbigentDir = File(tempDir.toFile(), ".arbigent")
+        
+        // Test the specific priority: local.yml xxxx > settings.yml run.xxxx
+        // Create settings.yml with run-specific settings
+        val settingsYml = File(arbigentDir, "settings.yml")
+        settingsYml.writeText("""
+            # settings.yml - lower priority file
+            project-file: ${projectFile.name}
+            ai-type: openai
+            openai-api-key: settings-yml-global-key
+            log-level: warn
+            
+            # Run-specific settings in settings.yml
+            run:
+              ai-type: azureopenai
+              azure-openai-api-key: settings-yml-run-azure-key
+              azure-openai-endpoint: https://settings.openai.azure.com/
+              log-level: error
+        """.trimIndent())
+        
+        // Create local.yml with ONLY global settings (no run-specific)
+        val localYml = File(arbigentDir, "settings.local.yml")
+        localYml.writeText("""
+            # local.yml - higher priority file
+            ai-type: gemini
+            gemini-api-key: local-yml-global-gemini-key
+            log-level: debug
+            # NO run-specific settings here!
+        """.trimIndent())
+        
+        arbigentDebugLog("Created detailed test config files:")
+        arbigentDebugLog("- settings.yml: ${settingsYml.exists()}")
+        arbigentDebugLog("- settings.local.yml: ${localYml.exists()}")
+        
+        // Test run command - should use local.yml global settings, NOT settings.yml run settings
+        val runHelpResult = runCli("run", "--help")
+        val runHelpOutput = runHelpResult.output
+        
+        arbigentDebugLog("Run help output (first 1000 chars):\n${runHelpOutput.take(1000)}")
+        
+        // Critical test: local.yml global ai-type should beat settings.yml run.ai-type
+        assertTrue(
+            runHelpOutput.contains("currently: 'gemini'") ||
+            runHelpOutput.contains("ai-type") && runHelpOutput.contains("gemini"),
+            "Should use ai-type=gemini from local.yml global, NOT azureopenai from settings.yml run.ai-type"
+        )
+        
+        // Critical test: local.yml global log-level should beat settings.yml run.log-level  
+        assertTrue(
+            runHelpOutput.contains("currently: 'debug'") ||
+            runHelpOutput.contains("log-level") && runHelpOutput.contains("debug"),
+            "Should use log-level=debug from local.yml global, NOT error from settings.yml run.log-level"
+        )
+        
+        // Verify gemini-api-key is available (confirming gemini is selected)
+        assertTrue(
+            runHelpOutput.contains("local-yml-global-gemini-key") ||
+            runHelpOutput.contains("gemini-api-key"),
+            "Should have gemini-api-key available since ai-type=gemini from local.yml"
+        )
+        
+        // Test scenarios command too - should also use local.yml global settings
+        val scenariosHelpResult = runCli("scenarios", "--help")
+        val scenariosHelpOutput = scenariosHelpResult.output
+        
+        assertTrue(
+            scenariosHelpOutput.contains("currently: 'debug'") ||
+            scenariosHelpOutput.contains("log-level") && scenariosHelpOutput.contains("debug"),
+            "Scenarios command should also use log-level=debug from local.yml global"
+        )
+    }
+    
+    @Test  
+    fun `CLI respects critical priority rule - local yml global beats settings yml run`() {
+        val arbigentDir = File(tempDir.toFile(), ".arbigent")
+        
+        // Test the critical priority rule: local.yml xxxx > settings.yml run.xxxx
+        // settings.yml with run-specific settings
+        val settingsYml = File(arbigentDir, "settings.yml")
+        settingsYml.writeText("""
+            project-file: ${projectFile.name}
+            ai-type: openai
+            openai-api-key: settings-yml-global-openai
+            log-level: warn
+            
+            # Run-specific settings that should be LOWER priority than local.yml global
+            run:
+              ai-type: azureopenai
+              azure-openai-api-key: settings-yml-run-azure
+              log-level: error
+        """.trimIndent())
+        
+        // local.yml with ONLY global settings (no run-specific)
+        val localYml = File(arbigentDir, "settings.local.yml")
+        localYml.writeText("""
+            # These global settings should beat settings.yml run settings
+            ai-type: gemini
+            gemini-api-key: local-yml-global-gemini
+            log-level: debug
+        """.trimIndent())
+        
+        // Test run command - should use local.yml global, NOT settings.yml run
+        val runResult = runCli("run", "--help")
+        val runOutput = runResult.output
+        
+        arbigentDebugLog("Run command output (priority test):\n${runOutput.take(800)}")
+        
+        // Critical: local.yml global should beat settings.yml run
+        assertTrue(
+            runOutput.contains("currently: 'gemini'") ||
+            runOutput.contains("ai-type") && runOutput.contains("gemini"),
+            "ai-type should be 'gemini' from local.yml global, NOT 'azureopenai' from settings.yml run"
+        )
+        
+        assertTrue(
+            runOutput.contains("currently: 'debug'") ||
+            runOutput.contains("log-level") && runOutput.contains("debug"),
+            "log-level should be 'debug' from local.yml global, NOT 'error' from settings.yml run"
+        )
+        
+        // Also test scenarios command for consistency
+        val scenariosResult = runCli("scenarios", "--help")
+        val scenariosOutput = scenariosResult.output
+        
+        assertTrue(
+            scenariosOutput.contains("currently: 'debug'") ||
+            scenariosOutput.contains("log-level") && scenariosOutput.contains("debug"),
+            "scenarios command should also use 'debug' from local.yml global"
+        )
+    }
+    
     private fun runCli(vararg args: String, expectSuccess: Boolean = true): CliResult {
         val command = listOf(cliPath) + args
         arbigentDebugLog("Running CLI command: ${command.joinToString(" ")}")

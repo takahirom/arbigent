@@ -23,22 +23,43 @@ data class CliAppSettings(
 class ArbigentCli : CliktCommand(name = "arbigent") {
   init {
     context {
-      val settingsFile = File(".arbigent/settings.local.yml")
-      if (settingsFile.exists()) {
-        valueSource = ChainedValueSource(
-          listOf(
-            // High priority: Command-specific settings (run.xxx, scenarios.xxx, etc.)
+      // Configuration file priority order: local.yml > local.yaml > settings.yml > settings.yaml
+      val configFileNames = listOf(
+        ".arbigent/settings.local.yml",
+        ".arbigent/settings.local.yaml", 
+        ".arbigent/settings.yml",
+        ".arbigent/settings.yaml"
+      )
+      
+      val existingConfigFiles = configFileNames.mapNotNull { fileName ->
+        val file = File(fileName)
+        if (file.exists()) file.absolutePath else null
+      }
+      
+      if (existingConfigFiles.isNotEmpty()) {
+        val valueSources = mutableListOf<ValueSource>()
+        
+        // For each config file, add command-specific settings first, then global settings
+        // This ensures proper priority: local.yml run.xxx > local.yml xxx > local.yaml run.xxx > local.yaml xxx > ...
+        existingConfigFiles.forEach { configPath ->
+          // Add command-specific settings (run.xxx, scenarios.xxx, etc.) - higher priority
+          valueSources.add(
             YamlValueSource.from(
-              settingsFile.absolutePath,
+              configPath,
               getKey = ValueSource.getKey(joinSubcommands = ".")
-            ),
-            // Low priority: Global settings (xxx) - fallback
+            )
+          )
+          
+          // Add global settings (xxx) - lower priority fallback for this file
+          valueSources.add(
             YamlValueSource.from(
-              settingsFile.absolutePath,
+              configPath,
               getKey = { _, option -> option.names.first().removePrefix("--") }
             )
           )
-        )
+        }
+        
+        valueSource = ChainedValueSource(valueSources)
       }
     }
   }
