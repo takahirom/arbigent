@@ -600,9 +600,14 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     arbigentInfoLog("")
     arbigentInfoLog("📋 Final Results:")
     
-    // Show each scenario with its dependencies
+    // Show only the main scenarios without dependencies to avoid confusion
     scenarios.forEach { scenario ->
-      logScenarioWithDependenciesStatus(arbigentProject, scenario)
+      val assignment = arbigentProject.scenarioAssignments().find { it.scenario.id == scenario.id }
+      if (assignment != null) {
+        val icon = getScenarioIcon(arbigentProject, scenario)
+        val state = assignment.scenarioExecutor.scenarioState().name()
+        arbigentInfoLog("$icon ${scenario.id}: $state")
+      }
     }
     
     arbigentInfoLog("")
