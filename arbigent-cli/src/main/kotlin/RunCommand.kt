@@ -289,8 +289,8 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     resultDir: File,
     dryRun: Boolean
   ) {
-    // Disable console output for Mosaic UI - logs will be displayed in mosaic instead
-    printLogger = {}
+    // Route logs to ArbigentGlobalStatus for Mosaic UI LogComponent display
+    printLogger = { log -> ArbigentGlobalStatus.log(log) }
 
     runNoRawMosaicBlocking {
       LaunchedEffect(Unit) {

@@ -3,6 +3,8 @@ package io.github.takahirom.arbigent
 import co.touchlab.kermit.LogWriter
 import co.touchlab.kermit.Logger
 import co.touchlab.kermit.Severity
+import io.github.takahirom.arbigent.ConfidentialInfo.removeConfidentialInfo
+import kotlin.time.Clock
 
 @RequiresOptIn(
   message = "This API is internal to Arbigent and should not be used from outside.",
@@ -115,18 +117,25 @@ public fun arbigentErrorLog(log: () -> String) {
 }
 
 @ArbigentInternalApi
-public var printLogger: (String) -> Unit = { println(it) }
+@OptIn(kotlin.time.ExperimentalTime::class)
+public var printLogger: (String) -> Unit = { log -> 
+  // Add time formatting for console output (non-interactive mode)
+  val timeText = Clock.System.now().toString().substring(11, 19)
+  println("$timeText $log")
+}
 
-@OptIn(ArbigentInternalApi::class)
+@OptIn(ArbigentInternalApi::class, kotlin.time.ExperimentalTime::class)
 private fun printLog(level: ArbigentLogLevel, rawLog: String, instance: Any? = null) {
-  val log = with(ConfidentialInfo) { rawLog.removeConfidentialInfo() }
+  val log = rawLog.removeConfidentialInfo()
   val logContent =
     if (instance != null && instance::class.simpleName != null) {
       "${level.shortName()}: $log (${instance::class.simpleName})"
     } else {
       "${level.shortName()}: $log"
     }
-  printLogger("Arbigent: $logContent")
+
+  // Route through printLogger (configured differently for interactive vs non-interactive mode)
+  printLogger(logContent)
 }
 
 public object ConfidentialInfo {
