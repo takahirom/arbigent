@@ -196,48 +196,61 @@ Commands:
   tags       Manage scenario tags
 ```
 
-#### Configuration with arbigent.properties
+#### Configuration with Settings Files
 
-Arbigent now supports configuration via an `arbigent.properties` file, which simplifies CLI usage by eliminating the need to specify common parameters repeatedly. Place this file in your project root directory.
+Arbigent supports configuration via settings files in the `.arbigent` directory, which simplifies CLI usage by eliminating the need to specify common parameters repeatedly. Create a `.arbigent` directory in your project root and place your configuration files inside.
 
-**Example configuration for Azure OpenAI:**
-```properties
-ai-type=azureopenai
-azure-openai-endpoint=https://xxxxxxxxx.openai.azure.com/openai/deployments/xxxxx/
-azure-openai-api-version=2025-xx-xx
-azure-openai-model-name=gpt-4o
-azure-openai-api-key=xxxxxxxxxxxxxxxxxx
-project-file=tests/arbigent-project.yml
-os=android
-log-level=info
-working-directory=/path/to/your/project
+Arbigent supports multiple configuration files with automatic priority ordering - local configuration files have higher priority than global ones, allowing you to maintain separate settings for different environments while providing appropriate fallbacks.
+
+**Prioritized Configuration Support:**
+
+Arbigent supports both global and command-specific configurations with prioritization:
+
+1. **High Priority**: Command-specific settings (e.g., `run.ai-type`)
+2. **Low Priority**: Global settings (e.g., `ai-type`) - used as fallback
+
+**Example hybrid configuration:**
+```yaml
+# Global settings (shared across all commands)
+project-file: tests/arbigent-project.yml
+working-directory: /path/to/your/project
+log-level: info
+
+# Default AI configuration (fallback)
+ai-type: openai
+openai-api-key: sk-xxxxxxxxxxxxxxxxxx
+openai-model-name: gpt-4o-mini
+
+# Run command specific settings (overrides global settings)
+run:
+  ai-type: azureopenai  # Overrides global ai-type
+  azure-openai-endpoint: https://xxxxxxxxx.openai.azure.com/openai/deployments/xxxxx/
+  azure-openai-api-version: 2025-xx-xx
+  azure-openai-model-name: gpt-4o
+  azure-openai-api-key: xxxxxxxxxxxxxxxxxx
+  os: android
 ```
 
-**Example configuration for OpenAI:**
-```properties
-ai-type=openai
-openai-api-key=sk-xxxxxxxxxxxxxxxxxx
-openai-model-name=gpt-4o-mini
-project-file=tests/arbigent-project.yml
-os=android
+**Simple flat configuration (still supported):**
+```yaml
+ai-type: azureopenai
+azure-openai-endpoint: https://xxxxxxxxx.openai.azure.com/openai/deployments/xxxxx/
+azure-openai-api-version: 2025-xx-xx
+azure-openai-model-name: gpt-4o
+azure-openai-api-key: xxxxxxxxxxxxxxxxxx
+project-file: tests/arbigent-project.yml
+os: android
+log-level: info
+working-directory: /path/to/your/project
 ```
 
-**Example configuration for Gemini:**
-```properties
-ai-type=gemini
-gemini-api-key=xxxxxxxxxxxxxxxxxx
-gemini-model-name=gemini-1.5-flash
-project-file=tests/arbigent-project.yml
-os=android
-```
-
-When using a properties file, you can run tests with the simplified command:
+When using a settings file, you can run tests with the simplified command:
 
 ```bash
 arbigent run
 ```
 
-All parameters configured in the properties file will be shown as `(source: already provided by property file)` in the help output, indicating which settings are already configured.
+All parameters configured in the settings files will be shown as `(source: already provided by property file)` in the help output, indicating which settings are already configured.
 
 #### arbigent run command
 
@@ -276,7 +289,7 @@ Options:
   -h, --help                             Show this message and exit
 ```
 
-When parameters are provided via the properties file, the help output will indicate `(source: already provided by property file)` for those options, so you know which parameters are already configured.
+When parameters are provided via the settings files, the help output will indicate `(source: already provided by property file)` for those options, so you know which parameters are already configured.
 
 #### Other commands
 

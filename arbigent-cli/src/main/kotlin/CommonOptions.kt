@@ -4,16 +4,15 @@ package io.github.takahirom.arbigent.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.default
-import com.github.ajalt.clikt.parameters.options.prompt
+import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.choice
 import io.github.takahirom.arbigent.ArbigentInternalApi
 
 const val defaultResultPath = "arbigent-result"
 const val defaultCachePath = "arbigent-cache"
 
-// Common options shared between commands - with fallback prompt for property file compatibility
+// Common options shared between commands
 fun CliktCommand.projectFileOption() = defaultOption("--project-file", help = "Path to the project YAML file")
-  .prompt("Project file path")
 
 fun CliktCommand.workingDirectoryOption() = defaultOption("--working-directory", help = "Working directory for the project")
 

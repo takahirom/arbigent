@@ -82,11 +82,21 @@ tasks.distTar {
 
 tasks.test {
   useJUnitPlatform()
+  
+  // Set test log level from system property or environment variable
+  // Usage: ./gradlew test -DTEST_LOG_LEVEL=DEBUG
+  // or: TEST_LOG_LEVEL=DEBUG ./gradlew test
+  val testLogLevel = System.getProperty("TEST_LOG_LEVEL") 
+    ?: System.getenv("TEST_LOG_LEVEL") 
+    ?: "INFO"
+  
+  systemProperty("arbigent.test.logLevel", testLogLevel)
 }
 
 dependencies {
   implementation("com.github.ajalt.clikt:clikt:5.0.2")
   implementation("com.jakewharton.mosaic:mosaic-runtime:0.17.0")
+  implementation("com.charleskorn.kaml:kaml:0.83.0")
   implementation(project(":arbigent-core"))
   implementation(project(":arbigent-ai-openai"))
   testImplementation(kotlin("test"))

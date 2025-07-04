@@ -14,6 +14,7 @@ test-arbigent.properties
 
 build/
 
+/.arbigent/settings.local.yml
 /local.properties
 /.idea/caches
 /.idea/libraries
