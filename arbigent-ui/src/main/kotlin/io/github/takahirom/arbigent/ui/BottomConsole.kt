@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import io.github.takahirom.arbigent.ArbigentFiles
 import io.github.takahirom.arbigent.ArbigentGlobalStatus
 import io.github.takahirom.arbigent.ArbigentInternalApi
-import io.github.takahirom.arbigent.arbigentLogFormatter
+import java.time.format.DateTimeFormatter
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.Orientation
 import org.jetbrains.jewel.ui.component.Divider
@@ -128,7 +128,7 @@ fun BottomConsole() {
           items(histories) { (instant, status) ->
             Row(Modifier.padding(2.dp)) {
               val timeText = instant.atZone(ZoneId.systemDefault()).format(
-                arbigentLogFormatter
+                DateTimeFormatter.ofPattern("HH:mm:ss.SSS")
               )
               Text(
                 text = timeText,
