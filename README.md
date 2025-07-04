@@ -196,9 +196,11 @@ Commands:
   tags       Manage scenario tags
 ```
 
-#### Configuration with settings.local.yml
+#### Configuration with Settings Files
 
-Arbigent now supports configuration via a `.arbigent/settings.local.yml` file, which simplifies CLI usage by eliminating the need to specify common parameters repeatedly. Create a `.arbigent` directory in your project root and place this file inside.
+Arbigent supports configuration via settings files in the `.arbigent` directory, which simplifies CLI usage by eliminating the need to specify common parameters repeatedly. Create a `.arbigent` directory in your project root and place your configuration files inside.
+
+Arbigent supports multiple configuration files with automatic priority ordering - local configuration files have higher priority than global ones, allowing you to maintain separate settings for different environments while providing appropriate fallbacks.
 
 **Prioritized Configuration Support:**
 
@@ -248,7 +250,7 @@ When using a settings file, you can run tests with the simplified command:
 arbigent run
 ```
 
-All parameters configured in the properties file will be shown as `(source: already provided by property file)` in the help output, indicating which settings are already configured.
+All parameters configured in the settings files will be shown as `(source: already provided by property file)` in the help output, indicating which settings are already configured.
 
 #### arbigent run command
 
@@ -287,7 +289,7 @@ Options:
   -h, --help                             Show this message and exit
 ```
 
-When parameters are provided via the properties file, the help output will indicate `(source: already provided by property file)` for those options, so you know which parameters are already configured.
+When parameters are provided via the settings files, the help output will indicate `(source: already provided by property file)` for those options, so you know which parameters are already configured.
 
 #### Other commands
 
