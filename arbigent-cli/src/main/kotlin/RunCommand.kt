@@ -14,6 +14,7 @@ import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.choice
 import com.jakewharton.mosaic.layout.background
 import com.jakewharton.mosaic.layout.padding
+import com.jakewharton.mosaic.layout.wrapContentWidth
 import com.jakewharton.mosaic.modifier.Modifier
 import com.jakewharton.mosaic.NonInteractivePolicy
 import com.jakewharton.mosaic.runMosaicBlocking
@@ -324,12 +325,26 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
         Text("─".repeat(80), color = White)
         
         val assignments by arbigentProject.scenarioAssignmentsFlow.collectAsState(arbigentProject.scenarioAssignments())
-        assignments
-          .filter { it.scenario.id in scenarioIdSet }
-          .shard(shard)
-          .forEach { (scenario, scenarioExecutor) ->
-            ScenarioRow(scenario, scenarioExecutor)
-          }
+        
+        // Find currently running scenario index
+        val runningScenarioIndex = scenarios.indexOfFirst { scenario ->
+          val assignment = assignments.find { it.scenario.id == scenario.id }
+          assignment?.scenarioExecutor?.scenarioState() == ArbigentScenarioExecutorState.Running
+        }
+        
+        // Display scenarios around the running one (±2)
+        val displayScenarios = if (runningScenarioIndex >= 0) {
+          val start = maxOf(0, runningScenarioIndex - 2)
+          val end = minOf(scenarios.size, runningScenarioIndex + 3) // +3 because end is exclusive
+          scenarios.subList(start, end)
+        } else {
+          // If no scenario is running, show first 5 scenarios
+          scenarios.take(5)
+        }
+        
+        displayScenarios.forEach { scenario ->
+          ScenarioWithDependenciesRow(arbigentProject, scenario, assignments)
+        }
       }
     }
   }
@@ -351,11 +366,25 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
         exitProcess(0)
       }
       
-      // Start progress monitoring
+      // Start reactive progress monitoring
       val progressJob = launch {
-        while (true) {
-          delay(5000) // Check every 5 seconds
+        // Monitor assignment changes
+        arbigentProject.scenarioAssignmentsFlow.collect { assignments ->
           logScenarioProgress(arbigentProject, scenarios)
+          
+          // Monitor state changes for each assignment
+          assignments.forEach { assignment ->
+            launch {
+              assignment.scenarioExecutor.scenarioStateFlow.collect {
+                logScenarioProgress(arbigentProject, scenarios)
+              }
+            }
+            launch {
+              assignment.scenarioExecutor.runningInfoFlow.collect {
+                logScenarioProgress(arbigentProject, scenarios)
+              }
+            }
+          }
         }
       }
       
@@ -379,41 +408,72 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     }
   }
   
-  private fun logScenarioProgress(arbigentProject: ArbigentProject, scenarios: List<ArbigentScenario>) {
-    val assignments = arbigentProject.scenarioAssignments()
+  private fun logScenarioWithDependencies(arbigentProject: ArbigentProject, scenario: ArbigentScenario, indent: String = ""): Boolean {
+    val assignment = arbigentProject.scenarioAssignments().find { it.scenario.id == scenario.id }
     var hasActiveScenarios = false
     
-    scenarios.forEach { scenario ->
-      val assignment = assignments.find { it.scenario.id == scenario.id }
-      if (assignment != null) {
-        val state = assignment.scenarioExecutor.scenarioState()
-        val runningInfo = assignment.scenarioExecutor.runningInfo()
-        
-        when (state) {
-          ArbigentScenarioExecutorState.Running -> {
+    if (assignment != null) {
+      val state = assignment.scenarioExecutor.scenarioState()
+      val runningInfo = assignment.scenarioExecutor.runningInfo()
+      
+      when (state) {
+        ArbigentScenarioExecutorState.Running -> {
+          hasActiveScenarios = true
+          if (runningInfo != null) {
+            arbigentInfoLog("$indent🔄 Running: ${scenario.id} - ${runningInfo.toString().lines().joinToString(" ")}")
+          } else {
+            arbigentInfoLog("$indent🔄 Running: ${scenario.id}")
+          }
+        }
+        ArbigentScenarioExecutorState.Success -> {
+          // Show completed status for context
+          arbigentInfoLog("$indent🟢 ${scenario.id}: Completed")
+        }
+        ArbigentScenarioExecutorState.Failed -> {
+          // Show failed status for context
+          arbigentInfoLog("$indent🔴 ${scenario.id}: Failed")
+        }
+        else -> {
+          // Show pending status for context
+          arbigentInfoLog("$indent⏸️ ${scenario.id}: Pending")
+        }
+      }
+    }
+    
+    // Show dependencies if this scenario has multiple agent tasks
+    if (scenario.agentTasks.size > 1) {
+      scenario.agentTasks.dropLast(1).forEach { task ->
+        val depScenario = arbigentProject.scenarios.find { it.id == task.scenarioId }
+        if (depScenario != null) {
+          if (logScenarioWithDependencies(arbigentProject, depScenario, "$indent └ ")) {
             hasActiveScenarios = true
-            if (runningInfo != null) {
-              arbigentInfoLog("🔄 Running: ${scenario.id} - ${runningInfo.toString().lines().joinToString(" ")}")
-            } else {
-              arbigentInfoLog("🔄 Running: ${scenario.id}")
-            }
-          }
-          ArbigentScenarioExecutorState.Success -> {
-            // Completion log is handled in ArbigentScenarioExecutor.execute
-          }
-          ArbigentScenarioExecutorState.Failed -> {
-            // Failure log is handled in ArbigentScenarioExecutor.execute
-          }
-          else -> {
-            // Idle - don't log to reduce noise
           }
         }
       }
     }
     
-    if (!hasActiveScenarios) {
-      // Check if all are completed
-      val allCompleted = scenarios.all { scenario ->
+    return hasActiveScenarios
+  }
+
+  private var lastLoggedStates = mutableMapOf<String, String>()
+  
+  private fun logScenarioProgress(arbigentProject: ArbigentProject, scenarios: List<ArbigentScenario>) {
+    // Use assignments to find running scenarios (not limited to scenarios list)
+    val assignments = arbigentProject.scenarioAssignments()
+    
+    
+    // Find running assignment using isRunning() method (more reliable than StateFlow with WhileSubscribed)
+    val runningAssignment = assignments.find { assignment ->
+      assignment.scenarioExecutor.isRunning()
+    }
+    
+    if (runningAssignment != null) {
+      // Show only the running scenario and its dependencies
+      logScenarioWithDependenciesWithStateChange(arbigentProject, runningAssignment.scenario)
+    } else {
+      // Check if execution scenarios are completed
+      val targetScenarios = scenarios
+      val allCompleted = targetScenarios.all { scenario ->
         val assignment = assignments.find { it.scenario.id == scenario.id }
         assignment?.scenarioExecutor?.scenarioState() in listOf(
           ArbigentScenarioExecutorState.Success,
@@ -421,30 +481,130 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
         )
       }
       
+      
       if (allCompleted) {
-        arbigentInfoLog("📊 All scenarios completed. Finalizing results...")
+        val stateKey = "all_completed"
+        if (lastLoggedStates[stateKey] != "completed") {
+          arbigentInfoLog("📊 All scenarios completed. Finalizing results...")
+          lastLoggedStates[stateKey] = "completed"
+        }
       }
     }
   }
   
+  private fun logScenarioWithDependenciesWithStateChange(arbigentProject: ArbigentProject, scenario: ArbigentScenario) {
+    val assignment = arbigentProject.scenarioAssignments().find { it.scenario.id == scenario.id }
+    
+    if (assignment != null) {
+      val state = assignment.scenarioExecutor.scenarioState()
+      val runningInfo = assignment.scenarioExecutor.runningInfo()
+      val stateString = "${state.name()}-${runningInfo?.toString() ?: "null"}"
+      
+      // Only log if state has changed
+      if (lastLoggedStates[scenario.id] != stateString) {
+        when (state) {
+          ArbigentScenarioExecutorState.Running -> {
+            if (runningInfo != null) {
+              arbigentInfoLog("🔄 Running: ${scenario.id} - ${runningInfo.toString().lines().firstOrNull() ?: ""}")
+            } else {
+              arbigentInfoLog("🔄 Running: ${scenario.id}")
+            }
+          }
+          ArbigentScenarioExecutorState.Success -> {
+            arbigentInfoLog("🟢 ${scenario.id}: Completed")
+          }
+          ArbigentScenarioExecutorState.Failed -> {
+            arbigentInfoLog("🔴 ${scenario.id}: Failed")
+          }
+          else -> {
+            arbigentInfoLog("⏸️ ${scenario.id}: Pending")
+          }
+        }
+        lastLoggedStates[scenario.id] = stateString
+      }
+    }
+    
+    // Show dependencies only if parent scenario is running and has multiple agent tasks
+    if (scenario.agentTasks.size > 1 && assignment != null) {
+      val parentState = assignment.scenarioExecutor.scenarioState()
+      if (parentState == ArbigentScenarioExecutorState.Running) {
+        val runningInfo = assignment.scenarioExecutor.runningInfo()
+        
+        scenario.agentTasks.dropLast(1).forEachIndexed { index, task ->
+          val depScenario = arbigentProject.scenarios.find { it.id == task.scenarioId }
+          if (depScenario != null) {
+            // Determine task status based on running info (same logic as UI)
+            val currentRunningInfo = runningInfo
+            val (icon, status) = if (currentRunningInfo != null) {
+              val currentTaskIndex = currentRunningInfo.runningTasks - 1 // Convert to 0-based
+              when {
+                index < currentTaskIndex -> "🟢" to "Completed"
+                index == currentTaskIndex -> "🔄" to "Running"
+                else -> "⏸️" to "Pending"
+              }
+            } else {
+              "⏸️" to "Pending"
+            }
+            
+            val depStateString = "$status-${currentRunningInfo?.toString() ?: "null"}"
+            val depKey = "${scenario.id}-dep-${task.scenarioId}"
+            
+            // Only log dependency if its state has changed
+            if (lastLoggedStates[depKey] != depStateString) {
+              arbigentInfoLog(" └ $icon ${depScenario.id}: $status")
+              lastLoggedStates[depKey] = depStateString
+            }
+          }
+        }
+      }
+    }
+  }
+  
+
+  private fun getScenarioIcon(arbigentProject: ArbigentProject, scenario: ArbigentScenario): String {
+    val assignment = arbigentProject.scenarioAssignments().find { it.scenario.id == scenario.id }
+    return if (assignment != null) {
+      when (assignment.scenarioExecutor.scenarioState()) {
+        ArbigentScenarioExecutorState.Success -> "🟢"
+        ArbigentScenarioExecutorState.Failed -> "🔴"
+        ArbigentScenarioExecutorState.Running -> "🔄"
+        else -> "⏸️"
+      }
+    } else "⏸️"
+  }
+
+  private fun logScenarioWithDependenciesStatus(arbigentProject: ArbigentProject, scenario: ArbigentScenario, indent: String = "") {
+    val assignment = arbigentProject.scenarioAssignments().find { it.scenario.id == scenario.id }
+    
+    if (assignment != null) {
+      val icon = getScenarioIcon(arbigentProject, scenario)
+      val state = assignment.scenarioExecutor.scenarioState().name()
+      arbigentInfoLog("$indent$icon ${scenario.id}: $state")
+    } else {
+      // Skip scenarios without assignments (dependency scenarios not selected for execution)
+      arbigentInfoLog("$indent⭕ ${scenario.id}: Dependency")
+    }
+    
+    // Show dependencies if this scenario has multiple agent tasks
+    if (scenario.agentTasks.size > 1) {
+      scenario.agentTasks.dropLast(1).forEach { task ->
+        val depScenario = arbigentProject.scenarios.find { it.id == task.scenarioId }
+        if (depScenario != null) {
+          logScenarioWithDependenciesStatus(arbigentProject, depScenario, "$indent └ ")
+        }
+      }
+    }
+  }
+
   private fun logFinalScenarioStatus(arbigentProject: ArbigentProject, scenarios: List<ArbigentScenario>) {
     arbigentInfoLog("")
     arbigentInfoLog("📋 Final Results:")
     
-    val assignments = arbigentProject.scenarioAssignments()
+    // Show each scenario with its dependencies
     scenarios.forEach { scenario ->
-      val assignment = assignments.find { it.scenario.id == scenario.id }
-      if (assignment != null) {
-        val state = assignment.scenarioExecutor.scenarioState()
-        val icon = when (state) {
-          ArbigentScenarioExecutorState.Success -> "🟢"
-          ArbigentScenarioExecutorState.Failed -> "🔴"
-          ArbigentScenarioExecutorState.Running -> "🔄"
-          else -> "⏸️"
-        }
-        arbigentInfoLog("  $icon ${scenario.id}: ${state.name()}")
-      }
+      logScenarioWithDependenciesStatus(arbigentProject, scenario)
     }
+    
     arbigentInfoLog("")
   }
 }
@@ -472,31 +632,114 @@ fun ScenarioRow(scenario: ArbigentScenario, scenarioExecutor: ArbigentScenarioEx
   val runningInfo by scenarioExecutor.runningInfoFlow.collectAsState(scenarioExecutor.runningInfo())
   val scenarioState by scenarioExecutor.scenarioStateFlow.collectAsState(scenarioExecutor.scenarioState())
   Row {
-    val bg = when (scenarioState) {
-      ArbigentScenarioExecutorState.Running -> Yellow
-      ArbigentScenarioExecutorState.Success -> Green
-      ArbigentScenarioExecutorState.Failed -> Red
-      ArbigentScenarioExecutorState.Idle -> White
+    val (icon, bg) = when (scenarioState) {
+      ArbigentScenarioExecutorState.Running -> "🔄" to Yellow
+      ArbigentScenarioExecutorState.Success -> "🟢" to Green
+      ArbigentScenarioExecutorState.Failed -> "🔴" to Red
+      ArbigentScenarioExecutorState.Idle -> "⏸️" to White
     }
     Text(
-      scenarioState.name(),
+      icon,
       modifier = Modifier
         .background(bg)
-        .padding(horizontal = 1),
+        .padding(horizontal = 1)
+        .wrapContentWidth(),
       color = Black,
     )
     if (runningInfo != null) {
       Text(
-        runningInfo.toString().lines()
-          .joinToString(" "),
-        modifier = Modifier.padding(horizontal = 1).background(Companion.Magenta),
+        runningInfo.toString().lines().firstOrNull() ?: "",
+        modifier = Modifier
+          .padding(horizontal = 1)
+          .background(Companion.Magenta),
         color = White,
       )
     }
     Text(
-      "Goal:" + scenario.agentTasks.lastOrNull()?.goal?.take(80) + "...",
+      "${scenario.id}: ${scenario.agentTasks.lastOrNull()?.goal?.lines()?.firstOrNull() ?: ""}",
       modifier = Modifier.padding(horizontal = 1),
     )
+  }
+}
+
+@Composable
+fun ScenarioWithDependenciesRow(
+  arbigentProject: ArbigentProject, 
+  scenario: ArbigentScenario, 
+  assignments: List<ArbigentScenarioAssignment>
+) {
+  // Find assignment for this scenario
+  val assignment = assignments.find { it.scenario.id == scenario.id }
+  
+  // Display main scenario
+  if (assignment != null) {
+    ScenarioRow(scenario, assignment.scenarioExecutor)
+  } else {
+    // Scenario not selected for execution
+    Row {
+      Text(
+        "⭕",
+        modifier = Modifier
+          .background(White)
+          .padding(horizontal = 1)
+          .wrapContentWidth(),
+        color = Black,
+      )
+      Text(
+        "${scenario.id}: ${scenario.agentTasks.lastOrNull()?.goal?.lines()?.firstOrNull() ?: ""}",
+        modifier = Modifier.padding(horizontal = 1),
+      )
+    }
+  }
+  
+  // Display dependencies only if parent scenario is running and has multiple agent tasks
+  if (scenario.agentTasks.size > 1 && assignment != null) {
+    val parentState by assignment.scenarioExecutor.scenarioStateFlow.collectAsState(assignment.scenarioExecutor.scenarioState())
+    if (parentState == ArbigentScenarioExecutorState.Running) {
+      val runningInfo by assignment.scenarioExecutor.runningInfoFlow.collectAsState(assignment.scenarioExecutor.runningInfo())
+      
+      scenario.agentTasks.dropLast(1).forEachIndexed { index, task ->
+        val depScenario = arbigentProject.scenarios.find { it.id == task.scenarioId }
+        if (depScenario != null) {
+          Row {
+            Text(
+              "  └ ",
+              modifier = Modifier
+                .padding(horizontal = 1)
+                .wrapContentWidth(),
+              color = White
+            )
+            
+            // Determine task status based on running info
+            val currentRunningInfo = runningInfo
+            val (icon, bg) = if (currentRunningInfo != null) {
+              val currentTaskIndex = currentRunningInfo.runningTasks - 1 // Convert to 0-based
+              when {
+                index < currentTaskIndex -> "🟢" to Green // Completed
+                index == currentTaskIndex -> "🔄" to Yellow // Currently running
+                else -> "⏸️" to White // Pending
+              }
+            } else {
+              "⏸️" to White // No running info available
+            }
+            
+            Text(
+              icon,
+              modifier = Modifier
+                .background(bg)
+                .padding(horizontal = 1)
+                .wrapContentWidth(),
+              color = Black,
+            )
+            Text(
+              "${depScenario.id}: ${depScenario.agentTasks.lastOrNull()?.goal?.lines()?.firstOrNull() ?: ""}",
+              modifier = Modifier.padding(horizontal = 1),
+              color = White
+            )
+          }
+        }
+      }
+    }
   }
 }
 
