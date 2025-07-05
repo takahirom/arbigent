@@ -16,6 +16,9 @@ jobs:
   cli-e2e-web:
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    concurrency:
+      group: ${{ github.workflow }}-cli-e2e-web-${{ github.ref }}
+      cancel-in-progress: true
 
     steps:
       - uses: actions/checkout@v4
