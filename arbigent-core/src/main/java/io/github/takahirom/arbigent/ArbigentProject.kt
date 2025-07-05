@@ -64,13 +64,15 @@ public class ArbigentProject(
   public suspend fun executeScenarios(scenarios: List<ArbigentScenario>) {
     mcpScope { mcpClient ->
       scenarios.forEach { scenario ->
-        arbigentInfoLog("Start scenario: $scenario")
+        arbigentInfoLog("⏺ ${scenario.id} scenario has been started")
         val scenarioExecutor =
           scenarioAssignments().first { it.scenario.id == scenario.id }.scenarioExecutor
         try {
           scenarioExecutor.execute(scenario, mcpClient)
         } catch (e: FailedToArchiveException) {
-          arbigentErrorLog("Failed to archive: $scenario" + e.stackTraceToString())
+          arbigentErrorLog {
+            "🔴 ${scenario.id} scenario failed to archive: ${e.stackTraceToString()}"
+          }
         }
         arbigentDebugLog(scenarioExecutor.statusText())
       }
@@ -82,7 +84,7 @@ public class ArbigentProject(
 
   public suspend fun execute(scenario: ArbigentScenario) {
     mcpScope { mcpClient ->
-      arbigentInfoLog("Start scenario: $scenario")
+      arbigentInfoLog("⏺ ${scenario.id} scenario has been started")
       val scenarioExecutor =
         scenarioAssignments().first { it.scenario.id == scenario.id }.scenarioExecutor
       scenarioExecutor.execute(scenario, mcpClient)

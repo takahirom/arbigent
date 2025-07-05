@@ -162,15 +162,15 @@ public class ClientConnection(
 
     try {
       // Log MCP tools request
-      logger.i { "MCP Tools - Requesting tools from server: $serverName" }
-      logger.i { "MCP Tools - JsonSchema type: $jsonSchemaType" }
+      logger.d { "MCP Tools - Requesting tools from server: $serverName" }
+      logger.d { "MCP Tools - JsonSchema type: $jsonSchemaType" }
       
       // Replace with your actual client call
       val toolsResponse = mcpClient.listTools()
       // Use mapNotNull to safely handle potential null tools or schemas
       val mcpTools = toolsResponse?.tools ?: emptyList()
 
-      logger.i { "MCP Tools - Received ${mcpTools.size} tools from server: $serverName" }
+      logger.d { "MCP Tools - Received ${mcpTools.size} tools from server: $serverName" }
 
       return mcpTools.mapNotNull { mcpTool ->
         val originalSchema = mcpTool.inputSchema ?: run {
@@ -178,10 +178,10 @@ public class ClientConnection(
           return@mapNotNull null // Skip tool if it has no schema
         }
 
-        logger.i { "MCP Tools - Processing tool: ${mcpTool.name}" }
-        logger.i { "MCP Tools - Original description: ${mcpTool.description}" }
-        logger.i { "MCP Tools - Original schema properties: ${originalSchema.properties}" }
-        logger.i { "MCP Tools - Original schema required: ${originalSchema.required}" }
+        logger.d { "MCP Tools - Processing tool: ${mcpTool.name}" }
+        logger.d { "MCP Tools - Original description: ${mcpTool.description}" }
+        logger.d { "MCP Tools - Original schema properties: ${originalSchema.properties}" }
+        logger.d { "MCP Tools - Original schema required: ${originalSchema.required}" }
 
         // Extract the actual properties from the JSON Schema format
         val actualProperties = if (originalSchema.properties.containsKey("properties")) {
@@ -200,8 +200,8 @@ public class ClientConnection(
 
         val actualRequired = originalSchema.required ?: emptyList()
         
-        logger.i { "MCP Tools - Extracted actual properties: $actualProperties" }
-        logger.i { "MCP Tools - Extracted actual required: $actualRequired" }
+        logger.d { "MCP Tools - Extracted actual properties: $actualProperties" }
+        logger.d { "MCP Tools - Extracted actual required: $actualRequired" }
 
         // Transform properties and determine required list based on the target API type
         val (transformedProperties, finalRequiredList) = when (jsonSchemaType) {
@@ -209,8 +209,8 @@ public class ClientConnection(
           JsonSchemaType.OpenAI -> transformSchemaForOpenAI(actualProperties, actualRequired)
         }
 
-        logger.i { "MCP Tools - Transformed properties: $transformedProperties" }
-        logger.i { "MCP Tools - Final required list: $finalRequiredList" }
+        logger.d { "MCP Tools - Transformed properties: $transformedProperties" }
+        logger.d { "MCP Tools - Final required list: $finalRequiredList" }
 
         // Create the final Tool object with the transformed schema
         val finalTool = Tool(
@@ -222,7 +222,7 @@ public class ClientConnection(
           )
         )
 
-        logger.i { "MCP Tools - Final tool: ${finalTool.name} with ${finalTool.inputSchema?.required?.size ?: 0} required parameters" }
+        logger.d { "MCP Tools - Final tool: ${finalTool.name} with ${finalTool.inputSchema?.required?.size ?: 0} required parameters" }
         finalTool
       }
     } catch (e: Exception) {
