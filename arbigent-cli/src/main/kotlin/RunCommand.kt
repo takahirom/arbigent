@@ -442,7 +442,7 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     
     // Show dependencies if this scenario has multiple agent tasks
     if (scenario.agentTasks.size > 1) {
-      scenario.agentTasks.dropLast(1).forEach { task ->
+      scenario.agentTasks.forEach { task ->
         val depScenario = arbigentProject.scenarios.find { it.id == task.scenarioId }
         if (depScenario != null) {
           if (logScenarioWithDependencies(arbigentProject, depScenario, "$indent └ ")) {
@@ -510,7 +510,7 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
       
       // Check dependency state changes if scenario has multiple tasks
       if (scenario.agentTasks.size > 1) {
-        scenario.agentTasks.dropLast(1).forEachIndexed { index, task ->
+        scenario.agentTasks.forEachIndexed { index, task ->
           val currentRunningInfo = runningInfo
           val status = if (currentRunningInfo != null) {
             val currentTaskIndex = currentRunningInfo.runningTasks - 1
@@ -555,7 +555,7 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
         
         // Log all dependencies
         if (scenario.agentTasks.size > 1) {
-          scenario.agentTasks.dropLast(1).forEachIndexed { index, task ->
+          scenario.agentTasks.forEachIndexed { index, task ->
             val depScenario = arbigentProject.scenarios.find { it.id == task.scenarioId }
             if (depScenario != null) {
               val currentRunningInfo = runningInfo
@@ -608,7 +608,7 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     
     // Show dependencies if this scenario has multiple agent tasks
     if (scenario.agentTasks.size > 1) {
-      scenario.agentTasks.dropLast(1).forEach { task ->
+      scenario.agentTasks.forEach { task ->
         val depScenario = arbigentProject.scenarios.find { it.id == task.scenarioId }
         if (depScenario != null) {
           logScenarioWithDependenciesStatus(arbigentProject, depScenario, "$indent └ ")
@@ -724,7 +724,7 @@ fun ScenarioWithDependenciesRow(
     if (parentState == ArbigentScenarioExecutorState.Running) {
       val runningInfo by assignment.scenarioExecutor.runningInfoFlow.collectAsState(assignment.scenarioExecutor.runningInfo())
       
-      scenario.agentTasks.dropLast(1).forEachIndexed { index, task ->
+      scenario.agentTasks.forEachIndexed { index, task ->
         val depScenario = arbigentProject.scenarios.find { it.id == task.scenarioId }
         if (depScenario != null) {
           Row {
