@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     concurrency:
-      group: ${{ github.workflow }}-${{ github.job }}-${{ github.ref }}
+      group: ${{ github.workflow }}-cli-e2e-web-${{ github.ref }}
       cancel-in-progress: true
 
     steps:

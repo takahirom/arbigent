@@ -18,7 +18,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     concurrency:
-      group: ${{ github.workflow }}-${{ github.job }}-${{ github.ref }}
+      group: ${{ github.workflow }}-build-${{ github.ref }}
       cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
@@ -74,7 +74,7 @@ jobs:
   cli-e2e-android:
     runs-on: ubuntu-latest
     concurrency:
-      group: ${{ github.workflow }}-${{ github.job }}-${{ github.ref }}-${{ matrix.shardIndex }}-${{ matrix.shardTotal }}
+      group: ${{ github.workflow }}-cli-e2e-android-${{ github.ref }}-${{ matrix.shardIndex }}-${{ matrix.shardTotal }}
       cancel-in-progress: true
     strategy:
       fail-fast: false
@@ -162,7 +162,7 @@ jobs:
   cli-e2e-ios:
     runs-on: macos-latest
     concurrency:
-      group: ${{ github.workflow }}-${{ github.job }}-${{ github.ref }}
+      group: ${{ github.workflow }}-cli-e2e-ios-${{ github.ref }}
       cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
