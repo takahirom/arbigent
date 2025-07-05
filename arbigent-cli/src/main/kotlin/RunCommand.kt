@@ -289,8 +289,8 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     resultDir: File,
     dryRun: Boolean
   ) {
-    // Disable console output for Mosaic UI - logs will be displayed in mosaic instead
-    printLogger = {}
+    // Route logs to ArbigentGlobalStatus for Mosaic UI LogComponent display
+    printLogger = { log -> ArbigentGlobalStatus.log(log) }
 
     runNoRawMosaicBlocking {
       LaunchedEffect(Unit) {
@@ -442,7 +442,7 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     
     // Show dependencies if this scenario has multiple agent tasks
     if (scenario.agentTasks.size > 1) {
-      scenario.agentTasks.dropLast(1).forEach { task ->
+      scenario.agentTasks.forEach { task ->
         val depScenario = arbigentProject.scenarios.find { it.id == task.scenarioId }
         if (depScenario != null) {
           if (logScenarioWithDependencies(arbigentProject, depScenario, "$indent └ ")) {
@@ -498,10 +498,41 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     if (assignment != null) {
       val state = assignment.scenarioExecutor.scenarioState()
       val runningInfo = assignment.scenarioExecutor.runningInfo()
-      val stateString = "${state.name()}-${runningInfo?.toString() ?: "null"}"
       
-      // Only log if state has changed
+      // Check if parent or any dependencies have state changes
+      var hasAnyChange = false
+      val stateString = state.name()
+      
+      // Check parent state change
       if (lastLoggedStates[scenario.id] != stateString) {
+        hasAnyChange = true
+      }
+      
+      // Check dependency state changes if scenario has multiple tasks
+      if (scenario.agentTasks.size > 1) {
+        scenario.agentTasks.forEachIndexed { index, task ->
+          val currentRunningInfo = runningInfo
+          val status = if (currentRunningInfo != null) {
+            val currentTaskIndex = currentRunningInfo.runningTasks - 1
+            when {
+              index < currentTaskIndex -> "Completed"
+              index == currentTaskIndex -> "Running"
+              else -> "Pending"
+            }
+          } else {
+            "Pending"
+          }
+          
+          val depKey = "${scenario.id}-dep-${task.scenarioId}"
+          if (lastLoggedStates[depKey] != status) {
+            hasAnyChange = true
+          }
+        }
+      }
+      
+      // If any state has changed, log parent and all dependencies together
+      if (hasAnyChange) {
+        // Log parent scenario
         when (state) {
           ArbigentScenarioExecutorState.Running -> {
             if (runningInfo != null) {
@@ -521,38 +552,28 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
           }
         }
         lastLoggedStates[scenario.id] = stateString
-      }
-    }
-    
-    // Show dependencies only if parent scenario is running and has multiple agent tasks
-    if (scenario.agentTasks.size > 1 && assignment != null) {
-      val parentState = assignment.scenarioExecutor.scenarioState()
-      if (parentState == ArbigentScenarioExecutorState.Running) {
-        val runningInfo = assignment.scenarioExecutor.runningInfo()
         
-        scenario.agentTasks.dropLast(1).forEachIndexed { index, task ->
-          val depScenario = arbigentProject.scenarios.find { it.id == task.scenarioId }
-          if (depScenario != null) {
-            // Determine task status based on running info (same logic as UI)
-            val currentRunningInfo = runningInfo
-            val (icon, status) = if (currentRunningInfo != null) {
-              val currentTaskIndex = currentRunningInfo.runningTasks - 1 // Convert to 0-based
-              when {
-                index < currentTaskIndex -> "🟢" to "Completed"
-                index == currentTaskIndex -> "🔄" to "Running"
-                else -> "⏸️" to "Pending"
+        // Log all dependencies
+        if (scenario.agentTasks.size > 1) {
+          scenario.agentTasks.forEachIndexed { index, task ->
+            val depScenario = arbigentProject.scenarios.find { it.id == task.scenarioId }
+            if (depScenario != null) {
+              val currentRunningInfo = runningInfo
+              val (icon, status) = if (currentRunningInfo != null) {
+                val currentTaskIndex = currentRunningInfo.runningTasks - 1
+                when {
+                  index < currentTaskIndex -> "🟢" to "Completed"
+                  index == currentTaskIndex -> "🔄" to "Running"
+                  else -> "⏸️" to "Pending"
+                }
+              } else {
+                "⏸️" to "Pending"
               }
-            } else {
-              "⏸️" to "Pending"
-            }
-            
-            val depStateString = "$status-${currentRunningInfo?.toString() ?: "null"}"
-            val depKey = "${scenario.id}-dep-${task.scenarioId}"
-            
-            // Only log dependency if its state has changed
-            if (lastLoggedStates[depKey] != depStateString) {
+              
               arbigentInfoLog(" └ $icon ${depScenario.id}: $status")
-              lastLoggedStates[depKey] = depStateString
+              
+              val depKey = "${scenario.id}-dep-${task.scenarioId}"
+              lastLoggedStates[depKey] = status
             }
           }
         }
@@ -587,7 +608,7 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     
     // Show dependencies if this scenario has multiple agent tasks
     if (scenario.agentTasks.size > 1) {
-      scenario.agentTasks.dropLast(1).forEach { task ->
+      scenario.agentTasks.forEach { task ->
         val depScenario = arbigentProject.scenarios.find { it.id == task.scenarioId }
         if (depScenario != null) {
           logScenarioWithDependenciesStatus(arbigentProject, depScenario, "$indent └ ")
@@ -600,9 +621,14 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     arbigentInfoLog("")
     arbigentInfoLog("📋 Final Results:")
     
-    // Show each scenario with its dependencies
+    // Show only the main scenarios without dependencies to avoid confusion
     scenarios.forEach { scenario ->
-      logScenarioWithDependenciesStatus(arbigentProject, scenario)
+      val assignment = arbigentProject.scenarioAssignments().find { it.scenario.id == scenario.id }
+      if (assignment != null) {
+        val icon = getScenarioIcon(arbigentProject, scenario)
+        val state = assignment.scenarioExecutor.scenarioState().name()
+        arbigentInfoLog("$icon ${scenario.id}: $state")
+      }
     }
     
     arbigentInfoLog("")
@@ -698,7 +724,7 @@ fun ScenarioWithDependenciesRow(
     if (parentState == ArbigentScenarioExecutorState.Running) {
       val runningInfo by assignment.scenarioExecutor.runningInfoFlow.collectAsState(assignment.scenarioExecutor.runningInfo())
       
-      scenario.agentTasks.dropLast(1).forEachIndexed { index, task ->
+      scenario.agentTasks.forEachIndexed { index, task ->
         val depScenario = arbigentProject.scenarios.find { it.id == task.scenarioId }
         if (depScenario != null) {
           Row {

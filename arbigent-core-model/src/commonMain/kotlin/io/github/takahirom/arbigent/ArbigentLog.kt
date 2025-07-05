@@ -4,11 +4,13 @@ import co.touchlab.kermit.LogWriter
 import co.touchlab.kermit.Logger
 import co.touchlab.kermit.Severity
 import io.github.takahirom.arbigent.ConfidentialInfo.removeConfidentialInfo
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.DateTimeFormatterBuilder
-import java.time.temporal.ChronoField
+import kotlin.time.Clock
+
+@RequiresOptIn(
+  message = "This API is internal to Arbigent and should not be used from outside.",
+  level = RequiresOptIn.Level.ERROR
+)
+public annotation class ArbigentInternalApi
 
 public enum class ArbigentLogLevel {
   DEBUG,
@@ -38,17 +40,15 @@ public var arbigentLogLevel: ArbigentLogLevel
     updateKermit(value)
   }
 
-private fun updateKermit(level: ArbigentLogLevel) {
+private fun updateKermit(value: ArbigentLogLevel) {
   Logger.setLogWriters(object : LogWriter() {
     override fun log(severity: Severity, message: String, tag: String, throwable: Throwable?) {
-      if (severity == Severity.Debug) {
-        printLog(ArbigentLogLevel.DEBUG, message)
-      } else if (severity == Severity.Info) {
-        printLog(ArbigentLogLevel.INFO, message)
-      } else if (severity == Severity.Warn) {
-        printLog(ArbigentLogLevel.WARN, message)
-      } else if (severity == Severity.Error) {
-        printLog(ArbigentLogLevel.ERROR, message)
+      when (severity) {
+        Severity.Debug -> printLog(ArbigentLogLevel.DEBUG, message)
+        Severity.Info -> printLog(ArbigentLogLevel.INFO, message)
+        Severity.Warn -> printLog(ArbigentLogLevel.WARN, message)
+        Severity.Error -> printLog(ArbigentLogLevel.ERROR, message)
+        else -> printLog(ArbigentLogLevel.INFO, message)
       }
     }
   })
@@ -92,6 +92,18 @@ public fun arbigentInfoLog(log: () -> String) {
   }
 }
 
+public fun arbigentWarnLog(log: String) {
+  if (arbigentLogLevel <= ArbigentLogLevel.WARN) {
+    printLog(ArbigentLogLevel.WARN, log)
+  }
+}
+
+public fun arbigentWarnLog(log: () -> String) {
+  if (arbigentLogLevel <= ArbigentLogLevel.WARN) {
+    printLog(ArbigentLogLevel.WARN, log())
+  }
+}
+
 public fun arbigentErrorLog(log: String) {
   if (arbigentLogLevel <= ArbigentLogLevel.ERROR) {
     printLog(ArbigentLogLevel.ERROR, log)
@@ -105,24 +117,14 @@ public fun arbigentErrorLog(log: () -> String) {
 }
 
 @ArbigentInternalApi
-public val arbigentLogFormatter: DateTimeFormatter = DateTimeFormatterBuilder()
-  .appendValue(ChronoField.MONTH_OF_YEAR, 2)
-  .appendLiteral('/')
-  .appendValue(ChronoField.DAY_OF_MONTH, 2)
-  .appendLiteral(' ')
-  .appendValue(ChronoField.HOUR_OF_DAY, 2)
-  .appendLiteral(':')
-  .appendValue(ChronoField.MINUTE_OF_HOUR, 2)
-  .optionalStart()
-  .appendLiteral(':')
-  .appendValue(ChronoField.SECOND_OF_MINUTE, 2)
-  .optionalStart()
-  .appendFraction(ChronoField.NANO_OF_SECOND, 3, 3, true)
-  .toFormatter()
+@OptIn(kotlin.time.ExperimentalTime::class)
+public var printLogger: (String) -> Unit = { log -> 
+  // Add time formatting for console output (non-interactive mode)
+  val timeText = Clock.System.now().toString().substring(11, 19)
+  println("$timeText $log")
+}
 
-@ArbigentInternalApi
-public var printLogger: (String) -> Unit = { println(it) }
-
+@OptIn(ArbigentInternalApi::class, kotlin.time.ExperimentalTime::class)
 private fun printLog(level: ArbigentLogLevel, rawLog: String, instance: Any? = null) {
   val log = rawLog.removeConfidentialInfo()
   val logContent =
@@ -131,16 +133,12 @@ private fun printLog(level: ArbigentLogLevel, rawLog: String, instance: Any? = n
     } else {
       "${level.shortName()}: $log"
     }
-  printLogger("Arbigent: $logContent")
-  ArbigentFiles.logFile?.parentFile?.mkdirs()
-  val date = arbigentLogFormatter.format(Instant.now().atZone(ZoneId.systemDefault()))
-  ArbigentFiles.logFile?.appendText("$date $logContent\n")
 
-  ArbigentGlobalStatus.log(logContent)
+  // Route through printLogger (configured differently for interactive vs non-interactive mode)
+  printLogger(logContent)
 }
 
 public object ConfidentialInfo {
-  @ArbigentInternalApi
   private val _shouldBeRemovedStrings: MutableMap<String, String> = mutableMapOf()
   public val shouldBeRemovedStrings: Map<String, String> get() = _shouldBeRemovedStrings
 
@@ -151,7 +149,6 @@ public object ConfidentialInfo {
     _shouldBeRemovedStrings[string] = replaceTo
   }
 
-  @ArbigentInternalApi
   public fun String.removeConfidentialInfo(): String {
     return shouldBeRemovedStrings.entries.fold(this) { acc, s ->
       acc.replace(s.key, s.value, ignoreCase = true)

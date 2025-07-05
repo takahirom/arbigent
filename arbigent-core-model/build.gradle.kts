@@ -19,6 +19,8 @@ kotlin {
       dependencies {
         implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.0")
         implementation("com.charleskorn.kaml:kaml:0.67.0")
+        implementation("co.touchlab:kermit:2.0.4")
+        implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.0")
       }
     }
   }
