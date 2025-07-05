@@ -17,7 +17,10 @@ import androidx.compose.ui.window.WindowExceptionHandler
 import androidx.compose.ui.window.WindowExceptionHandlerFactory
 import androidx.compose.ui.window.application
 import io.github.takahirom.arbigent.ArbigentAi
+import io.github.takahirom.arbigent.ArbigentGlobalStatus
+import io.github.takahirom.arbigent.ArbigentInternalApi
 import io.github.takahirom.arbigent.OpenAIAi
+import io.github.takahirom.arbigent.printLogger
 import io.github.takahirom.arbigent.ui.ArbigentAppStateHolder.ProjectDialogState
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
@@ -30,7 +33,11 @@ import org.jetbrains.jewel.window.styling.TitleBarStyle
 import java.awt.Window
 
 
+@OptIn(ArbigentInternalApi::class)
 fun main() {
+  // Route logs to ArbigentGlobalStatus for BottomConsole display
+  printLogger = { log -> ArbigentGlobalStatus.log(log) }
+  
   plantErrorDialog()
   application {
     val appStateHolder = remember {
