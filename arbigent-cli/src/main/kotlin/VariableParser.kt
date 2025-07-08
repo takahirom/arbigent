@@ -80,6 +80,11 @@ private fun parseJsonVariables(input: String): Map<String, String> {
             while (i < cleanJson.length && cleanJson[i].isWhitespace()) i++
             if (i < cleanJson.length && cleanJson[i] == ',') {
                 i++ // Skip comma
+                // Check for trailing comma
+                while (i < cleanJson.length && cleanJson[i].isWhitespace()) i++
+                if (i >= cleanJson.length) {
+                    throw IllegalArgumentException("Trailing comma in JSON")
+                }
             }
         }
         
