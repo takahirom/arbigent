@@ -86,7 +86,7 @@ class VariableParserTest {
     }
     
     @Test
-    fun `parseVariables throws on multiple equals signs`() {
+    fun `parseVariables handles multiple equals signs gracefully`() {
         val input = "key=value=extra"
         val result = parseVariables(input)
         
@@ -163,8 +163,7 @@ class VariableParserTest {
         val exception = assertFailsWith<CliktError> {
             parseVariables(input)
         }
-        assert(exception.message?.contains("Unmatched quote") == true || 
-               exception.message?.contains("Invalid") == true)
+        assert(exception.message?.contains("Unmatched quote") == true)
     }
     
     @Test
