@@ -1,5 +1,6 @@
 import androidx.compose.runtime.*
 import io.github.takahirom.arbigent.result.*
+import kotlinx.datetime.Instant
 import kotlinx.serialization.decodeFromString
 import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.dom.*
@@ -242,8 +243,9 @@ private fun AgentResultView(taskIndex: Int, agentResult: ArbigentAgentResult) {
   }
 }
 
+@OptIn(kotlin.time.ExperimentalTime::class)
 private fun formatTimestamp(timestamp: Long): String {
-  val instant = kotlinx.datetime.Instant.fromEpochMilliseconds(timestamp)
+  val instant = Instant.fromEpochMilliseconds(timestamp)
   return instant.toString().replace('T', ' ').substringBefore('.')
 }
 
