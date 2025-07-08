@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.serialization.Serializable
 
+private var stepCount = 1
+
 public class ArbigentContextHolder(
   public val goal: String,
   public val maxStep: Int,
@@ -14,9 +16,10 @@ public class ArbigentContextHolder(
   private val userPromptTemplate: UserPromptTemplate = UserPromptTemplate(UserPromptTemplate.DEFAULT_TEMPLATE),
 ) {
   public fun generateStepId(): String {
-    return "" + goal.hashCode() + "_" +
-      steps().size +"_" + startTimestamp + "_" + TimeProvider.get().currentTimeMillis().toString()
+    return String.format("%06d", stepCount++) + "_" + goal.hashCode() + "_" +
+      steps().size + "_" + startTimestamp + "_" + TimeProvider.get().currentTimeMillis().toString()
   }
+
   @Serializable
   public data class Step(
     public val stepId: String,
