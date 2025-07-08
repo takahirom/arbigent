@@ -95,6 +95,9 @@ internal class DefaultGoalVariableResolver : GoalVariableResolverInterface {
         }
         
         // Then replace non-escaped variables
+        var substitutionCount = 0
+        val substitutedVariables = mutableMapOf<String, String>()
+        
         val resolvedGoal = VARIABLE_PATTERN.replace(goalWithTempMarkers) { matchResult ->
             val variableName = matchResult.groupValues[1].trim()
             
@@ -105,10 +108,19 @@ internal class DefaultGoalVariableResolver : GoalVariableResolverInterface {
             }
             
             // Replace with value or keep original
-            variables[variableName] ?: run {
-                arbigentInfoLog("Variable '$variableName' not found in variables map. Keeping original placeholder.")
+            variables[variableName]?.let { value ->
+                substitutionCount++
+                substitutedVariables[variableName] = value
+                value
+            } ?: run {
+                arbigentDebugLog("Variable '$variableName' not found in variables map. Keeping original placeholder.")
                 matchResult.value
             }
+        }
+        
+        // Log substitution info if any variables were replaced
+        if (substitutionCount > 0) {
+            arbigentInfoLog("Goal variables substituted: $substitutedVariables")
         }
         
         // Finally, restore escaped variables

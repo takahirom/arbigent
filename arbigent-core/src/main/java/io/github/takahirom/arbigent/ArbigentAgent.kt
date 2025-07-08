@@ -866,22 +866,6 @@ public interface ArbigentStepInterceptor : ArbigentInterceptor {
   }
 }
 
-/**
- * Interceptor for monitoring and tracking variable usage
- */
-public interface ArbigentVariableUsageInterceptor : ArbigentInterceptor {
-  /**
-   * Called when variables are resolved for a goal
-   * @param originalGoal The original goal with variable placeholders
-   * @param resolvedGoal The goal after variable substitution
-   * @param variablesUsed Map of variable names to their substituted values
-   */
-  public fun onVariablesResolved(
-    originalGoal: String,
-    resolvedGoal: String,
-    variablesUsed: Map<String, String>
-  )
-}
 
 public fun defaultAgentActionTypesForVisualMode(): List<AgentActionType> {
   return listOf(
