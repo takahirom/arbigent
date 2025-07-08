@@ -38,9 +38,6 @@ public class ArbigentAgent(
   private val aiOptions = agentConfig.aiOptions
   private val appSettings = agentConfig.appSettings
   
-  // Cache for resolved goals to avoid repeated resolution
-  private val resolvedGoalCache = java.util.concurrent.ConcurrentHashMap<String, String>()
-  
   // Metrics for variable usage tracking
   private val variableUsageMetrics = VariableUsageMetrics()
 
@@ -199,8 +196,12 @@ public class ArbigentAgent(
     agentActionTypes: List<AgentActionType> = defaultAgentActionTypesForVisualMode(),
     mcpClient: MCPClient
   ) {
-    // Resolve variables in the goal with caching and logging
-    val resolvedGoal = resolveGoalWithCache(goal)
+    // Resolve variables in the goal
+    val resolvedGoal = if (appSettings?.variables != null) {
+      GoalVariableResolver.resolve(goal, appSettings.variables)
+    } else {
+      goal
+    }
     
     val executeInput = ExecuteInput(
       scenarioId = scenarioId,
@@ -326,88 +327,9 @@ public class ArbigentAgent(
   }
   
   /**
-   * Resolves goal variables with caching and enhanced logging
-   */
-  private fun resolveGoalWithCache(goal: String): String {
-    // Check cache first
-    resolvedGoalCache[goal]?.let { cached ->
-      arbigentDebugLog("Using cached resolved goal for: $goal")
-      variableUsageMetrics.recordCacheHit()
-      return cached
-    }
-    
-    // Handle null appSettings gracefully
-    if (appSettings == null) {
-      arbigentInfoLog("No appSettings available for variable resolution")
-      variableUsageMetrics.recordNoVariables()
-      return goal
-    }
-    
-    val variables = appSettings.variables
-    if (variables.isNullOrEmpty()) {
-      arbigentDebugLog("No variables defined in appSettings")
-      variableUsageMetrics.recordNoVariables()
-      return goal
-    }
-    
-    // Log variables being used for substitution
-    arbigentInfoLog("Resolving goal variables:")
-    arbigentInfoLog("  Original goal: $goal")
-    arbigentInfoLog("  Available variables: ${variables.keys.joinToString(", ")}")
-    
-    // Track which variables are actually used
-    val usedVariables = mutableMapOf<String, String>()
-    val variablePattern = """\{\{([^}]+)\}\}""".toRegex()
-    variablePattern.findAll(goal).forEach { match ->
-      val varName = match.groupValues[1]
-      if (variables.containsKey(varName)) {
-        usedVariables[varName] = variables[varName] ?: ""
-      }
-    }
-    
-    // Resolve the goal
-    val resolvedGoal = GoalVariableResolver.resolve(goal, variables)
-    
-    // Log the resolution result
-    arbigentInfoLog("  Resolved goal: $resolvedGoal")
-    arbigentInfoLog("  Variables substituted: ${usedVariables.keys.joinToString(", ")}")
-    
-    // Update metrics
-    variableUsageMetrics.recordSubstitution(usedVariables.size)
-    usedVariables.forEach { (varName, _) ->
-      variableUsageMetrics.recordVariableUsage(varName)
-    }
-    
-    // Notify interceptors
-    if (usedVariables.isNotEmpty()) {
-      variableUsageInterceptors.forEach { interceptor ->
-        try {
-          interceptor.onVariablesResolved(goal, resolvedGoal, usedVariables)
-        } catch (e: Exception) {
-          arbigentErrorLog("Error in variable usage interceptor: ${e.message}")
-        }
-      }
-    }
-    
-    // Cache the result
-    resolvedGoalCache[goal] = resolvedGoal
-    
-    return resolvedGoal
-  }
-  
-  /**
    * Gets variable usage metrics for telemetry
    */
   public fun getVariableUsageMetrics(): VariableUsageMetrics = variableUsageMetrics
-  
-  /**
-   * Clears the resolved goal cache. 
-   * Call this when appSettings or variables change.
-   */
-  public fun clearResolvedGoalCache() {
-    arbigentInfoLog("Clearing resolved goal cache (${resolvedGoalCache.size} entries)")
-    resolvedGoalCache.clear()
-  }
 }
 
 public class AgentConfig(

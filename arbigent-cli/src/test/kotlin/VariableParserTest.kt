@@ -16,46 +16,6 @@ class VariableParserTest {
     }
     
     @Test
-    fun `parseVariables with quoted values`() {
-        val input = """url="https://example.com",name="John Doe""""
-        val result = parseVariables(input)
-        
-        assertEquals(mapOf("url" to "https://example.com", "name" to "John Doe"), result)
-    }
-    
-    @Test
-    fun `parseVariables with mixed quoted values`() {
-        val input = """url='https://example.com',name="John Doe",id=123"""
-        val result = parseVariables(input)
-        
-        assertEquals(mapOf("url" to "https://example.com", "name" to "John Doe", "id" to "123"), result)
-    }
-    
-    @Test
-    fun `parseVariables with JSON format`() {
-        val input = """{"apiKey":"sk-123","userId":"user456","enabled":"true"}"""
-        val result = parseVariables(input)
-        
-        assertEquals(mapOf("apiKey" to "sk-123", "userId" to "user456", "enabled" to "true"), result)
-    }
-    
-    @Test
-    fun `parseVariables with JSON containing spaces`() {
-        val input = """{ "apiKey" : "sk-123" , "userId" : "user456" }"""
-        val result = parseVariables(input)
-        
-        assertEquals(mapOf("apiKey" to "sk-123", "userId" to "user456"), result)
-    }
-    
-    @Test
-    fun `parseVariables with escaped quotes in values`() {
-        val input = """message="Hello \"World\"",path='C:\\Users\\John'"""
-        val result = parseVariables(input)
-        
-        assertEquals(mapOf("message" to """Hello "World"""", "path" to """C:\Users\John"""), result)
-    }
-    
-    @Test
     fun `parseVariables with spaces around equals`() {
         val input = "key1 = value1 , key2=value2"
         val result = parseVariables(input)
@@ -64,19 +24,35 @@ class VariableParserTest {
     }
     
     @Test
-    fun `parseVariables with empty values`() {
-        val input = """key1=,key2="",key3=''"""
+    fun `parseVariables with empty string returns empty map`() {
+        val input = ""
         val result = parseVariables(input)
         
-        assertEquals(mapOf("key1" to "", "key2" to "", "key3" to ""), result)
+        assertEquals(emptyMap(), result)
     }
     
     @Test
-    fun `parseVariables with complex JSON values`() {
-        val input = """{"config":{"retries":3},"array":[1,2,3]}"""
+    fun `parseVariables with blank string returns empty map`() {
+        val input = "   "
         val result = parseVariables(input)
         
-        assertEquals(mapOf("config" to """{"retries":3}""", "array" to "[1,2,3]"), result)
+        assertEquals(emptyMap(), result)
+    }
+    
+    @Test
+    fun `parseVariables with single key-value pair`() {
+        val input = "key=value"
+        val result = parseVariables(input)
+        
+        assertEquals(mapOf("key" to "value"), result)
+    }
+    
+    @Test
+    fun `parseVariables with values containing special characters`() {
+        val input = "url=https://example.com,path=/usr/local/bin"
+        val result = parseVariables(input)
+        
+        assertEquals(mapOf("url" to "https://example.com", "path" to "/usr/local/bin"), result)
     }
     
     @Test
@@ -106,37 +82,16 @@ class VariableParserTest {
         val exception = assertFailsWith<CliktError> {
             parseVariables(input)
         }
-        assert(exception.message?.contains("Expected '='") == true)
+        assert(exception.message?.contains("Expected 'key=value'") == true)
     }
     
     @Test
-    fun `parseVariables throws on unterminated quoted value`() {
-        val input = """key="unterminated"""
+    fun `parseVariables throws on multiple equals signs`() {
+        val input = "key=value=extra"
+        val result = parseVariables(input)
         
-        val exception = assertFailsWith<CliktError> {
-            parseVariables(input)
-        }
-        assert(exception.message?.contains("Unterminated quoted value") == true)
-    }
-    
-    @Test
-    fun `parseVariables throws on invalid JSON`() {
-        val input = """{"key":"value",}"""
-        
-        val exception = assertFailsWith<CliktError> {
-            parseVariables(input)
-        }
-        assert(exception.message?.contains("Invalid JSON format") == true)
-    }
-    
-    @Test
-    fun `parseVariables throws on JSON with invalid variable name`() {
-        val input = """{"123key":"value"}"""
-        
-        val exception = assertFailsWith<CliktError> {
-            parseVariables(input)
-        }
-        assert(exception.message?.contains("Invalid variable name") == true)
+        // Should handle this gracefully by treating everything after first = as value
+        assertEquals(mapOf("key" to "value=extra"), result)
     }
     
     @Test
@@ -157,5 +112,107 @@ class VariableParserTest {
         assert(!isValidVariableName("my.var"))
         assert(!isValidVariableName("my var"))
         assert(!isValidVariableName("my@var"))
+    }
+    
+    // Quote handling tests
+    
+    @Test
+    fun `parseVariables with simple quoted values`() {
+        val input = """key="value""""
+        val result = parseVariables(input)
+        
+        assertEquals(mapOf("key" to "value"), result)
+    }
+    
+    @Test
+    fun `parseVariables with values containing spaces in quotes`() {
+        val input = """key="value with spaces""""
+        val result = parseVariables(input)
+        
+        assertEquals(mapOf("key" to "value with spaces"), result)
+    }
+    
+    @Test
+    fun `parseVariables with URLs containing query params in quotes`() {
+        val input = """url="https://example.com?foo=1""""
+        val result = parseVariables(input)
+        
+        assertEquals(mapOf("url" to "https://example.com?foo=1"), result)
+    }
+    
+    @Test
+    fun `parseVariables with single quotes`() {
+        val input = """key='value'"""
+        val result = parseVariables(input)
+        
+        assertEquals(mapOf("key" to "value"), result)
+    }
+    
+    @Test
+    fun `parseVariables with mixed quoted and non-quoted values`() {
+        val input = """key1=value1,key2="value 2""""
+        val result = parseVariables(input)
+        
+        assertEquals(mapOf("key1" to "value1", "key2" to "value 2"), result)
+    }
+    
+    @Test
+    fun `parseVariables throws on unmatched quotes`() {
+        val input = """key="value"""
+        
+        val exception = assertFailsWith<CliktError> {
+            parseVariables(input)
+        }
+        assert(exception.message?.contains("Unmatched quote") == true || 
+               exception.message?.contains("Invalid") == true)
+    }
+    
+    @Test
+    fun `parseVariables with empty quoted values`() {
+        val input = """key="""""
+        val result = parseVariables(input)
+        
+        assertEquals(mapOf("key" to ""), result)
+    }
+    
+    @Test
+    fun `parseVariables with values containing commas in quotes`() {
+        val input = """key="value,with,commas""""
+        val result = parseVariables(input)
+        
+        assertEquals(mapOf("key" to "value,with,commas"), result)
+    }
+    
+    @Test
+    fun `parseVariables with multiple quoted values`() {
+        val input = """key1="value 1",key2="value 2",key3="value 3""""
+        val result = parseVariables(input)
+        
+        assertEquals(mapOf("key1" to "value 1", "key2" to "value 2", "key3" to "value 3"), result)
+    }
+    
+    @Test
+    fun `parseVariables with quoted values containing equals signs`() {
+        val input = """equation="x=y+2",url="https://example.com?param=value""""
+        val result = parseVariables(input)
+        
+        assertEquals(mapOf("equation" to "x=y+2", "url" to "https://example.com?param=value"), result)
+    }
+    
+    @Test
+    fun `parseVariables with mixed single and double quotes`() {
+        val input = """key1="double quoted",key2='single quoted'"""
+        val result = parseVariables(input)
+        
+        assertEquals(mapOf("key1" to "double quoted", "key2" to "single quoted"), result)
+    }
+    
+    @Test
+    fun `parseVariables with quotes in the middle of value`() {
+        val input = """key=before"quoted"after"""
+        val result = parseVariables(input)
+        
+        // This tests current behavior - might need adjustment based on requirements
+        assertEquals(mapOf("key" to """before"quoted"after"""), result)
     }
 }

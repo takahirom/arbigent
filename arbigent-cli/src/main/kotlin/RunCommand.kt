@@ -67,11 +67,9 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
 
   private val variables by defaultOption(
     "--variables",
-    help = """Variables to replace in goals. 
-    |Examples:
-    |  Simple: --variables "env=production,timeout=30"
-    |  Quoted: --variables 'url="https://example.com",name="John Doe"'  
-    |  JSON:   --variables '{"apiKey":"sk-123","config":{"retries":3}}'""".trimMargin()
+    help = """Variables to replace in goals. Format: key1=value1,key2=value2
+             |Quote values with spaces: key="value with spaces"
+             |Example: name=John,message="Hello World",url="https://example.com"""".trimMargin()
   )
     .convert { input -> parseVariables(input) }
 
