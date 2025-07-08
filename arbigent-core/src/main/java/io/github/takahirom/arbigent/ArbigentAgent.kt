@@ -37,9 +37,6 @@ public class ArbigentAgent(
   private val prompt = agentConfig.prompt
   private val aiOptions = agentConfig.aiOptions
   private val appSettings = agentConfig.appSettings
-  
-  // Metrics for variable usage tracking
-  private val variableUsageMetrics = VariableUsageMetrics()
 
   private val executeInterceptors: List<ArbigentExecutionInterceptor> = interceptors
     .filterIsInstance<ArbigentExecutionInterceptor>()
@@ -134,8 +131,6 @@ public class ArbigentAgent(
     chain(input)
   }
   
-  private val variableUsageInterceptors: List<ArbigentVariableUsageInterceptor> = interceptors
-    .filterIsInstance<ArbigentVariableUsageInterceptor>()
   private val coroutineScope =
     CoroutineScope(ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob())
   private var job: Job? = null
@@ -326,10 +321,6 @@ public class ArbigentAgent(
     )
   }
   
-  /**
-   * Gets variable usage metrics for telemetry
-   */
-  public fun getVariableUsageMetrics(): VariableUsageMetrics = variableUsageMetrics
 }
 
 public class AgentConfig(
@@ -1258,76 +1249,4 @@ private suspend fun step(
     )
   )
   return StepResult.Continue
-}
-
-/**
- * Tracks metrics about variable usage for telemetry and debugging
- */
-public class VariableUsageMetrics {
-  private val totalSubstitutions = java.util.concurrent.atomic.AtomicInteger(0)
-  private val cacheHits = java.util.concurrent.atomic.AtomicInteger(0)
-  private val noVariablesCalls = java.util.concurrent.atomic.AtomicInteger(0)
-  private val variableUsageCount = java.util.concurrent.ConcurrentHashMap<String, Int>()
-  private val lastUsedTimestamp = java.util.concurrent.ConcurrentHashMap<String, Long>()
-  
-  /**
-   * Record a successful variable substitution
-   */
-  public fun recordSubstitution(variableCount: Int) {
-    totalSubstitutions.incrementAndGet()
-    arbigentDebugLog("Variable substitution recorded: $variableCount variables used")
-  }
-  
-  /**
-   * Record when a cached resolved goal is used
-   */
-  public fun recordCacheHit() {
-    cacheHits.incrementAndGet()
-    arbigentDebugLog("Variable resolution cache hit")
-  }
-  
-  /**
-   * Record when no variables are available for substitution
-   */
-  public fun recordNoVariables() {
-    noVariablesCalls.incrementAndGet()
-  }
-  
-  /**
-   * Record usage of a specific variable
-   */
-  public fun recordVariableUsage(variableName: String) {
-    variableUsageCount.compute(variableName) { _, count -> (count ?: 0) + 1 }
-    lastUsedTimestamp[variableName] = TimeProvider.get().currentTimeMillis()
-  }
-  
-  /**
-   * Get current metrics as a map for telemetry
-   */
-  public fun getMetrics(): Map<String, Any> {
-    val totalSubs = totalSubstitutions.get()
-    val hits = cacheHits.get()
-    return mapOf(
-      "totalSubstitutions" to totalSubs,
-      "cacheHits" to hits,
-      "cacheHitRate" to if (totalSubs > 0) hits.toDouble() / totalSubs else 0.0,
-      "noVariablesCalls" to noVariablesCalls.get(),
-      "uniqueVariablesUsed" to variableUsageCount.size,
-      "mostUsedVariables" to variableUsageCount.entries
-        .sortedByDescending { it.value }
-        .take(5)
-        .associate { it.key to it.value }
-    )
-  }
-  
-  /**
-   * Reset all metrics
-   */
-  public fun reset() {
-    totalSubstitutions.set(0)
-    cacheHits.set(0)
-    noVariablesCalls.set(0)
-    variableUsageCount.clear()
-    lastUsedTimestamp.clear()
-  }
 }
