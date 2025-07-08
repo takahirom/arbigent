@@ -26,7 +26,7 @@ kotlin {
         implementation(compose.html.core)
         implementation(compose.runtime)
         implementation("com.charleskorn.kaml:kaml:0.67.0")
-        implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
+        implementation(libs.kotlinx.datetime)
       }
     }
   }
