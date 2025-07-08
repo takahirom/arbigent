@@ -218,7 +218,8 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
           } else {
             null
           },
-          fixedScenarios = fixedScenarios
+          fixedScenarios = fixedScenarios,
+          appSettings = appSettings
         ).apply {
           aiOptions(projectSettings.aiOptions?.mergeWith(nodeScenario.aiOptions) ?: nodeScenario.aiOptions)
           aiFactory(aiFactory)

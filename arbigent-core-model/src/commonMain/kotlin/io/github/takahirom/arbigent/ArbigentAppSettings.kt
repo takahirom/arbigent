@@ -1,9 +1,16 @@
 package io.github.takahirom.arbigent
 
-/**
- * Interface for application settings that can be used across modules.
- */
+/** Application settings interface. */
 public interface ArbigentAppSettings {
+    /** Working directory path. */
     public val workingDirectory: String?
+    
+    /** PATH environment variable. */
     public val path: String?
+    
+    /**
+     * Variables for substitution in goals using {{variable_name}} format.
+     * Escaped variables (\{{variable_name}}) are preserved.
+     */
+    public val variables: Map<String, String>?
 }

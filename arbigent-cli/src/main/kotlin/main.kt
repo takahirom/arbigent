@@ -17,7 +17,8 @@ import java.io.File
  */
 data class CliAppSettings(
   override val workingDirectory: String?,
-  override val path: String?
+  override val path: String?,
+  override val variables: Map<String, String>? = null
 ) : ArbigentAppSettings
 
 class ArbigentCli : CliktCommand(name = "arbigent") {

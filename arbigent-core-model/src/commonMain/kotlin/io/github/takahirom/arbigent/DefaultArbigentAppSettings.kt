@@ -18,4 +18,11 @@ public object DefaultArbigentAppSettings : ArbigentAppSettings {
    * @return Always returns null as this is a default implementation.
    */
   override val path: String? = null
+
+  /**
+   * Gets the variables map for goal substitution.
+   *
+   * @return Always returns null as this is a default implementation.
+   */
+  override val variables: Map<String, String>? = null
 }
