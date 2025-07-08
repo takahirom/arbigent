@@ -67,7 +67,7 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
 
   private val scenarioIds by defaultOption(
     "--scenario-ids",
-    help = "Scenario IDs to execute (comma-separated or multiple flags)"
+    help = "Scenario IDs to execute with their dependencies (comma-separated or multiple flags)"
   )
     .split(",")
     .multiple()
