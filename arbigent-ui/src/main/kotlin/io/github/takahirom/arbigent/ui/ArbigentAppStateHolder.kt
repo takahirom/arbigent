@@ -4,6 +4,7 @@ import io.github.takahirom.arbigent.*
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import io.github.takahirom.arbigent.result.StepFeedback
 import io.github.takahirom.arbigent.result.StepFeedbackEvent
+import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import java.io.File
@@ -106,7 +107,7 @@ class ArbigentAppStateHolder(
     )
   }
   // AppSettings for working directory
-  private val appSettingsStateHolder = AppSettingsStateHolder()
+  val appSettingsStateHolder = AppSettingsStateHolder()
   val appSettings get() = appSettingsStateHolder.appSettings
   val devicesStateHolder = DevicesStateHolder(availableDeviceListFactory)
 
@@ -179,6 +180,20 @@ class ArbigentAppStateHolder(
     CoroutineScope(ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob())
 
   val stepFeedbacks: MutableStateFlow<Set<StepFeedback>> = MutableStateFlow(setOf())
+  
+  init {
+    // Watch for appSettings changes and recreate project if needed
+    coroutineScope.launch {
+      snapshotFlow { appSettings.variables }
+        .distinctUntilChanged()
+        .drop(1) // Skip initial value
+        .collect {
+          if (projectStateFlow.value != null) {
+            recreateProject()
+          }
+        }
+    }
+  }
 
   fun addSubScenario(parent: ArbigentScenarioStateHolder) {
     val scenarioStateHolder = ArbigentScenarioStateHolder(tagManager = tagManager).apply {

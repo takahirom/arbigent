@@ -27,11 +27,6 @@ class AppSettingsStateHolder {
     Preference.appSettingValue = appSettings
   }
 
-  fun onVariablesChanged(variables: Map<String, String>) {
-    appSettings = appSettings.copy(variables = variables)
-    Preference.appSettingValue = appSettings
-  }
-
   fun addVariable(key: String, value: String) {
     val currentVariables = appSettings.variables?.toMutableMap() ?: mutableMapOf()
     currentVariables[key] = value
@@ -43,16 +38,6 @@ class AppSettingsStateHolder {
     val currentVariables = appSettings.variables?.toMutableMap() ?: return
     currentVariables.remove(key)
     appSettings = appSettings.copy(variables = if (currentVariables.isEmpty()) null else currentVariables)
-    Preference.appSettingValue = appSettings
-  }
-
-  fun updateVariable(oldKey: String, newKey: String, value: String) {
-    val currentVariables = appSettings.variables?.toMutableMap() ?: mutableMapOf()
-    if (oldKey != newKey) {
-      currentVariables.remove(oldKey)
-    }
-    currentVariables[newKey] = value
-    appSettings = appSettings.copy(variables = currentVariables)
     Preference.appSettingValue = appSettings
   }
 }

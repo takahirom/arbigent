@@ -13,6 +13,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.takahirom.arbigent.ArbigentDeviceOs
+import kotlinx.coroutines.delay
 import org.jetbrains.jewel.ui.component.*
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
@@ -97,6 +98,7 @@ fun LauncherScreen(
     )
     AppSettingsSection(
       modifier = Modifier.padding(8.dp),
+      appSettingsStateHolder = appStateHolder.appSettingsStateHolder,
     )
     val deviceIsSelected = devices.isNotEmpty()
     if (!deviceIsSelected) {
@@ -221,8 +223,8 @@ private fun AiProviderSetting(
 @Composable
 private fun AppSettingsSection(
   modifier: Modifier = Modifier,
+  appSettingsStateHolder: AppSettingsStateHolder,
 ) {
-  val appSettingsStateHolder = remember { AppSettingsStateHolder() }
   val appSettings = appSettingsStateHolder.appSettings
 
   ExpandableSection("App Settings") {
@@ -273,158 +275,88 @@ private fun VariablesSection(
   
   Text("Variables (for goal substitution)")
   Text(
-    "Add key-value pairs to replace {{variable}} in goals",
+    "Use {{variable_name}} in goals to substitute values",
     style = androidx.compose.ui.text.TextStyle(
       fontSize = 12.sp,
       color = androidx.compose.ui.graphics.Color.Gray
     ),
     modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
   )
-  Text(
-    "Variable names must contain only letters, numbers, and underscores",
-    style = androidx.compose.ui.text.TextStyle(
-      fontSize = 11.sp,
-      color = androidx.compose.ui.graphics.Color.Gray
-    ),
-    modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
-  )
   
   val variables = appSettings.variables ?: emptyMap()
-  val maxVariables = 20
+  var numberOfSlots by rememberSaveable { mutableStateOf((variables.size + 1).coerceAtLeast(1)) }
+  var clearTrigger by remember { mutableStateOf(0) }
   
-  // Display existing variables
-  variables.forEach { (key, value) ->
-    var isEditing by remember { mutableStateOf(false) }
-    var editKey by remember(key) { mutableStateOf(key) }
-    var editValue by remember(value) { mutableStateOf(value) }
-    
-    Row(
-      modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-      verticalAlignment = Alignment.CenterVertically
-    ) {
-      if (isEditing) {
-        // Edit mode
-        val keyState = rememberSaveable(key, saver = TextFieldState.Saver) {
-          TextFieldState(editKey, TextRange(editKey.length))
-        }
-        val valueState = rememberSaveable(value, saver = TextFieldState.Saver) {
-          TextFieldState(editValue, TextRange(editValue.length))
-        }
+  Column(modifier = Modifier.padding(horizontal = 8.dp)) {
+    // Create slots for variables
+    repeat(numberOfSlots) { index ->
+      val variableKey = remember(variables) { 
+        variables.keys.elementAtOrNull(index) ?: ""
+      }
+      val variableValue = remember(variables, variableKey) {
+        if (variableKey.isNotEmpty()) variables[variableKey] ?: "" else ""
+      }
+      
+      // Use key to force recreation when clearing
+      key(index, clearTrigger) {
+        var shouldClear by remember { mutableStateOf(false) }
+        val keyState = rememberTextFieldState(if (shouldClear) "" else variableKey)
+        val valueState = rememberTextFieldState(if (shouldClear) "" else variableValue)
+        var keyError by remember { mutableStateOf<String?>(null) }
+        var previousKey by remember { mutableStateOf(variableKey) }
+      
+      // Update variables when text changes
+      LaunchedEffect(keyState.text, valueState.text) {
+        delay(500) // Debounce
         
-        LaunchedEffect(Unit) {
-          snapshotFlow { keyState.text }
-            .collect { editKey = it.toString() }
-        }
-        LaunchedEffect(Unit) {
-          snapshotFlow { valueState.text }
-            .collect { editValue = it.toString() }
-        }
+        val newKey = keyState.text.toString().trim()
+        val newValue = valueState.text.toString().trim()
         
-        TextField(
-          state = keyState,
-          modifier = Modifier.width(120.dp),
-          placeholder = { Text("Variable name") }
-        )
-        Text(" = ", modifier = Modifier.padding(horizontal = 4.dp))
-        TextField(
-          state = valueState,
-          modifier = Modifier.weight(1f),
-          placeholder = { Text("Value") }
-        )
-        // Save button
-        IconButton(
-          onClick = {
-            val trimmedKey = editKey.trim()
-            val trimmedValue = editValue.trim()
-            if (isValidVariableName(trimmedKey) && trimmedValue.isNotBlank()) {
-              appSettingsStateHolder.updateVariable(key, trimmedKey, trimmedValue)
-              isEditing = false
-            }
-          },
-          enabled = isValidVariableName(editKey.trim()) && editValue.trim().isNotBlank()
-        ) {
-          Icon(
-            key = AllIconsKeys.Actions.Execute,
-            contentDescription = "Save",
-            hint = Size(16)
-          )
-        }
-        // Cancel button
-        IconButton(
-          onClick = {
-            editKey = key
-            editValue = value
-            isEditing = false
+        // Validate key
+        when {
+          newKey.isNotEmpty() && !isValidVariableName(newKey) -> {
+            keyError = "Invalid name"
           }
-        ) {
-          Icon(
-            key = AllIconsKeys.Actions.Cancel,
-            contentDescription = "Cancel",
-            hint = Size(16)
-          )
-        }
-      } else {
-        // Display mode
-        Text("{{$key}} = ", modifier = Modifier.width(150.dp))
-        Text(value, modifier = Modifier.weight(1f))
-        // Edit button
-        IconButton(
-          onClick = { isEditing = true }
-        ) {
-          Icon(
-            key = AllIconsKeys.Actions.Edit,
-            contentDescription = "Edit variable",
-            hint = Size(16)
-          )
-        }
-        // Remove button
-        IconButton(
-          onClick = { appSettingsStateHolder.removeVariable(key) }
-        ) {
-          Icon(
-            key = AllIconsKeys.General.Remove,
-            contentDescription = "Remove variable",
-            hint = Size(16)
-          )
+          newKey.isNotEmpty() && newKey != previousKey && variables.containsKey(newKey) -> {
+            keyError = "Already exists"
+          }
+          else -> {
+            keyError = null
+            
+            // Update variables
+            if (previousKey.isNotEmpty() && previousKey != newKey) {
+              // Key changed or removed
+              appSettingsStateHolder.removeVariable(previousKey)
+            }
+            
+            if (newKey.isNotEmpty() && newValue.isNotEmpty()) {
+              // Add or update variable
+              appSettingsStateHolder.addVariable(newKey, newValue)
+              previousKey = newKey
+            } else if (newKey.isEmpty() && previousKey.isNotEmpty()) {
+              // Key cleared, remove variable
+              appSettingsStateHolder.removeVariable(previousKey)
+              previousKey = ""
+            } else if (newKey.isNotEmpty() && newValue.isEmpty() && variables.containsKey(newKey)) {
+              // Value cleared, remove variable
+              appSettingsStateHolder.removeVariable(newKey)
+              previousKey = ""
+            }
+          }
         }
       }
-    }
-  }
-  
-  // Add new variable (only show if under limit)
-  if (variables.size < maxVariables) {
-    var newKey by remember { mutableStateOf("") }
-    var newValue by remember { mutableStateOf("") }
-    var keyValidationError by remember { mutableStateOf<String?>(null) }
-    
-    // Validate key as it changes
-    LaunchedEffect(newKey) {
-      keyValidationError = when {
-        newKey.isEmpty() -> null
-        !isValidVariableName(newKey) -> 
-          "Only letters, numbers, and underscores allowed"
-        variables.containsKey(newKey) -> 
-          "Variable already exists"
-        else -> null
-      }
-    }
-    
-    Column {
+      
       Row(
-        modifier = Modifier.padding(8.dp),
+        modifier = Modifier.padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
       ) {
         Column(modifier = Modifier.width(150.dp)) {
-          val newKeyState = rememberTextFieldState(newKey)
-          LaunchedEffect(Unit) {
-            snapshotFlow { newKeyState.text }
-              .collect { newKey = it.toString() }
-          }
           TextField(
-            state = newKeyState,
-            placeholder = { Text("Variable name") }
+            state = keyState,
+            placeholder = { Text("variable_name") },
+            modifier = Modifier.fillMaxWidth()
           )
-          keyValidationError?.let { error ->
+          keyError?.let { error ->
             Text(
               text = error,
               style = androidx.compose.ui.text.TextStyle(
@@ -436,49 +368,56 @@ private fun VariablesSection(
           }
         }
         Text(" = ", modifier = Modifier.padding(horizontal = 8.dp))
-        val newValueState = rememberTextFieldState(newValue)
-        LaunchedEffect(Unit) {
-          snapshotFlow { newValueState.text }
-            .collect { newValue = it.toString() }
-        }
         TextField(
-          state = newValueState,
-          modifier = Modifier.weight(1f),
-          placeholder = { Text("Value") }
+          state = valueState,
+          placeholder = { Text("value") },
+          modifier = Modifier.weight(1f)
         )
-        IconButton(
-          onClick = {
-            val trimmedKey = newKey.trim()
-            val trimmedValue = newValue.trim()
-            if (isValidVariableName(trimmedKey) && 
-                trimmedValue.isNotBlank() && 
-                !variables.containsKey(trimmedKey)) {
-              appSettingsStateHolder.addVariable(trimmedKey, trimmedValue)
-              newKey = ""
-              newValue = ""
+        
+        // Delete button - only show if this slot has content or is the last empty slot
+        val hasContent = keyState.text.toString().trim().isNotEmpty() || valueState.text.toString().trim().isNotEmpty()
+        val isLastSlot = index == numberOfSlots - 1
+        if (hasContent || (isLastSlot && numberOfSlots > 1)) {
+          IconButton(
+            onClick = {
+              if (hasContent) {
+                // Clear the fields by triggering state change
+                val key = previousKey
+                if (key.isNotEmpty()) {
+                  appSettingsStateHolder.removeVariable(key)
+                }
+                shouldClear = true
+                clearTrigger++
+              }
+              // Remove slot if it's the last one and there are multiple slots
+              if (isLastSlot && numberOfSlots > 1) {
+                numberOfSlots--
+              }
             }
-          },
-          enabled = keyValidationError == null && 
-                   newKey.isNotEmpty() && 
-                   newValue.isNotEmpty()
-        ) {
-          Icon(
-            key = AllIconsKeys.General.Add,
-            contentDescription = "Add variable",
-            hint = Size(16)
-          )
+          ) {
+            Icon(
+              key = AllIconsKeys.General.Remove,
+              contentDescription = "Remove",
+              hint = Size(16)
+            )
+          }
         }
       }
+      } // Close key block
     }
-  } else {
-    Text(
-      "Maximum number of variables reached ($maxVariables)",
-      style = androidx.compose.ui.text.TextStyle(
-        fontSize = 11.sp,
-        color = androidx.compose.ui.graphics.Color.Gray
-      ),
-      modifier = Modifier.padding(8.dp)
-    )
+    
+    // Add button
+    OutlinedButton(
+      onClick = { numberOfSlots++ },
+      modifier = Modifier.padding(vertical = 8.dp)
+    ) {
+      Icon(
+        key = AllIconsKeys.General.Add,
+        contentDescription = "Add variable",
+        hint = Size(16)
+      )
+      Text(" Add Variable", modifier = Modifier.padding(start = 4.dp))
+    }
   }
 }
 
