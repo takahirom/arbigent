@@ -36,6 +36,7 @@ public class ArbigentAgent(
   private val deviceFormFactor = agentConfig.deviceFormFactor
   private val prompt = agentConfig.prompt
   private val aiOptions = agentConfig.aiOptions
+  private val appSettings = agentConfig.appSettings
 
   private val executeInterceptors: List<ArbigentExecutionInterceptor> = interceptors
     .filterIsInstance<ArbigentExecutionInterceptor>()
@@ -129,6 +130,7 @@ public class ArbigentAgent(
     }
     chain(input)
   }
+  
   private val coroutineScope =
     CoroutineScope(ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob())
   private var job: Job? = null
@@ -189,9 +191,16 @@ public class ArbigentAgent(
     agentActionTypes: List<AgentActionType> = defaultAgentActionTypesForVisualMode(),
     mcpClient: MCPClient
   ) {
+    // Resolve variables in the goal
+    val resolvedGoal = if (appSettings?.variables != null) {
+      GoalVariableResolver.resolve(goal, appSettings.variables)
+    } else {
+      goal
+    }
+    
     val executeInput = ExecuteInput(
       scenarioId = scenarioId,
-      goal = goal,
+      goal = resolvedGoal,
       maxStep = maxStep,
       agentActionTypes = agentActionTypes,
       deviceFormFactor = deviceFormFactor,
@@ -311,6 +320,7 @@ public class ArbigentAgent(
       } ?: emptyList(),
     )
   }
+  
 }
 
 public class AgentConfig(
@@ -320,6 +330,7 @@ public class AgentConfig(
   internal val deviceFormFactor: ArbigentScenarioDeviceFormFactor,
   internal val prompt: ArbigentPrompt,
   internal val aiOptions: ArbigentAiOptions?,
+  internal val appSettings: ArbigentAppSettings?,
 ) {
   public class Builder {
     private val interceptors = mutableListOf<ArbigentInterceptor>()
@@ -330,6 +341,7 @@ public class AgentConfig(
     private var prompt: ArbigentPrompt = ArbigentPrompt()
     private var aiOptions: ArbigentAiOptions? = null
     private var mcpClient: MCPClient? = null
+    private var appSettings: ArbigentAppSettings? = null
 
     public fun addInterceptor(interceptor: ArbigentInterceptor) {
       interceptors.add(0, interceptor)
@@ -359,6 +371,10 @@ public class AgentConfig(
       this.mcpClient = mcpClient
     }
 
+    public fun appSettings(appSettings: ArbigentAppSettings?) {
+      this.appSettings = appSettings
+    }
+
     public fun build(): AgentConfig {
       return AgentConfig(
         interceptors = interceptors,
@@ -367,6 +383,7 @@ public class AgentConfig(
         deviceFormFactor = deviceFormFactor,
         prompt = prompt,
         aiOptions = aiOptions,
+        appSettings = appSettings,
       )
     }
   }
@@ -379,6 +396,7 @@ public class AgentConfig(
     builder.deviceFactory(deviceFactory)
     builder.aiFactory(aiFactory)
     builder.aiOptions(aiOptions)
+    builder.appSettings(appSettings)
     return builder
   }
 }
@@ -528,10 +546,12 @@ public fun AgentConfigBuilder(
   cacheOptions: ArbigentScenarioCacheOptions,
   mcpClient: MCPClient? = null,
   fixedScenarios: List<FixedScenario> = emptyList(),
+  appSettings: ArbigentAppSettings? = null,
 ): AgentConfig.Builder = AgentConfigBuilder {
   deviceFormFactor(deviceFormFactor)
   prompt(prompt)
   mcpClient(mcpClient)
+  appSettings(appSettings)
   // Add basic decision interceptor
   addInterceptor(object : ArbigentDecisionInterceptor {
     override suspend fun intercept(
@@ -845,6 +865,7 @@ public interface ArbigentStepInterceptor : ArbigentInterceptor {
     public suspend fun proceed(stepInput: StepInput): StepResult
   }
 }
+
 
 public fun defaultAgentActionTypesForVisualMode(): List<AgentActionType> {
   return listOf(

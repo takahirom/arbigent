@@ -3,6 +3,8 @@ package io.github.takahirom.arbigent.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -10,7 +12,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.github.takahirom.arbigent.ArbigentDeviceOs
+import kotlinx.coroutines.delay
 import org.jetbrains.jewel.ui.component.*
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
@@ -95,6 +99,7 @@ fun LauncherScreen(
     )
     AppSettingsSection(
       modifier = Modifier.padding(8.dp),
+      appSettingsStateHolder = appStateHolder.appSettingsStateHolder,
     )
     val deviceIsSelected = devices.isNotEmpty()
     if (!deviceIsSelected) {
@@ -219,13 +224,13 @@ private fun AiProviderSetting(
 @Composable
 private fun AppSettingsSection(
   modifier: Modifier = Modifier,
+  appSettingsStateHolder: AppSettingsStateHolder,
 ) {
-  val appSettingsStateHolder = remember { AppSettingsStateHolder() }
   val appSettings = appSettingsStateHolder.appSettings
 
-  ExpandableSection("App Settings(Used for MCP)") {
+  ExpandableSection("App Settings") {
     Column(modifier = modifier) {
-      Text("Working Directory")
+      Text("Working Directory (Used for MCP)")
       val workingDirectory = rememberSaveable(saver = TextFieldState.Saver) {
         TextFieldState(appSettings.workingDirectory ?: "", TextRange(appSettings.workingDirectory?.length ?: 0))
       }
@@ -240,7 +245,7 @@ private fun AppSettingsSection(
         modifier = Modifier.padding(8.dp)
       )
 
-      Text("PATH")
+      Text("PATH (Used for MCP)")
       val path = rememberSaveable(saver = TextFieldState.Saver) {
         TextFieldState(appSettings.path ?: "", TextRange(appSettings.path?.length ?: 0))
       }
@@ -254,6 +259,156 @@ private fun AppSettingsSection(
         state = path,
         modifier = Modifier.padding(8.dp)
       )
+      
+      Spacer(modifier = Modifier.height(16.dp))
+      
+      VariablesSection(appSettingsStateHolder)
     }
   }
+}
+
+@Composable
+private fun VariablesSection(
+  appSettingsStateHolder: AppSettingsStateHolder,
+  modifier: Modifier = Modifier
+) {
+  val appSettings = appSettingsStateHolder.appSettings
+  
+  Text("Variables (for goal substitution)")
+  Text(
+    "Use {{variable_name}} in goals to substitute values",
+    style = androidx.compose.ui.text.TextStyle(
+      fontSize = 12.sp,
+      color = androidx.compose.ui.graphics.Color.Gray
+    ),
+    modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
+  )
+  
+  // Keep simplified approach but use value/onValueChange pattern for now
+  val variables = appSettings.variables ?: emptyMap()
+  val variablesList = remember(variables) {
+    mutableStateListOf<MutableState<Pair<String, String>>>().apply {
+      variables.forEach { (k, v) -> add(mutableStateOf(k to v)) }
+      if (isEmpty()) add(mutableStateOf("" to ""))
+    }
+  }
+  
+  Column(modifier = Modifier.padding(horizontal = 8.dp)) {
+    variablesList.forEachIndexed { index, variableState ->
+      val keyState = rememberTextFieldState()
+      val valueState = rememberTextFieldState()
+      var keyError by remember { mutableStateOf<String?>(null) }
+      
+      // Initialize states with current values
+      LaunchedEffect(variableState.value) {
+        keyState.setTextAndPlaceCursorAtEnd(variableState.value.first)
+        valueState.setTextAndPlaceCursorAtEnd(variableState.value.second)
+      }
+      
+      LaunchedEffect(keyState.text, valueState.text) {
+        delay(300)
+        
+        val newKey = keyState.text.toString().trim()
+        val newValue = valueState.text.toString().trim()
+        
+        // Validate
+        val existingKeys = variablesList
+          .mapIndexedNotNull { i, state -> 
+            if (i != index) state.value.first else null 
+          }
+          .filter { it.isNotEmpty() }
+        
+        keyError = when {
+          newKey.isNotEmpty() && !isValidVariableName(newKey) -> "Invalid name"
+          newKey.isNotEmpty() && existingKeys.contains(newKey) -> "Already exists"
+          else -> null
+        }
+        
+        if (keyError == null) {
+          variableState.value = newKey to newValue
+          
+          // Update app settings
+          val newVariables = variablesList
+            .map { it.value }
+            .filter { (k, v) -> k.isNotEmpty() && v.isNotEmpty() }
+            .toMap()
+          
+          appSettingsStateHolder.setVariables(newVariables.ifEmpty { null })
+        }
+      }
+      
+      Row(
+        modifier = Modifier.padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        Column(modifier = Modifier.width(150.dp)) {
+          TextField(
+            state = keyState,
+            placeholder = { Text("variable_name") },
+            modifier = Modifier.fillMaxWidth()
+          )
+          keyError?.let { error ->
+            Text(
+              text = error,
+              style = androidx.compose.ui.text.TextStyle(
+                fontSize = 10.sp,
+                color = androidx.compose.ui.graphics.Color.Red
+              ),
+              modifier = Modifier.padding(top = 2.dp)
+            )
+          }
+        }
+        
+        Text(" = ", modifier = Modifier.padding(horizontal = 8.dp))
+        
+        TextField(
+          state = valueState,
+          placeholder = { Text("value") },
+          modifier = Modifier.weight(1f)
+        )
+        
+        IconButton(
+          onClick = {
+            variablesList.removeAt(index)
+            if (variablesList.isEmpty()) {
+              variablesList.add(mutableStateOf("" to ""))
+            }
+            // Update app settings
+            val newVariables = variablesList
+              .map { it.value }
+              .filter { (k, v) -> k.isNotEmpty() && v.isNotEmpty() }
+              .toMap()
+            appSettingsStateHolder.setVariables(newVariables.ifEmpty { null })
+          }
+        ) {
+          Icon(
+            key = AllIconsKeys.General.Remove,
+            contentDescription = "Remove",
+            hint = Size(16)
+          )
+        }
+      }
+    }
+    
+    // Add button
+    OutlinedButton(
+      onClick = { variablesList.add(mutableStateOf("" to "")) },
+      modifier = Modifier.padding(vertical = 8.dp)
+    ) {
+      Icon(
+        key = AllIconsKeys.General.Add,
+        contentDescription = "Add variable",
+        hint = Size(16)
+      )
+      Text(" Add Variable", modifier = Modifier.padding(start = 4.dp))
+    }
+  }
+}
+
+/**
+ * Validates variable names to ensure they only contain letters, numbers, and underscores.
+ * This prevents issues with variable substitution in goals.
+ */
+private fun isValidVariableName(name: String): Boolean {
+  return name.matches(Regex("^[a-zA-Z_][a-zA-Z0-9_]*$"))
 }

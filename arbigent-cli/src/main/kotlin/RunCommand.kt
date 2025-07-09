@@ -65,6 +65,14 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
 
   private val path by defaultOption("--path",help = "Path to a file")
 
+  private val variables by defaultOption(
+    "--variables",
+    help = """Variables to replace in goals. Format: key1=value1,key2=value2
+             |Quote values with spaces: key="value with spaces"
+             |Example: name=John,message="Hello World",url="https://example.com"""".trimMargin()
+  )
+    .convert { input -> parseVariables(input) }
+
   private val scenarioIds by defaultOption(
     "--scenario-ids",
     help = "Scenario IDs to execute with their dependencies (comma-separated or multiple flags)"
@@ -214,6 +222,7 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     val appSettings = CliAppSettings(
       workingDirectory = workingDirectory,
       path = path,
+      variables = variables
     )
     val arbigentProject = ArbigentProject(
       file = File(projectFile),

@@ -38,7 +38,8 @@ internal object Preference {
           serializer = AppSettings.serializer(),
           value = AppSettings(
             workingDirectory = "",
-            path = ""
+            path = "",
+            variables = null
           ),
         )
     }
