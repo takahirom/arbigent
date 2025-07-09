@@ -40,4 +40,9 @@ class AppSettingsStateHolder {
     appSettings = appSettings.copy(variables = if (currentVariables.isEmpty()) null else currentVariables)
     Preference.appSettingValue = appSettings
   }
+  
+  fun setVariables(variables: Map<String, String>?) {
+    appSettings = appSettings.copy(variables = variables)
+    Preference.appSettingValue = appSettings
+  }
 }
