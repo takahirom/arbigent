@@ -45,6 +45,33 @@ scenarios:
   goal: "All you have to do is launch com.android.settings using mcp launch_app"
   initializationMethods:
   - type: "Back"
+- id: "variable-substitution-test"
+  goal: "Search for {{search_term}} in the Settings app and verify it appears in search results"
+  initializationMethods:
+  - type: "Back"
+    times: 5
+  - type: "LaunchApp"
+    packageName: "com.android.settings"
+  tags:
+  - name: "VariableSubstitution"
+  - name: "Settings"
+  - name: "Search"
+- id: "variable-app-launch-test"
+  goal: "Launch the {{app_package}} app using the launch_app tool"
+  initializationMethods:
+  - type: "Back"
+    times: 3
+  tags:
+  - name: "VariableSubstitution"
+  - name: "AppLaunch"
+- id: "escaped-variable-test"
+  goal: "Open Settings and search for the literal text '\\{{search_term}}' (including the curly braces). This tests that escaped variables are preserved as-is. The search should find no results since '\\{{search_term}}' is not a real setting."
+  initializationMethods:
+  - type: "LaunchApp"
+    packageName: "com.android.settings"
+  tags:
+  - name: "EscapedVariable"
+  - name: "Settings"
 fixedScenarios:
 - id: "3c441e6f-6178-4b4f-b2a2-fbdbf8fa4266"
   title: "launch setting by maestro"
