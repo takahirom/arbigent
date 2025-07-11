@@ -19,11 +19,13 @@ import org.jetbrains.jewel.ui.component.styling.TextFieldStyle
 @Composable
 fun AddAiProviderDialog(
   aiSettingStateHolder: AiSettingStateHolder,
+  editingProvider: AiProviderSetting? = null,
   onCloseRequest: () -> Unit
 ) {
+  val isEditMode = editingProvider != null
   TestCompatibleDialog(
     onCloseRequest = onCloseRequest,
-    title = "Add New AI Provider",
+    title = if (isEditMode) "Edit AI Provider" else "Add New AI Provider",
     content = {
       val scrollState = rememberScrollState()
       Column {
@@ -35,7 +37,17 @@ fun AddAiProviderDialog(
         ) {
           GroupHeader("AI Provider Type")
 
-          var selectedType by remember { mutableStateOf("OpenAi") }
+          var selectedType by remember { 
+            mutableStateOf(
+              when (editingProvider) {
+                is AiProviderSetting.OpenAi -> "OpenAi"
+                is AiProviderSetting.Gemini -> "Gemini"
+                is AiProviderSetting.CustomOpenAiApiBasedAi -> "CustomOpenAiApiBasedAi"
+                is AiProviderSetting.AzureOpenAi -> "AzureOpenAi"
+                else -> "OpenAi"
+              }
+            )
+          }
 
           Column(
             modifier = Modifier.padding(8.dp)
@@ -47,8 +59,9 @@ fun AddAiProviderDialog(
                 text = "OpenAI",
                 selected = selectedType == "OpenAi",
                 onClick = {
-                  selectedType = "OpenAi"
-                }
+                  if (!isEditMode) selectedType = "OpenAi"
+                },
+                enabled = !isEditMode
               )
             }
             Row(
@@ -58,8 +71,9 @@ fun AddAiProviderDialog(
                 text = "Gemini",
                 selected = selectedType == "Gemini",
                 onClick = {
-                  selectedType = "Gemini"
-                }
+                  if (!isEditMode) selectedType = "Gemini"
+                },
+                enabled = !isEditMode
               )
             }
             Row(
@@ -69,8 +83,9 @@ fun AddAiProviderDialog(
                 text = "Custom OpenAI API Based AI",
                 selected = selectedType == "CustomOpenAiApiBasedAi",
                 onClick = {
-                  selectedType = "CustomOpenAiApiBasedAi"
-                }
+                  if (!isEditMode) selectedType = "CustomOpenAiApiBasedAi"
+                },
+                enabled = !isEditMode
               )
             }
             Row(
@@ -80,31 +95,42 @@ fun AddAiProviderDialog(
                 text = "Azure OpenAI",
                 selected = selectedType == "AzureOpenAi",
                 onClick = {
-                  selectedType = "AzureOpenAi"
-                }
+                  if (!isEditMode) selectedType = "AzureOpenAi"
+                },
+                enabled = !isEditMode
               )
             }
           }
 
           GroupHeader("Provider ID")
-          val idState = remember { TextFieldState(selectedType) }
+          val idState = remember { 
+            TextFieldState(editingProvider?.id ?: selectedType) 
+          }
 
-          // Update ID state when selected type changes
+          // Update ID state when selected type changes (only in add mode)
           LaunchedEffect(selectedType) {
-            idState.edit { replace(0, length, selectedType) }
+            if (!isEditMode) {
+              idState.edit { replace(0, length, selectedType) }
+            }
           }
 
           TextField(
             state = idState,
             modifier = Modifier.padding(8.dp).fillMaxWidth(),
-            placeholder = { Text("Enter a unique ID for this provider") }
+            placeholder = { Text("Enter a unique ID for this provider") },
+            enabled = !isEditMode
           )
 
           // Check if ID already exists
           val existingIds = aiSettingStateHolder.aiSetting.aiSettings.map { it.id }
           val idText = idState.text.toString()
           val isIdEmpty = idText.isEmpty()
-          val isIdDuplicate = existingIds.contains(idText)
+          val isIdDuplicate = if (isEditMode) {
+            // In edit mode, only check for duplicates with other providers (exclude current provider)
+            existingIds.filter { it != editingProvider?.id }.contains(idText)
+          } else {
+            existingIds.contains(idText)
+          }
           val isIdValid = !isIdEmpty && !isIdDuplicate
 
           if (!isIdValid && !isIdEmpty) {
@@ -116,7 +142,17 @@ fun AddAiProviderDialog(
           }
 
           GroupHeader("Model Name")
-          val modelNameState = remember { TextFieldState("") }
+          val modelNameState = remember { 
+            TextFieldState(
+              when (editingProvider) {
+                is AiProviderSetting.OpenAi -> editingProvider.modelName
+                is AiProviderSetting.Gemini -> editingProvider.modelName
+                is AiProviderSetting.CustomOpenAiApiBasedAi -> editingProvider.modelName
+                is AiProviderSetting.AzureOpenAi -> editingProvider.modelName
+                else -> ""
+              }
+            )
+          }
           TextField(
             state = modelNameState,
             modifier = Modifier.padding(8.dp).fillMaxWidth(),
@@ -124,7 +160,17 @@ fun AddAiProviderDialog(
           )
 
           GroupHeader("API Key")
-          val apiKeyState = remember { TextFieldState("") }
+          val apiKeyState = remember { 
+            TextFieldState(
+              when (editingProvider) {
+                is AiProviderSetting.OpenAi -> editingProvider.apiKey
+                is AiProviderSetting.Gemini -> editingProvider.apiKey
+                is AiProviderSetting.CustomOpenAiApiBasedAi -> editingProvider.apiKey
+                is AiProviderSetting.AzureOpenAi -> editingProvider.apiKey
+                else -> ""
+              }
+            )
+          }
           BasicSecureTextField(
             modifier = Modifier.padding(8.dp).fillMaxWidth(),
             decorator = {
@@ -146,7 +192,11 @@ fun AddAiProviderDialog(
           when (selectedType) {
             "CustomOpenAiApiBasedAi" -> {
               GroupHeader("Base URL")
-              val baseUrlState = remember { TextFieldState("") }
+              val baseUrlState = remember { 
+                TextFieldState(
+                  (editingProvider as? AiProviderSetting.CustomOpenAiApiBasedAi)?.baseUrl ?: ""
+                )
+              }
               val baseUrlText = baseUrlState.text.toString()
               val isBaseUrlEndsWithSlash = baseUrlText.isEmpty() || baseUrlText.endsWith("/")
 
@@ -164,7 +214,7 @@ fun AddAiProviderDialog(
                 )
               }
 
-              // Add button
+              // Add/Update button
               OutlinedButton(
                 onClick = {
                   if (isIdValid && modelNameState.text.isNotEmpty() && baseUrlState.text.isNotEmpty()) {
@@ -174,26 +224,35 @@ fun AddAiProviderDialog(
                       baseUrl += "/"
                     }
 
-                    val newProvider = AiProviderSetting.CustomOpenAiApiBasedAi(
+                    val provider = AiProviderSetting.CustomOpenAiApiBasedAi(
                       id = idState.text.toString(),
                       apiKey = apiKeyState.text.toString(),
                       modelName = modelNameState.text.toString(),
                       baseUrl = baseUrl
                     )
-                    aiSettingStateHolder.addAiProvider(newProvider)
+                    
+                    if (isEditMode) {
+                      aiSettingStateHolder.updateAiProvider(provider)
+                    } else {
+                      aiSettingStateHolder.addAiProvider(provider)
+                    }
                     onCloseRequest()
                   }
                 },
                 enabled = isIdValid && modelNameState.text.isNotEmpty() && baseUrlState.text.isNotEmpty(),
                 modifier = Modifier.padding(8.dp)
               ) {
-                Text("Add Provider")
+                Text(if (isEditMode) "Update Provider" else "Add Provider")
               }
             }
 
             "AzureOpenAi" -> {
               GroupHeader("Endpoint")
-              val endpointState = remember { TextFieldState("") }
+              val endpointState = remember { 
+                TextFieldState(
+                  (editingProvider as? AiProviderSetting.AzureOpenAi)?.endpoint ?: ""
+                )
+              }
               val endpointText = endpointState.text.toString()
               val isEndpointEndsWithSlash = endpointText.isEmpty() || endpointText.endsWith("/")
 
@@ -212,14 +271,18 @@ fun AddAiProviderDialog(
               }
 
               GroupHeader("API Version")
-              val apiVersionState = remember { TextFieldState("2025-01-01-preview") }
+              val apiVersionState = remember { 
+                TextFieldState(
+                  (editingProvider as? AiProviderSetting.AzureOpenAi)?.apiVersion ?: "2025-01-01-preview"
+                )
+              }
               TextField(
                 state = apiVersionState,
                 modifier = Modifier.padding(8.dp).fillMaxWidth(),
                 placeholder = { Text("Enter API version") }
               )
 
-              // Add button
+              // Add/Update button
               OutlinedButton(
                 onClick = {
                   if (isIdValid && modelNameState.text.isNotEmpty() &&
@@ -231,14 +294,19 @@ fun AddAiProviderDialog(
                       endpoint += "/"
                     }
 
-                    val newProvider = AiProviderSetting.AzureOpenAi(
+                    val provider = AiProviderSetting.AzureOpenAi(
                       id = idState.text.toString(),
                       apiKey = apiKeyState.text.toString(),
                       modelName = modelNameState.text.toString(),
                       endpoint = endpoint,
                       apiVersion = apiVersionState.text.toString()
                     )
-                    aiSettingStateHolder.addAiProvider(newProvider)
+                    
+                    if (isEditMode) {
+                      aiSettingStateHolder.updateAiProvider(provider)
+                    } else {
+                      aiSettingStateHolder.addAiProvider(provider)
+                    }
                     onCloseRequest()
                   }
                 },
@@ -246,16 +314,16 @@ fun AddAiProviderDialog(
                   endpointState.text.isNotEmpty() && apiVersionState.text.isNotEmpty(),
                 modifier = Modifier.padding(8.dp)
               ) {
-                Text("Add Provider")
+                Text(if (isEditMode) "Update Provider" else "Add Provider")
               }
             }
 
             else -> { // OpenAi or Gemini
-              // Add button
+              // Add/Update button
               OutlinedButton(
                 onClick = {
                   if (isIdValid && modelNameState.text.isNotEmpty()) {
-                    val newProvider = if (selectedType == "OpenAi") {
+                    val provider = if (selectedType == "OpenAi") {
                       AiProviderSetting.OpenAi(
                         id = idState.text.toString(),
                         apiKey = apiKeyState.text.toString(),
@@ -268,14 +336,19 @@ fun AddAiProviderDialog(
                         modelName = modelNameState.text.toString()
                       )
                     }
-                    aiSettingStateHolder.addAiProvider(newProvider)
+                    
+                    if (isEditMode) {
+                      aiSettingStateHolder.updateAiProvider(provider)
+                    } else {
+                      aiSettingStateHolder.addAiProvider(provider)
+                    }
                     onCloseRequest()
                   }
                 },
                 enabled = isIdValid && modelNameState.text.isNotEmpty(),
                 modifier = Modifier.padding(8.dp)
               ) {
-                Text("Add Provider")
+                Text(if (isEditMode) "Update Provider" else "Add Provider")
               }
             }
           }
