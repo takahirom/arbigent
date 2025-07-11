@@ -150,6 +150,28 @@ class AiSettingStateHolder {
     aiSetting = aiSetting.copy(aiSettings = aiSetting.aiSettings + aiProviderSetting)
     Preference.aiSettingValue = aiSetting
   }
+
+  fun removeAiProvider(providerId: String) {
+    val newSettings = aiSetting.aiSettings.filter { it.id != providerId }
+    val newSelectedId = if (aiSetting.selectedId == providerId) {
+      newSettings.firstOrNull()?.id
+    } else {
+      aiSetting.selectedId
+    }
+    aiSetting = aiSetting.copy(
+      selectedId = newSelectedId,
+      aiSettings = newSettings
+    )
+    Preference.aiSettingValue = aiSetting
+  }
+
+  fun updateAiProvider(aiProviderSetting: AiProviderSetting) {
+    val newSettings = aiSetting.aiSettings.map { existing ->
+      if (existing.id == aiProviderSetting.id) aiProviderSetting else existing
+    }
+    aiSetting = aiSetting.copy(aiSettings = newSettings)
+    Preference.aiSettingValue = aiSetting
+  }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -173,15 +195,58 @@ private fun AiProviderSetting(
       )
       Text("Enable Debug Logging")
     }
-    FlowRow(modifier = modifier) {
+    FlowRow(
+      modifier = modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.spacedBy(4.dp),
+      verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
       aiSetting.aiSettings.forEach { aiProviderSetting: AiProviderSetting ->
-        RadioButtonRow(
-          text = aiProviderSetting.name + "(${aiProviderSetting.id})",
-          selected = aiSetting.selectedId == aiProviderSetting.id,
-          onClick = {
-            aiSettingStateHolder.onSelectedAiProviderSettingChanged(aiProviderSetting)
+        var showingEditDialog by remember { mutableStateOf(false) }
+        
+        Row(
+          modifier = Modifier.wrapContentWidth(),
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          RadioButtonRow(
+            text = aiProviderSetting.name + "(${aiProviderSetting.id})",
+            selected = aiSetting.selectedId == aiProviderSetting.id,
+            onClick = {
+              aiSettingStateHolder.onSelectedAiProviderSettingChanged(aiProviderSetting)
+            }
+          )
+          
+          IconButton(
+            onClick = { showingEditDialog = true },
+            modifier = Modifier.size(20.dp).padding(start = 4.dp)
+          ) {
+            Icon(
+              key = AllIconsKeys.Actions.Edit,
+              contentDescription = "Edit",
+              hint = Size(12)
+            )
           }
-        )
+          
+          IconButton(
+            onClick = { aiSettingStateHolder.removeAiProvider(aiProviderSetting.id) },
+            modifier = Modifier.size(20.dp)
+          ) {
+            Icon(
+              key = AllIconsKeys.General.Remove,
+              contentDescription = "Remove",
+              hint = Size(12)
+            )
+          }
+          
+          if (showingEditDialog) {
+            AddAiProviderDialog(
+              aiSettingStateHolder,
+              editingProvider = aiProviderSetting,
+              onCloseRequest = {
+                showingEditDialog = false
+              }
+            )
+          }
+        }
       }
     }
     var showingAddAiProviderDialog by remember { mutableStateOf(false) }
@@ -200,23 +265,6 @@ private fun AiProviderSetting(
           showingAddAiProviderDialog = false
         }
       )
-    }
-    // Remove selected model button
-    OutlinedButton(
-      modifier = Modifier.padding(8.dp),
-      onClick = {
-        val selectedId = aiSetting.selectedId
-        if (selectedId != null) {
-          aiSettingStateHolder.aiSetting =
-            aiSetting.copy(
-              selectedId = aiSetting.aiSettings.firstOrNull()?.id,
-              aiSettings = aiSetting.aiSettings.filter { it.id != selectedId }
-            )
-          Preference.aiSettingValue = aiSetting
-        }
-      },
-    ) {
-      Text("Remove selected model")
     }
   }
 }
