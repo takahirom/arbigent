@@ -18,7 +18,7 @@ public data class ArbigentScenarioRunningInfo(
   override fun toString(): String {
     return """
         task: $runningTasks/$allTasks
-        step: $currentStep/$maxStep
+        step: $currentStep (limit: $maxStep)
         retry: $retriedTasks/$maxRetry
     """.trimIndent()
   }
@@ -211,9 +211,10 @@ public class ArbigentScenarioExecutor {
                 it?.stepsFlow ?: emptyFlow()
               }
               .onEach { steps ->
+                val context = agent.latestArbigentContext()
                 _arbigentScenarioRunningInfoStateFlow.value = _arbigentScenarioRunningInfoStateFlow.value?.copy(
                   maxStep = task.maxStep,
-                  currentStep = steps.size
+                  currentStep = context?.countMeaningfulActions() ?: 0
                 )
               }
               .launchIn(coroutineScope)

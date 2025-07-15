@@ -17,7 +17,7 @@ public class UserPromptTemplate(
 
 <STEP>
 Current step: $CURRENT_STEP
-Max step: $MAX_STEP
+Step limit: $MAX_STEP
 
 <PREVIOUS_STEPS>
 $STEPS

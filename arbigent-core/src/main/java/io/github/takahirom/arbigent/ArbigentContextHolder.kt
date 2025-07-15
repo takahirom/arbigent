@@ -73,6 +73,13 @@ public class ArbigentContextHolder(
   public fun addStep(step: Step) {
     _steps.value = steps().toMutableList() + step
   }
+  
+  // Count meaningful actions (excluding null actions and FailedAgentAction)
+  public fun countMeaningfulActions(): Int {
+    return steps().count { step ->
+      step.agentAction != null && step.agentAction !is FailedAgentAction
+    }
+  }
 
   public fun getStepsText(aiOptions: ArbigentAiOptions?): String {
     val allSteps = steps().withIndex().toList()
@@ -91,7 +98,7 @@ public class ArbigentContextHolder(
   ): String {
     return userPromptTemplate.format(
       goal = goal,
-      currentStep = steps().size + 1,
+      currentStep = countMeaningfulActions() + 1,
       maxStep = maxStep,
       steps = getStepsText(aiOptions),
       uiElements = uiElements,
@@ -102,7 +109,7 @@ public class ArbigentContextHolder(
   public fun context(aiOptions: ArbigentAiOptions): String {
     return userPromptTemplate.format(
       goal = goal,
-      currentStep = steps().size + 1,
+      currentStep = countMeaningfulActions() + 1,
       maxStep = maxStep,
       steps = getStepsText(aiOptions)
     )

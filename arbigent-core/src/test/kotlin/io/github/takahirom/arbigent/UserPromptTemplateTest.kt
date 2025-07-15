@@ -85,7 +85,7 @@ class UserPromptTemplateTest {
 
 <STEP>
 Current step: 2
-Max step: 5
+Step limit: 5
 
 <PREVIOUS_STEPS>
 Step 1: Action
