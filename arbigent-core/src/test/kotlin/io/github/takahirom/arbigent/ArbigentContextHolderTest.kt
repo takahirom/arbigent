@@ -54,7 +54,7 @@ class ArbigentContextHolderTest {
         // Verify basic content
         assertEquals(true, prompt.contains("<GOAL>Test Goal</GOAL>"))
         assertEquals(true, prompt.contains("Current step: 1"))
-        assertEquals(true, prompt.contains("Max step: 5"))
+        assertEquals(true, prompt.contains("Step limit: 5"))
 
         // Verify UI elements
         assertEquals(true, prompt.contains("Button1: Click me"))
@@ -170,5 +170,124 @@ class ArbigentContextHolderTest {
         assertEquals(false, context.contains("Test Feedback 1"))
         assertEquals(true, context.contains("Test Feedback 2"))
         assertEquals(true, context.contains("Test Feedback 3"))
+    }
+
+    @Test
+    fun testCountMeaningfulActions() {
+        val contextHolder = ArbigentContextHolder(
+            goal = "Test Goal",
+            maxStep = 5
+        )
+
+        // Initially no meaningful actions
+        assertEquals(0, contextHolder.countMeaningfulActions())
+
+        // Add step without agentAction (context only)
+        val contextStep = ArbigentContextHolder.Step(
+            stepId = "context_step",
+            action = "Context Action",
+            feedback = "Context Feedback",
+            cacheKey = "context_cache",
+            screenshotFilePath = "context_screenshot.png"
+        )
+        contextHolder.addStep(contextStep)
+        assertEquals(0, contextHolder.countMeaningfulActions())
+
+        // Add step with meaningful action
+        val meaningfulStep = ArbigentContextHolder.Step(
+            stepId = "meaningful_step",
+            agentAction = ClickWithIndex(1),
+            action = "Click Action",
+            feedback = "Click Feedback",
+            cacheKey = "click_cache",
+            screenshotFilePath = "click_screenshot.png"
+        )
+        contextHolder.addStep(meaningfulStep)
+        assertEquals(1, contextHolder.countMeaningfulActions())
+
+        // Add step with FailedAgentAction (should not count)
+        val failedStep = ArbigentContextHolder.Step(
+            stepId = "failed_step",
+            agentAction = FailedAgentAction(),
+            action = "Failed Action",
+            feedback = "Failed Feedback",
+            cacheKey = "failed_cache",
+            screenshotFilePath = "failed_screenshot.png"
+        )
+        contextHolder.addStep(failedStep)
+        assertEquals(1, contextHolder.countMeaningfulActions())
+
+        // Add another meaningful action
+        val anotherMeaningfulStep = ArbigentContextHolder.Step(
+            stepId = "another_meaningful_step",
+            agentAction = InputTextAgentAction("test input"),
+            action = "Input Action",
+            feedback = "Input Feedback",
+            cacheKey = "input_cache",
+            screenshotFilePath = "input_screenshot.png"
+        )
+        contextHolder.addStep(anotherMeaningfulStep)
+        assertEquals(2, contextHolder.countMeaningfulActions())
+
+        // Add GoalAchievedAgentAction (should count)
+        val goalAchievedStep = ArbigentContextHolder.Step(
+            stepId = "goal_achieved_step",
+            agentAction = GoalAchievedAgentAction(),
+            action = "Goal Achieved Action",
+            feedback = "Goal Achieved Feedback",
+            cacheKey = "goal_cache",
+            screenshotFilePath = "goal_screenshot.png"
+        )
+        contextHolder.addStep(goalAchievedStep)
+        assertEquals(3, contextHolder.countMeaningfulActions())
+    }
+
+    @Test
+    fun testPromptUsesCountMeaningfulActions() {
+        val contextHolder = ArbigentContextHolder(
+            goal = "Test Goal",
+            maxStep = 5
+        )
+
+        // Add context step and meaningful action
+        val contextStep = ArbigentContextHolder.Step(
+            stepId = "context_step",
+            action = "Context Action",
+            feedback = "Context Feedback",
+            cacheKey = "context_cache",
+            screenshotFilePath = "context_screenshot.png"
+        )
+        contextHolder.addStep(contextStep)
+        
+        val meaningfulStep = ArbigentContextHolder.Step(
+            stepId = "meaningful_step",
+            agentAction = ClickWithIndex(1),
+            action = "Click Action",
+            feedback = "Click Feedback",
+            cacheKey = "click_cache",
+            screenshotFilePath = "click_screenshot.png"
+        )
+        contextHolder.addStep(meaningfulStep)
+        
+        val failedStep = ArbigentContextHolder.Step(
+            stepId = "failed_step",
+            agentAction = FailedAgentAction(),
+            action = "Failed Action",
+            feedback = "Failed Feedback",
+            cacheKey = "failed_cache",
+            screenshotFilePath = "failed_screenshot.png"
+        )
+        contextHolder.addStep(failedStep)
+
+        val prompt = contextHolder.prompt(
+            uiElements = "Button1: Click me",
+            focusedTree = "Tree Structure",
+            aiOptions = defaultAiOptions
+        )
+
+        // Should show currentStep as 2 (1 meaningful action + 1 for next step)
+        // Not 4 (3 total steps + 1 for next step)
+        assertEquals(true, prompt.contains("Current step: 2"))
+        assertEquals(true, prompt.contains("Step limit: 5"))
     }
 }
