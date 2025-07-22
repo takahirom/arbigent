@@ -810,5 +810,6 @@ public fun TreeNode.optimizeTree(
 }
 
 private fun TreeNode.getIdentifierDataForFocus(): List<Any> {
-  return listOf((attributes - "bounds" - "focused" - "selected")) + children.map { it.getIdentifierDataForFocus() }
+  val sortedAttributes = (attributes - "bounds" - "focused" - "selected").toSortedMap()
+  return listOf(sortedAttributes) + children.map { it.getIdentifierDataForFocus() }
 }
