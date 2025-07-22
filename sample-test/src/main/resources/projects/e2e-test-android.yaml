@@ -14,8 +14,7 @@ scenarios:
   imageAssertions:
   - assertionPrompt: "The screen should display the \"About emulated device\" page."
 - id: "open-model-page"
-  goal: "Scroll and open \"Model\" page in \"About emulated device\" page. Be careful\
-    \ not to open other pages"
+  goal: "First click on 'About emulated device' to enter the page, then scroll down and open \"Model\" page in \"About emulated device\" page. Be careful not to open other pages"
   dependency: "f9c17741-093e-49f0-ad45-8311ba68c1a6"
   tags:
   - name: "Settings"
