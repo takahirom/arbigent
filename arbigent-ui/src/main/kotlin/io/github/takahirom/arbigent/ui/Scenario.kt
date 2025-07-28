@@ -182,14 +182,15 @@ fun Scenario(
       }
     }
     BoxWithConstraints {
+      val maxHeightValue = maxHeight
       ExpandableSection(
         title = "Options",
         modifier = Modifier.fillMaxWidth()
-          .heightIn(max = maxHeight * 0.7f)
-          .verticalScroll(rememberScrollState())
       ) {
         Column(
           modifier = Modifier.testTag("scenario_options")
+            .heightIn(max = maxHeightValue * 0.7f)
+            .verticalScroll(rememberScrollState())
             .wrapContentHeight(unbounded = true)
         ) {
           ScenarioOptions(scenarioStateHolder, scenarioCountById, dependencyScenarioMenu, onShowFixedScenariosDialog, getFixedScenarioById)
