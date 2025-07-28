@@ -399,7 +399,8 @@ public class ArbigentProjectSerializer(
   }
 
   public fun load(file: File): ArbigentProjectFileContent {
-    return load(file.inputStream())
+    val result = load(file.inputStream())
+    return result
   }
 
   internal fun load(yamlString: String): ArbigentProjectFileContent {

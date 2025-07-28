@@ -424,6 +424,7 @@ class ArbigentAppStateHolder(
     cacheStrategyFlow.value = projectFile.settings.cacheStrategy
     aiOptionsFlow.value = projectFile.settings.aiOptions
     mcpJsonFlow.value = projectFile.settings.mcpJson
+    defaultDeviceFormFactorFlow.value = projectFile.settings.deviceFormFactor
     _fixedScenariosFlow.value = projectFile.fixedScenarios
     projectStateFlow.value = ArbigentProject(
       settings = projectFile.settings,
