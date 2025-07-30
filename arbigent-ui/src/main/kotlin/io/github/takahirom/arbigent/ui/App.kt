@@ -9,6 +9,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import io.github.takahirom.arbigent.ArbigentDeviceOs
@@ -120,6 +122,7 @@ private fun MainScreen(
       orientation = Orientation.Vertical,
       modifier = Modifier
         .fillMaxHeight()
+        .pointerHoverIcon(PointerIcon.Hand)
         .pointerInput(Unit) {
           detectDragGestures { change, dragAmount ->
             change.consume()

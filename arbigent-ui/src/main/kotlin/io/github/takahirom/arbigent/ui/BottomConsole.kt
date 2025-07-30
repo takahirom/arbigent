@@ -12,6 +12,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.unit.dp
@@ -57,6 +59,7 @@ fun BottomConsole() {
           thickness = 8.dp,
           orientation = Orientation.Horizontal,
           modifier = Modifier.fillMaxWidth()
+            .pointerHoverIcon(PointerIcon.Hand)
             .pointerInput(Unit) {
               detectDragGestures { change, dragAmount ->
                 change.consume()
