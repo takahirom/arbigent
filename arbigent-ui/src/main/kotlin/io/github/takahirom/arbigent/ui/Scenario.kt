@@ -5,6 +5,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -18,6 +19,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -77,20 +81,38 @@ fun Scenario(
   val arbigentScenarioExecutor: ArbigentScenarioExecutor? by scenarioStateHolder.arbigentScenarioExecutorStateFlow.collectAsState()
   val scenarioType by scenarioStateHolder.scenarioTypeStateFlow.collectAsState()
   val goal = scenarioStateHolder.goalState
+  var goalTextAreaHeight by remember { mutableStateOf(48.dp) }
   Column(
     modifier = Modifier.padding(8.dp)
   ) {
     Row(
       verticalAlignment = Alignment.CenterVertically
     ) {
-      TextArea(
-        modifier = Modifier.weight(1f).padding(4.dp).testTag("goal").height(48.dp),
-        enabled = scenarioType.isScenario(),
-        state = goal,
-        placeholder = { Text("Goal") },
-        textStyle = JewelTheme.editorTextStyle,
-        decorationBoxModifier = Modifier.padding(horizontal = 8.dp)
-      )
+      Column(
+        modifier = Modifier.weight(1f)
+      ) {
+        TextArea(
+          modifier = Modifier.fillMaxWidth().padding(4.dp).testTag("goal").height(goalTextAreaHeight),
+          enabled = scenarioType.isScenario(),
+          state = goal,
+          placeholder = { Text("Goal") },
+          textStyle = JewelTheme.editorTextStyle,
+          decorationBoxModifier = Modifier.padding(horizontal = 8.dp)
+        )
+        Divider(
+          orientation = Orientation.Horizontal,
+          modifier = Modifier
+            .fillMaxWidth()
+            .pointerHoverIcon(PointerIcon.Hand)
+            .pointerInput(Unit) {
+              detectDragGestures { change, dragAmount ->
+                change.consume()
+                goalTextAreaHeight = (goalTextAreaHeight + dragAmount.y.toDp()).coerceAtLeast(24.dp)
+              }
+            },
+          thickness = 8.dp
+        )
+      }
       IconActionButton(
         key = AllIconsKeys.RunConfigurations.TestState.Run,
         onClick = {
