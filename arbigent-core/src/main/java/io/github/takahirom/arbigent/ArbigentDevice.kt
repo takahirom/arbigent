@@ -162,7 +162,12 @@ public data class ArbigentElementList(
           (clickable == true || focused == true
             || attributes["clickable"] == "true"
             || attributes["focused"] == "true"
-            || attributes["focusable"] == "true")
+            || attributes["focusable"] == "true"
+            || checked == true
+            || attributes["checked"] == "true"
+            || selected == true
+            || attributes["selected"] == "true"
+          )
         } else {
           isMeaningfulView()
         }
