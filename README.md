@@ -59,7 +59,7 @@ Furthermore, I wanted to make Arbigent accessible to QA engineers by offering a 
     *   **Accessibility-Independent:** Provides annotated screenshots to assist AI in understanding UIs that lack accessibility information.
 *   **Cost Savings:**
     *   **Open Source:** Free to use, modify, and distribute, eliminating licensing costs.
-    *   **Efficient Model Usage:** Compatible with cost-effective models like `GPT-4.1`, reducing operational expenses.
+    *   **Efficient Model Usage:** Compatible with various models; defaults to `GPT-4.1` for improved capabilities while supporting cost-effective options like `gpt-4o-mini`.
 
 **IV. Robustness & Reliability**
 
