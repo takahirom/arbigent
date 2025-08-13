@@ -160,7 +160,9 @@ jobs:
           retention-days: 120
 
   cli-e2e-ios:
-    runs-on: macos-latest
+    # Use macOS 14 as it has Xcode 15.4 pre-installed at /Applications/Xcode_15.4.app
+    # macOS 15 (macos-latest) does not include Xcode 15.4 by default
+    runs-on: macos-14
     concurrency:
       group: ${{ github.workflow }}-cli-e2e-ios-${{ github.ref }}
       cancel-in-progress: true
