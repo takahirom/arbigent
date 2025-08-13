@@ -59,7 +59,7 @@ Furthermore, I wanted to make Arbigent accessible to QA engineers by offering a 
     *   **Accessibility-Independent:** Provides annotated screenshots to assist AI in understanding UIs that lack accessibility information.
 *   **Cost Savings:**
     *   **Open Source:** Free to use, modify, and distribute, eliminating licensing costs.
-    *   **Efficient Model Usage:** Compatible with cost-effective models like `GPT-4o mini`, reducing operational expenses.
+    *   **Efficient Model Usage:** Compatible with cost-effective models like `GPT-4.1`, reducing operational expenses.
 
 **IV. Robustness & Reliability**
 
@@ -219,7 +219,7 @@ log-level: info
 # Default AI configuration (fallback)
 ai-type: openai
 openai-api-key: sk-xxxxxxxxxxxxxxxxxx
-openai-model-name: gpt-4o-mini
+openai-model-name: gpt-4.1
 
 # Run command specific settings (overrides global settings)
 run:
@@ -259,7 +259,7 @@ Usage: arbigent run [<options>]
 
 Options for OpenAI API AI:
   --openai-endpoint=<text>    Endpoint URL (default: https://api.openai.com/v1/)
-  --openai-model-name=<text>  Model name (default: gpt-4o-mini)  
+  --openai-model-name=<text>  Model name (default: gpt-4.1)  
   --openai-api-key, --openai-key=<text> API key
 
 Options for Gemini API AI:
@@ -270,7 +270,7 @@ Options for Gemini API AI:
 Options for Azure OpenAI:
   --azure-openai-endpoint=<text>         Endpoint URL
   --azure-openai-api-version=<text>      API version
-  --azure-openai-model-name=<text>       Model name (default: gpt-4o-mini)  
+  --azure-openai-model-name=<text>       Model name (default: gpt-4.1)  
   --azure-openai-api-key, --azure-openai-key=<text> API key
 
 Options:

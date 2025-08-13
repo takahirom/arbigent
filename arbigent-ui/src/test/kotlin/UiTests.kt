@@ -658,7 +658,7 @@ class TestRobot(
     val openAiProvider = AiProviderSetting.OpenAi(
       id = "testOpenAi",
       apiKey = "test-api-key",
-      modelName = "gpt-4o-mini"
+      modelName = "gpt-4.1"
     )
 
     // Update the AI settings with the new provider and select it

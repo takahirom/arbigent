@@ -12,8 +12,8 @@ class OpenAIAiConfig : AiConfig("Options for OpenAI API AI") {
   private val defaultEndpoint = "https://api.openai.com/v1/"
   val openAiEndpoint by defaultOption("--openai-endpoint", help = "Endpoint URL (default: $defaultEndpoint)")
     .default(defaultEndpoint, defaultForHelp = defaultEndpoint)
-  val openAiModelName by defaultOption("--openai-model-name", help = "Model name (default: gpt-4o-mini)")
-    .default("gpt-4o-mini", "gpt-4o-mini")
+  val openAiModelName by defaultOption("--openai-model-name", help = "Model name (default: gpt-4.1)")
+    .default("gpt-4.1", "gpt-4.1")
   val openAiApiKey by defaultOption("--openai-api-key", "--openai-key", envvar = "OPENAI_API_KEY", help = "API key")
 }
 
@@ -30,7 +30,7 @@ class AzureOpenAiConfig : AiConfig("Options for Azure OpenAI") {
   val azureOpenAIEndpoint by defaultOption("--azure-openai-endpoint", help = "Endpoint URL")
   val azureOpenAIApiVersion by defaultOption("--azure-openai-api-version", help = "API version")
     .default("2024-10-21")
-  val azureOpenAIModelName by defaultOption("--azure-openai-model-name", help = "Model name (default: gpt-4o-mini)")
-    .default("gpt-4o-mini")
+  val azureOpenAIModelName by defaultOption("--azure-openai-model-name", help = "Model name (default: gpt-4.1)")
+    .default("gpt-4.1")
   val azureOpenAIKey by defaultOption("--azure-openai-api-key", "--azure-openai-key", envvar = "AZURE_OPENAI_API_KEY", help = "API key")
 }

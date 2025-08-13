@@ -156,7 +156,7 @@ fun AddAiProviderDialog(
           TextField(
             state = modelNameState,
             modifier = Modifier.padding(8.dp).fillMaxWidth(),
-            placeholder = { Text("Enter model name (e.g., gpt-4o-mini)") }
+            placeholder = { Text("Enter model name (e.g., gpt-4.1)") }
           )
 
           GroupHeader("API Key")

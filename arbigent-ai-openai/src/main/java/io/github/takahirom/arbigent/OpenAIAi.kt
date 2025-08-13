@@ -81,7 +81,7 @@ internal val curls: Deque<Curl> = ConcurrentLinkedDeque()
 public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
   private val apiKey: String,
   private val baseUrl: String = "https://api.openai.com/v1/",
-  private val modelName: String = "gpt-4o-mini",
+  private val modelName: String = "gpt-4.1",
   private val requestBuilderModifier: HttpRequestBuilder.() -> Unit = {
     header("Authorization", "Bearer $apiKey")
   },
