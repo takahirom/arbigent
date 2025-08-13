@@ -889,7 +889,6 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
   public companion object {
     /**
      * Default model for OpenAI API
-     * GPT-4.1 provides better capabilities than GPT-4o mini
      * Note: For JSON Schema response format, use gpt-4o-2024-08-06 or similar
      */
     public const val DEFAULT_OPENAI_MODEL: String = "gpt-4.1"
