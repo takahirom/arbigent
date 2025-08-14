@@ -81,7 +81,7 @@ internal val curls: Deque<Curl> = ConcurrentLinkedDeque()
 public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
   private val apiKey: String,
   private val baseUrl: String = "https://api.openai.com/v1/",
-  private val modelName: String = "gpt-4o-mini",
+  private val modelName: String = DEFAULT_OPENAI_MODEL,
   private val requestBuilderModifier: HttpRequestBuilder.() -> Unit = {
     header("Authorization", "Bearer $apiKey")
   },
@@ -884,6 +884,14 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
       // Throw an exception if API call fails
       throw ArbigentAi.FailedToParseResponseException("Error calling OpenAI API: ${e.message}", e)
     }
+  }
+  
+  public companion object {
+    /**
+     * Default model for OpenAI API
+     * Note: For JSON Schema response format, use gpt-4o-2024-08-06 or similar
+     */
+    public const val DEFAULT_OPENAI_MODEL: String = "gpt-4.1"
   }
 }
 
