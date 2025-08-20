@@ -26,6 +26,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -110,32 +111,38 @@ internal fun LeftScenariosPanel(
         }
       }
       val lazyColumnState = rememberLazyListState()
-      // Pre-compute visibility for all items to avoid O(n²) complexity
-      val visibleIndices = mutableSetOf<Int>()
-      val ancestorStack = mutableListOf<Pair<Int, ArbigentScenarioStateHolder>>() // (index, scenarioHolder)
       
-      scenarioAndDepths.forEachIndexed { index, (scenarioHolder, depth) ->
-        // Pop ancestors that are at same or deeper level
-        while (ancestorStack.isNotEmpty()) {
-          val (ancestorIndex, _) = ancestorStack.last()
-          if (scenarioAndDepths[ancestorIndex].second >= depth) {
-            ancestorStack.removeLast()
-          } else {
-            break
+      // Pre-compute visibility using derivedStateOf to avoid recomputation on unrelated recompositions
+      val visibleIndices by remember(scenarioAndDepths, expandedStates) {
+        derivedStateOf {
+          val indices = mutableSetOf<Int>()
+          val ancestorStack = mutableListOf<Pair<Int, ArbigentScenarioStateHolder>>()
+          
+          scenarioAndDepths.forEachIndexed { index, (scenarioHolder, depth) ->
+            // Pop ancestors that are at same or deeper level
+            while (ancestorStack.isNotEmpty()) {
+              val (ancestorIndex, _) = ancestorStack.last()
+              if (scenarioAndDepths[ancestorIndex].second >= depth) {
+                ancestorStack.removeLast()
+              } else {
+                break
+              }
+            }
+            
+            // Check if all ancestors are expanded
+            val allAncestorsExpanded = ancestorStack.all { (_, ancestorHolder) ->
+              expandedStates.getOrDefault(ancestorHolder, true)
+            }
+            
+            if (allAncestorsExpanded) {
+              indices.add(index)
+            }
+            
+            // Add current item to ancestor stack for its potential children
+            ancestorStack.add(index to scenarioHolder)
           }
+          indices
         }
-        
-        // Check if all ancestors are expanded
-        val allAncestorsExpanded = ancestorStack.all { (_, ancestorHolder) ->
-          expandedStates.getOrDefault(ancestorHolder, true)
-        }
-        
-        if (allAncestorsExpanded) {
-          visibleIndices.add(index)
-        }
-        
-        // Add current item to ancestor stack for its potential children
-        ancestorStack.add(index to scenarioHolder)
       }
       
       LazyColumn(
