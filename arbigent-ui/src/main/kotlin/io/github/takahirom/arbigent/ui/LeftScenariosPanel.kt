@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,6 +59,9 @@ internal fun LeftScenariosPanel(
   selectedScenarioIndex: Int,
   appStateHolder: ArbigentAppStateHolder
 ) {
+  // Map to manage expanded/collapsed state (scenario index -> expanded state)
+  // Default to expanded for new items
+  val expandedStates = remember { mutableStateMapOf<Int, Boolean>() }
   Column(
     Modifier
       .run {
@@ -107,11 +111,48 @@ internal fun LeftScenariosPanel(
         }
       }
       val lazyColumnState = rememberLazyListState()
+      // Pre-compute visibility for all items to avoid O(n²) complexity
+      val visibleIndices = mutableSetOf<Int>()
+      val ancestorStack = mutableListOf<Pair<Int, Boolean>>() // (index, isExpanded)
+      
+      scenarioAndDepths.forEachIndexed { index, (_, depth) ->
+        // Pop ancestors that are at same or deeper level
+        while (ancestorStack.isNotEmpty()) {
+          val (ancestorIndex, _) = ancestorStack.last()
+          if (scenarioAndDepths[ancestorIndex].second >= depth) {
+            ancestorStack.removeLast()
+          } else {
+            break
+          }
+        }
+        
+        // Check if all ancestors are expanded
+        val allAncestorsExpanded = ancestorStack.all { (ancestorIndex, _) ->
+          expandedStates.getOrDefault(ancestorIndex, true)
+        }
+        
+        if (allAncestorsExpanded) {
+          visibleIndices.add(index)
+        }
+        
+        // Add current item to ancestor stack for its potential children
+        val isCurrentExpanded = expandedStates.getOrDefault(index, true)
+        ancestorStack.add(index to isCurrentExpanded)
+      }
+      
       LazyColumn(
         state = lazyColumnState,
         modifier = Modifier.fillMaxSize()
       ) {
         itemsIndexed(scenarioAndDepths) { index, (scenarioStateHolder, depth) ->
+          if (!visibleIndices.contains(index)) {
+            return@itemsIndexed
+          }
+          
+          // Check if this scenario has children (next item has greater depth)
+          val hasChildren = index < scenarioAndDepths.size - 1 && 
+            scenarioAndDepths[index + 1].second > depth
+          
           val goal = scenarioStateHolder.goalState.text
           Column(
             modifier = Modifier.fillMaxWidth()
@@ -134,6 +175,23 @@ internal fun LeftScenariosPanel(
               modifier = Modifier.padding(8.dp),
               verticalAlignment = Alignment.CenterVertically
             ) {
+              // Show expand/collapse button if this scenario has children
+              if (hasChildren) {
+                val isExpanded = expandedStates.getOrDefault(index, true)
+                IconActionButton(
+                  onClick = {
+                    expandedStates[index] = !isExpanded
+                  },
+                  key = if (isExpanded) AllIconsKeys.General.ChevronDown else AllIconsKeys.General.ChevronRight,
+                  contentDescription = if (isExpanded) "Collapse" else "Expand",
+                  hint = Size(16),
+                  modifier = Modifier.padding(end = 4.dp)
+                )
+              } else {
+                // Show spacer if no children (matching button size)
+                Box(modifier = Modifier.size(20.dp).padding(end = 4.dp))
+              }
+              
               val runningInfo by scenarioStateHolder.arbigentScenarioRunningInfo.collectAsState()
               val scenarioType by scenarioStateHolder.scenarioTypeStateFlow.collectAsState()
               Text(
