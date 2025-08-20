@@ -59,9 +59,8 @@ internal fun LeftScenariosPanel(
   selectedScenarioIndex: Int,
   appStateHolder: ArbigentAppStateHolder
 ) {
-  // Map to manage expanded/collapsed state (scenario index -> expanded state)
-  // Default to expanded for new items
-  val expandedStates = remember { mutableStateMapOf<Int, Boolean>() }
+  // Map to manage expanded/collapsed state (scenario holder -> expanded state)
+  val expandedStates = remember { mutableStateMapOf<ArbigentScenarioStateHolder, Boolean>() }
   Column(
     Modifier
       .run {
@@ -113,9 +112,9 @@ internal fun LeftScenariosPanel(
       val lazyColumnState = rememberLazyListState()
       // Pre-compute visibility for all items to avoid O(n²) complexity
       val visibleIndices = mutableSetOf<Int>()
-      val ancestorStack = mutableListOf<Pair<Int, Boolean>>() // (index, isExpanded)
+      val ancestorStack = mutableListOf<Pair<Int, ArbigentScenarioStateHolder>>() // (index, scenarioHolder)
       
-      scenarioAndDepths.forEachIndexed { index, (_, depth) ->
+      scenarioAndDepths.forEachIndexed { index, (scenarioHolder, depth) ->
         // Pop ancestors that are at same or deeper level
         while (ancestorStack.isNotEmpty()) {
           val (ancestorIndex, _) = ancestorStack.last()
@@ -127,8 +126,8 @@ internal fun LeftScenariosPanel(
         }
         
         // Check if all ancestors are expanded
-        val allAncestorsExpanded = ancestorStack.all { (ancestorIndex, _) ->
-          expandedStates.getOrDefault(ancestorIndex, true)
+        val allAncestorsExpanded = ancestorStack.all { (_, ancestorHolder) ->
+          expandedStates.getOrDefault(ancestorHolder, true)
         }
         
         if (allAncestorsExpanded) {
@@ -136,8 +135,7 @@ internal fun LeftScenariosPanel(
         }
         
         // Add current item to ancestor stack for its potential children
-        val isCurrentExpanded = expandedStates.getOrDefault(index, true)
-        ancestorStack.add(index to isCurrentExpanded)
+        ancestorStack.add(index to scenarioHolder)
       }
       
       LazyColumn(
@@ -177,10 +175,10 @@ internal fun LeftScenariosPanel(
             ) {
               // Show expand/collapse button if this scenario has children
               if (hasChildren) {
-                val isExpanded = expandedStates.getOrDefault(index, true)
+                val isExpanded = expandedStates.getOrDefault(scenarioStateHolder, true)
                 IconActionButton(
                   onClick = {
-                    expandedStates[index] = !isExpanded
+                    expandedStates[scenarioStateHolder] = !isExpanded
                   },
                   key = if (isExpanded) AllIconsKeys.General.ChevronDown else AllIconsKeys.General.ChevronRight,
                   contentDescription = if (isExpanded) "Collapse" else "Expand",
@@ -189,7 +187,7 @@ internal fun LeftScenariosPanel(
                 )
               } else {
                 // Show spacer if no children (matching button size)
-                Box(modifier = Modifier.size(20.dp).padding(end = 4.dp))
+                Box(modifier = Modifier.size(16.dp).padding(end = 4.dp))
               }
               
               val runningInfo by scenarioStateHolder.arbigentScenarioRunningInfo.collectAsState()
