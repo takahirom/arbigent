@@ -165,7 +165,7 @@ internal fun LeftScenariosPanel(
                 start = 8.dp + 12.dp * depth,
                 top = if (depth == 0) 8.dp else 0.dp,
                 end = 8.dp,
-                bottom = 4.dp
+                bottom = 2.dp
               )
               .background(
                 if (index == selectedScenarioIndex) {
@@ -192,9 +192,6 @@ internal fun LeftScenariosPanel(
                   hint = Size(16),
                   modifier = Modifier.padding(end = 4.dp)
                 )
-              } else {
-                // Show spacer if no children (matching button size)
-                Box(modifier = Modifier.size(16.dp).padding(end = 4.dp))
               }
               
               val runningInfo by scenarioStateHolder.arbigentScenarioRunningInfo.collectAsState()
