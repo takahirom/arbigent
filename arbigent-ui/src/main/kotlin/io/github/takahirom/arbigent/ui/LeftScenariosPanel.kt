@@ -203,7 +203,11 @@ internal fun LeftScenariosPanel(
                 } else {
                   val scenarioId by scenarioStateHolder.idStateFlow.collectAsState()
                   "Execution: $scenarioId"
-                } + "\n" + runningInfo?.toString().orEmpty()
+                } + if (runningInfo?.toString().orEmpty().isEmpty()) {
+                  ""
+                } else {
+                  "\n" + runningInfo?.toString().orEmpty()
+                }
               )
               val isAchieved by scenarioStateHolder.isAchieved.collectAsState()
               if (isAchieved) {
