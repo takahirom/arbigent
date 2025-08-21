@@ -165,7 +165,7 @@ internal fun LeftScenariosPanel(
                 start = 8.dp + 12.dp * depth,
                 top = if (depth == 0) 8.dp else 0.dp,
                 end = 8.dp,
-                bottom = 4.dp
+                bottom = 2.dp
               )
               .background(
                 if (index == selectedScenarioIndex) {
@@ -177,7 +177,7 @@ internal fun LeftScenariosPanel(
               .clickable { appStateHolder.selectedScenarioIndex.value = index },
           ) {
             Row(
-              modifier = Modifier.padding(8.dp),
+              modifier = Modifier.padding(4.dp),
               verticalAlignment = Alignment.CenterVertically
             ) {
               // Show expand/collapse button if this scenario has children
@@ -192,9 +192,6 @@ internal fun LeftScenariosPanel(
                   hint = Size(16),
                   modifier = Modifier.padding(end = 4.dp)
                 )
-              } else {
-                // Show spacer if no children (matching button size)
-                Box(modifier = Modifier.size(16.dp).padding(end = 4.dp))
               }
               
               val runningInfo by scenarioStateHolder.arbigentScenarioRunningInfo.collectAsState()
@@ -206,7 +203,11 @@ internal fun LeftScenariosPanel(
                 } else {
                   val scenarioId by scenarioStateHolder.idStateFlow.collectAsState()
                   "Execution: $scenarioId"
-                } + "\n" + runningInfo?.toString().orEmpty()
+                } + if (runningInfo?.toString().orEmpty().isEmpty()) {
+                  ""
+                } else {
+                  "\n" + runningInfo?.toString().orEmpty()
+                }
               )
               val isAchieved by scenarioStateHolder.isAchieved.collectAsState()
               if (isAchieved) {
