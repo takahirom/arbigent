@@ -177,7 +177,7 @@ internal fun LeftScenariosPanel(
               .clickable { appStateHolder.selectedScenarioIndex.value = index },
           ) {
             Row(
-              modifier = Modifier.padding(8.dp),
+              modifier = Modifier.padding(4.dp),
               verticalAlignment = Alignment.CenterVertically
             ) {
               // Show expand/collapse button if this scenario has children
