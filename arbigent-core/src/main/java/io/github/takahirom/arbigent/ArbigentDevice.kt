@@ -8,6 +8,7 @@ import maestro.UiElement.Companion.toUiElementOrNull
 import maestro.orchestra.MaestroCommand
 import maestro.orchestra.Orchestra
 import java.io.File
+import kotlinx.coroutines.runBlocking
 
 @ArbigentInternalApi
 public fun getIndexSelector(text: String): Pair<Int, String> {
@@ -203,7 +204,7 @@ public class MaestroDevice(
 
   private val orchestra = Orchestra(
     maestro = maestro,
-    screenshotsDir = screenshotsDir,
+    screenshotsDir = screenshotsDir.toPath(),
   )
 
   override fun deviceName(): String {
@@ -220,7 +221,14 @@ public class MaestroDevice(
       } else {
         true
       }
-      orchestra.executeCommands(actions, shouldReinitJsEngine = shouldJsReinit)
+      // TODO: Make executeActions suspend function to align with maestro 2.0.0 architecture
+      // Priority: Medium - current runBlocking works but blocks threads
+      // Steps: 1) Change executeActions to suspend, 2) Update ArbigentDevice interface, 
+      //        3) Update all callers to use coroutines instead of runBlocking
+      // Impact: Breaking API change, coordinate with team before implementing
+      runBlocking {
+        orchestra.executeCommands(actions, shouldReinitJsEngine = shouldJsReinit)
+      }
     }
   }
 
@@ -516,7 +524,8 @@ public class MaestroDevice(
             ),
           ) ?: throw MaestroException.ElementNotFound(
             "Element not found",
-            maestro.viewHierarchy().root
+            maestro.viewHierarchy().root,
+            "Element with id ${selector.id} not found"
           )
           val uiElement: UiElement = element.element
           uiElement
@@ -529,7 +538,8 @@ public class MaestroDevice(
             )
           ) ?: throw MaestroException.ElementNotFound(
             "Element not found",
-            maestro.viewHierarchy().root
+            maestro.viewHierarchy().root,
+            "Element with id containing ${selector.id} not found"
           )
           val uiElement: UiElement = element.element
           uiElement
@@ -546,7 +556,8 @@ public class MaestroDevice(
             ),
           ) ?: throw MaestroException.ElementNotFound(
             "Element not found",
-            maestro.viewHierarchy().root
+            maestro.viewHierarchy().root,
+            "Element with text ${selector.text} not found"
           )
           val uiElement: UiElement = element.element
           uiElement
@@ -559,7 +570,8 @@ public class MaestroDevice(
             )
           ) ?: throw MaestroException.ElementNotFound(
             "Element not found",
-            maestro.viewHierarchy().root
+            maestro.viewHierarchy().root,
+            "Element with text containing ${selector.text} not found"
           )
           val uiElement: UiElement = element.element
           uiElement

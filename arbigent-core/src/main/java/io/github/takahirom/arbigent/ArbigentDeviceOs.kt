@@ -1,16 +1,14 @@
 package io.github.takahirom.arbigent
 
 import dadb.Dadb
-import ios.LocalIOSDevice
-import ios.simctl.SimctlIOSDevice
-import ios.xctest.XCTestIOSDevice
+import device.SimctlIOSDevice
 import maestro.Maestro
 import maestro.drivers.AndroidDriver
 import maestro.drivers.IOSDriver
+import util.IOSDeviceType
 import util.SimctlList
-import util.XCRunnerCLIUtils
-import xcuitest.XCTestClient
-import xcuitest.XCTestDriverClient
+import xcuitest.installer.Context
+import xcuitest.installer.IOSBuildProductsExtractor
 import xcuitest.installer.LocalXCTestInstaller
 
 public enum class ArbigentDeviceOs {
@@ -29,7 +27,7 @@ public sealed interface ArbigentAvailableDevice {
   public class Android(private val dadb: Dadb) : ArbigentAvailableDevice {
     override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Android
     override val name: String = dadb.toString()
-    override fun connectToDevice(): ArbigentDevice {
+    override suspend fun connectToDevice(): ArbigentDevice {
       val driver = AndroidDriver(
         dadb,
       )
@@ -58,46 +56,37 @@ public sealed interface ArbigentAvailableDevice {
   ) : ArbigentAvailableDevice {
     override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Ios
     override val name: String = device.name
-    override fun connectToDevice(): ArbigentDevice {
-      val port = port
-      val host = host
-
-      val xcTestInstaller = LocalXCTestInstaller(
-        deviceId = device.udid, // Use the device's UDID
-        host = host,
-        defaultPort = port,
-        enableXCTestOutputFileLogging = true,
+    override suspend fun connectToDevice(): ArbigentDevice {
+      val simctlIOSDevice = SimctlIOSDevice(device.udid)
+      
+      val iOSDriverConfig = LocalXCTestInstaller.IOSDriverConfig(
+        prebuiltRunner = true,
+        sourceDirectory = System.getProperty("user.dir") + "/maestro-ios-xctest-runner",
+        context = Context.CLI,
+        snapshotKeyHonorModalViews = null
       )
-
-      val xcTestDriverClient = XCTestDriverClient(
-        installer = xcTestInstaller,
-        client = XCTestClient(host, port), // Use the same host and port as above
-      )
-
-      val xcTestDevice = XCTestIOSDevice(
-        deviceId = device.udid,
-        client = xcTestDriverClient,
-        getInstalledApps = { XCRunnerCLIUtils.listApps(device.udid) },
-      )
-
-      return MaestroDevice(
-        Maestro.ios(
-          IOSDriver(
-            LocalIOSDevice(
-              deviceId = device.udid,
-              xcTestDevice = xcTestDevice,
-              simctlIOSDevice = SimctlIOSDevice(device.udid)
-            )
-          )
-        )
-      )
+      
+      val iosDriver = IOSDriver(simctlIOSDevice)
+      
+      val maestro = try {
+        Maestro.ios(iosDriver)
+      } catch (e: java.util.concurrent.TimeoutException) {
+        iosDriver.close()
+        simctlIOSDevice.close()
+        throw RuntimeException("Arbigent can not connect to iOS device in time. The likely reason why we can't connect is that you have multiple instance of Arbigent like UI and CLI of Arbigent", e)
+      } catch (e: Exception) {
+        iosDriver.close()
+        simctlIOSDevice.close()
+        throw e
+      }
+      return MaestroDevice(maestro)
     }
   }
 
   public class Web : ArbigentAvailableDevice {
     override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Web
     override val name: String = "Chrome"
-    public override fun connectToDevice(): ArbigentDevice {
+    public override suspend fun connectToDevice(): ArbigentDevice {
       return MaestroDevice(
         Maestro.web(false, false)
       )
@@ -107,11 +96,11 @@ public sealed interface ArbigentAvailableDevice {
   public class Fake : ArbigentAvailableDevice {
     override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Android
     override val name: String = "Fake"
-    public override fun connectToDevice(): ArbigentDevice {
+    public override suspend fun connectToDevice(): ArbigentDevice {
       // This is not called
       throw UnsupportedOperationException("Fake device is not supported")
     }
   }
 
-  public fun connectToDevice(): ArbigentDevice
+  public suspend fun connectToDevice(): ArbigentDevice
 }

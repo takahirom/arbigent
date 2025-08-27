@@ -2,6 +2,7 @@ package io.github.takahirom.arbigent.sample.test
 
 import io.github.takahirom.arbigent.*
 import dadb.Dadb
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import java.io.File
 import kotlin.test.Ignore
@@ -26,9 +27,11 @@ class RealArbigentTest {
         )
       },
       deviceFactory = {
-        ArbigentAvailableDevice.Android(
-          dadb = Dadb.discover()!!
-        ).connectToDevice()
+        runBlocking {
+          ArbigentAvailableDevice.Android(
+            dadb = Dadb.discover()!!
+          ).connectToDevice()
+        }
       },
       appSettings = DefaultArbigentAppSettings
     )
