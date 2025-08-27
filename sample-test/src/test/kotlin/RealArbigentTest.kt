@@ -2,7 +2,6 @@ package io.github.takahirom.arbigent.sample.test
 
 import io.github.takahirom.arbigent.*
 import dadb.Dadb
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import java.io.File
 import kotlin.test.Ignore
@@ -18,6 +17,11 @@ class RealArbigentTest {
   fun tests() = runTest(
     timeout = 10.minutes
   ) {
+    // Pre-connect within runTest coroutine and reuse
+    val connectedDevice = ArbigentAvailableDevice.Android(
+      dadb = Dadb.discover() ?: error("No Android device discovered for test")
+    ).connectToDevice()
+    
     val arbigentProject = ArbigentProject(
       file = scenarioFile,
       aiFactory = {
@@ -27,11 +31,7 @@ class RealArbigentTest {
         )
       },
       deviceFactory = {
-        runBlocking {
-          ArbigentAvailableDevice.Android(
-            dadb = Dadb.discover()!!
-          ).connectToDevice()
-        }
+        connectedDevice
       },
       appSettings = DefaultArbigentAppSettings
     )

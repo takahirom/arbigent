@@ -536,9 +536,11 @@ class ArbigentTest {
         )
       },
       deviceFactory = {
-        AvailableDevice.Android(
-          dadb = Dadb.discover()!!
-        ).connectToDevice()
+        runBlocking {
+          AvailableDevice.Android(
+            dadb = Dadb.discover()!!
+          ).connectToDevice()
+        }
       }
     )
     arbigentProject.execute()
