@@ -16,6 +16,7 @@ kotlinx-datetime = "0.7.1"
 kotlinx-io = "0.3.3"
 webpImageio = "0.3.3"
 identityJvm = "202411.1"
+maestro = "1.40.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -42,6 +43,11 @@ ktor-serialization-json = { module = "io.ktor:ktor-serialization-kotlinx-json", 
 kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.ref = "kotlinx-io" }
 identity-jvm = { group = "com.android.identity", name = "identity-jvm", version.ref = "identityJvm" }
 webp-imageio = { module = "io.github.darkxanter:webp-imageio", version.ref = "webpImageio" }
+
+maestro-orchestra = { module = "dev.mobile:maestro-orchestra", version.ref = "maestro" }
+maestro-client = { module = "dev.mobile:maestro-client", version.ref = "maestro" }
+maestro-ios = { module = "dev.mobile:maestro-ios", version.ref = "maestro" }
+maestro-ios-driver = { module = "dev.mobile:maestro-ios-driver", version.ref = "maestro" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
