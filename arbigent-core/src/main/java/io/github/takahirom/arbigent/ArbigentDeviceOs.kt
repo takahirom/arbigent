@@ -56,7 +56,9 @@ public sealed interface ArbigentAvailableDevice {
     override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Ios
     override val name: String = device.name
     override suspend fun connectToDevice(): ArbigentDevice {
-      // TODO: Add integration tests with iOS simulator - verify XCTestIOSDevice -> IOSDriver -> Maestro chain
+      // LIMITATION: iOS connection currently fails due to Maestro 2.0.0 IOSBuildProductsExtractor 
+      // requiring XCTest resources in classpath. This is a known architectural constraint.
+      // Integration testing requires resolving Maestro's resource loading mechanism.
       val iosDevice = createIOSDevice()
       var iosDriver: maestro.drivers.IOSDriver? = null
       var maestroCreated = false
@@ -105,48 +107,50 @@ public sealed interface ArbigentAvailableDevice {
     private fun createIOSDriverConfig(): xcuitest.installer.LocalXCTestInstaller.IOSDriverConfig {
       return xcuitest.installer.LocalXCTestInstaller.IOSDriverConfig(
         prebuiltRunner = true,
-        sourceDirectory = System.getProperty("user.dir") + "/maestro-ios-xctest-runner",
+        sourceDirectory = java.nio.file.Paths.get(System.getProperty("java.io.tmpdir"), "maestro-ios-resources").toString(),
         context = xcuitest.installer.Context.CLI,
         snapshotKeyHonorModalViews = null
       )
     }
     
     private fun createPlaceholderDevice(): device.IOSDevice {
-      // ARCHITECTURAL NOTE: This placeholder resolves circular dependency in maestro 2.0.0
-      // LocalXCTestInstaller requires IOSDevice but XCTestIOSDevice requires installer client
-      // This temporary device is replaced by real XCTestIOSDevice after installer initialization
-      // All methods throw UnsupportedOperationException to prevent accidental usage
+      // VALIDATION: This placeholder device should NEVER be used for actual operations.
+      // It exists solely to resolve circular dependencies in Maestro 2.0.0 initialization.
+      // Any operation call indicates architectural misuse.
       return object : device.IOSDevice {
         override val deviceId: String = device.udid
         override fun open() {}
         override fun close() {}
         
-        // All other methods throw UnsupportedOperationException - this is a placeholder only
-        override fun deviceInfo() = throw UnsupportedOperationException("Placeholder device")
-        override fun viewHierarchy(excludeKeyboardElements: Boolean) = throw UnsupportedOperationException("Placeholder device")
-        override fun tap(x: Int, y: Int) = throw UnsupportedOperationException("Placeholder device")
-        override fun longPress(x: Int, y: Int, durationMs: Long) = throw UnsupportedOperationException("Placeholder device")
-        override fun pressKey(name: String) = throw UnsupportedOperationException("Placeholder device")
-        override fun pressButton(name: String) = throw UnsupportedOperationException("Placeholder device")
-        override fun scroll(xStart: Double, yStart: Double, xEnd: Double, yEnd: Double, duration: Double) = throw UnsupportedOperationException("Placeholder device")
-        override fun input(text: String) = throw UnsupportedOperationException("Placeholder device")
-        override fun install(stream: java.io.InputStream) = throw UnsupportedOperationException("Placeholder device")
-        override fun uninstall(id: String) = throw UnsupportedOperationException("Placeholder device")
-        override fun clearAppState(id: String) = throw UnsupportedOperationException("Placeholder device")
-        override fun clearKeychain() = throw UnsupportedOperationException("Placeholder device")
-        override fun launch(id: String, launchArguments: Map<String, Any>) = throw UnsupportedOperationException("Placeholder device")
-        override fun stop(id: String) = throw UnsupportedOperationException("Placeholder device")
-        override fun isKeyboardVisible() = throw UnsupportedOperationException("Placeholder device")
-        override fun openLink(link: String) = throw UnsupportedOperationException("Placeholder device")
-        override fun takeScreenshot(out: okio.Sink, compressed: Boolean) = throw UnsupportedOperationException("Placeholder device")
-        override fun startScreenRecording(out: okio.Sink) = throw UnsupportedOperationException("Placeholder device")
-        override fun addMedia(path: String) = throw UnsupportedOperationException("Placeholder device")
-        override fun setLocation(latitude: Double, longitude: Double) = throw UnsupportedOperationException("Placeholder device")
-        override fun setOrientation(orientation: String) = throw UnsupportedOperationException("Placeholder device")
-        override fun isShutdown() = throw UnsupportedOperationException("Placeholder device")
-        override fun isScreenStatic() = throw UnsupportedOperationException("Placeholder device")
-        override fun setPermissions(id: String, permissions: Map<String, String>) = throw UnsupportedOperationException("Placeholder device")
-        override fun eraseText(charactersToErase: Int) = throw UnsupportedOperationException("Placeholder device")
+        // All operations must fail with clear error indicating misuse
+        private val error = { operation: String -> 
+          throw IllegalStateException("ARCHITECTURAL ERROR: Placeholder device used for operation '$operation'. This indicates incorrect iOS initialization flow.")
+        }
+        override fun deviceInfo() = error("deviceInfo")
+        override fun viewHierarchy(excludeKeyboardElements: Boolean) = error("viewHierarchy")
+        override fun tap(x: Int, y: Int) = error("tap")
+        override fun longPress(x: Int, y: Int, durationMs: Long) = error("longPress")
+        override fun pressKey(name: String) = error("pressKey")
+        override fun pressButton(name: String) = error("pressButton")
+        override fun scroll(xStart: Double, yStart: Double, xEnd: Double, yEnd: Double, duration: Double) = error("scroll")
+        override fun input(text: String) = error("input")
+        override fun install(stream: java.io.InputStream) = error("install")
+        override fun uninstall(id: String) = error("uninstall")
+        override fun clearAppState(id: String) = error("clearAppState")
+        override fun clearKeychain() = error("clearKeychain")
+        override fun launch(id: String, launchArguments: Map<String, Any>) = error("launch")
+        override fun stop(id: String) = error("stop")
+        override fun isKeyboardVisible() = error("isKeyboardVisible")
+        override fun openLink(link: String) = error("openLink")
+        override fun takeScreenshot(out: okio.Sink, compressed: Boolean) = error("takeScreenshot")
+        override fun startScreenRecording(out: okio.Sink) = error("startScreenRecording")
+        override fun addMedia(path: String) = error("addMedia")
+        override fun setLocation(latitude: Double, longitude: Double) = error("setLocation")
+        override fun setOrientation(orientation: String) = error("setOrientation")
+        override fun isShutdown() = error("isShutdown")
+        override fun isScreenStatic() = error("isScreenStatic")
+        override fun setPermissions(id: String, permissions: Map<String, String>) = error("setPermissions")
+        override fun eraseText(charactersToErase: Int) = error("eraseText")
       }
     }
   }
