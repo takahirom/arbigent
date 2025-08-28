@@ -56,9 +56,9 @@ public sealed interface ArbigentAvailableDevice {
     override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Ios
     override val name: String = device.name
     override suspend fun connectToDevice(): ArbigentDevice {
-      // LIMITATION: iOS connection currently fails due to Maestro 2.0.0 IOSBuildProductsExtractor 
-      // requiring XCTest resources in classpath. This is a known architectural constraint.
-      // Integration testing requires resolving Maestro's resource loading mechanism.
+      // TODO: iOS connection fails with ConnectException to port 8080
+      // XCTestDriver cannot connect to XCTest runner after configuration changes.
+      // Resource loading works but actual iOS device connection still has issues.
       val iosDevice = createIOSDevice()
       var iosDriver: maestro.drivers.IOSDriver? = null
       var maestroCreated = false
