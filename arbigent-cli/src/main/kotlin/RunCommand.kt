@@ -265,8 +265,10 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
               ArbigentDeviceOs.entries
                 .joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
             }")
-      device = fetchAvailableDevicesByOs(os).firstOrNull()?.connectToDevice()
-        ?: throw IllegalArgumentException("No available device found")
+      device = runBlocking {
+        fetchAvailableDevicesByOs(os).firstOrNull()?.connectToDevice()
+          ?: throw IllegalArgumentException("No available device found")
+      }
     }
     Runtime.getRuntime().addShutdownHook(object : Thread() {
       override fun run() {

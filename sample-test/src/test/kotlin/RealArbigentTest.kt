@@ -17,6 +17,11 @@ class RealArbigentTest {
   fun tests() = runTest(
     timeout = 10.minutes
   ) {
+    // Pre-connect within runTest coroutine and reuse
+    val connectedDevice = ArbigentAvailableDevice.Android(
+      dadb = Dadb.discover() ?: error("No Android device discovered for test")
+    ).connectToDevice()
+    
     val arbigentProject = ArbigentProject(
       file = scenarioFile,
       aiFactory = {
@@ -26,9 +31,7 @@ class RealArbigentTest {
         )
       },
       deviceFactory = {
-        ArbigentAvailableDevice.Android(
-          dadb = Dadb.discover()!!
-        ).connectToDevice()
+        connectedDevice
       },
       appSettings = DefaultArbigentAppSettings
     )

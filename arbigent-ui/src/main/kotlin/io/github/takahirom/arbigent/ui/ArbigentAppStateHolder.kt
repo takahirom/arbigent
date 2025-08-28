@@ -16,7 +16,9 @@ class ArbigentAppStateHolder(
   private val aiFactory: () -> ArbigentAi,
   val deviceFactory: (ArbigentAvailableDevice) -> ArbigentDevice = { avaiableDevice ->
     ArbigentGlobalStatus.onConnect {
-      avaiableDevice.connectToDevice()
+      runBlocking {
+        avaiableDevice.connectToDevice()
+      }
     }
   },
   val availableDeviceListFactory: (ArbigentDeviceOs) -> List<ArbigentAvailableDevice> = { os ->
