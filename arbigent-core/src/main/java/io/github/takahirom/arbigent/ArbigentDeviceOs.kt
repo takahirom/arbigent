@@ -49,16 +49,14 @@ public sealed interface ArbigentAvailableDevice {
 
   public class IOS(
     private val device: SimctlList.Device,
-    private val port: Int = 8080,
-    // local host
-    private val host: String = "[::1]",
+    private val port: Int = 22087,
+    // localhost (matches maestro-cli defaultXcTestPort)
+    private val host: String = "127.0.0.1",
   ) : ArbigentAvailableDevice {
     override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Ios
     override val name: String = device.name
     override suspend fun connectToDevice(): ArbigentDevice {
-      // TODO: iOS connection fails with ConnectException to port 8080
-      // XCTestDriver cannot connect to XCTest runner after configuration changes.
-      // Resource loading works but actual iOS device connection still has issues.
+      // Fixed: Use correct port 22087 (maestro-cli defaultXcTestPort) and IPv4 localhost
       val iosDevice = createIOSDevice()
       var iosDriver: maestro.drivers.IOSDriver? = null
       var maestroCreated = false
