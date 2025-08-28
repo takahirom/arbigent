@@ -105,12 +105,38 @@ public sealed interface ArbigentAvailableDevice {
     }
     
     private fun createIOSDriverConfig(): xcuitest.installer.LocalXCTestInstaller.IOSDriverConfig {
-      return xcuitest.installer.LocalXCTestInstaller.IOSDriverConfig(
-        prebuiltRunner = true,
-        sourceDirectory = java.nio.file.Paths.get(System.getProperty("java.io.tmpdir"), "maestro-ios-resources").toString(),
-        context = xcuitest.installer.Context.CLI,
-        snapshotKeyHonorModalViews = null
-      )
+      val customResourcesPath = System.getProperty("arbigent.maestro.resources.path") 
+          ?: System.getenv("MAESTRO_RESOURCES_PATH")
+      
+      return if (customResourcesPath != null) {
+          // Custom resources path
+          val resourceDir = java.io.File(customResourcesPath)
+          if (!resourceDir.exists()) {
+              throw IllegalStateException("Maestro resources directory not found: $customResourcesPath")
+          }
+          
+          val requiredFiles = listOf("maestro-driver-ios.zip", "maestro-driver-iosUITests-Runner.zip")
+          requiredFiles.forEach { fileName ->
+              if (!java.io.File(resourceDir, fileName).exists()) {
+                  throw IllegalStateException("Required resource file not found: $fileName in $customResourcesPath")
+              }
+          }
+          
+          xcuitest.installer.LocalXCTestInstaller.IOSDriverConfig(
+              prebuiltRunner = true,
+              sourceDirectory = customResourcesPath,
+              context = xcuitest.installer.Context.CLI,
+              snapshotKeyHonorModalViews = null
+          )
+      } else {
+          // Default: build on demand
+          xcuitest.installer.LocalXCTestInstaller.IOSDriverConfig(
+              prebuiltRunner = false,
+              sourceDirectory = "driver-iPhoneSimulator",
+              context = xcuitest.installer.Context.CLI,
+              snapshotKeyHonorModalViews = null
+          )
+      }
     }
     
     private fun createPlaceholderDevice(): device.IOSDevice {
