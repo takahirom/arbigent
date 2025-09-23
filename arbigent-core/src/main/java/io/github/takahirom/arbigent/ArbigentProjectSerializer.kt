@@ -366,6 +366,10 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
         val scenarioId: String,
         val yamlContent: String? = null
     ) : InitializationMethod
+
+    @Serializable
+    @SerialName("Reconnect")
+    public data object Reconnect : InitializationMethod
   }
 }
 

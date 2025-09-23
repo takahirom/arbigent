@@ -46,7 +46,7 @@ public sealed interface ArbigentAvailableDevice {
         dadb.close()
         throw e
       }
-      return MaestroDevice(maestro)
+      return MaestroDevice(maestro, availableDevice = this)
     }
   }
 
@@ -89,7 +89,8 @@ public sealed interface ArbigentAvailableDevice {
               simctlIOSDevice = SimctlIOSDevice(device.udid)
             )
           )
-        )
+        ),
+        availableDevice = this
       )
     }
   }
@@ -99,7 +100,8 @@ public sealed interface ArbigentAvailableDevice {
     override val name: String = "Chrome"
     public override fun connectToDevice(): ArbigentDevice {
       return MaestroDevice(
-        Maestro.web(false, false)
+        Maestro.web(false, false),
+        availableDevice = this
       )
     }
   }

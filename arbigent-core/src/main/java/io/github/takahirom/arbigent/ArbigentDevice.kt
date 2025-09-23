@@ -55,6 +55,7 @@ public interface ArbigentDevice {
   public fun elements(): ArbigentElementList
   public fun waitForAppToSettle(appId: String? = null)
   public fun os(): ArbigentDeviceOs
+  public fun reconnectIfDisconnected()
 }
 
 public data class ArbigentElement(
@@ -194,14 +195,15 @@ public data class ArbigentElementList(
 }
 
 public class MaestroDevice(
-  private val maestro: Maestro,
-  screenshotsDir: File = ArbigentFiles.screenshotsDir
+  private var maestro: Maestro,
+  private val screenshotsDir: File = ArbigentFiles.screenshotsDir,
+  private val availableDevice: ArbigentAvailableDevice? = null
 ) : ArbigentDevice, ArbigentTvCompatDevice {
   init {
     arbigentInfoLog("MaestroDevice created: screenshotsDir:${screenshotsDir.absolutePath}")
   }
 
-  private val orchestra = Orchestra(
+  private var orchestra = Orchestra(
     maestro = maestro,
     screenshotsDir = screenshotsDir,
   )
@@ -580,6 +582,46 @@ public class MaestroDevice(
   }
 
   private var isClosed = false
+  
+  override fun reconnectIfDisconnected() {
+    // Check if device is connected by trying to get view hierarchy
+    try {
+      maestro.viewHierarchy()
+      // Device is connected, nothing to do
+      return
+    } catch (e: Exception) {
+      // Device appears disconnected, attempt reconnection
+    }
+    
+    // Only reconnect if we have the available device reference
+    if (availableDevice == null) {
+      throw IllegalStateException("Cannot reconnect: no available device reference")
+    }
+    
+    // Close old connection
+    try {
+      maestro.close()
+    } catch (closeException: Exception) {
+      // Ignore close errors, device might already be disconnected
+    }
+    
+    // Reconnect using the same method as initial connection
+    val newDevice = try {
+      availableDevice.connectToDevice()
+    } catch (e: Exception) {
+      throw RuntimeException("Failed to reconnect device", e)
+    }
+    
+    if (newDevice !is MaestroDevice) {
+      throw IllegalStateException("Unexpected device type after reconnection: ${newDevice.javaClass}")
+    }
+    
+    // Extract maestro from new device and update our state
+    this.maestro = newDevice.maestro
+    this.orchestra = Orchestra(maestro = this.maestro, screenshotsDir = this.screenshotsDir)
+    // Note: We don't close newDevice as that would close the maestro we just extracted
+  }
+  
   override fun close() {
     isClosed = true
     maestro.close()
