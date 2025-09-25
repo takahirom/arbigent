@@ -310,7 +310,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
               addLaunchAppInitializationMethod()
               clickRunButton()
             }
-            itShould("execute cleanup and launch initialization methods twice") {
+            itShould("execute cleanup and launch initialization methods three times") {
               capture(it)
               assertRunInitializeAndLaunchTwice()
             }
