@@ -351,12 +351,14 @@ public class MaestroDevice(
   override fun moveFocusToElement(
     selector: ArbigentTvCompatDevice.Selector,
   ) {
+    ensureConnected()
     moveFocusToElement(
       fetchTarget = { fetchTargetBounds(selector) }
     )
   }
 
   override fun moveFocusToElement(element: ArbigentElement) {
+    ensureConnected()
     moveFocusToElement(
       fetchTarget = {
         val newElement = maestro.viewHierarchy().refreshedElement(element.identifierData)
@@ -670,7 +672,8 @@ public class MaestroDevice(
         return // Success!
       }
       
-      // All attempts failed
+      // All attempts failed - reset counter for future retry sequences
+      reconnectAttempts = 0
       throw RuntimeException("Failed to reconnect after $maxReconnectAttempts attempts", lastException)
     }
   }
