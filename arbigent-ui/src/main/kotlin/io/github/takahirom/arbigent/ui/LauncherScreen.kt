@@ -101,6 +101,10 @@ fun LauncherScreen(
       modifier = Modifier.padding(8.dp),
       appSettingsStateHolder = appStateHolder.appSettingsStateHolder,
     )
+    MCPSettingsSection(
+      modifier = Modifier.padding(8.dp),
+      appStateHolder = appStateHolder,
+    )
     val deviceIsSelected = devices.isNotEmpty()
     if (!deviceIsSelected) {
       Text(
@@ -274,42 +278,8 @@ private fun AppSettingsSection(
   modifier: Modifier = Modifier,
   appSettingsStateHolder: AppSettingsStateHolder,
 ) {
-  val appSettings = appSettingsStateHolder.appSettings
-
   ExpandableSection("App Settings") {
     Column(modifier = modifier) {
-      Text("Working Directory (Used for MCP)")
-      val workingDirectory = rememberSaveable(saver = TextFieldState.Saver) {
-        TextFieldState(appSettings.workingDirectory ?: "", TextRange(appSettings.workingDirectory?.length ?: 0))
-      }
-      LaunchedEffect(Unit) {
-        snapshotFlow { workingDirectory.text }
-          .collect {
-            appSettingsStateHolder.onWorkingDirectoryChanged(it.toString())
-          }
-      }
-      TextField(
-        state = workingDirectory,
-        modifier = Modifier.padding(8.dp)
-      )
-
-      Text("PATH (Used for MCP)")
-      val path = rememberSaveable(saver = TextFieldState.Saver) {
-        TextFieldState(appSettings.path ?: "", TextRange(appSettings.path?.length ?: 0))
-      }
-      LaunchedEffect(Unit) {
-        snapshotFlow { path.text }
-          .collect {
-            appSettingsStateHolder.onPathChanged(it.toString())
-          }
-      }
-      TextField(
-        state = path,
-        modifier = Modifier.padding(8.dp)
-      )
-      
-      Spacer(modifier = Modifier.height(16.dp))
-      
       VariablesSection(appSettingsStateHolder)
     }
   }
@@ -459,4 +429,47 @@ private fun VariablesSection(
  */
 private fun isValidVariableName(name: String): Boolean {
   return name.matches(Regex("^[a-zA-Z_][a-zA-Z0-9_]*$"))
+}
+
+@Composable
+private fun MCPSettingsSection(
+  modifier: Modifier = Modifier,
+  appStateHolder: ArbigentAppStateHolder,
+) {
+  val appSettingsStateHolder = appStateHolder.appSettingsStateHolder
+  val appSettings = appSettingsStateHolder.appSettings
+
+  ExpandableSection("MCP Settings") {
+    Column(modifier = modifier) {
+      Text("MCP Working Directory")
+      val workingDirectory = rememberSaveable(saver = TextFieldState.Saver) {
+        TextFieldState(appSettings.workingDirectory ?: "", TextRange(appSettings.workingDirectory?.length ?: 0))
+      }
+      LaunchedEffect(Unit) {
+        snapshotFlow { workingDirectory.text }
+          .collect {
+            appSettingsStateHolder.onWorkingDirectoryChanged(it.toString())
+          }
+      }
+      TextField(
+        state = workingDirectory,
+        modifier = Modifier.padding(8.dp)
+      )
+
+      Text("MCP PATH Environment Variable")
+      val path = rememberSaveable(saver = TextFieldState.Saver) {
+        TextFieldState(appSettings.path ?: "", TextRange(appSettings.path?.length ?: 0))
+      }
+      LaunchedEffect(Unit) {
+        snapshotFlow { path.text }
+          .collect {
+            appSettingsStateHolder.onPathChanged(it.toString())
+          }
+      }
+      TextField(
+        state = path,
+        modifier = Modifier.padding(8.dp)
+      )
+    }
+  }
 }
