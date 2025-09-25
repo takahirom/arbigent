@@ -10,7 +10,8 @@ import kotlinx.serialization.Serializable
 data class AppSettings(
   override val workingDirectory: String? = null,
   override val path: String? = null,
-  override val variables: Map<String, String>? = null
+  override val variables: Map<String, String>? = null,
+  override val mcpEnvironmentVariables: Map<String, String>? = null
 ) : ArbigentAppSettings
 
 class AppSettingsStateHolder {
@@ -43,6 +44,11 @@ class AppSettingsStateHolder {
   
   fun setVariables(variables: Map<String, String>?) {
     appSettings = appSettings.copy(variables = variables)
+    Preference.appSettingValue = appSettings
+  }
+  
+  fun setMcpEnvironmentVariables(mcpEnvironmentVariables: Map<String, String>?) {
+    appSettings = appSettings.copy(mcpEnvironmentVariables = mcpEnvironmentVariables)
     Preference.appSettingValue = appSettings
   }
 }

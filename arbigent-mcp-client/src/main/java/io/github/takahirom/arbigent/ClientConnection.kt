@@ -57,12 +57,23 @@ public class ClientConnection(
         // Add environment variables
         val processEnv = processBuilder.environment()
         env.forEach { (key, value) -> processEnv[key] = value }
+        
+        // Add MCP tool environment variables from appSettings
+        try {
+          val mcpEnvironmentVariables = appSettings.mcpEnvironmentVariables
+          if (!mcpEnvironmentVariables.isNullOrEmpty()) {
+            mcpEnvironmentVariables.forEach { (key, value) -> 
+              processEnv[key] = value 
+            }
+          }
+        } catch (e: Exception) {
+          arbigentWarnLog("Failed to get MCP environment variables from appSettings: ${e.message}")
+        }
 
         // Set PATH if provided in appSettings
         try {
           val path = appSettings.path
           if (!path.isNullOrBlank()) {
-            arbigentInfoLog("Setting PATH: $path")
             processEnv["PATH"] = path + File.pathSeparator + processEnv["PATH"]
           }
         } catch (e: Exception) {
@@ -126,13 +137,11 @@ public class ClientConnection(
         arbigentWarnLog("Failed to start or connect to MCP server: ${e.message}, continuing without MCP")
         close() // Clean up resources if connection fails
         throw e
-        return false
       }
     } catch (e: Exception) {
       arbigentWarnLog("Error connecting to MCP server: ${e.message}, continuing without MCP")
       close() // Clean up resources if connection fails
       throw e
-      return false
     }
   }
   public enum class JsonSchemaType {

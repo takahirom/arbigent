@@ -13,4 +13,9 @@ public interface ArbigentAppSettings {
      * Escaped variables (\{{variable_name}}) are preserved.
      */
     public val variables: Map<String, String>?
+    
+    /**
+     * MCP tool environment variables to be passed to MCP processes.
+     */
+    public val mcpEnvironmentVariables: Map<String, String>?
 }
