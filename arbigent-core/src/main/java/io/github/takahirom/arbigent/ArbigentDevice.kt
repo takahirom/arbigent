@@ -8,6 +8,8 @@ import maestro.UiElement.Companion.toUiElementOrNull
 import maestro.orchestra.MaestroCommand
 import maestro.orchestra.Orchestra
 import java.io.File
+import kotlin.math.pow
+import kotlin.system.measureTimeMillis
 
 @ArbigentInternalApi
 public fun getIndexSelector(text: String): Pair<Int, String> {
@@ -194,14 +196,15 @@ public data class ArbigentElementList(
 }
 
 public class MaestroDevice(
-  private val maestro: Maestro,
-  screenshotsDir: File = ArbigentFiles.screenshotsDir
+  @Volatile private var maestro: Maestro,
+  private val screenshotsDir: File = ArbigentFiles.screenshotsDir,
+  private val availableDevice: ArbigentAvailableDevice? = null
 ) : ArbigentDevice, ArbigentTvCompatDevice {
   init {
     arbigentInfoLog("MaestroDevice created: screenshotsDir:${screenshotsDir.absolutePath}")
   }
 
-  private val orchestra = Orchestra(
+  @Volatile private var orchestra = Orchestra(
     maestro = maestro,
     screenshotsDir = screenshotsDir,
   )
@@ -210,7 +213,20 @@ public class MaestroDevice(
     return maestro.deviceName
   }
 
+  @Synchronized
+  private fun ensureConnected() {
+    // Try a simple operation to check connection
+    try {
+      maestro.viewHierarchy()
+    } catch (e: Exception) {
+      // Device appears disconnected, reconnect
+      arbigentInfoLog("MaestroDevice failed to fetch view hierarchy: ${e.message}. Reconnect device ${maestro.deviceName}")
+      reconnectIfDisconnected()
+    }
+  }
+
   override fun executeActions(actions: List<MaestroCommand>) {
+    ensureConnected()
     ArbigentGlobalStatus.onDevice(actions.joinToString { it.toString() }) {
       // If the jsEngine is already initialized, we don't need to reinitialize it
       val shouldJsReinit = if (orchestra::class.java.getDeclaredField("jsEngine").apply {
@@ -225,10 +241,12 @@ public class MaestroDevice(
   }
 
   public override fun waitForAppToSettle(appId: String?) {
+    ensureConnected()
     maestro.waitForAppToSettle(appId = appId)
   }
 
   override fun elements(): ArbigentElementList {
+    ensureConnected()
     for (it in 0..2) {
       try {
         val viewHierarchy = maestro.viewHierarchy(false)
@@ -245,6 +263,7 @@ public class MaestroDevice(
 
 
   override fun viewTreeString(): ArbigentUiTreeStrings {
+    ensureConnected()
     for (it in 0..2) {
       try {
         val viewHierarchy = maestro.viewHierarchy(false)
@@ -266,6 +285,7 @@ public class MaestroDevice(
   }
 
   override fun focusedTreeString(): String {
+    ensureConnected()
     return findCurrentFocus()
       ?.optimizedToString(0, enableDepth = false) ?: ""
   }
@@ -331,12 +351,14 @@ public class MaestroDevice(
   override fun moveFocusToElement(
     selector: ArbigentTvCompatDevice.Selector,
   ) {
+    ensureConnected()
     moveFocusToElement(
       fetchTarget = { fetchTargetBounds(selector) }
     )
   }
 
   override fun moveFocusToElement(element: ArbigentElement) {
+    ensureConnected()
     moveFocusToElement(
       fetchTarget = {
         val newElement = maestro.viewHierarchy().refreshedElement(element.identifierData)
@@ -580,6 +602,82 @@ public class MaestroDevice(
   }
 
   private var isClosed = false
+  private var reconnectAttempts = 0
+  private val maxReconnectAttempts = 6  // Allows retries with exponential backoff up to ~64 seconds
+  private val reconnectLock = Any()
+  
+  private fun updateConnection(newMaestro: Maestro) {
+    this.maestro = newMaestro
+    this.orchestra = Orchestra(maestro = this.maestro, screenshotsDir = this.screenshotsDir)
+  }
+
+  private fun reconnectIfDisconnected() {
+    synchronized(reconnectLock) {
+      // Only reconnect if we have the available device reference
+      if (availableDevice == null) {
+        throw IllegalStateException("Cannot reconnect: no available device reference")
+      }
+
+      var lastException: Exception? = null
+      
+      // Retry with exponential backoff
+      while (reconnectAttempts < maxReconnectAttempts) {
+        // Exponential backoff: 2^attempt seconds (2s, 4s, 8s, 16s, 32s, 64s...)
+        // For attempt 0: no wait
+        // For attempt 1: 2s
+        // For attempt 2: 4s
+        // For attempt 3: 8s
+        // For attempt 4: 16s
+        // For attempt 5: 32s
+        // For attempt 6: 64s (just over 1 minute)
+        if (reconnectAttempts > 0) {
+          val waitTimeMs = (2.0.pow(reconnectAttempts) * 1000).toLong()
+          val maxWaitTimeMs = 60000L // Cap at 60 seconds
+          val actualWaitTimeMs = minOf(waitTimeMs, maxWaitTimeMs)
+          arbigentInfoLog("Waiting ${actualWaitTimeMs}ms before reconnection attempt ${reconnectAttempts + 1}")
+          Thread.sleep(actualWaitTimeMs)
+        }
+        
+        reconnectAttempts++
+        
+        val oldMaestro = this.maestro
+
+        // Try to reconnect
+        val newDevice = try {
+          availableDevice.connectToDevice()
+        } catch (e: Exception) {
+          lastException = e
+          arbigentInfoLog("Reconnection attempt $reconnectAttempts/$maxReconnectAttempts failed: ${e.message}")
+          continue // Try again
+        }
+
+        if (newDevice !is MaestroDevice) {
+          newDevice.close()
+          lastException = IllegalStateException("Unexpected device type after reconnection: ${newDevice.javaClass}")
+          continue // Try again
+        }
+
+        // Update to new connection
+        updateConnection(newDevice.maestro)
+
+        // Close old connection after successful reconnection
+        try {
+          oldMaestro.close()
+        } catch (_: Exception) {
+          // Ignore close errors, device might already be disconnected
+        }
+
+        // Reset counter on successful reconnection
+        reconnectAttempts = 0
+        return // Success!
+      }
+      
+      // All attempts failed - reset counter for future retry sequences
+      reconnectAttempts = 0
+      throw RuntimeException("Failed to reconnect after $maxReconnectAttempts attempts", lastException)
+    }
+  }
+
   override fun close() {
     isClosed = true
     maestro.close()

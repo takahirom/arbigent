@@ -1,0 +1,48 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+# top-most EditorConfig file
+root = true
+
+# Unix-style newlines with a newline ending every file
+[*]
+end_of_line = lf
+insert_final_newline = true
+charset = utf-8
+trim_trailing_whitespace = true
+
+# Kotlin and Java files
+[*.{kt,kts,java}]
+indent_style = space
+indent_size = 2
+continuation_indent_size = 2
+
+# Groovy/Gradle files
+[*.{gradle,gradle.kts}]
+indent_style = space
+indent_size = 2
+continuation_indent_size = 2
+
+# XML files
+[*.xml]
+indent_style = space
+indent_size = 2
+continuation_indent_size = 2
+
+# YAML files
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+# JSON files
+[*.json]
+indent_style = space
+indent_size = 2
+
+# Markdown files
+[*.md]
+trim_trailing_whitespace = false
+
+# Properties files
+[*.properties]
+indent_style = space
+indent_size = 2

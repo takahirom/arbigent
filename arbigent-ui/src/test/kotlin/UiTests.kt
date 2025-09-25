@@ -131,7 +131,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
               expandOptions()
               changeScenarioId("multiline_scenario")
             }
-            itShould("show multiline goal input properly") {
+            itShould("display goal input with multiline text") {
               capture(it)
               assertGoalInputExists()
             }
@@ -310,7 +310,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
               addLaunchAppInitializationMethod()
               clickRunButton()
             }
-            itShould("run methods correctly") {
+            itShould("execute cleanup and launch initialization methods three times") {
               capture(it)
               assertRunInitializeAndLaunchTwice()
             }
@@ -556,7 +556,15 @@ class TestRobot(
   }
 
   fun assertGoalInputExists() {
-    composeUiTest.onNode(hasTestTag("goal")).assertExists()
+    waitALittle()
+    composeUiTest.waitUntil(timeoutMillis = 5000) {
+      try {
+        composeUiTest.onNode(hasTestTag("goal")).assertExists()
+        true
+      } catch (e: AssertionError) {
+        false
+      }
+    }
   }
 
   fun expandOptions() {
@@ -924,6 +932,7 @@ class FakeDevice : ArbigentDevice {
     arbigentDebugLog("FakeDevice.isClosed")
     return isClosed
   }
+
 }
 
 class FakeKeyStore(

@@ -459,6 +459,16 @@ You can write a project file in YAML format by hand or create it using the Arbig
 
 The id is auto-generated UUID by Arbigent UI but you can change it to any string.
 
+#### Available Initialization Methods
+
+- **Back**: Press the back button
+- **Wait**: Wait for a specified duration
+- **LaunchApp**: Launch an application
+- **CleanupData**: Clear application data
+- **OpenLink**: Open a URL/link
+- **MaestroYaml**: Execute a predefined Maestro YAML scenario
+- **Reconnect**: Disconnect and reconnect the device
+
 ```yaml
 scenarios:
   - id: "7788d7f4-7276-4cb3-8e98-7d3ad1d1cd47"
