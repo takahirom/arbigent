@@ -49,11 +49,6 @@ class FakeDevice : ArbigentDevice {
     arbigentDebugLog("FakeDevice.isClosed")
     return isClosed
   }
-  
-  override fun reconnectIfDisconnected() {
-    arbigentDebugLog("FakeDevice.reconnectIfDisconnected")
-    // Fake device doesn't need actual reconnection
-  }
 
   override fun elements(): ArbigentElementList {
     return ArbigentElementList(

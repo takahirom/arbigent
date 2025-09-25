@@ -693,19 +693,6 @@ public fun AgentConfigBuilder(
           }
         })
       }
-
-      ArbigentScenarioContent.InitializationMethod.Reconnect -> {
-        addInterceptor(object : ArbigentInitializerInterceptor {
-          override fun intercept(
-            device: ArbigentDevice,
-            chain: ArbigentInitializerInterceptor.Chain
-          ) {
-            // Reconnect the device if it was disconnected (e.g., after adb reboot)
-            device.reconnectIfDisconnected()
-            chain.proceed(device)
-          }
-        })
-      }
     }
   }
   // Add cache control interceptor

@@ -588,8 +588,7 @@ enum class InitializationMethodMenu(
   Back("Back", ArbigentScenarioContent.InitializationMethod.Back(1)),
   OpenLink("Open link", ArbigentScenarioContent.InitializationMethod.OpenLink("")),
   LaunchApp("Launch app", ArbigentScenarioContent.InitializationMethod.LaunchApp("", emptyMap())),
-  MaestroYaml("Maestro YAML", ArbigentScenarioContent.InitializationMethod.MaestroYaml("")),
-  Reconnect("Reconnect device", ArbigentScenarioContent.InitializationMethod.Reconnect)
+  MaestroYaml("Maestro YAML", ArbigentScenarioContent.InitializationMethod.MaestroYaml(""))
 }
 
 @OptIn(ExperimentalFoundationApi::class)
