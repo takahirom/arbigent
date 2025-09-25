@@ -556,7 +556,15 @@ class TestRobot(
   }
 
   fun assertGoalInputExists() {
-    composeUiTest.onNode(hasTestTag("goal")).assertExists()
+    waitALittle()
+    composeUiTest.waitUntil(timeoutMillis = 5000) {
+      try {
+        composeUiTest.onNode(hasTestTag("goal")).assertExists()
+        true
+      } catch (e: AssertionError) {
+        false
+      }
+    }
   }
 
   fun expandOptions() {
