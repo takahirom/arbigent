@@ -131,7 +131,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
               expandOptions()
               changeScenarioId("multiline_scenario")
             }
-            itShould("show multiline goal input properly") {
+            itShould("display goal input with multiline text") {
               capture(it)
               assertGoalInputExists()
             }
@@ -310,7 +310,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
               addLaunchAppInitializationMethod()
               clickRunButton()
             }
-            itShould("run methods correctly") {
+            itShould("execute cleanup and launch initialization methods twice") {
               capture(it)
               assertRunInitializeAndLaunchTwice()
             }
