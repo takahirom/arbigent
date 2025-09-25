@@ -925,9 +925,6 @@ class FakeDevice : ArbigentDevice {
     return isClosed
   }
 
-  override fun reconnectIfDisconnected() {
-    arbigentDebugLog("FakeDevice.reconnectIfDisconnected")
-  }
 }
 
 class FakeKeyStore(
