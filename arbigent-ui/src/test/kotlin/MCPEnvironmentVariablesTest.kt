@@ -1,6 +1,7 @@
 package io.github.takahirom.arbigent.ui
 
 import io.github.takahirom.arbigent.*
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -13,6 +14,13 @@ class MCPEnvironmentVariablesTest {
     fun setup() {
         // Set up test keystore to avoid BackendNotSupportedException
         globalKeyStoreFactory = TestKeyStoreFactory()
+    }
+    
+    @After
+    fun tearDown() {
+        // Clean up any test data to avoid pollution
+        val stateHolder = AppSettingsStateHolder()
+        stateHolder.setMcpEnvironmentVariables(null)
     }
     
     @Test

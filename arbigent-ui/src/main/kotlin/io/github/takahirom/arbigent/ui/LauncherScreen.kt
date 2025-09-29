@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -147,7 +148,6 @@ class AiSettingStateHolder {
   }
 
   fun addAiProvider(aiProviderSetting: AiProviderSetting) {
-    // Check if ID already exists
     if (aiSetting.aiSettings.any { it.id == aiProviderSetting.id }) {
       return
     }
@@ -302,7 +302,6 @@ private fun VariablesSection(
     modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
   )
   
-  // Keep simplified approach but use value/onValueChange pattern for now
   val variables = appSettings.variables ?: emptyMap()
   val variablesList = remember(variables) {
     mutableStateListOf<MutableState<Pair<String, String>>>().apply {
@@ -512,15 +511,14 @@ private fun MCPEnvironmentVariablesSection(
   
   Column(modifier = Modifier.padding(horizontal = 8.dp)) {
     mcpVariablesList.forEachIndexed { index, variableState ->
-      val keyState = rememberTextFieldState()
-      val valueState = rememberTextFieldState()
-      var keyError by remember { mutableStateOf<String?>(null) }
-      
-      // Initialize states with current values
-      LaunchedEffect(variableState.value) {
-        keyState.setTextAndPlaceCursorAtEnd(variableState.value.first)
-        valueState.setTextAndPlaceCursorAtEnd(variableState.value.second)
+      // Use rememberSaveable with TextFieldState.Saver for proper state management
+      val keyState = rememberSaveable(saver = TextFieldState.Saver, key = "key_$index") { 
+        TextFieldState(variableState.value.first, TextRange(variableState.value.first.length)) 
       }
+      val valueState = rememberSaveable(saver = TextFieldState.Saver, key = "value_$index") { 
+        TextFieldState(variableState.value.second, TextRange(variableState.value.second.length)) 
+      }
+      var keyError by remember { mutableStateOf<String?>(null) }
       
       LaunchedEffect(keyState.text, valueState.text) {
         delay(300)
@@ -541,7 +539,7 @@ private fun MCPEnvironmentVariablesSection(
           else -> null
         }
         
-        if (keyError == null) {
+        if (keyError == null && (variableState.value.first != newKey || variableState.value.second != newValue)) {
           variableState.value = newKey to newValue
           updateMcpEnvironmentVariables()
         }
@@ -555,7 +553,9 @@ private fun MCPEnvironmentVariablesSection(
           TextField(
             state = keyState,
             placeholder = { Text("VARIABLE_NAME") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+              .fillMaxWidth()
+              .testTag("mcp_environment_variable_key_$index")
           )
           keyError?.let { error ->
             Text(
@@ -564,7 +564,9 @@ private fun MCPEnvironmentVariablesSection(
                 fontSize = 10.sp,
                 color = androidx.compose.ui.graphics.Color.Red
               ),
-              modifier = Modifier.padding(top = 2.dp)
+              modifier = Modifier
+                .padding(top = 2.dp)
+                .testTag("mcp_environment_variable_error_$index")
             )
           }
         }
@@ -574,7 +576,9 @@ private fun MCPEnvironmentVariablesSection(
         TextField(
           state = valueState,
           placeholder = { Text("value") },
-          modifier = Modifier.weight(1f)
+          modifier = Modifier
+            .weight(1f)
+            .testTag("mcp_environment_variable_value_$index")
         )
         
         IconButton(
@@ -584,7 +588,8 @@ private fun MCPEnvironmentVariablesSection(
               mcpVariablesList.add(mutableStateOf("" to ""))
             }
             updateMcpEnvironmentVariables()
-          }
+          },
+          modifier = Modifier.testTag("remove_mcp_environment_variable_$index")
         ) {
           Icon(
             key = AllIconsKeys.General.Remove,
@@ -598,7 +603,9 @@ private fun MCPEnvironmentVariablesSection(
     // Add button
     OutlinedButton(
       onClick = { mcpVariablesList.add(mutableStateOf("" to "")) },
-      modifier = Modifier.padding(vertical = 8.dp)
+      modifier = Modifier
+        .padding(vertical = 8.dp)
+        .testTag("add_mcp_environment_variable")
     ) {
       Icon(
         key = AllIconsKeys.General.Add,
