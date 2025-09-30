@@ -62,35 +62,6 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
             assertConnectToDeviceButtonExists()
           }
         }
-        
-        describe("MCP Environment Variables") {
-          doIt {
-            expandMcpSettings()
-          }
-
-          describe("when adding environment variables") {
-            doIt {
-              clickAddMcpEnvironmentVariableButton()
-            }
-
-            itShould("show new environment variable input fields") {
-              assertMcpEnvironmentVariableInputExists(0)
-              capture(it)
-            }
-
-            describe("when entering valid environment variable") {
-              doIt {
-                enterMcpEnvironmentVariable(0, "API_KEY", "test-api-key-123")
-              }
-
-              itShould("accept the input") {
-                assertMcpEnvironmentVariableContains(0, "API_KEY", "test-api-key-123")
-                capture(it)
-              }
-            }
-          }
-        }
-        
         describe("when add scenario") {
           doIt {
             clickConnectToDeviceButton()
@@ -311,9 +282,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
               }
             }
           }
-        }
-
-        describe("when enter goals and run") {
+          describe("when enter goals and run") {
             doIt {
               enterGoal("launch the app")
               clickRunButton()
@@ -346,6 +315,15 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
               assertRunInitializeAndLaunchTwice()
             }
           }
+          describeEnterDependencyGoal(
+            firstGoal = "g1",
+            secondGoal = "g2"
+          )
+          // Same goal
+          describeEnterDependencyGoal(
+            firstGoal = "g1",
+            secondGoal = "g1"
+          )
         }
       }
     }
@@ -420,6 +398,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
       onRoot().captureRoboImage("$it.png")
     }
   }
+}
 
 @ExperimentalTestApi
 class TestRobot(
@@ -593,11 +572,6 @@ class TestRobot(
     composeUiTest.waitUntilAtLeastOneExists(hasContentDescription("Collapse Options"))
     // To make the test deterministic
     changeScenarioId("default_scenario")
-  }
-
-  fun expandMcpSettings() {
-    composeUiTest.onNode(hasContentDescription("Expand MCP Settings")).performClick()
-    composeUiTest.waitUntilAtLeastOneExists(hasContentDescription("Collapse MCP Settings"))
   }
 
   fun collapseOptions() {
@@ -884,74 +858,6 @@ class TestRobot(
     composeUiTest
       .onNode(hasTestTag("image_detail_level_combo"))
       .assertExists()
-  }
-
-  fun clickAddMcpEnvironmentVariableButton() {
-    composeUiTest
-      .onNode(hasTestTag("add_mcp_environment_variable"))
-      .performClick()
-    waitALittle()
-  }
-
-  fun assertMcpEnvironmentVariableInputExists(index: Int) {
-    waitForNode(hasTestTag("mcp_environment_variable_key_$index"))
-    composeUiTest
-      .onNode(hasTestTag("mcp_environment_variable_key_$index"))
-      .assertExists()
-    composeUiTest
-      .onNode(hasTestTag("mcp_environment_variable_value_$index"))
-      .assertExists()
-  }
-
-  fun enterMcpEnvironmentVariable(index: Int, key: String, value: String) {
-    composeUiTest
-      .onNode(hasTestTag("mcp_environment_variable_key_$index"))
-      .performTextClearance()
-    composeUiTest
-      .onNode(hasTestTag("mcp_environment_variable_key_$index"))
-      .performTextInput(key)
-    waitALittle()
-    
-    composeUiTest
-      .onNode(hasTestTag("mcp_environment_variable_value_$index"))
-      .performTextClearance()
-    composeUiTest
-      .onNode(hasTestTag("mcp_environment_variable_value_$index"))
-      .performTextInput(value)
-    waitALittle()
-  }
-
-  fun assertMcpEnvironmentVariableContains(index: Int, key: String, value: String) {
-    composeUiTest
-      .onNode(hasTestTag("mcp_environment_variable_key_$index"))
-      .assertTextContains(key)
-    composeUiTest
-      .onNode(hasTestTag("mcp_environment_variable_value_$index"))
-      .assertTextContains(value)
-  }
-
-  fun clickRemoveMcpEnvironmentVariableButton(index: Int) {
-    composeUiTest
-      .onNode(hasTestTag("remove_mcp_environment_variable_$index"))
-      .performClick()
-    waitALittle()
-  }
-
-  fun assertMcpEnvironmentVariableCount(expectedCount: Int) {
-    for (i in 0 until expectedCount) {
-      composeUiTest
-        .onNode(hasTestTag("mcp_environment_variable_key_$i"))
-        .assertExists()
-    }
-    composeUiTest
-      .onNode(hasTestTag("mcp_environment_variable_key_$expectedCount"))
-      .assertDoesNotExist()
-  }
-
-  fun assertMcpEnvironmentVariableError(index: Int, errorMessage: String) {
-    composeUiTest
-      .onNode(hasTestTag("mcp_environment_variable_error_$index"))
-      .assertTextContains(errorMessage)
   }
 
   fun assertImageDetailDisabled() {
