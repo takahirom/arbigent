@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -147,7 +148,6 @@ class AiSettingStateHolder {
   }
 
   fun addAiProvider(aiProviderSetting: AiProviderSetting) {
-    // Check if ID already exists
     if (aiSetting.aiSettings.any { it.id == aiProviderSetting.id }) {
       return
     }
@@ -302,7 +302,6 @@ private fun VariablesSection(
     modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
   )
   
-  // Keep simplified approach but use value/onValueChange pattern for now
   val variables = appSettings.variables ?: emptyMap()
   val variablesList = remember(variables) {
     mutableStateListOf<MutableState<Pair<String, String>>>().apply {
@@ -470,6 +469,158 @@ private fun MCPSettingsSection(
         state = path,
         modifier = Modifier.padding(8.dp)
       )
+      
+      MCPEnvironmentVariablesSection(appSettingsStateHolder)
     }
   }
+}
+
+@Composable
+private fun MCPEnvironmentVariablesSection(
+  appSettingsStateHolder: AppSettingsStateHolder,
+  modifier: Modifier = Modifier
+) {
+  val appSettings = appSettingsStateHolder.appSettings
+  
+  Text("MCP Tool Environment Variables")
+  Text(
+    "Define environment variables for MCP tool processes",
+    style = androidx.compose.ui.text.TextStyle(
+      fontSize = 12.sp,
+      color = androidx.compose.ui.graphics.Color.Gray
+    ),
+    modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)
+  )
+  
+  val mcpVariables = appSettings.mcpEnvironmentVariables ?: emptyMap()
+  val mcpVariablesList = remember(mcpVariables) {
+    mutableStateListOf<MutableState<Pair<String, String>>>().apply {
+      mcpVariables.forEach { (k, v) -> add(mutableStateOf(k to v)) }
+      if (isEmpty()) add(mutableStateOf("" to ""))
+    }
+  }
+  
+  // Helper function to update MCP environment variables
+  fun updateMcpEnvironmentVariables() {
+    val newMcpVariables = mcpVariablesList
+      .map { it.value }
+      .filter { (k, v) -> k.isNotEmpty() && v.isNotEmpty() }
+      .toMap()
+    appSettingsStateHolder.setMcpEnvironmentVariables(newMcpVariables.ifEmpty { null })
+  }
+  
+  Column(modifier = Modifier.padding(horizontal = 8.dp)) {
+    mcpVariablesList.forEachIndexed { index, variableState ->
+      // Use rememberSaveable with TextFieldState.Saver for proper state management
+      val keyState = rememberSaveable(saver = TextFieldState.Saver, key = "key_$index") { 
+        TextFieldState(variableState.value.first, TextRange(variableState.value.first.length)) 
+      }
+      val valueState = rememberSaveable(saver = TextFieldState.Saver, key = "value_$index") { 
+        TextFieldState(variableState.value.second, TextRange(variableState.value.second.length)) 
+      }
+      var keyError by remember { mutableStateOf<String?>(null) }
+      
+      LaunchedEffect(keyState.text, valueState.text) {
+        delay(300)
+        
+        val newKey = keyState.text.toString().trim()
+        val newValue = valueState.text.toString().trim()
+        
+        // Validate
+        val existingKeys = mcpVariablesList
+          .mapIndexedNotNull { i, state -> 
+            if (i != index) state.value.first else null 
+          }
+          .filter { it.isNotEmpty() }
+        
+        keyError = when {
+          newKey.isNotEmpty() && !isValidEnvironmentVariableName(newKey) -> "Invalid name"
+          newKey.isNotEmpty() && existingKeys.contains(newKey) -> "Already exists"
+          else -> null
+        }
+        
+        if (keyError == null && (variableState.value.first != newKey || variableState.value.second != newValue)) {
+          variableState.value = newKey to newValue
+          updateMcpEnvironmentVariables()
+        }
+      }
+      
+      Row(
+        modifier = Modifier.padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        Column(modifier = Modifier.width(150.dp)) {
+          TextField(
+            state = keyState,
+            placeholder = { Text("VARIABLE_NAME") },
+            modifier = Modifier
+              .fillMaxWidth()
+              .testTag("mcp_environment_variable_key_$index")
+          )
+          keyError?.let { error ->
+            Text(
+              text = error,
+              style = androidx.compose.ui.text.TextStyle(
+                fontSize = 10.sp,
+                color = androidx.compose.ui.graphics.Color.Red
+              ),
+              modifier = Modifier
+                .padding(top = 2.dp)
+                .testTag("mcp_environment_variable_error_$index")
+            )
+          }
+        }
+        
+        Text(" = ", modifier = Modifier.padding(horizontal = 8.dp))
+        
+        TextField(
+          state = valueState,
+          placeholder = { Text("value") },
+          modifier = Modifier
+            .weight(1f)
+            .testTag("mcp_environment_variable_value_$index")
+        )
+        
+        IconButton(
+          onClick = {
+            mcpVariablesList.removeAt(index)
+            if (mcpVariablesList.isEmpty()) {
+              mcpVariablesList.add(mutableStateOf("" to ""))
+            }
+            updateMcpEnvironmentVariables()
+          },
+          modifier = Modifier.testTag("remove_mcp_environment_variable_$index")
+        ) {
+          Icon(
+            key = AllIconsKeys.General.Remove,
+            contentDescription = "Remove",
+            hint = Size(16)
+          )
+        }
+      }
+    }
+    
+    // Add button
+    OutlinedButton(
+      onClick = { mcpVariablesList.add(mutableStateOf("" to "")) },
+      modifier = Modifier
+        .padding(vertical = 8.dp)
+        .testTag("add_mcp_environment_variable")
+    ) {
+      Icon(
+        key = AllIconsKeys.General.Add,
+        contentDescription = "Add MCP environment variable",
+        hint = Size(16)
+      )
+      Text(" Add Environment Variable", modifier = Modifier.padding(start = 4.dp))
+    }
+  }
+}
+
+/**
+ * Validates environment variable names.
+ * Environment variables typically allow uppercase letters, numbers, and underscores.
+ */
+internal fun isValidEnvironmentVariableName(name: String): Boolean {
+  return name.matches(Regex("^[A-Z_][A-Z0-9_]*$"))
 }

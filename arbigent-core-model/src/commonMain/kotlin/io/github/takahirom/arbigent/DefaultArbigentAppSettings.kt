@@ -25,4 +25,11 @@ public object DefaultArbigentAppSettings : ArbigentAppSettings {
    * @return Always returns null as this is a default implementation.
    */
   override val variables: Map<String, String>? = null
+
+  /**
+   * Gets the MCP tool environment variables.
+   *
+   * @return Always returns null as this is a default implementation.
+   */
+  override val mcpEnvironmentVariables: Map<String, String>? = null
 }

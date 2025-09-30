@@ -62,6 +62,35 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
             assertConnectToDeviceButtonExists()
           }
         }
+        
+        describe("MCP Environment Variables") {
+          doIt {
+            expandMcpSettings()
+          }
+
+          describe("when adding environment variables") {
+            doIt {
+              clickAddMcpEnvironmentVariableButton()
+            }
+
+            itShould("show new environment variable input fields") {
+              assertMcpEnvironmentVariableInputExists(0)
+              capture(it)
+            }
+
+            describe("when entering valid environment variable") {
+              doIt {
+                enterMcpEnvironmentVariable(0, "API_KEY", "test-api-key-123")
+              }
+
+              itShould("accept the input") {
+                assertMcpEnvironmentVariableContains(0, "API_KEY", "test-api-key-123")
+                capture(it)
+              }
+            }
+          }
+        }
+        
         describe("when add scenario") {
           doIt {
             clickConnectToDeviceButton()
@@ -867,12 +896,60 @@ class TestRobot(
       .assertDoesNotExist()
   }
 
+  fun expandMcpSettings() {
+    composeUiTest.onNode(hasContentDescription("Expand MCP Settings")).performClick()
+    composeUiTest.waitUntilAtLeastOneExists(hasContentDescription("Collapse MCP Settings"))
+  }
+
+  fun clickAddMcpEnvironmentVariableButton() {
+    composeUiTest
+      .onNode(hasTestTag("add_mcp_environment_variable"))
+      .performClick()
+    waitALittle()
+  }
+
+  fun assertMcpEnvironmentVariableInputExists(index: Int) {
+    waitForNode(hasTestTag("mcp_environment_variable_key_$index"))
+    composeUiTest
+      .onNode(hasTestTag("mcp_environment_variable_key_$index"))
+      .assertExists()
+    composeUiTest
+      .onNode(hasTestTag("mcp_environment_variable_value_$index"))
+      .assertExists()
+  }
+
+  fun enterMcpEnvironmentVariable(index: Int, key: String, value: String) {
+    composeUiTest
+      .onNode(hasTestTag("mcp_environment_variable_key_$index"))
+      .performTextClearance()
+    composeUiTest
+      .onNode(hasTestTag("mcp_environment_variable_key_$index"))
+      .performTextInput(key)
+    waitALittle()
+    
+    composeUiTest
+      .onNode(hasTestTag("mcp_environment_variable_value_$index"))
+      .performTextClearance()
+    composeUiTest
+      .onNode(hasTestTag("mcp_environment_variable_value_$index"))
+      .performTextInput(value)
+    waitALittle()
+  }
+
+  fun assertMcpEnvironmentVariableContains(index: Int, key: String, value: String) {
+    composeUiTest
+      .onNode(hasTestTag("mcp_environment_variable_key_$index"))
+      .assertTextContains(key)
+    composeUiTest
+      .onNode(hasTestTag("mcp_environment_variable_value_$index"))
+      .assertTextContains(value)
+  }
+
 }
 
 class FakeDevice : ArbigentDevice {
   private val actionHistory = mutableListOf<MaestroCommand>()
   override fun executeActions(actions: List<MaestroCommand>) {
-    arbigentDebugLog("FakeDevice.executeActions: $actions")
     actions.forEach { command ->
       val screenshotCommand = command.takeScreenshotCommand
       if (screenshotCommand != null) {
@@ -896,21 +973,17 @@ class FakeDevice : ArbigentDevice {
   }
 
   override fun os(): ArbigentDeviceOs {
-    arbigentDebugLog("FakeDevice.os")
     return ArbigentDeviceOs.Android
   }
 
   override fun waitForAppToSettle(appId: String?) {
-    arbigentDebugLog("FakeDevice.waitForAppToSettle")
   }
 
   override fun focusedTreeString(): String {
-    arbigentDebugLog("FakeDevice.focusedTreeString")
     return "focusedTreeString"
   }
 
   override fun viewTreeString(): ArbigentUiTreeStrings {
-    arbigentDebugLog("FakeDevice.viewTreeString")
     return ArbigentUiTreeStrings(
       "viewTreeString",
       "optimizedTreeString"
@@ -918,18 +991,15 @@ class FakeDevice : ArbigentDevice {
   }
 
   override fun elements(): ArbigentElementList {
-    arbigentDebugLog("FakeDevice.elements")
     return ArbigentElementList(emptyList(), 1080)
   }
 
   private var isClosed = false
   override fun close() {
-    arbigentDebugLog("FakeDevice.close")
     isClosed = true
   }
 
   override fun isClosed(): Boolean {
-    arbigentDebugLog("FakeDevice.isClosed")
     return isClosed
   }
 
@@ -983,7 +1053,6 @@ class FakeAi : ArbigentAi {
       }
 
       override fun decideAgentActions(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
-        arbigentDebugLog("FakeAi.decideWhatToDo")
         if (decisionCount < 10) {
           decisionCount++
           return createDecisionOutput(
@@ -1005,7 +1074,6 @@ class FakeAi : ArbigentAi {
 
       override fun assertImage(imageAssertionInput: ArbigentAi.ImageAssertionInput): ArbigentAi.ImageAssertionOutput {
         imageAssertionCount++
-        arbigentDebugLog("FakeAi.assertImage")
         return ArbigentAi.ImageAssertionOutput(
           listOf(
             ArbigentAi.ImageAssertionResult(
@@ -1021,7 +1089,6 @@ class FakeAi : ArbigentAi {
       override fun generateScenarios(
         scenarioGenerationInput: ArbigentAi.ScenarioGenerationInput
       ): GeneratedScenariosContent {
-        arbigentDebugLog("FakeAi.Normal.generateScenarios")
         val scenarioContent = ArbigentScenarioContent(
           goal = scenarioGenerationInput.scenariosToGenerate,
           type = ArbigentScenarioType.Scenario
@@ -1062,7 +1129,6 @@ class FakeAi : ArbigentAi {
       override fun generateScenarios(
         scenarioGenerationInput: ArbigentAi.ScenarioGenerationInput
       ): GeneratedScenariosContent {
-        arbigentDebugLog("FakeAi.ImageAssertionFailed.generateScenarios")
         val scenarioContent = ArbigentScenarioContent(
           goal = scenarioGenerationInput.scenariosToGenerate,
           type = ArbigentScenarioType.Scenario
@@ -1086,7 +1152,6 @@ class FakeAi : ArbigentAi {
   override fun generateScenarios(
     scenarioGenerationInput: ArbigentAi.ScenarioGenerationInput
   ): GeneratedScenariosContent {
-    arbigentDebugLog("FakeAi.generateScenarios")
     val scenarioContent = ArbigentScenarioContent(
       goal = scenarioGenerationInput.scenariosToGenerate,
       type = ArbigentScenarioType.Scenario

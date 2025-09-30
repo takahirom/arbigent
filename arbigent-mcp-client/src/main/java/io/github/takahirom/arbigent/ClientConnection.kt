@@ -46,23 +46,30 @@ public class ClientConnection(
       }
       arbigentInfoLog("Starting MCP server: $serverName with command: $command ${args.joinToString(" ")}")
 
-      // Build the command list
       val commandList = mutableListOf(command)
       commandList.addAll(args)
 
       try {
-        // Start the server process
         val processBuilder = ProcessBuilder(commandList)
 
-        // Add environment variables
         val processEnv = processBuilder.environment()
         env.forEach { (key, value) -> processEnv[key] = value }
+        
+        try {
+          val mcpEnvironmentVariables = appSettings.mcpEnvironmentVariables
+          if (!mcpEnvironmentVariables.isNullOrEmpty()) {
+            mcpEnvironmentVariables.forEach { (key, value) -> 
+              processEnv[key] = value 
+            }
+          }
+        } catch (e: Exception) {
+          arbigentWarnLog("Failed to get MCP environment variables from appSettings: ${e.message}")
+        }
 
         // Set PATH if provided in appSettings
         try {
           val path = appSettings.path
           if (!path.isNullOrBlank()) {
-            arbigentInfoLog("Setting PATH: $path")
             processEnv["PATH"] = path + File.pathSeparator + processEnv["PATH"]
           }
         } catch (e: Exception) {
@@ -126,13 +133,11 @@ public class ClientConnection(
         arbigentWarnLog("Failed to start or connect to MCP server: ${e.message}, continuing without MCP")
         close() // Clean up resources if connection fails
         throw e
-        return false
       }
     } catch (e: Exception) {
       arbigentWarnLog("Error connecting to MCP server: ${e.message}, continuing without MCP")
       close() // Clean up resources if connection fails
       throw e
-      return false
     }
   }
   public enum class JsonSchemaType {
@@ -156,16 +161,10 @@ public class ClientConnection(
      }
 
     try {
-      // Log MCP tools request
-      arbigentDebugLog("MCP Tools - Requesting tools from server: $serverName")
-      arbigentDebugLog("MCP Tools - JsonSchema type: $jsonSchemaType")
-      
       // Replace with your actual client call
       val toolsResponse = mcpClient.listTools()
       // Use mapNotNull to safely handle potential null tools or schemas
       val mcpTools = toolsResponse?.tools ?: emptyList()
-
-      arbigentDebugLog("MCP Tools - Received ${mcpTools.size} tools from server: $serverName")
 
       return mcpTools.mapNotNull { mcpTool ->
         val originalSchema = mcpTool.inputSchema ?: run {
@@ -173,10 +172,6 @@ public class ClientConnection(
           return@mapNotNull null // Skip tool if it has no schema
         }
 
-        arbigentDebugLog("MCP Tools - Processing tool: ${mcpTool.name}")
-        arbigentDebugLog("MCP Tools - Original description: ${mcpTool.description}")
-        arbigentDebugLog("MCP Tools - Original schema properties: ${originalSchema.properties}")
-        arbigentDebugLog("MCP Tools - Original schema required: ${originalSchema.required}")
 
         // Extract the actual properties from the JSON Schema format
         val actualProperties = if (originalSchema.properties.containsKey("properties")) {
@@ -195,17 +190,11 @@ public class ClientConnection(
 
         val actualRequired = originalSchema.required ?: emptyList()
         
-        arbigentDebugLog("MCP Tools - Extracted actual properties: $actualProperties")
-        arbigentDebugLog("MCP Tools - Extracted actual required: $actualRequired")
-
-        // Transform properties and determine required list based on the target API type
         val (transformedProperties, finalRequiredList) = when (jsonSchemaType) {
           JsonSchemaType.GeminiOpenAICompatible -> transformSchemaForGemini(actualProperties, actualRequired)
           JsonSchemaType.OpenAI -> transformSchemaForOpenAI(actualProperties, actualRequired)
         }
 
-        arbigentDebugLog("MCP Tools - Transformed properties: $transformedProperties")
-        arbigentDebugLog("MCP Tools - Final required list: $finalRequiredList")
 
         // Create the final Tool object with the transformed schema
         val finalTool = Tool(
@@ -217,7 +206,6 @@ public class ClientConnection(
           )
         )
 
-        arbigentDebugLog("MCP Tools - Final tool: ${finalTool.name} with ${finalTool.inputSchema?.required?.size ?: 0} required parameters")
         finalTool
       }
     } catch (e: Exception) {
