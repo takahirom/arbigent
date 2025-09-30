@@ -62,6 +62,35 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
             assertConnectToDeviceButtonExists()
           }
         }
+        
+        describe("MCP Environment Variables") {
+          doIt {
+            expandMcpSettings()
+          }
+
+          describe("when adding environment variables") {
+            doIt {
+              clickAddMcpEnvironmentVariableButton()
+            }
+
+            itShould("show new environment variable input fields") {
+              assertMcpEnvironmentVariableInputExists(0)
+              capture(it)
+            }
+
+            describe("when entering valid environment variable") {
+              doIt {
+                enterMcpEnvironmentVariable(0, "API_KEY", "test-api-key-123")
+              }
+
+              itShould("accept the input") {
+                assertMcpEnvironmentVariableContains(0, "API_KEY", "test-api-key-123")
+                capture(it)
+              }
+            }
+          }
+        }
+        
         describe("when add scenario") {
           doIt {
             clickConnectToDeviceButton()
@@ -865,6 +894,55 @@ class TestRobot(
     composeUiTest
       .onNode(hasTestTag("image_detail_level_combo"))
       .assertDoesNotExist()
+  }
+
+  fun expandMcpSettings() {
+    composeUiTest.onNode(hasContentDescription("Expand MCP Settings")).performClick()
+    composeUiTest.waitUntilAtLeastOneExists(hasContentDescription("Collapse MCP Settings"))
+  }
+
+  fun clickAddMcpEnvironmentVariableButton() {
+    composeUiTest
+      .onNode(hasTestTag("add_mcp_environment_variable"))
+      .performClick()
+    waitALittle()
+  }
+
+  fun assertMcpEnvironmentVariableInputExists(index: Int) {
+    waitForNode(hasTestTag("mcp_environment_variable_key_$index"))
+    composeUiTest
+      .onNode(hasTestTag("mcp_environment_variable_key_$index"))
+      .assertExists()
+    composeUiTest
+      .onNode(hasTestTag("mcp_environment_variable_value_$index"))
+      .assertExists()
+  }
+
+  fun enterMcpEnvironmentVariable(index: Int, key: String, value: String) {
+    composeUiTest
+      .onNode(hasTestTag("mcp_environment_variable_key_$index"))
+      .performTextClearance()
+    composeUiTest
+      .onNode(hasTestTag("mcp_environment_variable_key_$index"))
+      .performTextInput(key)
+    waitALittle()
+    
+    composeUiTest
+      .onNode(hasTestTag("mcp_environment_variable_value_$index"))
+      .performTextClearance()
+    composeUiTest
+      .onNode(hasTestTag("mcp_environment_variable_value_$index"))
+      .performTextInput(value)
+    waitALittle()
+  }
+
+  fun assertMcpEnvironmentVariableContains(index: Int, key: String, value: String) {
+    composeUiTest
+      .onNode(hasTestTag("mcp_environment_variable_key_$index"))
+      .assertTextContains(key)
+    composeUiTest
+      .onNode(hasTestTag("mcp_environment_variable_value_$index"))
+      .assertTextContains(value)
   }
 
 }
