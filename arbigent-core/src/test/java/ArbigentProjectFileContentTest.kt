@@ -332,4 +332,122 @@ Previous steps:
     )
   }
 
+  private val projectWithAdditionalActions = ArbigentProjectSerializer().load(
+    """
+    settings:
+      additionalActions:
+        - ClickWithText
+    scenarios:
+    - id: "project-actions"
+      goal: "Test project-level actions"
+    - id: "scenario-actions"
+      goal: "Test scenario-level actions"
+      additionalActions:
+        - ClickWithId
+    - id: "scenario-only-actions"
+      goal: "Test scenario-only actions"
+    """
+  )
+
+  @Test
+  fun testAdditionalActions() {
+    // Test project-level additionalActions
+    val projectSettings = projectWithAdditionalActions.settings
+    val projectAdditionalActions = projectSettings.additionalActions
+    assertNotNull(projectAdditionalActions, "Project additionalActions should not be null")
+    assertEquals(1, projectAdditionalActions.size, "Project should have 1 additional action")
+    assertEquals("ClickWithText", projectAdditionalActions[0], "Project action should be ClickWithText")
+
+    // Test scenario using project actions
+    val scenarioWithProjectActions = projectWithAdditionalActions.scenarioContents.createArbigentScenario(
+      projectSettings = projectSettings,
+      scenario = projectWithAdditionalActions.scenarioContents[0],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
+    )
+    val projectActionsTask = scenarioWithProjectActions.agentTasks[0]
+    assertEquals(1, projectActionsTask.additionalActions.size, "Scenario should have 1 additional action from project")
+    assertEquals("ClickWithText", projectActionsTask.additionalActions[0])
+
+    // Test scenario with both project and scenario actions (merged)
+    val scenarioWithBothActions = projectWithAdditionalActions.scenarioContents.createArbigentScenario(
+      projectSettings = projectSettings,
+      scenario = projectWithAdditionalActions.scenarioContents[1],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
+    )
+    val bothActionsTask = scenarioWithBothActions.agentTasks[0]
+    assertEquals(2, bothActionsTask.additionalActions.size, "Scenario should have 2 additional actions (merged)")
+    assertTrue(bothActionsTask.additionalActions.contains("ClickWithText"), "Should contain project action")
+    assertTrue(bothActionsTask.additionalActions.contains("ClickWithId"), "Should contain scenario action")
+
+    // Test scenario with no additional actions (empty project settings)
+    val scenarioWithNoActions = projectWithAdditionalActions.scenarioContents.createArbigentScenario(
+      projectSettings = ArbigentProjectSettings(additionalActions = null),
+      scenario = projectWithAdditionalActions.scenarioContents[2],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
+    )
+    val noActionsTask = scenarioWithNoActions.agentTasks[0]
+    assertEquals(0, noActionsTask.additionalActions.size, "Scenario should have 0 additional actions")
+  }
+
+  private val projectWithDuplicateActions = ArbigentProjectSerializer().load(
+    """
+    settings:
+      additionalActions:
+        - ClickWithText
+    scenarios:
+    - id: "duplicate-test"
+      goal: "Test deduplication"
+      additionalActions:
+        - ClickWithText
+        - ClickWithId
+    """
+  )
+
+  @Test
+  fun testAdditionalActionsDeduplication() {
+    // Test that duplicate actions are removed
+    val projectSettings = projectWithDuplicateActions.settings
+    val scenarioWithDuplicates = projectWithDuplicateActions.scenarioContents.createArbigentScenario(
+      projectSettings = projectSettings,
+      scenario = projectWithDuplicateActions.scenarioContents[0],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
+    )
+    val task = scenarioWithDuplicates.agentTasks[0]
+    assertEquals(2, task.additionalActions.size, "Should have 2 actions after deduplication")
+    assertEquals(listOf("ClickWithText", "ClickWithId"), task.additionalActions, "Should deduplicate ClickWithText")
+  }
+
+  private val projectWithScenarioOnlyActions = ArbigentProjectSerializer().load(
+    """
+    scenarios:
+    - id: "scenario-only"
+      goal: "Test scenario-only actions"
+      additionalActions:
+        - ClickWithText
+    """
+  )
+
+  @Test
+  fun testScenarioOnlyAdditionalActions() {
+    // Test scenario-level additionalActions without project-level settings
+    val scenarioOnly = projectWithScenarioOnlyActions.scenarioContents.createArbigentScenario(
+      projectSettings = ArbigentProjectSettings(),
+      scenario = projectWithScenarioOnlyActions.scenarioContents[0],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
+    )
+    val task = scenarioOnly.agentTasks[0]
+    assertEquals(1, task.additionalActions.size, "Scenario should have 1 additional action")
+    assertEquals("ClickWithText", task.additionalActions[0])
+  }
+
 }

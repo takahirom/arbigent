@@ -8,4 +8,5 @@ public data class ArbigentAgentTask(
   val agentConfig: AgentConfig,
   val maxStep: Int = 10,
   val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Mobile,
+  val additionalActions: List<String> = emptyList(),
 )

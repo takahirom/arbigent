@@ -39,6 +39,7 @@ import io.github.takahirom.arbigent.result.StepFeedback
 import io.github.takahirom.arbigent.result.StepFeedbackEvent
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.Orientation
+import org.jetbrains.jewel.ui.component.Checkbox
 import org.jetbrains.jewel.ui.component.CheckboxRow
 import org.jetbrains.jewel.ui.component.CircularProgressIndicator
 import org.jetbrains.jewel.ui.component.Divider
@@ -462,6 +463,41 @@ private fun ScenarioOptions(
             updatedScenarioStateHolder.onOverrideCacheForceDisabledChanged(disabled)
           }
         )
+      }
+    }
+    Column(
+      modifier = Modifier.padding(8.dp).width(240.dp)
+    ) {
+      GroupHeader("Additional Actions")
+      val additionalActions by updatedScenarioStateHolder.additionalActionsFlow.collectAsState()
+      val currentActions = additionalActions ?: emptyList()
+
+      Column {
+        AdditionalActionsConstants.AVAILABLE_ACTIONS.forEach { actionName ->
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(vertical = 2.dp)
+          ) {
+            Checkbox(
+              checked = currentActions.contains(actionName),
+              onCheckedChange = { isChecked ->
+                val updatedActions = if (isChecked) {
+                  currentActions + actionName
+                } else {
+                  currentActions - actionName
+                }
+                updatedScenarioStateHolder.onAdditionalActionsChanged(
+                  if (updatedActions.isEmpty()) null else updatedActions
+                )
+              },
+              modifier = Modifier.testTag("scenario_additional_action_$actionName")
+            )
+            Text(
+              text = actionName,
+              modifier = Modifier.padding(start = 8.dp)
+            )
+          }
+        }
       }
     }
     Column(

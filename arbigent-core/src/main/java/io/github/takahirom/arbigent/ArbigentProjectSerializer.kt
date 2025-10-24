@@ -113,6 +113,7 @@ public data class ArbigentProjectSettings(
   @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
   public val mcpJson: String = DefaultMcpJson,
   public val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Unspecified,
+  public val additionalActions: List<String>? = null,
 ) {
   public companion object {
     public const val DefaultMcpJson: String = "{}"
@@ -196,12 +197,16 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
       nodeScenario.deviceFormFactor
     }
 
+    // Merge additionalActions from project and scenario
+    val mergedAdditionalActions = (projectSettings.additionalActions.orEmpty() + nodeScenario.additionalActions.orEmpty()).distinct()
+
     result.add(
       ArbigentAgentTask(
         scenarioId = nodeScenario.id,
         goal = nodeScenario.goal,
         maxStep = nodeScenario.maxStep,
         deviceFormFactor = effectiveDeviceFormFactor,
+        additionalActions = mergedAdditionalActions,
         agentConfig = AgentConfigBuilder(
           prompt = projectSettings.prompt,
           scenarioType = nodeScenario.type,
@@ -296,7 +301,8 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
   public val imageAssertions: List<ArbigentImageAssertion> = emptyList(),
   public val userPromptTemplate: String = UserPromptTemplate.DEFAULT_TEMPLATE,
   public val aiOptions: ArbigentAiOptions? = null,
-  public val cacheOptions: ArbigentScenarioCacheOptions? = null
+  public val cacheOptions: ArbigentScenarioCacheOptions? = null,
+  public val additionalActions: List<String>? = null
 ) {
   @Serializable
   public sealed interface CleanupData {

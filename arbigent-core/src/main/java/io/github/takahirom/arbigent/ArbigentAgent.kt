@@ -171,16 +171,45 @@ public class ArbigentAgent(
     agentTask: ArbigentAgentTask,
     mcpClient: MCPClient
   ) {
+    val baseActionTypes = when (agentTask.deviceFormFactor) {
+      ArbigentScenarioDeviceFormFactor.Mobile -> defaultAgentActionTypesForVisualMode()
+      ArbigentScenarioDeviceFormFactor.Tv -> defaultAgentActionTypesForTvForVisualMode()
+      else -> throw IllegalArgumentException("Unsupported device form factor: ${agentTask.deviceFormFactor}")
+    }
+
+    // Registry mapping action names to AgentActionType objects
+    val actionTypeRegistry = mapOf(
+      ClickWithTextAgentAction.actionName to ClickWithTextAgentAction,
+      ClickWithIdAgentAction.actionName to ClickWithIdAgentAction,
+      DpadAutoFocusWithIdAgentAction.actionName to DpadAutoFocusWithIdAgentAction,
+      DpadAutoFocusWithTextAgentAction.actionName to DpadAutoFocusWithTextAgentAction,
+    )
+
+    // Resolve additional actions from string names to AgentActionType objects
+    val resolvedAdditionalActions = agentTask.additionalActions.mapNotNull { actionName ->
+      val actionType = actionTypeRegistry[actionName]
+
+      if (actionType == null) {
+        arbigentInfoLog("Unknown additional action: $actionName. Valid actions: ${actionTypeRegistry.keys}")
+        return@mapNotNull null
+      }
+
+      // Validate compatibility with device form factor
+      val isDpadAction = actionName.startsWith("Dpad")
+      if (isDpadAction && agentTask.deviceFormFactor == ArbigentScenarioDeviceFormFactor.Mobile) {
+        arbigentInfoLog("Warning: D-pad action '$actionName' is not compatible with Mobile device form factor")
+        return@mapNotNull null
+      }
+
+      actionType
+    }
+
     execute(
       scenarioId = agentTask.scenarioId,
       goal = agentTask.goal,
       maxStep = agentTask.maxStep,
       mcpClient = mcpClient,
-      agentActionTypes = when (agentTask.deviceFormFactor) {
-        ArbigentScenarioDeviceFormFactor.Mobile -> defaultAgentActionTypesForVisualMode()
-        ArbigentScenarioDeviceFormFactor.Tv -> defaultAgentActionTypesForTvForVisualMode()
-        else -> throw IllegalArgumentException("Unsupported device form factor: ${agentTask.deviceFormFactor}")
-      }
+      agentActionTypes = baseActionTypes + resolvedAdditionalActions
     )
   }
 
