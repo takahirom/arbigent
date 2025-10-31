@@ -171,16 +171,20 @@ public class ArbigentAgent(
     agentTask: ArbigentAgentTask,
     mcpClient: MCPClient
   ) {
+    val baseActionTypes = when (agentTask.deviceFormFactor) {
+      ArbigentScenarioDeviceFormFactor.Mobile -> defaultAgentActionTypesForVisualMode()
+      ArbigentScenarioDeviceFormFactor.Tv -> defaultAgentActionTypesForTvForVisualMode()
+      else -> throw IllegalArgumentException("Unsupported device form factor: ${agentTask.deviceFormFactor}")
+    }
+    
+    val actionTypes = mergeAdditionalActions(baseActionTypes, agentTask.additionalActions)
+    
     execute(
       scenarioId = agentTask.scenarioId,
       goal = agentTask.goal,
       maxStep = agentTask.maxStep,
       mcpClient = mcpClient,
-      agentActionTypes = when (agentTask.deviceFormFactor) {
-        ArbigentScenarioDeviceFormFactor.Mobile -> defaultAgentActionTypesForVisualMode()
-        ArbigentScenarioDeviceFormFactor.Tv -> defaultAgentActionTypesForTvForVisualMode()
-        else -> throw IllegalArgumentException("Unsupported device form factor: ${agentTask.deviceFormFactor}")
-      }
+      agentActionTypes = actionTypes
     )
   }
 
@@ -899,6 +903,61 @@ public fun defaultAgentActionTypesForTvForVisualMode(): List<AgentActionType> {
     GoalAchievedAgentAction,
     FailedAgentAction,
   )
+}
+
+/**
+ * Maps action type name strings to their corresponding AgentActionType instances.
+ */
+private fun getAgentActionTypeByName(actionName: String): AgentActionType? {
+  return when (actionName) {
+    "ClickWithText" -> ClickWithTextAgentAction
+    "ClickWithId" -> ClickWithIdAgentAction
+    "ClickWithIndex" -> ClickWithIndex
+    "DpadTryAutoFocusById" -> DpadAutoFocusWithIdAgentAction
+    "DpadTryAutoFocusByText" -> DpadAutoFocusWithTextAgentAction
+    "DPadTryAutoFocusByIndex" -> DpadAutoFocusWithIndexAgentAction
+    else -> null
+  }
+}
+
+/**
+ * Merges additional action types into the base list of action types.
+ * Additional actions are inserted after ClickWithIndex or at the beginning if not found.
+ * 
+ * @param baseActionTypes The base list of action types
+ * @param additionalActionNames Optional list of additional action type names to include
+ * @return A new list with additional actions merged in
+ */
+private fun mergeAdditionalActions(
+  baseActionTypes: List<AgentActionType>,
+  additionalActionNames: List<String>?
+): List<AgentActionType> {
+  if (additionalActionNames.isNullOrEmpty()) {
+    return baseActionTypes
+  }
+  
+  val additionalActions = additionalActionNames.mapNotNull { actionName ->
+    getAgentActionTypeByName(actionName).also { actionType ->
+      if (actionType == null) {
+        arbigentInfoLog("Warning: Unknown additional action type: $actionName")
+      }
+    }
+  }
+  
+  if (additionalActions.isEmpty()) {
+    return baseActionTypes
+  }
+  
+  // Insert additional actions after ClickWithIndex (or at the beginning if not found)
+  val clickWithIndexPos = baseActionTypes.indexOfFirst { it == ClickWithIndex }
+  val insertPosition = if (clickWithIndexPos >= 0) clickWithIndexPos + 1 else 0
+  
+  val result = baseActionTypes.toMutableList()
+  result.addAll(insertPosition, additionalActions)
+  
+  arbigentInfoLog("Added ${additionalActions.size} additional action(s): ${additionalActions.joinToString { it.actionName }}")
+  
+  return result
 }
 
 private suspend fun executeActions(

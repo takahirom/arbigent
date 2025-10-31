@@ -202,6 +202,7 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
         goal = nodeScenario.goal,
         maxStep = nodeScenario.maxStep,
         deviceFormFactor = effectiveDeviceFormFactor,
+        additionalActions = nodeScenario.additionalActions,
         agentConfig = AgentConfigBuilder(
           prompt = projectSettings.prompt,
           scenarioType = nodeScenario.type,
@@ -296,7 +297,8 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
   public val imageAssertions: List<ArbigentImageAssertion> = emptyList(),
   public val userPromptTemplate: String = UserPromptTemplate.DEFAULT_TEMPLATE,
   public val aiOptions: ArbigentAiOptions? = null,
-  public val cacheOptions: ArbigentScenarioCacheOptions? = null
+  public val cacheOptions: ArbigentScenarioCacheOptions? = null,
+  public val additionalActions: List<String>? = null
 ) {
   @Serializable
   public sealed interface CleanupData {

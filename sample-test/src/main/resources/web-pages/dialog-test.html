@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dialog Button Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 40px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        button {
+            margin: 20px;
+            padding: 15px 30px;
+            font-size: 18px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #007bff;
+            color: white;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        
+        /* Dialog styles */
+        .dialog-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+        
+        .dialog-overlay.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .dialog {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            text-align: center;
+        }
+        
+        .dialog h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        
+        .dialog p {
+            color: #666;
+            margin: 20px 0;
+        }
+        
+        .dialog-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        
+        .dialog button {
+            margin: 0;
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+        
+        .dialog .cancel-button {
+            background-color: #6c757d;
+        }
+        
+        .dialog .cancel-button:hover {
+            background-color: #545b62;
+        }
+        
+        .dialog .remove-button {
+            background-color: #dc3545;
+        }
+        
+        .dialog .remove-button:hover {
+            background-color: #c82333;
+        }
+        
+        #status {
+            margin-top: 30px;
+            padding: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 5px;
+            min-height: 50px;
+            display: none;
+        }
+        
+        #status.success {
+            display: block;
+            background-color: #28a745;
+            color: white;
+        }
+        
+        #status.cancelled {
+            display: block;
+            background-color: #ffc107;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Dialog Button Test</h1>
+        <p>This page tests whether Arbigent can detect and click buttons in a dialog.</p>
+        
+        <button id="open-dialog-button">Open Confirmation Dialog</button>
+        
+        <div id="status"></div>
+    </div>
+
+    <!-- Dialog Overlay -->
+    <div id="dialog-overlay" class="dialog-overlay">
+        <div class="dialog">
+            <h2>Confirm Action</h2>
+            <p>Are you sure you want to remove this item?</p>
+            <div class="dialog-buttons">
+                <button id="cancel-button" class="cancel-button">Cancel</button>
+                <button id="remove-button" class="remove-button">Remove</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const openDialogBtn = document.getElementById('open-dialog-button');
+        const dialogOverlay = document.getElementById('dialog-overlay');
+        const cancelBtn = document.getElementById('cancel-button');
+        const removeBtn = document.getElementById('remove-button');
+        const statusDiv = document.getElementById('status');
+
+        // Open dialog
+        openDialogBtn.addEventListener('click', function() {
+            dialogOverlay.classList.add('active');
+            console.log('Dialog opened');
+        });
+
+        // Cancel button
+        cancelBtn.addEventListener('click', function() {
+            dialogOverlay.classList.remove('active');
+            statusDiv.className = 'cancelled';
+            statusDiv.textContent = 'Action cancelled';
+            console.log('Action cancelled');
+        });
+
+        // Remove button
+        removeBtn.addEventListener('click', function() {
+            dialogOverlay.classList.remove('active');
+            statusDiv.className = 'success';
+            statusDiv.textContent = 'Item removed successfully! ✓';
+            console.log('Item removed');
+        });
+    </script>
+</body>
+</html>
+

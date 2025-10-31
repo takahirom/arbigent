@@ -260,6 +260,49 @@ Previous steps:
     assertEquals(0.5, scenarioBAiOptions.temperature!!, "Scenario B temperature should be 0.5")
   }
 
+  private val projectWithAdditionalActions = ArbigentProjectSerializer().load(
+    """
+    scenarios:
+    - id: "scenario-without-additional-actions"
+      goal: "Test without additional actions"
+    - id: "scenario-with-additional-actions"
+      goal: "Test with additional actions"
+      additionalActions:
+        - ClickWithText
+        - ClickWithId
+    """
+  )
+
+  @Test
+  fun testAdditionalActions() {
+    val projectSettings = projectWithAdditionalActions.settings
+
+    // Test scenario without additionalActions
+    val scenarioWithout = projectWithAdditionalActions.scenarioContents.createArbigentScenario(
+      projectSettings = projectSettings,
+      scenario = projectWithAdditionalActions.scenarioContents[0],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
+    )
+    val scenarioWithoutActions = scenarioWithout.agentTasks[0].additionalActions
+    assertTrue(scenarioWithoutActions.isNullOrEmpty(), "Scenario without additional actions should have null or empty list")
+
+    // Test scenario with additionalActions
+    val scenarioWith = projectWithAdditionalActions.scenarioContents.createArbigentScenario(
+      projectSettings = projectSettings,
+      scenario = projectWithAdditionalActions.scenarioContents[1],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
+    )
+    val scenarioWithActions = scenarioWith.agentTasks[0].additionalActions
+    assertNotNull(scenarioWithActions, "Scenario with additional actions should not be null")
+    assertEquals(2, scenarioWithActions.size, "Should have 2 additional actions")
+    assertTrue(scenarioWithActions.contains("ClickWithText"), "Should contain ClickWithText")
+    assertTrue(scenarioWithActions.contains("ClickWithId"), "Should contain ClickWithId")
+  }
+
   private val projectWithDeviceFormFactor = ArbigentProjectSerializer().load(
     """
     settings:
