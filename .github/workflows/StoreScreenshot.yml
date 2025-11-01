@@ -5,6 +5,7 @@ on:
     branches:
       - main
   pull_request:
+  workflow_dispatch:
 
 permissions: {}
 
@@ -44,7 +45,7 @@ jobs:
           name: screenshot
           path: |
             **/build/outputs/roborazzi
-          retention-days: 30
+          retention-days: 60
 
       - uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4
         if: ${{ always() }}
