@@ -1,0 +1,38 @@
+name: "Dialog Button Test"
+aiModel: "gpt-4.1"
+aiOptions:
+  temperature: 0.0
+  imageFormat: "png"
+
+scenarios:
+- id: "test-dialog-without-text-action"
+  goal: "Open the confirmation dialog and click the 'Remove' button to remove the item"
+  initializationMethods:
+  - type: "OpenLink"
+    link: "http://localhost:8080/dialog-test.html"
+  imageAssertions:
+  - assertionPrompt: "A green success message 'Item removed successfully! ✓' is visible on the page"
+  maxStep: 5
+
+- id: "test-dialog-with-text-action"
+  goal: "Open the confirmation dialog and click the 'Remove' button to remove the item"
+  initializationMethods:
+  - type: "OpenLink"
+    link: "http://localhost:8080/dialog-test.html"
+  additionalActions:
+    - ClickWithText
+  imageAssertions:
+  - assertionPrompt: "A green success message 'Item removed successfully! ✓' is visible on the page"
+  maxStep: 5
+
+- id: "test-dialog-cancel-button"
+  goal: "Open the confirmation dialog and click the 'Cancel' button"
+  initializationMethods:
+  - type: "OpenLink"
+    link: "http://localhost:8080/dialog-test.html"
+  additionalActions:
+    - ClickWithText
+  imageAssertions:
+  - assertionPrompt: "A yellow message 'Action cancelled' is visible on the page"
+  maxStep: 5
+

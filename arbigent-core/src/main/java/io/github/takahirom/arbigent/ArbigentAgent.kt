@@ -177,39 +177,14 @@ public class ArbigentAgent(
       else -> throw IllegalArgumentException("Unsupported device form factor: ${agentTask.deviceFormFactor}")
     }
 
-    // Registry mapping action names to AgentActionType objects
-    val actionTypeRegistry = mapOf(
-      ClickWithTextAgentAction.actionName to ClickWithTextAgentAction,
-      ClickWithIdAgentAction.actionName to ClickWithIdAgentAction,
-      DpadAutoFocusWithIdAgentAction.actionName to DpadAutoFocusWithIdAgentAction,
-      DpadAutoFocusWithTextAgentAction.actionName to DpadAutoFocusWithTextAgentAction,
-    )
-
-    // Resolve additional actions from string names to AgentActionType objects
-    val resolvedAdditionalActions = agentTask.additionalActions.mapNotNull { actionName ->
-      val actionType = actionTypeRegistry[actionName]
-
-      if (actionType == null) {
-        arbigentInfoLog("Unknown additional action: $actionName. Valid actions: ${actionTypeRegistry.keys}")
-        return@mapNotNull null
-      }
-
-      // Validate compatibility with device form factor
-      val isDpadAction = actionName.startsWith("Dpad")
-      if (isDpadAction && agentTask.deviceFormFactor == ArbigentScenarioDeviceFormFactor.Mobile) {
-        arbigentInfoLog("Warning: D-pad action '$actionName' is not compatible with Mobile device form factor")
-        return@mapNotNull null
-      }
-
-      actionType
-    }
+    val actionTypes = mergeAdditionalActions(baseActionTypes, agentTask.additionalActions, agentTask.deviceFormFactor)
 
     execute(
       scenarioId = agentTask.scenarioId,
       goal = agentTask.goal,
       maxStep = agentTask.maxStep,
       mcpClient = mcpClient,
-      agentActionTypes = baseActionTypes + resolvedAdditionalActions
+      agentActionTypes = actionTypes
     )
   }
 
@@ -928,6 +903,73 @@ public fun defaultAgentActionTypesForTvForVisualMode(): List<AgentActionType> {
     GoalAchievedAgentAction,
     FailedAgentAction,
   )
+}
+
+/**
+ * Maps action type name strings to their corresponding AgentActionType instances.
+ */
+private fun getAgentActionTypeByName(actionName: String): AgentActionType? {
+  return when (actionName) {
+    "ClickWithText" -> ClickWithTextAgentAction
+    "ClickWithId" -> ClickWithIdAgentAction
+    "ClickWithIndex" -> ClickWithIndex
+    "DpadTryAutoFocusById" -> DpadAutoFocusWithIdAgentAction
+    "DpadTryAutoFocusByText" -> DpadAutoFocusWithTextAgentAction
+    "DPadTryAutoFocusByIndex" -> DpadAutoFocusWithIndexAgentAction
+    else -> null
+  }
+}
+
+/**
+ * Merges additional action types into the base list of action types.
+ * Additional actions are inserted after ClickWithIndex or at the beginning if not found.
+ *
+ * @param baseActionTypes The base list of action types
+ * @param additionalActionNames Optional list of additional action type names to include
+ * @param deviceFormFactor The device form factor to validate compatibility
+ * @return A new list with additional actions merged in
+ */
+private fun mergeAdditionalActions(
+  baseActionTypes: List<AgentActionType>,
+  additionalActionNames: List<String>,
+  deviceFormFactor: ArbigentScenarioDeviceFormFactor
+): List<AgentActionType> {
+  if (additionalActionNames.isEmpty()) {
+    return baseActionTypes
+  }
+
+  val additionalActions = additionalActionNames.mapNotNull { actionName ->
+    val actionType = getAgentActionTypeByName(actionName)
+
+    if (actionType == null) {
+      arbigentInfoLog("Warning: Unknown additional action type: $actionName")
+      return@mapNotNull null
+    }
+
+    // Validate compatibility with device form factor
+    val isDpadAction = actionName.startsWith("Dpad")
+    if (isDpadAction && deviceFormFactor == ArbigentScenarioDeviceFormFactor.Mobile) {
+      arbigentInfoLog("Warning: D-pad action '$actionName' is not compatible with Mobile device form factor")
+      return@mapNotNull null
+    }
+
+    actionType
+  }
+
+  if (additionalActions.isEmpty()) {
+    return baseActionTypes
+  }
+
+  // Insert additional actions after ClickWithIndex (or at the beginning if not found)
+  val clickWithIndexPos = baseActionTypes.indexOfFirst { it == ClickWithIndex }
+  val insertPosition = if (clickWithIndexPos >= 0) clickWithIndexPos + 1 else 0
+
+  val result = baseActionTypes.toMutableList()
+  result.addAll(insertPosition, additionalActions)
+
+  arbigentDebugLog("Added ${additionalActions.size} additional action(s): ${additionalActions.joinToString { it.actionName }}")
+
+  return result
 }
 
 private suspend fun executeActions(
