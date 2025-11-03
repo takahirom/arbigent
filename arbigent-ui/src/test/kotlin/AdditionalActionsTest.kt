@@ -134,7 +134,8 @@ class AdditionalActionsTest {
             "ClickWithText",
             "ClickWithId",
             "DpadTryAutoFocusById",
-            "DpadTryAutoFocusByText"
+            "DpadTryAutoFocusByText",
+            "DpadTryAutoFocusByIndex"
         )
 
         assertEquals(expectedActions, AdditionalActionsConstants.AVAILABLE_ACTIONS)
