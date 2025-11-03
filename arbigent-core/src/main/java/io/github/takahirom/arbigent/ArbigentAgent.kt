@@ -915,7 +915,7 @@ private fun getAgentActionTypeByName(actionName: String): AgentActionType? {
     "ClickWithIndex" -> ClickWithIndex
     "DpadTryAutoFocusById" -> DpadAutoFocusWithIdAgentAction
     "DpadTryAutoFocusByText" -> DpadAutoFocusWithTextAgentAction
-    "DPadTryAutoFocusByIndex" -> DpadAutoFocusWithIndexAgentAction
+    "DpadTryAutoFocusByIndex" -> DpadAutoFocusWithIndexAgentAction
     else -> null
   }
 }

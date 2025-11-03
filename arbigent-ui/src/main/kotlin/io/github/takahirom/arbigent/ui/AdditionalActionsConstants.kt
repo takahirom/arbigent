@@ -5,6 +5,7 @@ object AdditionalActionsConstants {
     "ClickWithText",
     "ClickWithId",
     "DpadTryAutoFocusById",
-    "DpadTryAutoFocusByText"
+    "DpadTryAutoFocusByText",
+    "DpadTryAutoFocusByIndex"
   )
 }

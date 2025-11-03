@@ -444,7 +444,7 @@ public data class DpadAutoFocusWithIndexAgentAction(val index: Int) : ArbigentAg
   }
 
   public companion object : AgentActionType {
-    override val actionName: String = "DPadTryAutoFocusByIndex"
+    override val actionName: String = "DpadTryAutoFocusByIndex"
 
     override fun actionDescription(): String =
       "Try to focus on an element by its index in the ELEMENTS using D-pad navigation"
