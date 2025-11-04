@@ -622,6 +622,9 @@ class TestRobot(
 
   fun enableCache() {
     composeUiTest.onNode(hasContentDescription("Project Settings")).performClick()
+    // Scroll to AI decision cache section to ensure it's visible
+    composeUiTest.onNode(hasTestTag("project_settings_content"))
+      .performScrollToNode(hasText("AI decision cache"))
     composeUiTest.waitUntilAtLeastOneExists(hasText("Disabled"), timeoutMillis = 1000)
     composeUiTest.onNode(hasText("Disabled")).performClick()
     composeUiTest.waitUntilAtLeastOneExists(hasText("InMemory"), timeoutMillis = 1000)
@@ -766,8 +769,16 @@ class TestRobot(
   }
 
   fun addLaunchAppInitializationMethod() {
+    composeUiTest.onNode(hasTestTag("scenario_options"))
+      .performScrollToNode(
+        hasContentDescription("Add initialization method")
+      )
     composeUiTest.onNode(hasContentDescription("Add initialization method")).performClick()
     waitALittle()
+    composeUiTest.onNode(hasTestTag("scenario_options"))
+      .performScrollToNode(
+        hasTestTag("initialization_method")
+      )
     composeUiTest.onAllNodes(hasText(InitializationMethodMenu.Noop.type), useUnmergedTree = true)
       .onFirst()
       .performClick()

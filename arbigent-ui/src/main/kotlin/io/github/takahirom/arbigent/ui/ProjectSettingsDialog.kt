@@ -53,6 +53,7 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
             .padding(16.dp)
             .weight(1F)
             .verticalScroll(scrollState)
+            .testTag("project_settings_content")
         ) {
           val additionalSystemPrompt: TextFieldState = remember {
             TextFieldState(
