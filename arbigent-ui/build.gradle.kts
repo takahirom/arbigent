@@ -72,3 +72,10 @@ compose.desktop {
     }
   }
 }
+
+tasks.test {
+  testLogging {
+    events("started", "passed", "skipped", "failed")
+    showStandardStreams = true
+  }
+}
