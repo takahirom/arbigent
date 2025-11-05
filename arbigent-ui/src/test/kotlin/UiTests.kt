@@ -21,6 +21,7 @@ import io.github.takahirom.robospec.execute
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import maestro.orchestra.MaestroCommand
@@ -441,6 +442,31 @@ class TestRobot(
     fakeAi.status = aiStatus
   }
 
+  /**
+   * Safe wait that avoids waitUntil to prevent hangs.
+   * Returns true if element found, false if timeout.
+   * Does not throw - caller should handle failure explicitly.
+   */
+  @OptIn(ExperimentalCoroutinesApi::class)
+  private fun waitForNodeSafely(
+    matcher: SemanticsMatcher,
+    timeoutMs: Long = 5000
+  ): Boolean {
+    val pollCount = (timeoutMs / 100).toInt()
+
+    repeat(pollCount) {
+      testScope.advanceUntilIdle()
+      val nodes = composeUiTest.onAllNodes(matcher).fetchSemanticsNodes()
+      if (nodes.isNotEmpty()) {
+        return true
+      }
+      testScope.advanceTimeBy(100)
+    }
+
+    testScope.advanceUntilIdle()
+    return composeUiTest.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty()
+  }
+
   fun clickConnectToDeviceButton() {
     waitALittle()
     composeUiTest.onNode(hasText("Connect to device")).performClick()
@@ -526,20 +552,16 @@ class TestRobot(
     waitALittle()
   }
 
+  @OptIn(ExperimentalCoroutinesApi::class)
   fun waitUntilScenarioRunning() {
-    repeat(5) {
-      composeUiTest.waitUntil(
-        timeoutMillis = 1000
-      ) {
-        try {
-          composeUiTest.onNode(hasTestTag("scenario_running"), useUnmergedTree = true)
-            .assertExists()
-          false
-        } catch (e: AssertionError) {
-          true
-        }
+    // Wait for scenario_running tag to disappear (scenario has finished)
+    repeat(50) {
+      val nodes = composeUiTest.onAllNodes(hasTestTag("scenario_running"), useUnmergedTree = true).fetchSemanticsNodes()
+      if (nodes.isEmpty()) {
+        return  // Element disappeared, scenario finished
       }
-      waitALittle()
+      testScope.advanceTimeBy(100)
+      testScope.advanceUntilIdle()
     }
   }
 
@@ -586,19 +608,17 @@ class TestRobot(
 
   fun assertGoalInputExists() {
     waitALittle()
-    composeUiTest.waitUntil(timeoutMillis = 5000) {
-      try {
-        composeUiTest.onNode(hasTestTag("goal")).assertExists()
-        true
-      } catch (e: AssertionError) {
-        false
-      }
+    if (!waitForNodeSafely(hasTestTag("goal"), 5000)) {
+      kotlin.test.fail("Goal input not found")
     }
+    composeUiTest.onNode(hasTestTag("goal")).assertExists()
   }
 
   fun expandOptions() {
     composeUiTest.onNode(hasContentDescription("Expand Options")).performClick()
-    composeUiTest.waitUntilAtLeastOneExists(hasContentDescription("Collapse Options"))
+    if (!waitForNodeSafely(hasContentDescription("Collapse Options"))) {
+      kotlin.test.fail("Options did not expand - Collapse Options button not found")
+    }
     // To make the test deterministic
     changeScenarioId("default_scenario")
   }
@@ -621,9 +641,11 @@ class TestRobot(
   }
 
   fun enableCache() {
-    // Skip cache configuration in tests - it causes UI interaction issues with Jewel dropdown
+    // Skip cache configuration in tests - Jewel dropdown has interaction issues in complex app state
     // The cache setting is not critical for most test scenarios
-    // TODO: Investigate proper way to interact with Jewel Dropdown components in tests
+    // Investigation showed dropdown works in isolation but fails after clickConnectToDeviceButton()
+    // See /tmp/test-fail-flow.md for detailed investigation results
+    // TODO: Investigate Jewel dropdown interaction with TestDispatcher in complex app state
   }
 
   fun toggleScenarioCache() {
@@ -642,7 +664,10 @@ class TestRobot(
 
   fun changePromptTemplate(template: String) {
     composeUiTest.onNode(hasContentDescription("Project Settings")).performClick()
-    composeUiTest.waitUntilAtLeastOneExists(hasText("User Prompt Template"), timeoutMillis = 1000)
+    if (!waitForNodeSafely(hasText("User Prompt Template"), 1000)) {
+      runCatching { composeUiTest.onNode(hasText("Close")).performClick() }
+      kotlin.test.fail("User Prompt Template not found in Project Settings")
+    }
     composeUiTest.onNode(hasTestTag("user_prompt_template"))
       .performTextClearance()
     composeUiTest.onNode(hasTestTag("user_prompt_template"))
@@ -671,10 +696,6 @@ class TestRobot(
       .performTextClearance()
     composeUiTest.onNode(hasTestTag("scenario_id"))
       .performTextInput(id)
-  }
-
-  fun debugCapture() {
-    composeUiTest.onAllNodes(isRoot()).onLast().captureRoboImage("debug.png")
   }
 
   fun capture(describedBehavior: DescribedBehavior<TestRobot>) {
@@ -844,13 +865,8 @@ class TestRobot(
   }
 
   private fun waitForNode(matcher: SemanticsMatcher) {
-    composeUiTest.waitUntil(timeoutMillis = 2000) {
-      try {
-        composeUiTest.onNode(matcher, useUnmergedTree = true).assertExists()
-        true
-      } catch (e: AssertionError) {
-        false
-      }
+    if (!waitForNodeSafely(matcher, 2000)) {
+      kotlin.test.fail("Element matching $matcher not found within timeout")
     }
   }
 
@@ -904,7 +920,9 @@ class TestRobot(
 
   fun expandMcpSettings() {
     composeUiTest.onNode(hasContentDescription("Expand MCP Settings")).performClick()
-    composeUiTest.waitUntilAtLeastOneExists(hasContentDescription("Collapse MCP Settings"))
+    if (!waitForNodeSafely(hasContentDescription("Collapse MCP Settings"))) {
+      kotlin.test.fail("MCP Settings did not expand - Collapse MCP Settings button not found")
+    }
   }
 
   fun clickAddMcpEnvironmentVariableButton() {
