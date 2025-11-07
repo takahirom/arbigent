@@ -641,11 +641,30 @@ class TestRobot(
   }
 
   fun enableCache() {
-    // Skip cache configuration in tests - Jewel dropdown has interaction issues in complex app state
-    // The cache setting is not critical for most test scenarios
-    // Investigation showed dropdown works in isolation but fails after clickConnectToDeviceButton()
-    // See /tmp/test-fail-flow.md for detailed investigation results
-    // TODO: Investigate Jewel dropdown interaction with TestDispatcher in complex app state
+    composeUiTest.onNode(hasContentDescription("Project Settings")).performClick()
+    testScope.advanceUntilIdle()
+
+    // Scroll to AI decision cache section (needed after Additional Actions were added)
+    composeUiTest.onNode(hasTestTag("project_settings_content"))
+        .performScrollToNode(hasText("AI decision cache"))
+    testScope.advanceUntilIdle()
+
+    // Click InMemory radio button (RadioButton replaced Dropdown to fix hang issue)
+    if (!waitForNodeSafely(hasText("InMemory"), 2000)) {
+        kotlin.test.fail("InMemory radio button not found")
+    }
+    composeUiTest.onNode(hasText("InMemory")).performClick()
+    testScope.advanceUntilIdle()
+
+    // Verify InMemory is selected (assertion to ensure cache was enabled)
+    composeUiTest.onNode(hasText("InMemory"))
+        .assertExists("InMemory radio button should exist after selection")
+
+    composeUiTest.onNode(hasText("Close")).performClick()
+    testScope.advanceUntilIdle()
+
+    // Verify dialog closed successfully
+    composeUiTest.onNode(hasContentDescription("Project Settings")).assertExists()
   }
 
   fun toggleScenarioCache() {

@@ -237,46 +237,49 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
           }
           GroupHeader("AI decision cache")
           val cacheStrategy by appStateHolder.cacheStrategyFlow.collectAsState()
-          Dropdown(
-            modifier = Modifier.padding(8.dp),
-            menuContent = {
-              selectableItem(
-                cacheStrategy.aiDecisionCacheStrategy == AiDecisionCacheStrategy.Disabled,
-                onClick = {
-                  appStateHolder.onCacheStrategyChanged(
-                    appStateHolder.cacheStrategyFlow.value.copy(aiDecisionCacheStrategy = AiDecisionCacheStrategy.Disabled)
-                  )
-                }
-              ) {
-                Text("Disabled")
-              }
-              selectableItem(
-                cacheStrategy.aiDecisionCacheStrategy is AiDecisionCacheStrategy.InMemory,
-                onClick = {
-                  appStateHolder.onCacheStrategyChanged(
-                    appStateHolder.cacheStrategyFlow.value.copy(aiDecisionCacheStrategy = AiDecisionCacheStrategy.InMemory())
-                  )
-                }
-              ) {
-                Text("InMemory")
-              }
-              selectableItem(
-                cacheStrategy.aiDecisionCacheStrategy is AiDecisionCacheStrategy.Disk,
-                onClick = {
-                  appStateHolder.onCacheStrategyChanged(
-                    appStateHolder.cacheStrategyFlow.value.copy(aiDecisionCacheStrategy = AiDecisionCacheStrategy.Disk())
-                  )
-                }
-              ) {
-                Text("Disk")
-              }
-            }
-          ) {
-            Text(
+
+          val selectedCacheStrategy by remember {
+            derivedStateOf {
               when (cacheStrategy.aiDecisionCacheStrategy) {
                 is AiDecisionCacheStrategy.Disabled -> "Disabled"
                 is AiDecisionCacheStrategy.InMemory -> "InMemory"
                 is AiDecisionCacheStrategy.Disk -> "Disk"
+              }
+            }
+          }
+
+          Column(modifier = Modifier.padding(8.dp)) {
+            RadioButtonRow(
+              text = "Disabled",
+              selected = selectedCacheStrategy == "Disabled",
+              onClick = {
+                appStateHolder.onCacheStrategyChanged(
+                  appStateHolder.cacheStrategyFlow.value.copy(
+                    aiDecisionCacheStrategy = AiDecisionCacheStrategy.Disabled
+                  )
+                )
+              }
+            )
+            RadioButtonRow(
+              text = "InMemory",
+              selected = selectedCacheStrategy == "InMemory",
+              onClick = {
+                appStateHolder.onCacheStrategyChanged(
+                  appStateHolder.cacheStrategyFlow.value.copy(
+                    aiDecisionCacheStrategy = AiDecisionCacheStrategy.InMemory()
+                  )
+                )
+              }
+            )
+            RadioButtonRow(
+              text = "Disk",
+              selected = selectedCacheStrategy == "Disk",
+              onClick = {
+                appStateHolder.onCacheStrategyChanged(
+                  appStateHolder.cacheStrategyFlow.value.copy(
+                    aiDecisionCacheStrategy = AiDecisionCacheStrategy.Disk()
+                  )
+                )
               }
             )
           }
