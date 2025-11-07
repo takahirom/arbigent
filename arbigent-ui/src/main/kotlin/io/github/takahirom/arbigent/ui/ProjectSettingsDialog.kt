@@ -88,15 +88,15 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
           GroupHeader("Default Device Form Factor")
           val defaultDeviceFormFactor by appStateHolder.defaultDeviceFormFactorFlow.collectAsState()
 
-          // Display the current value
-          val formFactorName = when {
-            defaultDeviceFormFactor.isMobile() -> "Mobile"
-            defaultDeviceFormFactor.isTv() -> "TV"
-            else -> "Unspecified"
+          val selectedOption by remember {
+            derivedStateOf {
+              when {
+                defaultDeviceFormFactor.isMobile() -> "Mobile"
+                defaultDeviceFormFactor.isTv() -> "TV"
+                else -> "Unspecified"
+              }
+            }
           }
-
-          // Create a mutable state to track the selected option
-          var selectedOption by remember { mutableStateOf(formFactorName) }
 
           Column(
             modifier = Modifier.padding(8.dp)
@@ -108,8 +108,6 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
                 text = "Mobile",
                 selected = selectedOption == "Mobile",
                 onClick = {
-                  selectedOption = "Mobile"
-                  // Update the defaultDeviceFormFactor using the provided method
                   appStateHolder.onDefaultDeviceFormFactorChanged(ArbigentScenarioDeviceFormFactor.Mobile)
                 }
               )
@@ -121,8 +119,6 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
                 text = "TV",
                 selected = selectedOption == "TV",
                 onClick = {
-                  selectedOption = "TV"
-                  // Update the defaultDeviceFormFactor using the provided method
                   appStateHolder.onDefaultDeviceFormFactorChanged(ArbigentScenarioDeviceFormFactor.Tv)
                 }
               )
@@ -134,8 +130,6 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
                 text = "Unspecified",
                 selected = selectedOption == "Unspecified",
                 onClick = {
-                  selectedOption = "Unspecified"
-                  // Update the defaultDeviceFormFactor using the provided method
                   appStateHolder.onDefaultDeviceFormFactorChanged(ArbigentScenarioDeviceFormFactor.Unspecified)
                 }
               )

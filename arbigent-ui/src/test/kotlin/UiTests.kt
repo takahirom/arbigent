@@ -311,6 +311,43 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
                 }
               }
             }
+
+            describe("Default Device Form Factor") {
+              doIt {
+                openProjectSettings()
+                scrollToFormFactor()
+              }
+
+              itShould("show default selection") {
+                assertFormFactorSelected("Unspecified")
+                capture(it)
+              }
+
+              describe("when selecting TV") {
+                doIt {
+                  clickFormFactorRadioButton("TV")
+                }
+
+                itShould("update selection immediately") {
+                  assertFormFactorSelected("TV")
+                  capture(it)
+                }
+
+                describe("when reopening settings") {
+                  doIt {
+                    closeProjectSettingsDialog()
+                    openProjectSettings()
+                    scrollToFormFactor()
+                  }
+
+                  itShould("persist selection") {
+                    assertFormFactorSelected("TV")
+                    capture(it)
+                    closeProjectSettingsDialog()
+                  }
+                }
+              }
+            }
           }
           describe("when enter goals and run") {
             doIt {
@@ -555,7 +592,8 @@ class TestRobot(
   @OptIn(ExperimentalCoroutinesApi::class)
   fun waitUntilScenarioRunning() {
     // Wait for scenario_running tag to disappear (scenario has finished)
-    repeat(50) {
+    // 10 second timeout for image assertion processing
+    repeat(100) {
       val nodes = composeUiTest.onAllNodes(hasTestTag("scenario_running"), useUnmergedTree = true).fetchSemanticsNodes()
       if (nodes.isEmpty()) {
         return  // Element disappeared, scenario finished
@@ -563,6 +601,7 @@ class TestRobot(
       testScope.advanceTimeBy(100)
       testScope.advanceUntilIdle()
     }
+    kotlin.test.fail("Scenario did not finish within 10 seconds")
   }
 
   @OptIn(ExperimentalCoroutinesApi::class)
@@ -986,6 +1025,27 @@ class TestRobot(
     composeUiTest
       .onNode(hasTestTag("mcp_environment_variable_value_$index"))
       .assertTextContains(value)
+  }
+
+  fun scrollToFormFactor() {
+    composeUiTest.onNode(hasTestTag("project_settings_content"))
+      .performScrollToNode(hasText("Default Device Form Factor"))
+    testScope.advanceUntilIdle()
+  }
+
+  fun clickFormFactorRadioButton(formFactor: String) {
+    if (!waitForNodeSafely(hasText(formFactor), 2000)) {
+      kotlin.test.fail("$formFactor radio button not found")
+    }
+    composeUiTest.onNode(hasText(formFactor)).performClick()
+    testScope.advanceUntilIdle()
+  }
+
+  fun assertFormFactorSelected(expectedFormFactor: String) {
+    // Verify the radio button exists and is selected
+    composeUiTest.onNode(hasText(expectedFormFactor))
+      .assertExists("$expectedFormFactor radio button should exist")
+      .assertIsSelected()
   }
 
 }
