@@ -136,38 +136,6 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
             }
           }
 
-          GroupHeader("Additional Actions")
-          val additionalActions by appStateHolder.additionalActionsFlow.collectAsState()
-          val currentActions = additionalActions ?: emptyList()
-
-          Column(modifier = Modifier.padding(8.dp)) {
-            AdditionalActionsConstants.AVAILABLE_ACTIONS.forEach { actionName ->
-              Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(vertical = 2.dp)
-              ) {
-                Checkbox(
-                  checked = currentActions.contains(actionName),
-                  onCheckedChange = { isChecked ->
-                    val updatedActions = if (isChecked) {
-                      currentActions + actionName
-                    } else {
-                      currentActions - actionName
-                    }
-                    appStateHolder.onAdditionalActionsChanged(
-                      if (updatedActions.isEmpty()) null else updatedActions
-                    )
-                  },
-                  modifier = Modifier.testTag("additional_action_$actionName")
-                )
-                Text(
-                  text = actionName,
-                  modifier = Modifier.padding(start = 8.dp)
-                )
-              }
-            }
-          }
-
           GroupHeader("AI Options")
           val aiOptions by appStateHolder.aiOptionsFlow.collectAsState()
           val currentOptions = aiOptions ?: ArbigentAiOptions()
@@ -300,6 +268,38 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
             placeholder = { Text("MCP JSON Configuration") },
             decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
           )
+
+          GroupHeader("Additional Actions")
+          val additionalActions by appStateHolder.additionalActionsFlow.collectAsState()
+          val currentActions = additionalActions ?: emptyList()
+
+          Column(modifier = Modifier.padding(8.dp)) {
+            AdditionalActionsConstants.AVAILABLE_ACTIONS.forEach { actionName ->
+              Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(vertical = 2.dp)
+              ) {
+                Checkbox(
+                  checked = currentActions.contains(actionName),
+                  onCheckedChange = { isChecked ->
+                    val updatedActions = if (isChecked) {
+                      currentActions + actionName
+                    } else {
+                      currentActions - actionName
+                    }
+                    appStateHolder.onAdditionalActionsChanged(
+                      if (updatedActions.isEmpty()) null else updatedActions
+                    )
+                  },
+                  modifier = Modifier.testTag("additional_action_$actionName")
+                )
+                Text(
+                  text = actionName,
+                  modifier = Modifier.padding(start = 8.dp)
+                )
+              }
+            }
+          }
         }
         // Close Button
         OutlinedButton(

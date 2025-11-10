@@ -695,9 +695,16 @@ class TestRobot(
     composeUiTest.onNode(hasText("InMemory")).performClick()
     testScope.advanceUntilIdle()
 
-    // Verify InMemory is selected (assertion to ensure cache was enabled)
+    // Wait for async state propagation and verify selection
+    if (!waitForNodeSafely(hasText("InMemory"), 2000)) {
+        kotlin.test.fail("InMemory radio button not selected after click")
+    }
     composeUiTest.onNode(hasText("InMemory"))
-        .assertExists("InMemory radio button should exist after selection")
+        .assertIsSelected()
+
+    // Reset to Disabled to avoid affecting subsequent tests
+    composeUiTest.onNode(hasText("Disabled")).performClick()
+    testScope.advanceUntilIdle()
 
     composeUiTest.onNode(hasText("Close")).performClick()
     testScope.advanceUntilIdle()
