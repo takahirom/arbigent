@@ -63,7 +63,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
             assertConnectToDeviceButtonExists()
           }
         }
-        
+
         describe("MCP Environment Variables") {
           doIt {
             expandMcpSettings()
@@ -91,7 +91,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
             }
           }
         }
-        
+
         describe("when add scenario") {
           doIt {
             clickConnectToDeviceButton()
@@ -683,12 +683,12 @@ class TestRobot(
     composeUiTest.onNode(hasContentDescription("Project Settings")).performClick()
     testScope.advanceUntilIdle()
 
-    // Scroll to AI decision cache section (needed after Additional Actions were added)
+    // Scroll to AI decision cache section
     composeUiTest.onNode(hasTestTag("project_settings_content"))
         .performScrollToNode(hasText("AI decision cache"))
     testScope.advanceUntilIdle()
 
-    // Click InMemory radio button (RadioButton replaced Dropdown to fix hang issue)
+    // Click InMemory radio button
     if (!waitForNodeSafely(hasText("InMemory"), 2000)) {
         kotlin.test.fail("InMemory radio button not found")
     }
@@ -697,20 +697,27 @@ class TestRobot(
 
     // Wait for async state propagation and verify selection
     if (!waitForNodeSafely(hasText("InMemory"), 2000)) {
-        kotlin.test.fail("InMemory radio button not selected after click")
+        kotlin.test.fail("InMemory radio button not found after click")
     }
     composeUiTest.onNode(hasText("InMemory"))
         .assertIsSelected()
-
-    // Reset to Disabled to avoid affecting subsequent tests
-    composeUiTest.onNode(hasText("Disabled")).performClick()
-    testScope.advanceUntilIdle()
 
     composeUiTest.onNode(hasText("Close")).performClick()
     testScope.advanceUntilIdle()
 
     // Verify dialog closed successfully
     composeUiTest.onNode(hasContentDescription("Project Settings")).assertExists()
+
+    // Verify cache is persisted by reopening settings
+    composeUiTest.onNode(hasContentDescription("Project Settings")).performClick()
+    testScope.advanceUntilIdle()
+    composeUiTest.onNode(hasTestTag("project_settings_content"))
+        .performScrollToNode(hasText("AI decision cache"))
+    testScope.advanceUntilIdle()
+    composeUiTest.onNode(hasText("InMemory"))
+        .assertIsSelected()
+    composeUiTest.onNode(hasText("Close")).performClick()
+    testScope.advanceUntilIdle()
   }
 
   fun toggleScenarioCache() {
@@ -1015,7 +1022,7 @@ class TestRobot(
       .onNode(hasTestTag("mcp_environment_variable_key_$index"))
       .performTextInput(key)
     waitALittle()
-    
+
     composeUiTest
       .onNode(hasTestTag("mcp_environment_variable_value_$index"))
       .performTextClearance()
