@@ -53,6 +53,7 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
             .padding(16.dp)
             .weight(1F)
             .verticalScroll(scrollState)
+            .testTag("project_settings_content")
         ) {
           val additionalSystemPrompt: TextFieldState = remember {
             TextFieldState(
@@ -87,15 +88,15 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
           GroupHeader("Default Device Form Factor")
           val defaultDeviceFormFactor by appStateHolder.defaultDeviceFormFactorFlow.collectAsState()
 
-          // Display the current value
-          val formFactorName = when {
-            defaultDeviceFormFactor.isMobile() -> "Mobile"
-            defaultDeviceFormFactor.isTv() -> "TV"
-            else -> "Unspecified"
+          val selectedOption by remember {
+            derivedStateOf {
+              when {
+                defaultDeviceFormFactor.isMobile() -> "Mobile"
+                defaultDeviceFormFactor.isTv() -> "TV"
+                else -> "Unspecified"
+              }
+            }
           }
-
-          // Create a mutable state to track the selected option
-          var selectedOption by remember { mutableStateOf(formFactorName) }
 
           Column(
             modifier = Modifier.padding(8.dp)
@@ -107,8 +108,6 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
                 text = "Mobile",
                 selected = selectedOption == "Mobile",
                 onClick = {
-                  selectedOption = "Mobile"
-                  // Update the defaultDeviceFormFactor using the provided method
                   appStateHolder.onDefaultDeviceFormFactorChanged(ArbigentScenarioDeviceFormFactor.Mobile)
                 }
               )
@@ -120,8 +119,6 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
                 text = "TV",
                 selected = selectedOption == "TV",
                 onClick = {
-                  selectedOption = "TV"
-                  // Update the defaultDeviceFormFactor using the provided method
                   appStateHolder.onDefaultDeviceFormFactorChanged(ArbigentScenarioDeviceFormFactor.Tv)
                 }
               )
@@ -133,8 +130,6 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
                 text = "Unspecified",
                 selected = selectedOption == "Unspecified",
                 onClick = {
-                  selectedOption = "Unspecified"
-                  // Update the defaultDeviceFormFactor using the provided method
                   appStateHolder.onDefaultDeviceFormFactorChanged(ArbigentScenarioDeviceFormFactor.Unspecified)
                 }
               )
@@ -204,46 +199,49 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
           }
           GroupHeader("AI decision cache")
           val cacheStrategy by appStateHolder.cacheStrategyFlow.collectAsState()
-          Dropdown(
-            modifier = Modifier.padding(8.dp),
-            menuContent = {
-              selectableItem(
-                cacheStrategy.aiDecisionCacheStrategy == AiDecisionCacheStrategy.Disabled,
-                onClick = {
-                  appStateHolder.onCacheStrategyChanged(
-                    appStateHolder.cacheStrategyFlow.value.copy(aiDecisionCacheStrategy = AiDecisionCacheStrategy.Disabled)
-                  )
-                }
-              ) {
-                Text("Disabled")
-              }
-              selectableItem(
-                cacheStrategy.aiDecisionCacheStrategy is AiDecisionCacheStrategy.InMemory,
-                onClick = {
-                  appStateHolder.onCacheStrategyChanged(
-                    appStateHolder.cacheStrategyFlow.value.copy(aiDecisionCacheStrategy = AiDecisionCacheStrategy.InMemory())
-                  )
-                }
-              ) {
-                Text("InMemory")
-              }
-              selectableItem(
-                cacheStrategy.aiDecisionCacheStrategy is AiDecisionCacheStrategy.Disk,
-                onClick = {
-                  appStateHolder.onCacheStrategyChanged(
-                    appStateHolder.cacheStrategyFlow.value.copy(aiDecisionCacheStrategy = AiDecisionCacheStrategy.Disk())
-                  )
-                }
-              ) {
-                Text("Disk")
-              }
-            }
-          ) {
-            Text(
+
+          val selectedCacheStrategy by remember {
+            derivedStateOf {
               when (cacheStrategy.aiDecisionCacheStrategy) {
                 is AiDecisionCacheStrategy.Disabled -> "Disabled"
                 is AiDecisionCacheStrategy.InMemory -> "InMemory"
                 is AiDecisionCacheStrategy.Disk -> "Disk"
+              }
+            }
+          }
+
+          Column(modifier = Modifier.padding(8.dp)) {
+            RadioButtonRow(
+              text = "Disabled",
+              selected = selectedCacheStrategy == "Disabled",
+              onClick = {
+                appStateHolder.onCacheStrategyChanged(
+                  appStateHolder.cacheStrategyFlow.value.copy(
+                    aiDecisionCacheStrategy = AiDecisionCacheStrategy.Disabled
+                  )
+                )
+              }
+            )
+            RadioButtonRow(
+              text = "InMemory",
+              selected = selectedCacheStrategy == "InMemory",
+              onClick = {
+                appStateHolder.onCacheStrategyChanged(
+                  appStateHolder.cacheStrategyFlow.value.copy(
+                    aiDecisionCacheStrategy = AiDecisionCacheStrategy.InMemory()
+                  )
+                )
+              }
+            )
+            RadioButtonRow(
+              text = "Disk",
+              selected = selectedCacheStrategy == "Disk",
+              onClick = {
+                appStateHolder.onCacheStrategyChanged(
+                  appStateHolder.cacheStrategyFlow.value.copy(
+                    aiDecisionCacheStrategy = AiDecisionCacheStrategy.Disk()
+                  )
+                )
               }
             )
           }
@@ -270,6 +268,38 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
             placeholder = { Text("MCP JSON Configuration") },
             decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
           )
+
+          GroupHeader("Additional Actions")
+          val additionalActions by appStateHolder.additionalActionsFlow.collectAsState()
+          val currentActions = additionalActions ?: emptyList()
+
+          Column(modifier = Modifier.padding(8.dp)) {
+            AdditionalActionsConstants.AVAILABLE_ACTIONS.forEach { actionName ->
+              Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(vertical = 2.dp)
+              ) {
+                Checkbox(
+                  checked = currentActions.contains(actionName),
+                  onCheckedChange = { isChecked ->
+                    val updatedActions = if (isChecked) {
+                      currentActions + actionName
+                    } else {
+                      currentActions - actionName
+                    }
+                    appStateHolder.onAdditionalActionsChanged(
+                      if (updatedActions.isEmpty()) null else updatedActions
+                    )
+                  },
+                  modifier = Modifier.testTag("additional_action_$actionName")
+                )
+                Text(
+                  text = actionName,
+                  modifier = Modifier.padding(start = 8.dp)
+                )
+              }
+            }
+          }
         }
         // Close Button
         OutlinedButton(

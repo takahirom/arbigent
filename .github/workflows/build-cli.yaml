@@ -136,7 +136,7 @@ jobs:
       - name: CLI E2E test
         uses: reactivecircus/android-emulator-runner@v2
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_FREE_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPEN_ROUTER_API_KEY }}
         with:
           api-level: 34
           arch: x86_64
@@ -144,10 +144,10 @@ jobs:
           disk-size: 6000M
           heap-size: 600M
           script: |
-            arbigent-cli/build/install/arbigent/bin/arbigent run --os=android --project-file=sample-test/src/main/resources/projects/e2e-test-android.yaml --ai-type=gemini --gemini-model-name=gemini-2.5-flash-lite-preview-06-17 --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }} --variables "search_term=Bluetooth,app_package=com.android.camera2"
+            arbigent-cli/build/install/arbigent/bin/arbigent run --os=android --project-file=sample-test/src/main/resources/projects/e2e-test-android.yaml --ai-type=openai --openai-endpoint=https://openrouter.ai/api/v1/ --openai-model-name=google/gemini-2.5-flash-lite --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }} --variables "search_term=Bluetooth,app_package=com.android.camera2"
       - name: Check API key leakage
         run: |
-          if grep -R --quiet "${{ secrets.GEMINI_FREE_API_KEY }}" arbigent-result/; then
+          if grep -R --quiet "${{ secrets.OPEN_ROUTER_API_KEY }}" arbigent-result/; then
             echo "::error::API key leaked in results!"
             exit 1
           fi
@@ -231,12 +231,12 @@ jobs:
 
       - name: CLI E2E test for iOS
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_FREE_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPEN_ROUTER_API_KEY }}
         run: |
-          arbigent-cli/build/install/arbigent/bin/arbigent run --os=ios --project-file=sample-test/src/main/resources/projects/e2e-test-ios.yaml --ai-type=gemini --gemini-model-name=gemini-2.0-flash-exp
+          arbigent-cli/build/install/arbigent/bin/arbigent run --os=ios --project-file=sample-test/src/main/resources/projects/e2e-test-ios.yaml --ai-type=openai --openai-endpoint=https://openrouter.ai/api/v1/ --openai-model-name=google/gemini-2.5-flash-lite
       - name: Check API key leakage
         run: |
-          if grep -R --quiet "${{ secrets.GEMINI_FREE_API_KEY }}" arbigent-result/; then
+          if grep -R --quiet "${{ secrets.OPEN_ROUTER_API_KEY }}" arbigent-result/; then
             echo "::error::API key leaked in results!"
             exit 1
           fi

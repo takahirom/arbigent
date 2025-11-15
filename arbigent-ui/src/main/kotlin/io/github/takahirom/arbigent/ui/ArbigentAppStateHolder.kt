@@ -162,6 +162,7 @@ class ArbigentAppStateHolder(
   val mcpJsonFlow = MutableStateFlow("{}")
   val defaultDeviceFormFactorFlow =
     MutableStateFlow<ArbigentScenarioDeviceFormFactor>(ArbigentScenarioDeviceFormFactor.Unspecified)
+  val additionalActionsFlow = MutableStateFlow<List<String>?>(null)
   val decisionCache = cacheStrategyFlow
     .map {
       val decisionCacheStrategy = it.aiDecisionCacheStrategy
@@ -267,7 +268,8 @@ class ArbigentAppStateHolder(
         cacheStrategy = cacheStrategyFlow.value,
         aiOptions = aiOptionsFlow.value,
         mcpJson = mcpJsonFlow.value,
-        deviceFormFactor = defaultDeviceFormFactorFlow.value
+        deviceFormFactor = defaultDeviceFormFactorFlow.value,
+        additionalActions = additionalActionsFlow.value
       ),
       initialScenarios = allScenarioStateHoldersStateFlow.value.map { scenario ->
         scenario.createScenario(allScenarioStateHoldersStateFlow.value)
@@ -295,7 +297,8 @@ class ArbigentAppStateHolder(
           cacheStrategy = this@ArbigentAppStateHolder.cacheStrategyFlow.value,
           aiOptions = this@ArbigentAppStateHolder.aiOptionsFlow.value,
           mcpJson = this@ArbigentAppStateHolder.mcpJsonFlow.value,
-          deviceFormFactor = this@ArbigentAppStateHolder.defaultDeviceFormFactorFlow.value
+          deviceFormFactor = this@ArbigentAppStateHolder.defaultDeviceFormFactorFlow.value,
+          additionalActions = this@ArbigentAppStateHolder.additionalActionsFlow.value
         ),
         scenario = createArbigentScenarioContent(),
         aiFactory = aiFactory,
@@ -389,7 +392,8 @@ class ArbigentAppStateHolder(
           cacheStrategy = cacheStrategyFlow.value,
           aiOptions = aiOptionsFlow.value,
           mcpJson = mcpJsonFlow.value,
-          deviceFormFactor = defaultDeviceFormFactorFlow.value
+          deviceFormFactor = defaultDeviceFormFactorFlow.value,
+          additionalActions = additionalActionsFlow.value
         ),
         scenarioContents = sortedScenarios.map {
           it.createArbigentScenarioContent()
@@ -425,6 +429,7 @@ class ArbigentAppStateHolder(
     aiOptionsFlow.value = projectFile.settings.aiOptions
     mcpJsonFlow.value = projectFile.settings.mcpJson
     defaultDeviceFormFactorFlow.value = projectFile.settings.deviceFormFactor
+    additionalActionsFlow.value = projectFile.settings.additionalActions
     _fixedScenariosFlow.value = projectFile.fixedScenarios
     projectStateFlow.value = ArbigentProject(
       settings = projectFile.settings,
@@ -526,6 +531,10 @@ class ArbigentAppStateHolder(
 
   fun onDefaultDeviceFormFactorChanged(formFactor: ArbigentScenarioDeviceFormFactor) {
     defaultDeviceFormFactorFlow.value = formFactor
+  }
+
+  fun onAdditionalActionsChanged(actions: List<String>?) {
+    additionalActionsFlow.value = actions
   }
 
   fun scenarioCountById(newScenarioId: String): Int {

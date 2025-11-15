@@ -21,6 +21,7 @@ import io.github.takahirom.robospec.execute
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import maestro.orchestra.MaestroCommand
@@ -62,7 +63,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
             assertConnectToDeviceButtonExists()
           }
         }
-        
+
         describe("MCP Environment Variables") {
           doIt {
             expandMcpSettings()
@@ -90,7 +91,7 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
             }
           }
         }
-        
+
         describe("when add scenario") {
           doIt {
             clickConnectToDeviceButton()
@@ -310,6 +311,43 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
                 }
               }
             }
+
+            describe("Default Device Form Factor") {
+              doIt {
+                openProjectSettings()
+                scrollToFormFactor()
+              }
+
+              itShould("show default selection") {
+                assertFormFactorSelected("Unspecified")
+                capture(it)
+              }
+
+              describe("when selecting TV") {
+                doIt {
+                  clickFormFactorRadioButton("TV")
+                }
+
+                itShould("update selection immediately") {
+                  assertFormFactorSelected("TV")
+                  capture(it)
+                }
+
+                describe("when reopening settings") {
+                  doIt {
+                    closeProjectSettingsDialog()
+                    openProjectSettings()
+                    scrollToFormFactor()
+                  }
+
+                  itShould("persist selection") {
+                    assertFormFactorSelected("TV")
+                    capture(it)
+                    closeProjectSettingsDialog()
+                  }
+                }
+              }
+            }
           }
           describe("when enter goals and run") {
             doIt {
@@ -441,6 +479,31 @@ class TestRobot(
     fakeAi.status = aiStatus
   }
 
+  /**
+   * Safe wait that avoids waitUntil to prevent hangs.
+   * Returns true if element found, false if timeout.
+   * Does not throw - caller should handle failure explicitly.
+   */
+  @OptIn(ExperimentalCoroutinesApi::class)
+  private fun waitForNodeSafely(
+    matcher: SemanticsMatcher,
+    timeoutMs: Long = 5000
+  ): Boolean {
+    val pollCount = (timeoutMs / 100).toInt()
+
+    repeat(pollCount) {
+      testScope.advanceUntilIdle()
+      val nodes = composeUiTest.onAllNodes(matcher).fetchSemanticsNodes()
+      if (nodes.isNotEmpty()) {
+        return true
+      }
+      testScope.advanceTimeBy(100)
+    }
+
+    testScope.advanceUntilIdle()
+    return composeUiTest.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty()
+  }
+
   fun clickConnectToDeviceButton() {
     waitALittle()
     composeUiTest.onNode(hasText("Connect to device")).performClick()
@@ -526,21 +589,19 @@ class TestRobot(
     waitALittle()
   }
 
+  @OptIn(ExperimentalCoroutinesApi::class)
   fun waitUntilScenarioRunning() {
-    repeat(5) {
-      composeUiTest.waitUntil(
-        timeoutMillis = 1000
-      ) {
-        try {
-          composeUiTest.onNode(hasTestTag("scenario_running"), useUnmergedTree = true)
-            .assertExists()
-          false
-        } catch (e: AssertionError) {
-          true
-        }
+    // Wait for scenario_running tag to disappear (scenario has finished)
+    // 10 second timeout for image assertion processing
+    repeat(100) {
+      val nodes = composeUiTest.onAllNodes(hasTestTag("scenario_running"), useUnmergedTree = true).fetchSemanticsNodes()
+      if (nodes.isEmpty()) {
+        return  // Element disappeared, scenario finished
       }
-      waitALittle()
+      testScope.advanceTimeBy(100)
+      testScope.advanceUntilIdle()
     }
+    kotlin.test.fail("Scenario did not finish within 10 seconds")
   }
 
   @OptIn(ExperimentalCoroutinesApi::class)
@@ -586,19 +647,17 @@ class TestRobot(
 
   fun assertGoalInputExists() {
     waitALittle()
-    composeUiTest.waitUntil(timeoutMillis = 5000) {
-      try {
-        composeUiTest.onNode(hasTestTag("goal")).assertExists()
-        true
-      } catch (e: AssertionError) {
-        false
-      }
+    if (!waitForNodeSafely(hasTestTag("goal"), 5000)) {
+      kotlin.test.fail("Goal input not found")
     }
+    composeUiTest.onNode(hasTestTag("goal")).assertExists()
   }
 
   fun expandOptions() {
     composeUiTest.onNode(hasContentDescription("Expand Options")).performClick()
-    composeUiTest.waitUntilAtLeastOneExists(hasContentDescription("Collapse Options"))
+    if (!waitForNodeSafely(hasContentDescription("Collapse Options"))) {
+      kotlin.test.fail("Options did not expand - Collapse Options button not found")
+    }
     // To make the test deterministic
     changeScenarioId("default_scenario")
   }
@@ -622,11 +681,43 @@ class TestRobot(
 
   fun enableCache() {
     composeUiTest.onNode(hasContentDescription("Project Settings")).performClick()
-    composeUiTest.waitUntilAtLeastOneExists(hasText("Disabled"), timeoutMillis = 1000)
-    composeUiTest.onNode(hasText("Disabled")).performClick()
-    composeUiTest.waitUntilAtLeastOneExists(hasText("InMemory"), timeoutMillis = 1000)
-    composeUiTest.onNode(hasText("InMemory"), useUnmergedTree = true).performClick()
+    testScope.advanceUntilIdle()
+
+    // Scroll to AI decision cache section
+    composeUiTest.onNode(hasTestTag("project_settings_content"))
+        .performScrollToNode(hasText("AI decision cache"))
+    testScope.advanceUntilIdle()
+
+    // Click InMemory radio button
+    if (!waitForNodeSafely(hasText("InMemory"), 2000)) {
+        kotlin.test.fail("InMemory radio button not found")
+    }
+    composeUiTest.onNode(hasText("InMemory")).performClick()
+    testScope.advanceUntilIdle()
+
+    // Wait for async state propagation and verify selection
+    if (!waitForNodeSafely(hasText("InMemory"), 2000)) {
+        kotlin.test.fail("InMemory radio button not found after click")
+    }
+    composeUiTest.onNode(hasText("InMemory"))
+        .assertIsSelected()
+
     composeUiTest.onNode(hasText("Close")).performClick()
+    testScope.advanceUntilIdle()
+
+    // Verify dialog closed successfully
+    composeUiTest.onNode(hasContentDescription("Project Settings")).assertExists()
+
+    // Verify cache is persisted by reopening settings
+    composeUiTest.onNode(hasContentDescription("Project Settings")).performClick()
+    testScope.advanceUntilIdle()
+    composeUiTest.onNode(hasTestTag("project_settings_content"))
+        .performScrollToNode(hasText("AI decision cache"))
+    testScope.advanceUntilIdle()
+    composeUiTest.onNode(hasText("InMemory"))
+        .assertIsSelected()
+    composeUiTest.onNode(hasText("Close")).performClick()
+    testScope.advanceUntilIdle()
   }
 
   fun toggleScenarioCache() {
@@ -645,7 +736,10 @@ class TestRobot(
 
   fun changePromptTemplate(template: String) {
     composeUiTest.onNode(hasContentDescription("Project Settings")).performClick()
-    composeUiTest.waitUntilAtLeastOneExists(hasText("User Prompt Template"), timeoutMillis = 1000)
+    if (!waitForNodeSafely(hasText("User Prompt Template"), 1000)) {
+      runCatching { composeUiTest.onNode(hasText("Close")).performClick() }
+      kotlin.test.fail("User Prompt Template not found in Project Settings")
+    }
     composeUiTest.onNode(hasTestTag("user_prompt_template"))
       .performTextClearance()
     composeUiTest.onNode(hasTestTag("user_prompt_template"))
@@ -674,10 +768,6 @@ class TestRobot(
       .performTextClearance()
     composeUiTest.onNode(hasTestTag("scenario_id"))
       .performTextInput(id)
-  }
-
-  fun debugCapture() {
-    composeUiTest.onAllNodes(isRoot()).onLast().captureRoboImage("debug.png")
   }
 
   fun capture(describedBehavior: DescribedBehavior<TestRobot>) {
@@ -766,16 +856,25 @@ class TestRobot(
   }
 
   fun addLaunchAppInitializationMethod() {
+    composeUiTest.onNode(hasTestTag("scenario_options"))
+      .performScrollToNode(
+        hasContentDescription("Add initialization method")
+      )
     composeUiTest.onNode(hasContentDescription("Add initialization method")).performClick()
     waitALittle()
+    // Scroll to the last initialization_method to ensure it's visible
+    composeUiTest.onAllNodes(hasTestTag("initialization_method"))
+      .onLast()
+      .performScrollTo()
     composeUiTest.onAllNodes(hasText(InitializationMethodMenu.Noop.type), useUnmergedTree = true)
-      .onFirst()
+      .onLast()
       .performClick()
+    waitALittle()
     composeUiTest.onAllNodes(
       hasText(InitializationMethodMenu.LaunchApp.type),
       useUnmergedTree = true
     )
-      .onFirst()
+      .onLast()
       .performClick()
     composeUiTest.onNode(hasTestTag("launch_app_package"))
       .performTextInput("com.example")
@@ -838,13 +937,8 @@ class TestRobot(
   }
 
   private fun waitForNode(matcher: SemanticsMatcher) {
-    composeUiTest.waitUntil(timeoutMillis = 2000) {
-      try {
-        composeUiTest.onNode(matcher, useUnmergedTree = true).assertExists()
-        true
-      } catch (e: AssertionError) {
-        false
-      }
+    if (!waitForNodeSafely(matcher, 2000)) {
+      kotlin.test.fail("Element matching $matcher not found within timeout")
     }
   }
 
@@ -898,7 +992,9 @@ class TestRobot(
 
   fun expandMcpSettings() {
     composeUiTest.onNode(hasContentDescription("Expand MCP Settings")).performClick()
-    composeUiTest.waitUntilAtLeastOneExists(hasContentDescription("Collapse MCP Settings"))
+    if (!waitForNodeSafely(hasContentDescription("Collapse MCP Settings"))) {
+      kotlin.test.fail("MCP Settings did not expand - Collapse MCP Settings button not found")
+    }
   }
 
   fun clickAddMcpEnvironmentVariableButton() {
@@ -926,7 +1022,7 @@ class TestRobot(
       .onNode(hasTestTag("mcp_environment_variable_key_$index"))
       .performTextInput(key)
     waitALittle()
-    
+
     composeUiTest
       .onNode(hasTestTag("mcp_environment_variable_value_$index"))
       .performTextClearance()
@@ -943,6 +1039,27 @@ class TestRobot(
     composeUiTest
       .onNode(hasTestTag("mcp_environment_variable_value_$index"))
       .assertTextContains(value)
+  }
+
+  fun scrollToFormFactor() {
+    composeUiTest.onNode(hasTestTag("project_settings_content"))
+      .performScrollToNode(hasText("Default Device Form Factor"))
+    testScope.advanceUntilIdle()
+  }
+
+  fun clickFormFactorRadioButton(formFactor: String) {
+    if (!waitForNodeSafely(hasText(formFactor), 2000)) {
+      kotlin.test.fail("$formFactor radio button not found")
+    }
+    composeUiTest.onNode(hasText(formFactor)).performClick()
+    testScope.advanceUntilIdle()
+  }
+
+  fun assertFormFactorSelected(expectedFormFactor: String) {
+    // Verify the radio button exists and is selected
+    composeUiTest.onNode(hasText(expectedFormFactor))
+      .assertExists("$expectedFormFactor radio button should exist")
+      .assertIsSelected()
   }
 
 }

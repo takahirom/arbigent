@@ -1,6 +1,6 @@
 scenarios:
 - id: "bc48fe6d-3c21-4933-b232-524905dadcc2"
-  goal: "Just Open \"General\" setting. That's it."
+  goal: "Just Open \"General\" setting. That's it. If you can see AutoFill & Passwords, you are already in General setting"
   initializationMethods:
   - type: "Back"
   - type: "LaunchApp"
