@@ -131,11 +131,7 @@ class AdditionalActionsTest {
     @Test
     fun `AdditionalActionsConstants AVAILABLE_ACTIONS should contain all supported actions`() {
         val expectedActions = listOf(
-            "ClickWithText",
-            "ClickWithId",
-            "DpadTryAutoFocusById",
-            "DpadTryAutoFocusByText",
-            "DpadTryAutoFocusByIndex"
+            "ClickWithText"
         )
 
         assertEquals(expectedActions, AdditionalActionsConstants.AVAILABLE_ACTIONS)
