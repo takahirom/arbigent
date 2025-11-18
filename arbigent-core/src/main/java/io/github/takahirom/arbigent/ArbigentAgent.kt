@@ -911,11 +911,6 @@ public fun defaultAgentActionTypesForTvForVisualMode(): List<AgentActionType> {
 private fun getAgentActionTypeByName(actionName: String): AgentActionType? {
   return when (actionName) {
     "ClickWithText" -> ClickWithTextAgentAction
-    "ClickWithId" -> ClickWithIdAgentAction
-    "ClickWithIndex" -> ClickWithIndex
-    "DpadTryAutoFocusById" -> DpadAutoFocusWithIdAgentAction
-    "DpadTryAutoFocusByText" -> DpadAutoFocusWithTextAgentAction
-    "DpadTryAutoFocusByIndex" -> DpadAutoFocusWithIndexAgentAction
     else -> null
   }
 }
