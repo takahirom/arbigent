@@ -1,4 +1,6 @@
 # Arbigent(Arbiter-Agent): An AI Agent Testing Framework for Modern Applications
+<img width="2668" height="1132" alt="arbigent-banner-optimized" src="https://github.com/user-attachments/assets/546c36ed-45fe-4ac2-a918-c7b0e7261f41" />
+
 
 **Zero to AI agent testing in minutes. Arbigent's intuitive UI and powerful code interface make it accessible to everyone, while its scenario breakdown feature ensures scalability for even the most complex tasks.**
 
