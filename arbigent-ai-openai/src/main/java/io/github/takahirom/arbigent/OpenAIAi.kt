@@ -563,11 +563,10 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
           }
           requestBuilderModifier()
           contentType(ContentType.Application.Json)
-          setBody(
-            aiOptions?.temperature?.let { temp ->
-              chatCompletionRequest.copy(temperature = temp)
-            } ?: chatCompletionRequest
-          )
+          val requestWithTemp = aiOptions?.temperature?.let { temp ->
+            chatCompletionRequest.copy(temperature = temp)
+          } ?: chatCompletionRequest
+          setBody(buildRequestBody(requestWithTemp, aiOptions?.extraRequestParams))
         }
       if (response.status == HttpStatusCode.TooManyRequests) {
         throw ArbigentAiRateLimitExceededException()
@@ -583,6 +582,35 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
       val responseBody = response.bodyAsText()
       return@runBlocking responseBody
     }
+  }
+
+  /**
+   * Builds the final request body by merging the base request with extra parameters.
+   *
+   * Protected fields (model, messages, tools, tool_choice) cannot be overridden
+   * via extraParams and will be silently ignored if present.
+   *
+   * For non-protected fields, extra params use last-write-wins strategy,
+   * meaning extraParams will override any existing field in the request.
+   *
+   * @param request The base ChatCompletionRequest
+   * @param extraParams Optional JSON object with additional API parameters
+   * @return JsonElement representing the complete request body
+   */
+  internal fun buildRequestBody(request: ChatCompletionRequest, extraParams: JsonObject?): JsonElement {
+    val json = Json { encodeDefaults = true }
+    if (extraParams == null) return json.encodeToJsonElement(request)
+
+    val requestJson = json.encodeToJsonElement(request).jsonObject.toMutableMap()
+    extraParams.forEach { (key, value) ->
+      if (key in protectedFields) {
+        // Silently ignore protected field override attempt to prevent information disclosure
+      } else {
+        // Extra params override existing non-protected fields (last-write-wins)
+        requestJson[key] = value
+      }
+    }
+    return JsonObject(requestJson)
   }
 
   private fun buildTools(agentActionTypes: List<AgentActionType>, mcpTools: List<MCPTool>?): List<ToolDefinition> {
@@ -892,6 +920,12 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
      * Note: For JSON Schema response format, use gpt-4o-2024-08-06 or similar
      */
     public const val DEFAULT_OPENAI_MODEL: String = "gpt-4.1"
+
+    /**
+     * Protected fields that cannot be overridden via extraRequestParams.
+     * These are critical API fields that could break functionality or cause security issues.
+     */
+    internal val protectedFields: Set<String> = setOf("model", "messages", "tools", "tool_choice")
   }
 }
 
