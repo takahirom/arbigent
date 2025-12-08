@@ -15,7 +15,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
@@ -29,6 +28,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.*
+import org.jetbrains.jewel.ui.theme.colorPalette
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
 import org.jetbrains.jewel.ui.theme.simpleListItemStyle
@@ -318,7 +318,7 @@ fun AiOptionsComponent(
         if (jsonParseError != null) {
             Text(
                 text = "Invalid JSON",
-                color = Color.Red,
+                color = JewelTheme.colorPalette.red(8),
                 modifier = Modifier
                     .padding(horizontal = 8.dp)
                     .testTag("extra_request_params_error_text")
