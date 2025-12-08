@@ -598,7 +598,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
    * @return JsonElement representing the complete request body
    */
   internal fun buildRequestBody(request: ChatCompletionRequest, extraParams: JsonObject?): JsonElement {
-    val json = Json { encodeDefaults = true }
+    val json = Json { encodeDefaults = true; explicitNulls = false }
     if (extraParams == null) return json.encodeToJsonElement(request)
 
     val requestJson = json.encodeToJsonElement(request).jsonObject.toMutableMap()

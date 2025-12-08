@@ -252,4 +252,40 @@ class BuildRequestBodyTest {
       ?.jsonPrimitive?.content
     assertEquals("deep", deepValue)
   }
+
+  @Test
+  fun `buildRequestBody omits null fields from serialization`() {
+    // This test verifies that explicitNulls = false is configured correctly
+    // Without this, null fields like "text: null" would be serialized and cause API errors
+    val request = ChatCompletionRequest(
+      model = "gpt-4",
+      messages = listOf(
+        ChatMessage(
+          role = "user",
+          contents = emptyList()
+        )
+      ),
+      responseFormat = null,
+      temperature = null,
+      tools = null
+    )
+
+    val result = openAiAi.buildRequestBody(request, null)
+
+    // Null fields should be omitted entirely, not serialized as "field: null"
+    assertFalse(
+      "responseFormat should be omitted when null",
+      result.jsonObject.containsKey("response_format")
+    )
+    assertFalse(
+      "temperature should be omitted when null",
+      result.jsonObject.containsKey("temperature")
+    )
+    // tools is a protected field but also null - verify it's not in the output
+    val tools = result.jsonObject["tools"]
+    assertTrue(
+      "tools should be JsonNull or absent when null",
+      tools == null || tools == JsonNull
+    )
+  }
 }
