@@ -566,7 +566,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
           val requestWithTemp = aiOptions?.temperature?.let { temp ->
             chatCompletionRequest.copy(temperature = temp)
           } ?: chatCompletionRequest
-          setBody(buildRequestBody(requestWithTemp, aiOptions?.extraRequestParams))
+          setBody(buildRequestBody(requestWithTemp, aiOptions?.extraBody))
         }
       if (response.status == HttpStatusCode.TooManyRequests) {
         throw ArbigentAiRateLimitExceededException()
@@ -922,7 +922,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     public const val DEFAULT_OPENAI_MODEL: String = "gpt-4.1"
 
     /**
-     * Protected fields that cannot be overridden via extraRequestParams.
+     * Protected fields that cannot be overridden via extraBody.
      * These are critical API fields that could break functionality or cause security issues.
      */
     internal val protectedFields: Set<String> = setOf("model", "messages", "tools", "tool_choice")

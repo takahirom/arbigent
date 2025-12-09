@@ -235,17 +235,17 @@ fun AiOptionsComponent(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Checkbox(
-            checked = updatedOptions.extraRequestParams != null,
+            checked = updatedOptions.extraBody != null,
             onCheckedChange = { enabled: Boolean ->
                 updatedOptionsChanged(
-                    updatedOptions.copy(extraRequestParams = if (enabled) JsonObject(emptyMap()) else null)
+                    updatedOptions.copy(extraBody = if (enabled) JsonObject(emptyMap()) else null)
                 )
             },
             modifier = Modifier.testTag("use_extra_request_params")
         )
         Text("Use Extra Request Params", modifier = Modifier.padding(start = 8.dp))
     }
-    if (updatedOptions.extraRequestParams != null) {
+    if (updatedOptions.extraBody != null) {
         Row(
             modifier = Modifier.padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -266,14 +266,14 @@ fun AiOptionsComponent(
         }
         var jsonParseError by remember { mutableStateOf<String?>(null) }
         val textFieldState = rememberTextFieldState(
-            updatedOptions.extraRequestParams?.toString() ?: "{}"
+            updatedOptions.extraBody?.toString() ?: "{}"
         )
         LaunchedEffect(textFieldState.text) {
             val text = textFieldState.text.toString()
             if (text.isBlank() || text == "{}") {
                 jsonParseError = null
                 updatedOptionsChanged(
-                    updatedOptions.copy(extraRequestParams = JsonObject(emptyMap()))
+                    updatedOptions.copy(extraBody = JsonObject(emptyMap()))
                 )
             } else {
                 try {
@@ -281,7 +281,7 @@ fun AiOptionsComponent(
                     if (parsed is JsonObject) {
                         jsonParseError = null
                         updatedOptionsChanged(
-                            updatedOptions.copy(extraRequestParams = parsed)
+                            updatedOptions.copy(extraBody = parsed)
                         )
                     } else {
                         jsonParseError = "Expected a JSON object, not ${parsed::class.simpleName}"

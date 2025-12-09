@@ -457,7 +457,7 @@ Previous steps:
     """
     settings:
       aiOptions:
-        extraRequestParams:
+        extraBody:
           reasoning:
             effort: "high"
     scenarios:
@@ -466,13 +466,13 @@ Previous steps:
     - id: "override-params"
       goal: "Test overriding params"
       aiOptions:
-        extraRequestParams:
+        extraBody:
           reasoning:
             effort: "low"
     - id: "merge-params"
       goal: "Test merging params"
       aiOptions:
-        extraRequestParams:
+        extraBody:
           max_tokens: 1000
     """
   )
@@ -482,7 +482,7 @@ Previous steps:
     val projectSettings = projectWithExtraRequestParams.settings
     val projectAiOptions = projectSettings.aiOptions
     assertNotNull(projectAiOptions, "Project aiOptions should not be null")
-    assertNotNull(projectAiOptions.extraRequestParams, "Project extraRequestParams should not be null")
+    assertNotNull(projectAiOptions.extraBody, "Project extraBody should not be null")
 
     // Test scenario using project params
     val scenarioUsingProject = projectWithExtraRequestParams.scenarioContents.createArbigentScenario(
@@ -493,7 +493,7 @@ Previous steps:
       aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
     )
     val projectParamsTask = scenarioUsingProject.agentTasks[0].agentConfig.aiOptions
-    assertNotNull(projectParamsTask?.extraRequestParams, "Scenario should have extraRequestParams from project")
+    assertNotNull(projectParamsTask?.extraBody, "Scenario should have extraBody from project")
 
     // Test scenario overriding params
     val scenarioOverriding = projectWithExtraRequestParams.scenarioContents.createArbigentScenario(
@@ -504,8 +504,8 @@ Previous steps:
       aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
     )
     val overridingTask = scenarioOverriding.agentTasks[0].agentConfig.aiOptions
-    assertNotNull(overridingTask?.extraRequestParams, "Scenario should have extraRequestParams")
-    val reasoningObj = overridingTask?.extraRequestParams?.get("reasoning") as? JsonObject
+    assertNotNull(overridingTask?.extraBody, "Scenario should have extraBody")
+    val reasoningObj = overridingTask?.extraBody?.get("reasoning") as? JsonObject
     assertNotNull(reasoningObj, "Should have reasoning object")
     assertEquals(JsonPrimitive("low"), reasoningObj["effort"], "Should override to 'low'")
 
@@ -518,33 +518,33 @@ Previous steps:
       aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
     )
     val mergingTask = scenarioMerging.agentTasks[0].agentConfig.aiOptions
-    assertNotNull(mergingTask?.extraRequestParams, "Scenario should have merged extraRequestParams")
+    assertNotNull(mergingTask?.extraBody, "Scenario should have merged extraBody")
     // Should have both reasoning and max_tokens
-    assertNotNull(mergingTask?.extraRequestParams?.get("reasoning"), "Should have reasoning from project")
-    assertNotNull(mergingTask?.extraRequestParams?.get("max_tokens"), "Should have max_tokens from scenario")
+    assertNotNull(mergingTask?.extraBody?.get("reasoning"), "Should have reasoning from project")
+    assertNotNull(mergingTask?.extraBody?.get("max_tokens"), "Should have max_tokens from scenario")
   }
 
   @Test
   fun testAiOptionsMerge() {
     val base = ArbigentAiOptions(
       temperature = 0.5,
-      extraRequestParams = buildJsonObject {
+      extraBody = buildJsonObject {
         put("reasoning", buildJsonObject {
           put("effort", JsonPrimitive("high"))
         })
       }
     )
     val overlay = ArbigentAiOptions(
-      extraRequestParams = buildJsonObject {
+      extraBody = buildJsonObject {
         put("max_tokens", JsonPrimitive(1000))
       }
     )
     val merged = base.mergeWith(overlay)
 
     assertEquals(0.5, merged.temperature, "Temperature should be preserved from base")
-    assertNotNull(merged.extraRequestParams, "Merged should have extraRequestParams")
-    assertNotNull(merged.extraRequestParams?.get("reasoning"), "Should have reasoning from base")
-    assertNotNull(merged.extraRequestParams?.get("max_tokens"), "Should have max_tokens from overlay")
+    assertNotNull(merged.extraBody, "Merged should have extraBody")
+    assertNotNull(merged.extraBody?.get("reasoning"), "Should have reasoning from base")
+    assertNotNull(merged.extraBody?.get("max_tokens"), "Should have max_tokens from overlay")
   }
 
 }

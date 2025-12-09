@@ -100,7 +100,7 @@ public enum class ImageFormat {
 
 /**
  * Serializer that converts between YAML maps and JsonObject.
- * This allows extraRequestParams to be written as YAML maps in project files
+ * This allows extraBody to be written as YAML maps in project files
  * while being used as JsonObject in the code.
  */
 internal object YamlCompatibleJsonObjectSerializer : KSerializer<JsonObject> {
@@ -234,7 +234,7 @@ public data class ArbigentAiOptions(
   public val imageFormat: ImageFormat? = null,
   public val historicalStepLimit: Int? = null,
   @Serializable(with = YamlCompatibleJsonObjectSerializer::class)
-  public val extraRequestParams: JsonObject? = null
+  public val extraBody: JsonObject? = null
 ) {
   public fun mergeWith(other: ArbigentAiOptions?): ArbigentAiOptions {
     if (other == null) return this
@@ -243,7 +243,7 @@ public data class ArbigentAiOptions(
       imageDetail = other.imageDetail ?: imageDetail,
       imageFormat = other.imageFormat ?: imageFormat,
       historicalStepLimit = other.historicalStepLimit ?: historicalStepLimit,
-      extraRequestParams = mergeJsonObjects(extraRequestParams, other.extraRequestParams)
+      extraBody = mergeJsonObjects(extraBody, other.extraBody)
     )
   }
 
