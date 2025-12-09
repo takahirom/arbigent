@@ -268,6 +268,15 @@ fun AiOptionsComponent(
         val textFieldState = rememberTextFieldState(
             updatedOptions.extraBody?.toString() ?: "{}"
         )
+        // Sync TextField when extraBody changes externally (e.g., switching scenarios)
+        LaunchedEffect(updatedOptions.extraBody) {
+            val newText = updatedOptions.extraBody?.toString() ?: "{}"
+            if (textFieldState.text.toString() != newText) {
+                textFieldState.edit {
+                    replace(0, length, newText)
+                }
+            }
+        }
         LaunchedEffect(textFieldState.text) {
             val text = textFieldState.text.toString()
             if (text.isBlank() || text == "{}") {
