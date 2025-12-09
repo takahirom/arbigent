@@ -176,8 +176,8 @@ internal object AnyValueSerializer : KSerializer<Any?> {
     if (decoder is com.charleskorn.kaml.YamlInput) {
       return deserializeYamlNode(decoder.node)
     }
-    // Note: This serializer is designed for YAML only. Other decoders may not work correctly.
-    return decoder.decodeString()
+    // This serializer is designed for YAML only
+    throw IllegalStateException("AnyValueSerializer only supports YamlInput decoder, got: ${decoder::class.simpleName}")
   }
 
   private fun deserializeYamlNode(node: com.charleskorn.kaml.YamlNode): Any? {
