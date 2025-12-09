@@ -243,14 +243,14 @@ fun AiOptionsComponent(
             },
             modifier = Modifier.testTag("use_extra_request_params")
         )
-        Text("Use Extra Request Params", modifier = Modifier.padding(start = 8.dp))
+        Text("Use Extra Body", modifier = Modifier.padding(start = 8.dp))
     }
     if (updatedOptions.extraBody != null) {
         Row(
             modifier = Modifier.padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Extra Request Params (JSON)", modifier = Modifier.padding(end = 8.dp))
+            Text("Extra Body (JSON)", modifier = Modifier.padding(end = 8.dp))
             val uriHandler = LocalUriHandler.current
             IconActionButton(
                 key = AllIconsKeys.General.Information,
@@ -261,7 +261,7 @@ fun AiOptionsComponent(
                 contentDescription = "Extra Request Params Info",
                 hint = Size(16)
             ) {
-                Text("Add custom parameters to the API request. For example: {\"reasoning\": {\"effort\": \"high\"}} for OpenRouter or {\"reasoning_effort\": \"high\"} for OpenAI.")
+                Text("Add custom JSON fields to the API request body. For example: {\"reasoning_effort\": \"high\"} for OpenAI o3/5.1 models.")
             }
         }
         var jsonParseError by remember { mutableStateOf<String?>(null) }
