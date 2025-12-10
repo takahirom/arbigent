@@ -9,8 +9,19 @@ import io.github.takahirom.arbigent.ArbigentProjectSettings.Companion.DefaultMcp
 import io.github.takahirom.arbigent.result.ArbigentProjectExecutionResult
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import kotlinx.serialization.Contextual
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
@@ -87,12 +98,143 @@ public enum class ImageFormat {
     }
 }
 
+/**
+ * Serializer that converts between YAML maps and JsonObject.
+ * This allows extraBody to be written as YAML maps in project files
+ * while being used as JsonObject in the code.
+ */
+internal object YamlCompatibleJsonObjectSerializer : KSerializer<JsonObject> {
+  override val descriptor: SerialDescriptor = kotlinx.serialization.descriptors.buildClassSerialDescriptor("JsonObject")
+
+  override fun deserialize(decoder: Decoder): JsonObject {
+    // For kaml, directly process the YamlNode
+    if (decoder is com.charleskorn.kaml.YamlInput) {
+      val node = decoder.node
+      if (node is com.charleskorn.kaml.YamlMap) {
+        return yamlMapToJsonObject(node)
+      }
+    }
+    // Fallback for JSON decoder
+    return decoder.decodeSerializableValue(JsonObject.serializer())
+  }
+
+  override fun serialize(encoder: Encoder, value: JsonObject) {
+    // Always use Map serialization for compatibility with YAML
+    val map = jsonObjectToMap(value)
+    encoder.encodeSerializableValue(
+      MapSerializer(String.serializer(), AnyValueSerializer),
+      map
+    )
+  }
+
+  private fun yamlMapToJsonObject(yamlMap: com.charleskorn.kaml.YamlMap): JsonObject {
+    val result = mutableMapOf<String, JsonElement>()
+    for ((key, value) in yamlMap.entries) {
+      result[key.content] = yamlNodeToJsonElement(value)
+    }
+    return JsonObject(result)
+  }
+
+  private fun yamlNodeToJsonElement(node: com.charleskorn.kaml.YamlNode): JsonElement = when (node) {
+    is com.charleskorn.kaml.YamlScalar -> {
+      val content = node.content
+      // Try to parse as appropriate type
+      content.toLongOrNull()?.let { JsonPrimitive(it) }
+        ?: content.toDoubleOrNull()?.let { JsonPrimitive(it) }
+        ?: content.toBooleanStrictOrNull()?.let { JsonPrimitive(it) }
+        ?: JsonPrimitive(content)
+    }
+    is com.charleskorn.kaml.YamlMap -> yamlMapToJsonObject(node)
+    is com.charleskorn.kaml.YamlList -> JsonArray(node.items.map { yamlNodeToJsonElement(it) })
+    is com.charleskorn.kaml.YamlNull -> JsonNull
+    is com.charleskorn.kaml.YamlTaggedNode -> yamlNodeToJsonElement(node.innerNode)
+  }
+
+  private fun jsonObjectToMap(jsonObject: JsonObject): Map<String, Any?> {
+    return jsonObject.mapValues { (_, v) -> jsonElementToAny(v) }
+  }
+
+  private fun jsonElementToAny(element: JsonElement): Any? = when (element) {
+    is JsonNull -> null
+    is JsonPrimitive -> when {
+      element.isString -> element.content
+      element.content == "true" -> true
+      element.content == "false" -> false
+      element.content.contains('.') -> element.content.toDoubleOrNull() ?: element.content
+      else -> element.content.toLongOrNull() ?: element.content
+    }
+    is JsonObject -> jsonObjectToMap(element)
+    is JsonArray -> element.map { jsonElementToAny(it) }
+  }
+}
+
+internal object AnyValueSerializer : KSerializer<Any?> {
+  override val descriptor: SerialDescriptor = kotlinx.serialization.descriptors.buildClassSerialDescriptor("Any")
+
+  override fun deserialize(decoder: Decoder): Any? {
+    // For kaml, we need to check the input type first
+    if (decoder is com.charleskorn.kaml.YamlInput) {
+      return deserializeYamlNode(decoder.node)
+    }
+    // This serializer is designed for YAML only
+    throw IllegalStateException("AnyValueSerializer only supports YamlInput decoder, got: ${decoder::class.simpleName}")
+  }
+
+  private fun deserializeYamlNode(node: com.charleskorn.kaml.YamlNode): Any? {
+    return when (node) {
+      is com.charleskorn.kaml.YamlScalar -> {
+        val content = node.content
+        content.toLongOrNull() ?: content.toDoubleOrNull() ?: content.toBooleanStrictOrNull() ?: content
+      }
+      is com.charleskorn.kaml.YamlMap -> {
+        val result = mutableMapOf<String, Any?>()
+        for ((key, value) in node.entries) {
+          result[key.content] = deserializeYamlNode(value)
+        }
+        result.toMap()
+      }
+      is com.charleskorn.kaml.YamlList -> {
+        node.items.map { deserializeYamlNode(it) }
+      }
+      is com.charleskorn.kaml.YamlNull -> null
+      is com.charleskorn.kaml.YamlTaggedNode -> deserializeYamlNode(node.innerNode)
+    }
+  }
+
+  override fun serialize(encoder: Encoder, value: Any?) {
+    when (value) {
+      null -> encoder.encodeNull()
+      is String -> encoder.encodeString(value)
+      is Int -> encoder.encodeInt(value)
+      is Long -> encoder.encodeLong(value)
+      is Double -> encoder.encodeDouble(value)
+      is Boolean -> encoder.encodeBoolean(value)
+      is Map<*, *> -> {
+        @Suppress("UNCHECKED_CAST")
+        encoder.encodeSerializableValue(
+          MapSerializer(String.serializer(), this),
+          value as Map<String, Any?>
+        )
+      }
+      is List<*> -> {
+        encoder.encodeSerializableValue(
+          kotlinx.serialization.builtins.ListSerializer(this),
+          value
+        )
+      }
+      else -> encoder.encodeString(value.toString())
+    }
+  }
+}
+
 @Serializable
 public data class ArbigentAiOptions(
   public val temperature: Double? = null,
   public val imageDetail: ImageDetailLevel? = null,
   public val imageFormat: ImageFormat? = null,
-  public val historicalStepLimit: Int? = null
+  public val historicalStepLimit: Int? = null,
+  @Serializable(with = YamlCompatibleJsonObjectSerializer::class)
+  public val extraBody: JsonObject? = null
 ) {
   public fun mergeWith(other: ArbigentAiOptions?): ArbigentAiOptions {
     if (other == null) return this
@@ -100,8 +242,17 @@ public data class ArbigentAiOptions(
       temperature = other.temperature ?: temperature,
       imageDetail = other.imageDetail ?: imageDetail,
       imageFormat = other.imageFormat ?: imageFormat,
-      historicalStepLimit = other.historicalStepLimit ?: historicalStepLimit
+      historicalStepLimit = other.historicalStepLimit ?: historicalStepLimit,
+      extraBody = mergeJsonObjects(extraBody, other.extraBody)
     )
+  }
+
+  private fun mergeJsonObjects(base: JsonObject?, overlay: JsonObject?): JsonObject? {
+    if (base == null) return overlay
+    if (overlay == null) return base
+    val merged = base.toMutableMap()
+    overlay.forEach { (key, value) -> merged[key] = value }
+    return JsonObject(merged)
   }
 }
 

@@ -11,7 +11,10 @@ import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
@@ -21,8 +24,11 @@ import androidx.compose.ui.unit.dp
 import io.github.takahirom.arbigent.ArbigentAiOptions
 import io.github.takahirom.arbigent.ImageDetailLevel
 import io.github.takahirom.arbigent.ImageFormat
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.*
+import org.jetbrains.jewel.ui.theme.colorPalette
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
 import org.jetbrains.jewel.ui.theme.simpleListItemStyle
@@ -220,6 +226,111 @@ fun AiOptionsComponent(
                 modifier = Modifier
                     .width(100.dp)
                     .testTag("historical_step_limit")
+            )
+        }
+    }
+
+    Row(
+        modifier = Modifier.padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(
+            checked = updatedOptions.extraBody != null,
+            onCheckedChange = { enabled: Boolean ->
+                updatedOptionsChanged(
+                    updatedOptions.copy(extraBody = if (enabled) JsonObject(emptyMap()) else null)
+                )
+            },
+            modifier = Modifier.testTag("use_extra_request_params")
+        )
+        Text("Use Extra Body", modifier = Modifier.padding(start = 8.dp))
+    }
+    if (updatedOptions.extraBody != null) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Extra Body (JSON)", modifier = Modifier.padding(end = 8.dp))
+            val uriHandler = LocalUriHandler.current
+            IconActionButton(
+                key = AllIconsKeys.General.Information,
+                onClick = {
+                    uriHandler.openUri(uri = "https://platform.openai.com/docs/api-reference/chat/create")
+                },
+                modifier = Modifier.testTag("extra_request_params_info"),
+                contentDescription = "Extra Request Params Info",
+                hint = Size(16)
+            ) {
+                Text("Add custom JSON fields to the API request body. For example: {\"reasoning_effort\": \"high\"} for OpenAI o3/5.1 models.")
+            }
+        }
+        var jsonParseError by remember { mutableStateOf<String?>(null) }
+        val textFieldState = rememberTextFieldState(
+            updatedOptions.extraBody?.toString() ?: "{}"
+        )
+        // Sync TextField when extraBody changes externally (e.g., switching scenarios)
+        LaunchedEffect(updatedOptions.extraBody) {
+            val newText = updatedOptions.extraBody?.toString() ?: "{}"
+            if (textFieldState.text.toString() != newText) {
+                textFieldState.edit {
+                    replace(0, length, newText)
+                }
+            }
+        }
+        LaunchedEffect(textFieldState.text) {
+            val text = textFieldState.text.toString()
+            if (text.isBlank() || text == "{}") {
+                jsonParseError = null
+                updatedOptionsChanged(
+                    updatedOptions.copy(extraBody = JsonObject(emptyMap()))
+                )
+            } else {
+                try {
+                    val parsed = Json.parseToJsonElement(text)
+                    if (parsed is JsonObject) {
+                        jsonParseError = null
+                        updatedOptionsChanged(
+                            updatedOptions.copy(extraBody = parsed)
+                        )
+                    } else {
+                        jsonParseError = "Expected a JSON object, not ${parsed::class.simpleName}"
+                    }
+                } catch (e: Exception) {
+                    jsonParseError = e.message ?: "Invalid JSON"
+                }
+            }
+        }
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextField(
+                state = textFieldState,
+                modifier = Modifier
+                    .width(300.dp)
+                    .testTag("extra_request_params")
+            )
+            jsonParseError?.let { error ->
+                IconActionButton(
+                    key = AllIconsKeys.General.Warning,
+                    onClick = {},
+                    modifier = Modifier
+                        .padding(start = 4.dp)
+                        .testTag("extra_request_params_error"),
+                    contentDescription = "JSON Parse Error",
+                    hint = Size(16)
+                ) {
+                    Text(error)
+                }
+            }
+        }
+        if (jsonParseError != null) {
+            Text(
+                text = "Invalid JSON",
+                color = JewelTheme.colorPalette.red(8),
+                modifier = Modifier
+                    .padding(horizontal = 8.dp)
+                    .testTag("extra_request_params_error_text")
             )
         }
     }

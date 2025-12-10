@@ -3,6 +3,9 @@ package io.github.takahirom.arbigent.sample.test
 import io.github.takahirom.arbigent.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -448,6 +451,100 @@ Previous steps:
     val task = scenarioOnly.agentTasks[0]
     assertEquals(1, task.additionalActions.size, "Scenario should have 1 additional action")
     assertEquals("ClickWithText", task.additionalActions[0])
+  }
+
+  private val projectWithExtraRequestParams = ArbigentProjectSerializer().load(
+    """
+    settings:
+      aiOptions:
+        extraBody:
+          reasoning:
+            effort: "high"
+    scenarios:
+    - id: "use-project-params"
+      goal: "Test using project params"
+    - id: "override-params"
+      goal: "Test overriding params"
+      aiOptions:
+        extraBody:
+          reasoning:
+            effort: "low"
+    - id: "merge-params"
+      goal: "Test merging params"
+      aiOptions:
+        extraBody:
+          max_tokens: 1000
+    """
+  )
+
+  @Test
+  fun testExtraRequestParams() {
+    val projectSettings = projectWithExtraRequestParams.settings
+    val projectAiOptions = projectSettings.aiOptions
+    assertNotNull(projectAiOptions, "Project aiOptions should not be null")
+    assertNotNull(projectAiOptions.extraBody, "Project extraBody should not be null")
+
+    // Test scenario using project params
+    val scenarioUsingProject = projectWithExtraRequestParams.scenarioContents.createArbigentScenario(
+      projectSettings = projectSettings,
+      scenario = projectWithExtraRequestParams.scenarioContents[0],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
+    )
+    val projectParamsTask = scenarioUsingProject.agentTasks[0].agentConfig.aiOptions
+    assertNotNull(projectParamsTask?.extraBody, "Scenario should have extraBody from project")
+
+    // Test scenario overriding params
+    val scenarioOverriding = projectWithExtraRequestParams.scenarioContents.createArbigentScenario(
+      projectSettings = projectSettings,
+      scenario = projectWithExtraRequestParams.scenarioContents[1],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
+    )
+    val overridingTask = scenarioOverriding.agentTasks[0].agentConfig.aiOptions
+    assertNotNull(overridingTask?.extraBody, "Scenario should have extraBody")
+    val reasoningObj = overridingTask?.extraBody?.get("reasoning") as? JsonObject
+    assertNotNull(reasoningObj, "Should have reasoning object")
+    assertEquals(JsonPrimitive("low"), reasoningObj["effort"], "Should override to 'low'")
+
+    // Test scenario merging params
+    val scenarioMerging = projectWithExtraRequestParams.scenarioContents.createArbigentScenario(
+      projectSettings = projectSettings,
+      scenario = projectWithExtraRequestParams.scenarioContents[2],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
+    )
+    val mergingTask = scenarioMerging.agentTasks[0].agentConfig.aiOptions
+    assertNotNull(mergingTask?.extraBody, "Scenario should have merged extraBody")
+    // Should have both reasoning and max_tokens
+    assertNotNull(mergingTask?.extraBody?.get("reasoning"), "Should have reasoning from project")
+    assertNotNull(mergingTask?.extraBody?.get("max_tokens"), "Should have max_tokens from scenario")
+  }
+
+  @Test
+  fun testAiOptionsMerge() {
+    val base = ArbigentAiOptions(
+      temperature = 0.5,
+      extraBody = buildJsonObject {
+        put("reasoning", buildJsonObject {
+          put("effort", JsonPrimitive("high"))
+        })
+      }
+    )
+    val overlay = ArbigentAiOptions(
+      extraBody = buildJsonObject {
+        put("max_tokens", JsonPrimitive(1000))
+      }
+    )
+    val merged = base.mergeWith(overlay)
+
+    assertEquals(0.5, merged.temperature, "Temperature should be preserved from base")
+    assertNotNull(merged.extraBody, "Merged should have extraBody")
+    assertNotNull(merged.extraBody?.get("reasoning"), "Should have reasoning from base")
+    assertNotNull(merged.extraBody?.get("max_tokens"), "Should have max_tokens from overlay")
   }
 
 }
