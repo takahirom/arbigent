@@ -271,7 +271,8 @@ public class MaestroDevice(
           allTreeString = viewHierarchy.toString(),
           optimizedTreeString = viewHierarchy.toOptimizedString(
             deviceInfo = maestro.cachedDeviceInfo
-          )
+          ),
+          appHints = viewHierarchy.root.findAllArbigentHints()
         )
       } catch (e: ArbigentElementList.NodeInBoundsNotFoundException) {
         arbigentDebugLog("NodeInBoundsNotFoundException. Retry $it")
@@ -699,6 +700,29 @@ private fun dfs(node: TreeNode, condition: (TreeNode) -> Boolean): TreeNode? {
     }
   }
   return null
+}
+
+private const val ARBIGENT_HINT_PREFIX = "ArbigentHint:"
+
+/**
+ * Collects all ArbigentHint entries from the tree.
+ * Apps can set contentDescription starting with "ArbigentHint:" to provide
+ * domain-specific context information to Arbigent.
+ *
+ * Example: view.contentDescription = "ArbigentHint:EpisodePlayer screen, playing episode"
+ *
+ * Multiple hints can be set on different views and all will be collected.
+ */
+public fun TreeNode.findAllArbigentHints(): List<String> {
+  val hints = mutableListOf<String>()
+
+  attributes["accessibilityText"]
+    ?.takeIf { it.startsWith(ARBIGENT_HINT_PREFIX) }
+    ?.removePrefix(ARBIGENT_HINT_PREFIX)
+    ?.let { hints.add(it) }
+
+  children.forEach { hints.addAll(it.findAllArbigentHints()) }
+  return hints
 }
 
 private fun StringBuilder.appendUiElementContents(

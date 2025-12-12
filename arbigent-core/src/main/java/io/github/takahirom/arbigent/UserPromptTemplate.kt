@@ -11,10 +11,11 @@ public class UserPromptTemplate(
         public const val UI_ELEMENTS: String = "{{UI_ELEMENTS}}"
         public const val FOCUSED_TREE: String = "{{FOCUSED_TREE}}"
         public const val ACTION_TEMPLATES: String = "{{ACTION_TEMPLATES}}"
+        public const val APP_HINTS: String = "{{APP_HINTS}}"
 
         public val DEFAULT_TEMPLATE: String = """
 <GOAL>$USER_INPUT_GOAL</GOAL>
-
+$APP_HINTS
 <STEP>
 Current step: $CURRENT_STEP
 Step limit: $MAX_STEP
@@ -54,7 +55,8 @@ Based on the above, decide on the next action to achieve the goal. Please ensure
         )
         val optionalPlaceholders = listOf(
             UI_ELEMENTS,
-            FOCUSED_TREE
+            FOCUSED_TREE,
+            APP_HINTS
         )
         val missingRequiredPlaceholders = requiredPlaceholders.filter { !template.contains(it) }
         if (missingRequiredPlaceholders.isNotEmpty()) {
@@ -83,7 +85,11 @@ Based on the above, decide on the next action to achieve the goal. Please ensure
         steps: String,
         uiElements: String = "",
         focusedTree: String = "",
+        appHints: List<String> = emptyList(),
     ): String {
+        val appHintsText = if (appHints.isNotEmpty()) {
+            "\n<HINT_FROM_APP>\n${appHints.joinToString("\n") { "- $it" }}\n</HINT_FROM_APP>"
+        } else ""
         return template
             .replace(USER_INPUT_GOAL, goal)
             .replace(CURRENT_STEP, currentStep.toString())
@@ -91,5 +97,6 @@ Based on the above, decide on the next action to achieve the goal. Please ensure
             .replace(STEPS, steps)
             .replace(UI_ELEMENTS, uiElements)
             .replace(FOCUSED_TREE, focusedTree)
+            .replace(APP_HINTS, appHintsText)
     }
 }

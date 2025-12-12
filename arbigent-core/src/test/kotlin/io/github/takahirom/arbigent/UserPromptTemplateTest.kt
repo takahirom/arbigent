@@ -3,6 +3,8 @@ package io.github.takahirom.arbigent
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class UserPromptTemplateTest {
     @Test
@@ -111,7 +113,56 @@ Based on the above, decide on the next action to achieve the goal. Please ensure
     }
 
     @Test
-    fun showDefaultTemplate() {
-        println(UserPromptTemplate.DEFAULT_TEMPLATE)
+    fun testDefaultTemplateWithAppHints() {
+        val template = UserPromptTemplate(UserPromptTemplate.DEFAULT_TEMPLATE)
+
+        val result = template.format(
+            goal = "Test goal",
+            currentStep = 1,
+            maxStep = 5,
+            steps = "Step 1: Action",
+            appHints = listOf("First hint", "Second hint")
+        )
+
+        assertTrue(result.contains("<HINT_FROM_APP>"))
+        assertTrue(result.contains("- First hint"))
+        assertTrue(result.contains("- Second hint"))
+        assertTrue(result.contains("</HINT_FROM_APP>"))
+    }
+
+    @Test
+    fun testDefaultTemplateWithEmptyAppHints() {
+        val template = UserPromptTemplate(UserPromptTemplate.DEFAULT_TEMPLATE)
+
+        val result = template.format(
+            goal = "Test goal",
+            currentStep = 1,
+            maxStep = 5,
+            steps = "Step 1: Action",
+            appHints = emptyList()
+        )
+
+        assertFalse(result.contains("<HINT_FROM_APP>"))
+        assertFalse(result.contains("</HINT_FROM_APP>"))
+    }
+
+    @Test
+    fun testHintsPositionInTemplate() {
+        val template = UserPromptTemplate(UserPromptTemplate.DEFAULT_TEMPLATE)
+
+        val result = template.format(
+            goal = "Test goal",
+            currentStep = 1,
+            maxStep = 5,
+            steps = "Step 1: Action",
+            appHints = listOf("Test hint")
+        )
+
+        val goalEndIndex = result.indexOf("</GOAL>")
+        val hintIndex = result.indexOf("<HINT_FROM_APP>")
+        val stepIndex = result.indexOf("<STEP>")
+
+        assertTrue(goalEndIndex < hintIndex, "Hints should appear after GOAL")
+        assertTrue(hintIndex < stepIndex, "Hints should appear before STEP")
     }
 }
