@@ -100,6 +100,7 @@ public data class ArbigentAgentTaskStepResult(
 public data class ArbigentUiTreeStrings(
   val allTreeString: String,
   val optimizedTreeString: String,
+  val appHints: List<String> = emptyList(),
 )
 
 @Serializable
