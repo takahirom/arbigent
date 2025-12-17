@@ -96,7 +96,8 @@ public class ArbigentContextHolder(
   public fun prompt(
     uiElements: String,
     focusedTree: String,
-    aiOptions: ArbigentAiOptions
+    aiOptions: ArbigentAiOptions,
+    appHints: List<String> = emptyList(),
   ): String {
     return userPromptTemplate.format(
       goal = goal,
@@ -105,6 +106,7 @@ public class ArbigentContextHolder(
       steps = getStepsText(aiOptions),
       uiElements = uiElements,
       focusedTree = focusedTree,
+      appHints = appHints,
     )
   }
 
