@@ -90,19 +90,21 @@ Furthermore, I wanted to make Arbigent accessible to QA engineers by offering a 
         * Interact with various other custom tools and services
 * **AI Hints - App-Provided Context:**
     * Apps can provide domain-specific hints to help the AI understand the current screen better.
-    * Embed hints in `contentDescription` using the `[[aihint:...]]` format:
+    * Embed hints in the accessibility label using the `[[aihint:...]]` format:
       ```kotlin
-      // Hint only
-      view.contentDescription = "[[aihint:Video player, buffering]]"
-
-      // Coexisting with accessibility label
-      view.contentDescription = "Play button [[aihint:Video player, currently buffering]]"
-
-      // Structured data (JSON)
-      view.contentDescription = """[[aihint:{"screen":"player","state":"buffering"}]]"""
+      // Android (contentDescription)
+      view.contentDescription = "Play button [[aihint:Video player, buffering]]"
+      ```
+      ```swift
+      // iOS (accessibilityLabel)
+      button.accessibilityLabel = "Play button [[aihint:Video player, buffering]]"
+      ```
+      ```html
+      <!-- Web (aria-label) -->
+      <button aria-label="Play button [[aihint:Video player, buffering]]">Play</button>
       ```
     * The `[[...]]` format allows hints to coexist with accessibility labels and supports structured data like JSON.
-    * **Note:** Since this uses `contentDescription`, it affects screen readers. Enable hints only during testing via Intent flag or debug BuildConfig to avoid accessibility issues in production.
+    * **Note:** Since this uses accessibility labels, it affects screen readers (TalkBack, VoiceOver, etc.). Enable hints only during testing to avoid accessibility issues in production.
 
 **VI. Community & Open Source**
 
