@@ -220,7 +220,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
         elements = elements,
         aiOptions = decisionInput.aiOptions ?: ArbigentAiOptions(),
         tools = decisionInput.mcpTools,
-        appHints = uiTreeStrings.appHints,
+        aiHints = uiTreeStrings.aiHints,
       )
     val imageDetail = decisionInput.aiOptions?.imageDetail?.name?.lowercase()
     arbigentDebugLog { "AI imageDetailOption: $imageDetail" }
@@ -344,7 +344,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     elements: ArbigentElementList,
     aiOptions: ArbigentAiOptions,
     tools: List<MCPTool>? = null,
-    appHints: List<String> = emptyList(),
+    aiHints: List<String> = emptyList(),
   ): String {
     val focusedTreeText = focusedTree.orEmpty().ifBlank { "No focused tree" }
     val uiElements = elements.getPromptTexts().ifBlank { "No UI elements to select. Please check the image." }
@@ -353,7 +353,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
       uiElements = uiElements,
       focusedTree = focusedTreeText,
       aiOptions = aiOptions,
-      appHints = appHints,
+      aiHints = aiHints,
     )
   }
 

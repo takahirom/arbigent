@@ -88,12 +88,20 @@ Furthermore, I wanted to make Arbigent accessible to QA engineers by offering a 
         * Check server logs (e.g., user behavior) using external tools
         * Retrieve debug logs
         * Interact with various other custom tools and services
-* **ArbigentHint - App-Provided Context:**
+* **AI Hints - App-Provided Context:**
     * Apps can provide domain-specific hints to help the AI understand the current screen better.
-    * Set `contentDescription` with `ArbigentHint:` prefix:
+    * Embed hints in `contentDescription` using the `[[aihint:...]]` format:
       ```kotlin
-      view.contentDescription = "ArbigentHint:Video player, buffering"
+      // Hint only
+      view.contentDescription = "[[aihint:Video player, buffering]]"
+
+      // Coexisting with accessibility label
+      view.contentDescription = "Play button [[aihint:Video player, currently buffering]]"
+
+      // Structured data (JSON)
+      view.contentDescription = """[[aihint:{"screen":"player","state":"buffering"}]]"""
       ```
+    * The `[[...]]` format allows hints to coexist with accessibility labels and supports structured data like JSON.
     * **Note:** Since this uses `contentDescription`, it affects screen readers. Enable hints only during testing via Intent flag or debug BuildConfig to avoid accessibility issues in production.
 
 **VI. Community & Open Source**

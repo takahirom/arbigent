@@ -272,7 +272,7 @@ public class MaestroDevice(
           optimizedTreeString = viewHierarchy.toOptimizedString(
             deviceInfo = maestro.cachedDeviceInfo
           ),
-          appHints = viewHierarchy.root.findAllArbigentHints()
+          aiHints = viewHierarchy.root.findAllAiHints()
         )
       } catch (e: ArbigentElementList.NodeInBoundsNotFoundException) {
         arbigentDebugLog("NodeInBoundsNotFoundException. Retry $it")
@@ -702,26 +702,38 @@ private fun dfs(node: TreeNode, condition: (TreeNode) -> Boolean): TreeNode? {
   return null
 }
 
-private const val ARBIGENT_HINT_PREFIX = "ArbigentHint:"
+private const val AI_HINT_PREFIX = "[[aihint:"
+private const val AI_HINT_SUFFIX = "]]"
 
 /**
- * Collects all ArbigentHint entries from the tree.
- * Apps can set contentDescription starting with "ArbigentHint:" to provide
+ * Collects all AI hints from the tree.
+ * Apps can embed hints in contentDescription using the [[aihint:...]] format to provide
  * domain-specific context information to Arbigent.
  *
- * Example: view.contentDescription = "ArbigentHint:EpisodePlayer screen, playing episode"
+ * Example: view.contentDescription = "Play button [[aihint:Video player, currently buffering]]"
  *
- * Multiple hints can be set on different views and all will be collected.
+ * The hint can be placed anywhere in the contentDescription, allowing coexistence with
+ * accessibility labels. Multiple hints can be set on different views and all will be collected.
+ *
+ * Hints can contain structured data like JSON:
+ * Example: view.contentDescription = "[[aihint:{\"screen\":\"player\",\"state\":\"buffering\"}]]"
  */
-public fun TreeNode.findAllArbigentHints(): List<String> {
+public fun TreeNode.findAllAiHints(): List<String> {
   val hints = mutableListOf<String>()
 
-  attributes["accessibilityText"]
-    ?.takeIf { it.startsWith(ARBIGENT_HINT_PREFIX) }
-    ?.removePrefix(ARBIGENT_HINT_PREFIX)
-    ?.let { hints.add(it) }
+  attributes["accessibilityText"]?.let { text ->
+    val startIndex = text.indexOf(AI_HINT_PREFIX)
+    if (startIndex >= 0) {
+      // Find the closing ]] after the opening [[aihint:
+      val endIndex = text.indexOf(AI_HINT_SUFFIX, startIndex + AI_HINT_PREFIX.length)
+      if (endIndex > startIndex) {
+        val hint = text.substring(startIndex + AI_HINT_PREFIX.length, endIndex)
+        hints.add(hint)
+      }
+    }
+  }
 
-  children.forEach { hints.addAll(it.findAllArbigentHints()) }
+  children.forEach { hints.addAll(it.findAllAiHints()) }
   return hints
 }
 
