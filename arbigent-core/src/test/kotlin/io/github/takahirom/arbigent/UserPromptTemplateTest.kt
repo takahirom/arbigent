@@ -113,7 +113,7 @@ Based on the above, decide on the next action to achieve the goal. Please ensure
     }
 
     @Test
-    fun testDefaultTemplateWithAppHints() {
+    fun testDefaultTemplateWithAiHints() {
         val template = UserPromptTemplate(UserPromptTemplate.DEFAULT_TEMPLATE)
 
         val result = template.format(
@@ -121,17 +121,17 @@ Based on the above, decide on the next action to achieve the goal. Please ensure
             currentStep = 1,
             maxStep = 5,
             steps = "Step 1: Action",
-            appHints = listOf("First hint", "Second hint")
+            aiHints = listOf("First hint", "Second hint")
         )
 
-        assertTrue(result.contains("<HINT_FROM_APP>"))
+        assertTrue(result.contains("<AI_HINTS>"))
         assertTrue(result.contains("- First hint"))
         assertTrue(result.contains("- Second hint"))
-        assertTrue(result.contains("</HINT_FROM_APP>"))
+        assertTrue(result.contains("</AI_HINTS>"))
     }
 
     @Test
-    fun testDefaultTemplateWithEmptyAppHints() {
+    fun testDefaultTemplateWithEmptyAiHints() {
         val template = UserPromptTemplate(UserPromptTemplate.DEFAULT_TEMPLATE)
 
         val result = template.format(
@@ -139,11 +139,11 @@ Based on the above, decide on the next action to achieve the goal. Please ensure
             currentStep = 1,
             maxStep = 5,
             steps = "Step 1: Action",
-            appHints = emptyList()
+            aiHints = emptyList()
         )
 
-        assertFalse(result.contains("<HINT_FROM_APP>"))
-        assertFalse(result.contains("</HINT_FROM_APP>"))
+        assertFalse(result.contains("<AI_HINTS>"))
+        assertFalse(result.contains("</AI_HINTS>"))
     }
 
     @Test
@@ -155,11 +155,11 @@ Based on the above, decide on the next action to achieve the goal. Please ensure
             currentStep = 1,
             maxStep = 5,
             steps = "Step 1: Action",
-            appHints = listOf("Test hint")
+            aiHints = listOf("Test hint")
         )
 
         val goalEndIndex = result.indexOf("</GOAL>")
-        val hintIndex = result.indexOf("<HINT_FROM_APP>")
+        val hintIndex = result.indexOf("<AI_HINTS>")
         val stepIndex = result.indexOf("<STEP>")
 
         assertTrue(goalEndIndex < hintIndex, "Hints should appear after GOAL")
