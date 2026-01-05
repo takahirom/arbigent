@@ -95,6 +95,75 @@ public sealed interface ArbigentAvailableDevice {
     }
   }
 
+  public class RealIOS(
+    private val deviceName: String,
+    private val udid: String,
+    private val port: Int = 6001,  // maestro-ios-device default port
+    private val host: String = "[::1]",
+  ) : ArbigentAvailableDevice {
+    override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Ios
+    override val name: String = deviceName
+    override fun connectToDevice(): ArbigentDevice {
+      // For real devices with maestro-ios-device daemon
+      arbigentInfoLog("Connecting to real iOS device $deviceName ($udid) via maestro-ios-device on port $port")
+
+      // Create a passthrough installer that connects to existing maestro-ios-device server
+      // Based on Maestro PR #2856 approach for real device support
+      val passThroughInstaller = object : xcuitest.installer.XCTestInstaller {
+        override fun start(): XCTestClient {
+          arbigentInfoLog("Connecting to existing maestro-ios-device XCTest server at $host:$port")
+          return XCTestClient(host, port)
+        }
+
+        override fun uninstall(): Boolean {
+          arbigentInfoLog("Skipping XCTest uninstall for real device (managed by maestro-ios-device)")
+          return true
+        }
+
+        override fun close() {
+          arbigentInfoLog("Closing connection to maestro-ios-device")
+        }
+
+        override fun isChannelAlive(): Boolean {
+          // maestro-ios-device manages the channel, assume alive
+          return true
+        }
+
+        override val preBuiltRunner: Boolean
+          get() = true  // maestro-ios-device already has the runner built and installed
+      }
+
+      val xcTestDriverClient = XCTestDriverClient(
+        installer = passThroughInstaller,
+        client = XCTestClient(host, port),
+      )
+
+      val xcTestDevice = XCTestIOSDevice(
+        deviceId = udid,
+        client = xcTestDriverClient,
+        getInstalledApps = { XCRunnerCLIUtils.listApps(udid) },
+      )
+
+      // For real devices, use the regular SimctlIOSDevice
+      // Note: simctl operations will fail, but maestro-ios-device handles the actual device operations
+      arbigentInfoLog("Note: simctl operations (clearState, addMedia, etc.) are not supported on real devices")
+      val simctlDevice = SimctlIOSDevice(udid)
+
+      return MaestroDevice(
+        Maestro.ios(
+          IOSDriver(
+            LocalIOSDevice(
+              deviceId = udid,
+              xcTestDevice = xcTestDevice,
+              simctlIOSDevice = simctlDevice
+            )
+          )
+        ),
+        availableDevice = this
+      )
+    }
+  }
+
   public class Web : ArbigentAvailableDevice {
     override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Web
     override val name: String = "Chrome"
