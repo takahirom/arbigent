@@ -358,6 +358,7 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
         maxStep = nodeScenario.maxStep,
         deviceFormFactor = effectiveDeviceFormFactor,
         additionalActions = mergedAdditionalActions,
+        mcpOptions = nodeScenario.mcpOptions,
         agentConfig = AgentConfigBuilder(
           prompt = projectSettings.prompt,
           scenarioType = nodeScenario.type,
@@ -411,7 +412,8 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
     tags = scenario.tags,
     deviceFormFactor = effectiveScenarioDeviceFormFactor,
     isLeaf = this.none { it.dependencyId == scenario.id },
-    cacheOptions = scenario.cacheOptions
+    cacheOptions = scenario.cacheOptions,
+    mcpOptions = scenario.mcpOptions
   )
 }
 
@@ -453,7 +455,8 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
   public val userPromptTemplate: String = UserPromptTemplate.DEFAULT_TEMPLATE,
   public val aiOptions: ArbigentAiOptions? = null,
   public val cacheOptions: ArbigentScenarioCacheOptions? = null,
-  public val additionalActions: List<String>? = null
+  public val additionalActions: List<String>? = null,
+  public val mcpOptions: ArbigentMcpOptions? = null
 ) {
   @Serializable
   public sealed interface CleanupData {

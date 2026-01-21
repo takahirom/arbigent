@@ -169,6 +169,7 @@ public data class ArbigentScenario(
   // Even if we only run leaf scenarios, we can run all scenarios.
   val isLeaf: Boolean,
   val cacheOptions: ArbigentScenarioCacheOptions? = null,
+  val mcpOptions: ArbigentMcpOptions? = null,
 ) {
   public fun goal(): String? {
     return agentTasks.lastOrNull()?.goal

@@ -35,6 +35,8 @@ constructor(
   private val _additionalActions = MutableStateFlow<List<String>?>(null)
   val additionalActionsFlow: StateFlow<List<String>?> = _additionalActions
 
+  private val _mcpOptions = MutableStateFlow<ArbigentMcpOptions?>(null)
+  val mcpOptionsFlow: StateFlow<ArbigentMcpOptions?> = _mcpOptions
 
   val goalState = TextFieldState("")
   val goal get() = goalState.text.toString()
@@ -165,6 +167,10 @@ constructor(
     _additionalActions.value = actions
   }
 
+  fun onMcpOptionsChanged(options: ArbigentMcpOptions?) {
+    _mcpOptions.value = options
+  }
+
   fun createArbigentScenarioContent(): ArbigentScenarioContent {
     return ArbigentScenarioContent(
       id = id,
@@ -186,7 +192,8 @@ constructor(
       userPromptTemplate = userUserPromptTemplateState.text.toString(),
       aiOptions = aiOptionsFlow.value,
       cacheOptions = cacheOptionsFlow.value,
-      additionalActions = additionalActionsFlow.value
+      additionalActions = additionalActionsFlow.value,
+      mcpOptions = mcpOptionsFlow.value
     )
   }
 
@@ -219,6 +226,7 @@ constructor(
     val cacheOptions = scenarioContent.cacheOptions
     _cacheOptions.value = cacheOptions
     _additionalActions.value = scenarioContent.additionalActions
+    _mcpOptions.value = scenarioContent.mcpOptions
   }
 
   fun onRemoveInitializationMethod(index: Int) {

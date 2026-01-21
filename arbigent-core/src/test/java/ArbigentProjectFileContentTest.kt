@@ -8,7 +8,9 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 
@@ -545,6 +547,80 @@ Previous steps:
     assertNotNull(merged.extraBody, "Merged should have extraBody")
     assertNotNull(merged.extraBody?.get("reasoning"), "Should have reasoning from base")
     assertNotNull(merged.extraBody?.get("max_tokens"), "Should have max_tokens from overlay")
+  }
+
+  private val projectWithMcpOptions = ArbigentProjectSerializer().load(
+    """
+    scenarios:
+    - id: "mcp-all"
+      goal: "Test MCP all servers enabled"
+    - id: "mcp-specific"
+      goal: "Test MCP specific servers"
+      mcpOptions:
+        enabledMcpServers:
+          - name: "filesystem"
+          - name: "github"
+    - id: "mcp-disabled"
+      goal: "Test MCP disabled"
+      mcpOptions:
+        enabledMcpServers: []
+    """
+  )
+
+  @Test
+  fun testMcpOptions() {
+    // Test scenario with all MCP servers enabled (default)
+    val scenarioWithAllMcp = projectWithMcpOptions.scenarioContents.createArbigentScenario(
+      projectSettings = ArbigentProjectSettings(),
+      scenario = projectWithMcpOptions.scenarioContents[0],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
+    )
+    assertNull(scenarioWithAllMcp.mcpOptions, "MCP options should be null (all servers enabled)")
+
+    // Test scenario with specific MCP servers enabled
+    val scenarioWithSpecificMcp = projectWithMcpOptions.scenarioContents.createArbigentScenario(
+      projectSettings = ArbigentProjectSettings(),
+      scenario = projectWithMcpOptions.scenarioContents[1],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
+    )
+    assertNotNull(scenarioWithSpecificMcp.mcpOptions, "MCP options should not be null")
+    assertEquals(2, scenarioWithSpecificMcp.mcpOptions?.enabledMcpServers?.size, "Should have 2 enabled servers")
+    assertTrue(scenarioWithSpecificMcp.mcpOptions?.isServerEnabled("filesystem") == true, "filesystem should be enabled")
+    assertTrue(scenarioWithSpecificMcp.mcpOptions?.isServerEnabled("github") == true, "github should be enabled")
+    assertTrue(scenarioWithSpecificMcp.mcpOptions?.isServerEnabled("database") == false, "database should be disabled")
+
+    // Test scenario with MCP disabled
+    val scenarioWithMcpDisabled = projectWithMcpOptions.scenarioContents.createArbigentScenario(
+      projectSettings = ArbigentProjectSettings(),
+      scenario = projectWithMcpOptions.scenarioContents[2],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
+    )
+    assertNotNull(scenarioWithMcpDisabled.mcpOptions, "MCP options should not be null")
+    assertEquals(0, scenarioWithMcpDisabled.mcpOptions?.enabledMcpServers?.size, "Should have 0 enabled servers")
+    assertTrue(scenarioWithMcpDisabled.mcpOptions?.isServerEnabled("filesystem") == false, "filesystem should be disabled")
+  }
+
+  @Test
+  fun testMcpOptionsIsServerEnabled() {
+    // null = all enabled
+    val optionsNull = ArbigentMcpOptions(enabledMcpServers = null)
+    assertTrue(optionsNull.isServerEnabled("any-server"), "null should enable all servers")
+
+    // empty = all disabled
+    val optionsEmpty = ArbigentMcpOptions(enabledMcpServers = emptyList())
+    assertFalse(optionsEmpty.isServerEnabled("any-server"), "empty list should disable all servers")
+
+    // specific list
+    val optionsSpecific = ArbigentMcpOptions(enabledMcpServers = listOf(EnabledMcpServer("server1"), EnabledMcpServer("server2")))
+    assertTrue(optionsSpecific.isServerEnabled("server1"), "server1 should be enabled")
+    assertTrue(optionsSpecific.isServerEnabled("server2"), "server2 should be enabled")
+    assertFalse(optionsSpecific.isServerEnabled("server3"), "server3 should be disabled")
   }
 
 }

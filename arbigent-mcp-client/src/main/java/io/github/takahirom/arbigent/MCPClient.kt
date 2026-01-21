@@ -137,6 +137,52 @@ public class MCPClient(
   }
 
   /**
+   * Returns the list of tools filtered by enabled server names.
+   *
+   * @param jsonSchemaType The JSON schema type for tool definitions.
+   * @param enabledServerNames List of enabled server names. If null, all servers enabled. If empty, all disabled.
+   * @return List of available tools filtered by enabledServerNames.
+   */
+  public suspend fun tools(
+    jsonSchemaType: ClientConnection.JsonSchemaType,
+    enabledServerNames: List<String>?
+  ): List<MCPTool> {
+    val allTools = tools(jsonSchemaType)
+
+    // If enabledServerNames is null, return all tools (backward compatible)
+    if (enabledServerNames == null) {
+      return allTools
+    }
+
+    // If enabledServerNames is empty, return no tools (all disabled)
+    if (enabledServerNames.isEmpty()) {
+      return emptyList()
+    }
+
+    // Filter tools based on enabled servers
+    return allTools.filter { tool ->
+      tool.serverName in enabledServerNames
+    }
+  }
+
+  /**
+   * Returns the list of server names from the JSON configuration.
+   * This can be used by UI to display available servers for selection.
+   *
+   * @return List of server names defined in the configuration.
+   */
+  public fun getServerNames(): List<String> {
+    return try {
+      val config = json.parseToJsonElement(jsonString).jsonObject
+      val mcpServers = config["mcpServers"]?.jsonObject
+      mcpServers?.keys?.toList() ?: emptyList()
+    } catch (e: Exception) {
+      logger.w { "Error parsing MCP configuration for server names: ${e.message}" }
+      emptyList()
+    }
+  }
+
+  /**
    * Executes a tool with the given arguments on the specified MCP server.
    *
    * @param mcpTool The tool to execute, including server information.

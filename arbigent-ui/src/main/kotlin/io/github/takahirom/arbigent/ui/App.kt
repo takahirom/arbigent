@@ -194,7 +194,8 @@ private fun MainScreen(
           },
           getFixedScenarioById = { scenarioId ->
             appStateHolder.getFixedScenarioById(scenarioId)
-          }
+          },
+          mcpServerNames = appStateHolder.mcpServerNamesFlow.collectAsState().value
         )
       }
     }

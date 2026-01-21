@@ -78,6 +78,7 @@ fun Scenario(
   onRemove: (ArbigentScenarioStateHolder) -> Unit,
   onShowFixedScenariosDialog: (ArbigentScenarioStateHolder, Int) -> Unit = { _, _ -> },
   getFixedScenarioById: (String) -> FixedScenario? = { null },
+  mcpServerNames: List<String> = emptyList(),
 ) {
   val arbigentScenarioExecutor: ArbigentScenarioExecutor? by scenarioStateHolder.arbigentScenarioExecutorStateFlow.collectAsState()
   val scenarioType by scenarioStateHolder.scenarioTypeStateFlow.collectAsState()
@@ -216,7 +217,7 @@ fun Scenario(
             .verticalScroll(rememberScrollState())
             .wrapContentHeight(unbounded = true)
         ) {
-          ScenarioOptions(scenarioStateHolder, scenarioCountById, dependencyScenarioMenu, onShowFixedScenariosDialog, getFixedScenarioById)
+          ScenarioOptions(scenarioStateHolder, scenarioCountById, dependencyScenarioMenu, onShowFixedScenariosDialog, getFixedScenarioById, mcpServerNames)
         }
       }
     }
@@ -431,7 +432,8 @@ private fun ScenarioOptions(
   scenarioCountById: (String) -> Int,
   dependencyScenarioMenu: MenuScope.() -> Unit,
   onShowFixedScenariosDialog: (ArbigentScenarioStateHolder, Int) -> Unit = { _, _ -> },
-  getFixedScenarioById: (String) -> FixedScenario? = { null }
+  getFixedScenarioById: (String) -> FixedScenario? = { null },
+  mcpServerNames: List<String> = emptyList()
 ) {
   val updatedScenarioStateHolder by rememberUpdatedState(scenarioStateHolder)
   GroupHeader("Fundamental options")
@@ -462,6 +464,19 @@ private fun ScenarioOptions(
           onCheckedChange = { disabled ->
             updatedScenarioStateHolder.onOverrideCacheForceDisabledChanged(disabled)
           }
+        )
+      }
+    }
+    if (mcpServerNames.isNotEmpty()) {
+      Column(
+        modifier = Modifier.padding(8.dp).width(240.dp)
+      ) {
+        GroupHeader("MCP Options")
+        val mcpOptions by updatedScenarioStateHolder.mcpOptionsFlow.collectAsState()
+        io.github.takahirom.arbigent.ui.components.McpOptionsComponent(
+          currentOptions = mcpOptions,
+          availableServers = mcpServerNames,
+          onOptionsChanged = updatedScenarioStateHolder::onMcpOptionsChanged
         )
       }
     }
