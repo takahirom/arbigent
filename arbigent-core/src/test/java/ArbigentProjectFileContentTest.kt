@@ -552,75 +552,65 @@ Previous steps:
   private val projectWithMcpOptions = ArbigentProjectSerializer().load(
     """
     scenarios:
-    - id: "mcp-all"
-      goal: "Test MCP all servers enabled"
-    - id: "mcp-specific"
-      goal: "Test MCP specific servers"
+    - id: "mcp-default"
+      goal: "Test MCP using project defaults"
+    - id: "mcp-overrides"
+      goal: "Test MCP with overrides"
       mcpOptions:
-        enabledMcpServers:
+        mcpServerOptions:
           - name: "filesystem"
+            enable: true
           - name: "github"
-    - id: "mcp-disabled"
-      goal: "Test MCP disabled"
-      mcpOptions:
-        enabledMcpServers: []
+            enable: false
     """
   )
 
   @Test
   fun testMcpOptions() {
-    // Test scenario with all MCP servers enabled (default)
-    val scenarioWithAllMcp = projectWithMcpOptions.scenarioContents.createArbigentScenario(
+    // Test scenario with project defaults (no overrides)
+    val scenarioWithDefaults = projectWithMcpOptions.scenarioContents.createArbigentScenario(
       projectSettings = ArbigentProjectSettings(),
       scenario = projectWithMcpOptions.scenarioContents[0],
       aiFactory = { FakeAi() },
       deviceFactory = { FakeDevice() },
       aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
     )
-    assertNull(scenarioWithAllMcp.mcpOptions, "MCP options should be null (all servers enabled)")
+    assertNull(scenarioWithDefaults.mcpOptions, "MCP options should be null (use project defaults)")
 
-    // Test scenario with specific MCP servers enabled
-    val scenarioWithSpecificMcp = projectWithMcpOptions.scenarioContents.createArbigentScenario(
+    // Test scenario with MCP overrides
+    val scenarioWithOverrides = projectWithMcpOptions.scenarioContents.createArbigentScenario(
       projectSettings = ArbigentProjectSettings(),
       scenario = projectWithMcpOptions.scenarioContents[1],
       aiFactory = { FakeAi() },
       deviceFactory = { FakeDevice() },
       aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
     )
-    assertNotNull(scenarioWithSpecificMcp.mcpOptions, "MCP options should not be null")
-    assertEquals(2, scenarioWithSpecificMcp.mcpOptions?.enabledMcpServers?.size, "Should have 2 enabled servers")
-    assertTrue(scenarioWithSpecificMcp.mcpOptions?.isServerEnabled("filesystem") == true, "filesystem should be enabled")
-    assertTrue(scenarioWithSpecificMcp.mcpOptions?.isServerEnabled("github") == true, "github should be enabled")
-    assertTrue(scenarioWithSpecificMcp.mcpOptions?.isServerEnabled("database") == false, "database should be disabled")
-
-    // Test scenario with MCP disabled
-    val scenarioWithMcpDisabled = projectWithMcpOptions.scenarioContents.createArbigentScenario(
-      projectSettings = ArbigentProjectSettings(),
-      scenario = projectWithMcpOptions.scenarioContents[2],
-      aiFactory = { FakeAi() },
-      deviceFactory = { FakeDevice() },
-      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
-    )
-    assertNotNull(scenarioWithMcpDisabled.mcpOptions, "MCP options should not be null")
-    assertEquals(0, scenarioWithMcpDisabled.mcpOptions?.enabledMcpServers?.size, "Should have 0 enabled servers")
-    assertTrue(scenarioWithMcpDisabled.mcpOptions?.isServerEnabled("filesystem") == false, "filesystem should be disabled")
+    assertNotNull(scenarioWithOverrides.mcpOptions, "MCP options should not be null")
+    assertEquals(2, scenarioWithOverrides.mcpOptions?.mcpServerOptions?.size, "Should have 2 overrides")
+    assertEquals(true, scenarioWithOverrides.mcpOptions?.getServerOverride("filesystem"), "filesystem should be overridden to enabled")
+    assertEquals(false, scenarioWithOverrides.mcpOptions?.getServerOverride("github"), "github should be overridden to disabled")
+    assertNull(scenarioWithOverrides.mcpOptions?.getServerOverride("database"), "database should not be overridden (use default)")
   }
 
   @Test
-  fun testMcpOptionsIsServerEnabled() {
-    // null = all enabled
-    val optionsNull = ArbigentMcpOptions(enabledMcpServers = null)
-    assertTrue(optionsNull.isServerEnabled("any-server"), "null should enable all servers")
+  fun testMcpOptionsGetServerOverride() {
+    // null/empty = no overrides (use project defaults)
+    val optionsNull = ArbigentMcpOptions(mcpServerOptions = null)
+    assertNull(optionsNull.getServerOverride("any-server"), "null options should return null (use default)")
 
-    // empty = all disabled
-    val optionsEmpty = ArbigentMcpOptions(enabledMcpServers = emptyList())
-    assertFalse(optionsEmpty.isServerEnabled("any-server"), "empty list should disable all servers")
+    val optionsEmpty = ArbigentMcpOptions(mcpServerOptions = emptyList())
+    assertNull(optionsEmpty.getServerOverride("any-server"), "empty options should return null (use default)")
 
-    // specific list
-    val optionsSpecific = ArbigentMcpOptions(enabledMcpServers = listOf(EnabledMcpServer("server1"), EnabledMcpServer("server2")))
-    assertTrue(optionsSpecific.isServerEnabled("server1"), "server1 should be enabled")
-    assertTrue(optionsSpecific.isServerEnabled("server2"), "server2 should be enabled")
-    assertFalse(optionsSpecific.isServerEnabled("server3"), "server3 should be disabled")
+    // specific overrides
+    val optionsWithOverrides = ArbigentMcpOptions(
+      mcpServerOptions = listOf(
+        McpServerOption(name = "server1", enable = true),
+        McpServerOption(name = "server2", enable = false)
+      )
+    )
+    assertEquals(true, optionsWithOverrides.getServerOverride("server1"), "server1 should be overridden to enabled")
+    assertEquals(false, optionsWithOverrides.getServerOverride("server2"), "server2 should be overridden to disabled")
+    assertNull(optionsWithOverrides.getServerOverride("server3"), "server3 should not be overridden")
   }
 
 }

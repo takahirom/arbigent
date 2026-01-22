@@ -4,33 +4,31 @@ import kotlinx.serialization.Serializable
 
 /**
  * Configuration options for controlling MCP server behavior at the scenario level.
+ * Uses an override approach: only servers listed here are overridden from project defaults.
  */
 @Serializable
 public data class ArbigentMcpOptions(
     /**
-     * List of enabled MCP servers for this scenario.
-     * - null: All servers enabled (default, backward compatible)
-     * - empty list: All MCP disabled
-     * - non-empty list: Only listed servers are enabled
+     * List of MCP server options that override project defaults.
+     * - null or empty: Use project defaults for all servers
+     * - non-empty: Override listed servers with specified enable/disable state
      */
-    val enabledMcpServers: List<EnabledMcpServer>? = null
+    val mcpServerOptions: List<McpServerOption>? = null
 ) {
     /**
      * Check if a specific server is enabled based on the configuration.
+     * If the server is not in the override list, returns null (use default).
      */
-    public fun isServerEnabled(serverName: String): Boolean = when {
-        enabledMcpServers == null -> true   // null means all enabled
-        enabledMcpServers.isEmpty() -> false // empty means all disabled
-        else -> enabledMcpServers.any { it.name == serverName }
+    public fun getServerOverride(serverName: String): Boolean? {
+        return mcpServerOptions?.find { it.name == serverName }?.enable
     }
 }
 
 /**
- * Represents an enabled MCP server configuration.
- * Using an object instead of a plain string for future extensibility
- * (e.g., adding timeout, custom environment variables per server).
+ * Represents an MCP server option override.
  */
 @Serializable
-public data class EnabledMcpServer(
-    val name: String
+public data class McpServerOption(
+    val name: String,
+    val enable: Boolean
 )

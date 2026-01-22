@@ -1212,14 +1212,27 @@ private suspend fun step(
     )
   }
 
-  // Get tools from MCPClient if available, filtered by mcpOptions
-  val tools = stepInput.mcpClient?.tools(
+  // Get tools from MCPClient if available, filtered by mcpOptions (overrides) and project defaults
+  val allTools = stepInput.mcpClient?.tools(
     jsonSchemaType = when (stepInput.ai.jsonSchemaType()) {
       ArbigentAi.JsonSchemaType.OpenAI -> ClientConnection.JsonSchemaType.OpenAI
       ArbigentAi.JsonSchemaType.GeminiOpenAICompatible -> ClientConnection.JsonSchemaType.GeminiOpenAICompatible
-    },
-    enabledServerNames = stepInput.mcpOptions?.enabledMcpServers?.map { it.name }
+    }
   )
+  // Apply filtering: scenario overrides take precedence over project defaults
+  val tools = allTools?.filter { tool ->
+    // Check if there's a scenario-level override for this server
+    val override = stepInput.mcpOptions?.getServerOverride(tool.serverName)
+    if (override != null) {
+      // Use the override value
+      override
+    } else {
+      // No override, use project default from mcpJson's 'enabled' field
+      val projectDefaults = stepInput.mcpClient?.getDefaultEnabledServerNames()
+      // If projectDefaults is null, all servers are enabled by default
+      projectDefaults == null || tool.serverName in projectDefaults
+    }
+  }
 
   val decisionInput = ArbigentAi.DecisionInput(
     stepId = stepId,
