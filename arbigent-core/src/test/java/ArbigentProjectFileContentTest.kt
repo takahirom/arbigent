@@ -613,4 +613,98 @@ Previous steps:
     assertNull(optionsWithOverrides.getServerOverride("server3"), "server3 should not be overridden")
   }
 
+  /**
+   * Tests the MCP filtering logic that combines project defaults and scenario overrides.
+   * This simulates the filtering logic in ArbigentAgent.kt (lines 1222-1235).
+   */
+  private fun simulateMcpFilteringLogic(
+    mcpOptions: ArbigentMcpOptions?,
+    projectDefaults: List<String>?,
+    serverName: String
+  ): Boolean {
+    val override = mcpOptions?.getServerOverride(serverName)
+    return if (override != null) {
+      override
+    } else {
+      projectDefaults == null || serverName in projectDefaults
+    }
+  }
+
+  @Test
+  fun testMcpFilteringLogic_ProjectDisabledButOverrideEnabled() {
+    // Scenario: github is disabled at project level, but override enables it
+    val mcpOptions = ArbigentMcpOptions(
+      mcpServerOptions = listOf(
+        McpServerOption(name = "github", enable = true)  // Override to enable
+      )
+    )
+    // Project defaults: only "filesystem" is enabled (github is disabled)
+    val projectDefaults = listOf("filesystem")
+
+    val isEnabled = simulateMcpFilteringLogic(mcpOptions, projectDefaults, "github")
+    assertTrue(isEnabled, "Server should be enabled when override is true, even if project default is disabled")
+  }
+
+  @Test
+  fun testMcpFilteringLogic_ProjectEnabledButOverrideDisabled() {
+    // Scenario: all servers enabled by default, but override disables filesystem
+    val mcpOptions = ArbigentMcpOptions(
+      mcpServerOptions = listOf(
+        McpServerOption(name = "filesystem", enable = false)  // Override to disable
+      )
+    )
+    // null = all servers enabled by default
+    val projectDefaults: List<String>? = null
+
+    val isEnabled = simulateMcpFilteringLogic(mcpOptions, projectDefaults, "filesystem")
+    assertFalse(isEnabled, "Server should be disabled when override is false")
+  }
+
+  @Test
+  fun testMcpFilteringLogic_NoOverrideUsesProjectDefault() {
+    // Scenario: filesystem has no override, should use project default
+    val mcpOptions = ArbigentMcpOptions(
+      mcpServerOptions = listOf(
+        McpServerOption(name = "github", enable = true)  // Only github has override
+      )
+    )
+    // Project defaults: only filesystem is enabled
+    val projectDefaults = listOf("filesystem")
+
+    val isEnabled = simulateMcpFilteringLogic(mcpOptions, projectDefaults, "filesystem")
+    assertTrue(isEnabled, "Server without override should use project default (enabled)")
+
+    val isGithubEnabled = simulateMcpFilteringLogic(mcpOptions, projectDefaults, "github")
+    assertTrue(isGithubEnabled, "github should be enabled via override")
+
+    val isDatabaseEnabled = simulateMcpFilteringLogic(mcpOptions, projectDefaults, "database")
+    assertFalse(isDatabaseEnabled, "database should be disabled (not in project defaults, no override)")
+  }
+
+  @Test
+  fun testMcpFilteringLogic_NullMcpOptionsUsesProjectDefault() {
+    // Scenario: no scenario-level mcpOptions, use project defaults
+    val mcpOptions: ArbigentMcpOptions? = null
+    val projectDefaults = listOf("filesystem")
+
+    val isFilesystemEnabled = simulateMcpFilteringLogic(mcpOptions, projectDefaults, "filesystem")
+    assertTrue(isFilesystemEnabled, "filesystem should be enabled (in project defaults)")
+
+    val isGithubEnabled = simulateMcpFilteringLogic(mcpOptions, projectDefaults, "github")
+    assertFalse(isGithubEnabled, "github should be disabled (not in project defaults)")
+  }
+
+  @Test
+  fun testMcpFilteringLogic_AllServersEnabledByDefault() {
+    // Scenario: no project defaults (null) = all enabled
+    val mcpOptions: ArbigentMcpOptions? = null
+    val projectDefaults: List<String>? = null
+
+    val isFilesystemEnabled = simulateMcpFilteringLogic(mcpOptions, projectDefaults, "filesystem")
+    assertTrue(isFilesystemEnabled, "All servers should be enabled when no project defaults")
+
+    val isGithubEnabled = simulateMcpFilteringLogic(mcpOptions, projectDefaults, "github")
+    assertTrue(isGithubEnabled, "All servers should be enabled when no project defaults")
+  }
+
 }
