@@ -559,9 +559,9 @@ Previous steps:
       mcpOptions:
         mcpServerOptions:
           - name: "filesystem"
-            enable: true
+            enabled: true
           - name: "github"
-            enable: false
+            enabled: false
     """
   )
 
@@ -604,8 +604,8 @@ Previous steps:
     // specific overrides
     val optionsWithOverrides = ArbigentMcpOptions(
       mcpServerOptions = listOf(
-        McpServerOption(name = "server1", enable = true),
-        McpServerOption(name = "server2", enable = false)
+        McpServerOption(name = "server1", enabled = true),
+        McpServerOption(name = "server2", enabled = false)
       )
     )
     assertEquals(true, optionsWithOverrides.getServerOverride("server1"), "server1 should be overridden to enabled")
@@ -635,7 +635,7 @@ Previous steps:
     // Scenario: github is disabled at project level, but override enables it
     val mcpOptions = ArbigentMcpOptions(
       mcpServerOptions = listOf(
-        McpServerOption(name = "github", enable = true)  // Override to enable
+        McpServerOption(name = "github", enabled = true)  // Override to enable
       )
     )
     // Project defaults: only "filesystem" is enabled (github is disabled)
@@ -650,7 +650,7 @@ Previous steps:
     // Scenario: all servers enabled by default, but override disables filesystem
     val mcpOptions = ArbigentMcpOptions(
       mcpServerOptions = listOf(
-        McpServerOption(name = "filesystem", enable = false)  // Override to disable
+        McpServerOption(name = "filesystem", enabled = false)  // Override to disable
       )
     )
     // null = all servers enabled by default
@@ -665,7 +665,7 @@ Previous steps:
     // Scenario: filesystem has no override, should use project default
     val mcpOptions = ArbigentMcpOptions(
       mcpServerOptions = listOf(
-        McpServerOption(name = "github", enable = true)  // Only github has override
+        McpServerOption(name = "github", enabled = true)  // Only github has override
       )
     )
     // Project defaults: only filesystem is enabled

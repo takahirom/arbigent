@@ -88,16 +88,16 @@ fun McpOptionsComponent(
 
             // Enable checkbox
             CheckboxRow(
-              checked = option.enable,
-              onCheckedChange = { newEnable ->
+              checked = option.enabled,
+              onCheckedChange = { newEnabled ->
                 val newOverrides = overrides.map {
-                  if (it.name == option.name) it.copy(enable = newEnable) else it
+                  if (it.name == option.name) it.copy(enabled = newEnabled) else it
                 }
                 onOptionsChanged(ArbigentMcpOptions(mcpServerOptions = newOverrides))
               },
-              modifier = Modifier.testTag("mcp_override_enable_${option.name}")
+              modifier = Modifier.testTag("mcp_override_enabled_${option.name}")
             ) {
-              Text(if (option.enable) "Enabled" else "Disabled")
+              Text(if (option.enabled) "Enabled" else "Disabled")
             }
 
             // Delete button
@@ -157,7 +157,7 @@ fun McpOptionsComponent(
             key = AllIconsKeys.General.Add,
             onClick = {
               selectedServerToAdd?.let { serverName ->
-                val newOverrides = overrides + McpServerOption(name = serverName, enable = false)
+                val newOverrides = overrides + McpServerOption(name = serverName, enabled = false)
                 onOptionsChanged(ArbigentMcpOptions(mcpServerOptions = newOverrides))
                 selectedServerToAdd = null
                 showAddRow = false

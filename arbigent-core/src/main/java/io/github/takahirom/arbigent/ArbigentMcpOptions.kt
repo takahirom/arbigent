@@ -20,7 +20,7 @@ public data class ArbigentMcpOptions(
      * If the server is not in the override list, returns null (use default).
      */
     public fun getServerOverride(serverName: String): Boolean? {
-        return mcpServerOptions?.find { it.name == serverName }?.enable
+        return mcpServerOptions?.find { it.name == serverName }?.enabled
     }
 }
 
@@ -30,5 +30,5 @@ public data class ArbigentMcpOptions(
 @Serializable
 public data class McpServerOption(
     val name: String,
-    val enable: Boolean
+    val enabled: Boolean
 )

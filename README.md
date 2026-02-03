@@ -106,9 +106,9 @@ Furthermore, I wanted to make Arbigent accessible to QA engineers by offering a 
             mcpOptions:
               mcpServerOptions:
                 - name: "github"
-                  enable: true   # Override: enable for this scenario
+                  enabled: true   # Override: enable for this scenario
                 - name: "filesystem"
-                  enable: false  # Override: disable for this scenario
+                  enabled: false  # Override: disable for this scenario
           ```
         * Servers without overrides use project defaults. If no `enabled` field exists, the server is enabled by default.
 * **AI Hints - App-Provided Context:**
