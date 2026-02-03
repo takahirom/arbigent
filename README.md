@@ -88,6 +88,29 @@ Furthermore, I wanted to make Arbigent accessible to QA engineers by offering a 
         * Check server logs (e.g., user behavior) using external tools
         * Retrieve debug logs
         * Interact with various other custom tools and services
+    * **MCP Server Control:**
+        * **Project-level defaults:** Use the `enabled` field in MCP JSON to disable servers by default:
+          ```json
+          {
+            "mcpServers": {
+              "filesystem": { "command": "npx", "args": ["..."] },
+              "github": { "command": "npx", "args": ["..."], "enabled": false }
+            }
+          }
+          ```
+        * **Scenario-level overrides:** Override project defaults per scenario using `mcpOptions`:
+          ```yaml
+          scenarios:
+          - id: "my-scenario"
+            goal: "Test with specific MCP servers"
+            mcpOptions:
+              mcpServerOptions:
+                - name: "github"
+                  enable: true   # Override: enable for this scenario
+                - name: "filesystem"
+                  enable: false  # Override: disable for this scenario
+          ```
+        * Servers without overrides use project defaults. If no `enabled` field exists, the server is enabled by default.
 * **AI Hints - App-Provided Context:**
     * Apps can provide domain-specific hints to help the AI understand the current screen better.
     * Embed hints in the accessibility label using the `[[aihint:...]]` format:
