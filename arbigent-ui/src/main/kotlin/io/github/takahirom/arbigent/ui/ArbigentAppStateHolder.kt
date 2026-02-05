@@ -389,28 +389,45 @@ class ArbigentAppStateHolder(
   }
 
   private val arbigentProjectSerializer = ArbigentProjectSerializer()
+
+  // Track dirty state for unsaved changes warning
+  private var lastSavedYaml: String? = null
+
+  private fun getCurrentProjectFileContent(): ArbigentProjectFileContent {
+    val sortedScenarios = sortedScenariosAndDepthsStateFlow.value.map { it.first }
+    return ArbigentProjectFileContent(
+      settings = ArbigentProjectSettings(
+        prompt = promptFlow.value,
+        cacheStrategy = cacheStrategyFlow.value,
+        aiOptions = aiOptionsFlow.value,
+        mcpJson = mcpJsonFlow.value,
+        deviceFormFactor = defaultDeviceFormFactorFlow.value,
+        additionalActions = additionalActionsFlow.value
+      ),
+      scenarioContents = sortedScenarios.map { it.createArbigentScenarioContent() },
+      fixedScenarios = _fixedScenariosFlow.value
+    )
+  }
+
+  private fun getCurrentContentAsYaml(): String {
+    return arbigentProjectSerializer.encodeToString(getCurrentProjectFileContent())
+  }
+
+  fun hasUnsavedChanges(): Boolean {
+    val saved = lastSavedYaml ?: return false
+    return getCurrentContentAsYaml() != saved
+  }
+
   fun saveProjectContents(file: File?) {
     if (file == null) {
       return
     }
-    val sortedScenarios = sortedScenariosAndDepthsStateFlow.value.map { it.first }
+    val content = getCurrentProjectFileContent()
     arbigentProjectSerializer.save(
-      projectFileContent = ArbigentProjectFileContent(
-        settings = ArbigentProjectSettings(
-          prompt = promptFlow.value,
-          cacheStrategy = cacheStrategyFlow.value,
-          aiOptions = aiOptionsFlow.value,
-          mcpJson = mcpJsonFlow.value,
-          deviceFormFactor = defaultDeviceFormFactorFlow.value,
-          additionalActions = additionalActionsFlow.value
-        ),
-        scenarioContents = sortedScenarios.map {
-          it.createArbigentScenarioContent()
-        },
-        fixedScenarios = _fixedScenariosFlow.value
-      ),
+      projectFileContent = content,
       file = file
     )
+    lastSavedYaml = arbigentProjectSerializer.encodeToString(content)
   }
 
   fun loadProjectContents(file: File?) {
@@ -450,6 +467,8 @@ class ArbigentAppStateHolder(
       appSettings = appSettings
     )
     allScenarioStateHoldersStateFlow.value = arbigentScenarioStateHolders
+    // Use the loaded content directly to avoid format differences
+    lastSavedYaml = arbigentProjectSerializer.encodeToString(projectFile)
   }
 
   fun cancel() {

@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindow
 import io.github.takahirom.arbigent.AiDecisionCacheStrategy
@@ -318,6 +319,8 @@ fun TestCompatibleDialog(
   onCloseRequest: () -> Unit,
   title: String,
   resizable: Boolean = true,
+  width: Dp = 520.dp,
+  height: Dp = 520.dp,
   content: @Composable () -> Unit
 ) {
   val isUiTest = LocalIsUiTest.current
@@ -334,8 +337,8 @@ fun TestCompatibleDialog(
       onCloseRequest = onCloseRequest,
       title = title,
       state = rememberDialogState(
-        width = 520.dp,
-        height = 520.dp
+        width = width,
+        height = height
       ),
       resizable = resizable,
       content = {

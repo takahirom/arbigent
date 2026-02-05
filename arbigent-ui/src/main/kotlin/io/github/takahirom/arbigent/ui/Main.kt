@@ -4,9 +4,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -101,11 +104,44 @@ fun AppWindow(
   appStateHolder: ArbigentAppStateHolder,
   onExit: () -> Unit,
 ) {
+  var showCloseConfirmDialog by remember { mutableStateOf(false) }
+  var pendingExitAfterSave by remember { mutableStateOf(false) }
+
+  // Watch for save completion to exit if pending
+  val projectDialogState by appStateHolder.projectDialogState.collectAsState()
+  LaunchedEffect(projectDialogState) {
+    if (pendingExitAfterSave && projectDialogState == ProjectDialogState.NotSelected) {
+      pendingExitAfterSave = false
+      onExit()
+    }
+  }
+
   AppTheme {
+    if (showCloseConfirmDialog) {
+      UnsavedChangesDialog(
+        onSave = {
+          showCloseConfirmDialog = false
+          pendingExitAfterSave = true
+          appStateHolder.projectDialogState.value = ProjectDialogState.SaveProjectContent
+        },
+        onDiscard = {
+          showCloseConfirmDialog = false
+          onExit()
+        },
+        onCancel = {
+          showCloseConfirmDialog = false
+        }
+      )
+    }
+
     DecoratedWindow(
       title = "App Test AI Agent",
       onCloseRequest = {
-        onExit()
+        if (appStateHolder.hasUnsavedChanges()) {
+          showCloseConfirmDialog = true
+        } else {
+          onExit()
+        }
       }) {
       CompositionLocalProvider(
         LocalWindowExceptionHandlerFactory provides object : WindowExceptionHandlerFactory {
