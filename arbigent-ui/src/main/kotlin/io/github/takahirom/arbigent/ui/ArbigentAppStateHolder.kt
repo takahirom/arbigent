@@ -2,6 +2,8 @@ package io.github.takahirom.arbigent.ui
 
 import io.github.takahirom.arbigent.*
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import io.github.takahirom.arbigent.result.StepFeedback
 import io.github.takahirom.arbigent.result.StepFeedbackEvent
 import androidx.compose.runtime.snapshotFlow
@@ -160,6 +162,13 @@ class ArbigentAppStateHolder(
   val cacheStrategyFlow = MutableStateFlow(CacheStrategy())
   val aiOptionsFlow = MutableStateFlow<ArbigentAiOptions?>(null)
   val mcpJsonFlow = MutableStateFlow("{}")
+  val mcpServerNamesFlow: StateFlow<List<String>> = mcpJsonFlow
+    .map { json -> parseMcpServerNames(json) }
+    .stateIn(
+      scope = CoroutineScope(ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob()),
+      started = SharingStarted.Eagerly,
+      initialValue = emptyList()
+    )
   val defaultDeviceFormFactorFlow =
     MutableStateFlow<ArbigentScenarioDeviceFormFactor>(ArbigentScenarioDeviceFormFactor.Unspecified)
   val additionalActionsFlow = MutableStateFlow<List<String>?>(null)
@@ -601,5 +610,16 @@ class ArbigentAppStateHolder(
 
   fun getAi(): ArbigentAi {
     return aiFactory()
+  }
+}
+
+private fun parseMcpServerNames(json: String): List<String> {
+  return try {
+    val jsonParser = Json { ignoreUnknownKeys = true }
+    val jsonElement = jsonParser.parseToJsonElement(json)
+    val mcpServers = jsonElement.jsonObject["mcpServers"]?.jsonObject
+    mcpServers?.keys?.toList() ?: emptyList()
+  } catch (e: Exception) {
+    emptyList()
   }
 }

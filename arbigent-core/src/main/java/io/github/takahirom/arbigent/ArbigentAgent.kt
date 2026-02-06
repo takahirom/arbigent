@@ -184,6 +184,7 @@ public class ArbigentAgent(
       goal = agentTask.goal,
       maxStep = agentTask.maxStep,
       mcpClient = mcpClient,
+      mcpOptions = agentTask.mcpOptions,
       agentActionTypes = actionTypes
     )
   }
@@ -193,7 +194,8 @@ public class ArbigentAgent(
     goal: String,
     maxStep: Int = 10,
     agentActionTypes: List<AgentActionType> = defaultAgentActionTypesForVisualMode(),
-    mcpClient: MCPClient
+    mcpClient: MCPClient,
+    mcpOptions: ArbigentMcpOptions? = null
   ) {
     // Resolve variables in the goal
     val resolvedGoal = if (appSettings?.variables != null) {
@@ -231,6 +233,7 @@ public class ArbigentAgent(
       imageAssertionChain = imageAssertionChain,
       executeActionChain = executeActionChain,
       mcpClient = mcpClient,
+      mcpOptions = mcpOptions,
     )
 
     when (executeChain(executeInput)) {
@@ -261,6 +264,7 @@ public class ArbigentAgent(
     val imageAssertionChain: (ArbigentAi.ImageAssertionInput) -> ArbigentAi.ImageAssertionOutput,
     val executeActionChain: suspend (ExecuteActionsInput) -> ExecuteActionsOutput,
     val mcpClient: MCPClient? = null,
+    val mcpOptions: ArbigentMcpOptions? = null,
   )
 
   public sealed interface ExecutionResult {
@@ -282,6 +286,7 @@ public class ArbigentAgent(
     val aiOptions: ArbigentAiOptions?,
     val cacheOptions: ArbigentScenarioCacheOptions = ArbigentScenarioCacheOptions(),
     val mcpClient: MCPClient? = null,
+    val mcpOptions: ArbigentMcpOptions? = null,
   )
 
   public sealed interface StepResult {
@@ -1083,7 +1088,8 @@ private suspend fun executeDefault(input: ExecuteInput): ExecutionResult {
         prompt = input.prompt,
         aiOptions = input.aiOptions,
         cacheOptions = input.cacheOptions,
-        mcpClient = input.mcpClient
+        mcpClient = input.mcpClient,
+        mcpOptions = input.mcpOptions
       )
       when (input.stepChain(stepInput)) {
         StepResult.GoalAchieved -> break
@@ -1206,13 +1212,27 @@ private suspend fun step(
     )
   }
 
-  // Get tools from MCPClient if available
-  val tools = stepInput.mcpClient?.tools(
-    when (stepInput.ai.jsonSchemaType()) {
+  // Get tools from MCPClient if available, filtered by mcpOptions (overrides) and project defaults
+  val allTools = stepInput.mcpClient?.tools(
+    jsonSchemaType = when (stepInput.ai.jsonSchemaType()) {
       ArbigentAi.JsonSchemaType.OpenAI -> ClientConnection.JsonSchemaType.OpenAI
       ArbigentAi.JsonSchemaType.GeminiOpenAICompatible -> ClientConnection.JsonSchemaType.GeminiOpenAICompatible
     }
   )
+  // Apply filtering: scenario overrides take precedence over project defaults
+  val tools = allTools?.filter { tool ->
+    // Check if there's a scenario-level override for this server
+    val override = stepInput.mcpOptions?.getServerOverride(tool.serverName)
+    if (override != null) {
+      // Use the override value
+      override
+    } else {
+      // No override, use project default from mcpJson's 'enabled' field
+      val projectDefaults = stepInput.mcpClient?.getDefaultEnabledServerNames()
+      // If projectDefaults is null, all servers are enabled by default
+      projectDefaults == null || tool.serverName in projectDefaults
+    }
+  }
 
   val decisionInput = ArbigentAi.DecisionInput(
     stepId = stepId,

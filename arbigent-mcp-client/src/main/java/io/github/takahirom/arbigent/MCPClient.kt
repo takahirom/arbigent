@@ -1,6 +1,7 @@
 package io.github.takahirom.arbigent
 
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import co.touchlab.kermit.Logger
@@ -134,6 +135,87 @@ public class MCPClient(
     }
 
     return allTools
+  }
+
+  /**
+   * Returns the list of tools filtered by enabled server names.
+   *
+   * @param jsonSchemaType The JSON schema type for tool definitions.
+   * @param enabledServerNames List of enabled server names. If null, all servers enabled. If empty, all disabled.
+   * @return List of available tools filtered by enabledServerNames.
+   */
+  public suspend fun tools(
+    jsonSchemaType: ClientConnection.JsonSchemaType,
+    enabledServerNames: List<String>?
+  ): List<MCPTool> {
+    val allTools = tools(jsonSchemaType)
+
+    // If enabledServerNames is null, return all tools (backward compatible)
+    if (enabledServerNames == null) {
+      return allTools
+    }
+
+    // If enabledServerNames is empty, return no tools (all disabled)
+    if (enabledServerNames.isEmpty()) {
+      return emptyList()
+    }
+
+    // Filter tools based on enabled servers
+    return allTools.filter { tool ->
+      tool.serverName in enabledServerNames
+    }
+  }
+
+  /**
+   * Returns the list of server names from the JSON configuration.
+   * This can be used by UI to display available servers for selection.
+   *
+   * @return List of server names defined in the configuration.
+   */
+  public fun getServerNames(): List<String> {
+    return try {
+      val config = json.parseToJsonElement(jsonString).jsonObject
+      val mcpServers = config["mcpServers"]?.jsonObject
+      mcpServers?.keys?.toList() ?: emptyList()
+    } catch (e: Exception) {
+      logger.w { "Error parsing MCP configuration for server names: ${e.message}" }
+      emptyList()
+    }
+  }
+
+  /**
+   * Returns the list of server names that are enabled by default based on the 'enabled' field.
+   * Servers without an 'enabled' field are considered enabled by default (backward compatible).
+   *
+   * This is an Arbigent-specific extension to the MCP JSON format.
+   *
+   * @return List of server names that are enabled by default. Returns null if all servers are enabled
+   *         (no server has 'enabled: false'), indicating no filtering is needed.
+   */
+  public fun getDefaultEnabledServerNames(): List<String>? {
+    return try {
+      val config = json.parseToJsonElement(jsonString).jsonObject
+      val mcpServers = config["mcpServers"]?.jsonObject ?: return null
+
+      // Check if any server has 'enabled: false'
+      val hasDisabledServer = mcpServers.any { (_, serverConfig) ->
+        serverConfig.jsonObject["enabled"]?.jsonPrimitive?.boolean == false
+      }
+
+      // If no server is disabled, return null to indicate all are enabled
+      if (!hasDisabledServer) {
+        return null
+      }
+
+      // Return only servers that are enabled (or don't have 'enabled' field, defaulting to true)
+      mcpServers.filter { (_, serverConfig) ->
+        val enabled = serverConfig.jsonObject["enabled"]?.jsonPrimitive?.boolean
+        enabled == null || enabled != false
+      }.keys.toList()
+    } catch (e: Exception) {
+      logger.w { "Error parsing MCP configuration for default enabled servers: ${e.message}" }
+      null
+    }
   }
 
   /**

@@ -8,7 +8,9 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 
@@ -545,6 +547,164 @@ Previous steps:
     assertNotNull(merged.extraBody, "Merged should have extraBody")
     assertNotNull(merged.extraBody?.get("reasoning"), "Should have reasoning from base")
     assertNotNull(merged.extraBody?.get("max_tokens"), "Should have max_tokens from overlay")
+  }
+
+  private val projectWithMcpOptions = ArbigentProjectSerializer().load(
+    """
+    scenarios:
+    - id: "mcp-default"
+      goal: "Test MCP using project defaults"
+    - id: "mcp-overrides"
+      goal: "Test MCP with overrides"
+      mcpOptions:
+        mcpServerOptions:
+          - name: "filesystem"
+            enabled: true
+          - name: "github"
+            enabled: false
+    """
+  )
+
+  @Test
+  fun testMcpOptions() {
+    // Test scenario with project defaults (no overrides)
+    val scenarioWithDefaults = projectWithMcpOptions.scenarioContents.createArbigentScenario(
+      projectSettings = ArbigentProjectSettings(),
+      scenario = projectWithMcpOptions.scenarioContents[0],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
+    )
+    assertNull(scenarioWithDefaults.mcpOptions, "MCP options should be null (use project defaults)")
+
+    // Test scenario with MCP overrides
+    val scenarioWithOverrides = projectWithMcpOptions.scenarioContents.createArbigentScenario(
+      projectSettings = ArbigentProjectSettings(),
+      scenario = projectWithMcpOptions.scenarioContents[1],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
+    )
+    assertNotNull(scenarioWithOverrides.mcpOptions, "MCP options should not be null")
+    assertEquals(2, scenarioWithOverrides.mcpOptions?.mcpServerOptions?.size, "Should have 2 overrides")
+    assertEquals(true, scenarioWithOverrides.mcpOptions?.getServerOverride("filesystem"), "filesystem should be overridden to enabled")
+    assertEquals(false, scenarioWithOverrides.mcpOptions?.getServerOverride("github"), "github should be overridden to disabled")
+    assertNull(scenarioWithOverrides.mcpOptions?.getServerOverride("database"), "database should not be overridden (use default)")
+  }
+
+  @Test
+  fun testMcpOptionsGetServerOverride() {
+    // null/empty = no overrides (use project defaults)
+    val optionsNull = ArbigentMcpOptions(mcpServerOptions = null)
+    assertNull(optionsNull.getServerOverride("any-server"), "null options should return null (use default)")
+
+    val optionsEmpty = ArbigentMcpOptions(mcpServerOptions = emptyList())
+    assertNull(optionsEmpty.getServerOverride("any-server"), "empty options should return null (use default)")
+
+    // specific overrides
+    val optionsWithOverrides = ArbigentMcpOptions(
+      mcpServerOptions = listOf(
+        McpServerOption(name = "server1", enabled = true),
+        McpServerOption(name = "server2", enabled = false)
+      )
+    )
+    assertEquals(true, optionsWithOverrides.getServerOverride("server1"), "server1 should be overridden to enabled")
+    assertEquals(false, optionsWithOverrides.getServerOverride("server2"), "server2 should be overridden to disabled")
+    assertNull(optionsWithOverrides.getServerOverride("server3"), "server3 should not be overridden")
+  }
+
+  /**
+   * Tests the MCP filtering logic that combines project defaults and scenario overrides.
+   * This simulates the filtering logic in ArbigentAgent.kt (lines 1222-1235).
+   */
+  private fun simulateMcpFilteringLogic(
+    mcpOptions: ArbigentMcpOptions?,
+    projectDefaults: List<String>?,
+    serverName: String
+  ): Boolean {
+    val override = mcpOptions?.getServerOverride(serverName)
+    return if (override != null) {
+      override
+    } else {
+      projectDefaults == null || serverName in projectDefaults
+    }
+  }
+
+  @Test
+  fun testMcpFilteringLogic_ProjectDisabledButOverrideEnabled() {
+    // Scenario: github is disabled at project level, but override enables it
+    val mcpOptions = ArbigentMcpOptions(
+      mcpServerOptions = listOf(
+        McpServerOption(name = "github", enabled = true)  // Override to enable
+      )
+    )
+    // Project defaults: only "filesystem" is enabled (github is disabled)
+    val projectDefaults = listOf("filesystem")
+
+    val isEnabled = simulateMcpFilteringLogic(mcpOptions, projectDefaults, "github")
+    assertTrue(isEnabled, "Server should be enabled when override is true, even if project default is disabled")
+  }
+
+  @Test
+  fun testMcpFilteringLogic_ProjectEnabledButOverrideDisabled() {
+    // Scenario: all servers enabled by default, but override disables filesystem
+    val mcpOptions = ArbigentMcpOptions(
+      mcpServerOptions = listOf(
+        McpServerOption(name = "filesystem", enabled = false)  // Override to disable
+      )
+    )
+    // null = all servers enabled by default
+    val projectDefaults: List<String>? = null
+
+    val isEnabled = simulateMcpFilteringLogic(mcpOptions, projectDefaults, "filesystem")
+    assertFalse(isEnabled, "Server should be disabled when override is false")
+  }
+
+  @Test
+  fun testMcpFilteringLogic_NoOverrideUsesProjectDefault() {
+    // Scenario: filesystem has no override, should use project default
+    val mcpOptions = ArbigentMcpOptions(
+      mcpServerOptions = listOf(
+        McpServerOption(name = "github", enabled = true)  // Only github has override
+      )
+    )
+    // Project defaults: only filesystem is enabled
+    val projectDefaults = listOf("filesystem")
+
+    val isEnabled = simulateMcpFilteringLogic(mcpOptions, projectDefaults, "filesystem")
+    assertTrue(isEnabled, "Server without override should use project default (enabled)")
+
+    val isGithubEnabled = simulateMcpFilteringLogic(mcpOptions, projectDefaults, "github")
+    assertTrue(isGithubEnabled, "github should be enabled via override")
+
+    val isDatabaseEnabled = simulateMcpFilteringLogic(mcpOptions, projectDefaults, "database")
+    assertFalse(isDatabaseEnabled, "database should be disabled (not in project defaults, no override)")
+  }
+
+  @Test
+  fun testMcpFilteringLogic_NullMcpOptionsUsesProjectDefault() {
+    // Scenario: no scenario-level mcpOptions, use project defaults
+    val mcpOptions: ArbigentMcpOptions? = null
+    val projectDefaults = listOf("filesystem")
+
+    val isFilesystemEnabled = simulateMcpFilteringLogic(mcpOptions, projectDefaults, "filesystem")
+    assertTrue(isFilesystemEnabled, "filesystem should be enabled (in project defaults)")
+
+    val isGithubEnabled = simulateMcpFilteringLogic(mcpOptions, projectDefaults, "github")
+    assertFalse(isGithubEnabled, "github should be disabled (not in project defaults)")
+  }
+
+  @Test
+  fun testMcpFilteringLogic_AllServersEnabledByDefault() {
+    // Scenario: no project defaults (null) = all enabled
+    val mcpOptions: ArbigentMcpOptions? = null
+    val projectDefaults: List<String>? = null
+
+    val isFilesystemEnabled = simulateMcpFilteringLogic(mcpOptions, projectDefaults, "filesystem")
+    assertTrue(isFilesystemEnabled, "All servers should be enabled when no project defaults")
+
+    val isGithubEnabled = simulateMcpFilteringLogic(mcpOptions, projectDefaults, "github")
+    assertTrue(isGithubEnabled, "All servers should be enabled when no project defaults")
   }
 
 }

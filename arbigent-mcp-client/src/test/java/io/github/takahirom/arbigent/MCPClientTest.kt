@@ -5,6 +5,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class MCPClientTest {
     @Test
@@ -88,4 +89,76 @@ class MCPClientTest {
         }
         assertEquals("[MCP server not available]", result.content)
     }
+
+    @Test
+    fun `test getDefaultEnabledServerNames returns null when all servers enabled`() {
+        val jsonString = """
+        {
+          "mcpServers": {
+            "filesystem": { "command": "npx", "args": ["-y", "@anthropic/mcp-filesystem"] },
+            "github": { "command": "npx", "args": ["-y", "@anthropic/mcp-github"] }
+          }
+        }
+        """.trimIndent()
+
+        val mcpClient = MCPClient(jsonString, DefaultArbigentAppSettings)
+        val result = mcpClient.getDefaultEnabledServerNames()
+
+        // null means all servers are enabled (no filtering needed)
+        assertNull(result)
+    }
+
+    @Test
+    fun `test getDefaultEnabledServerNames returns enabled servers when some disabled`() {
+        val jsonString = """
+        {
+          "mcpServers": {
+            "filesystem": { "command": "npx", "args": ["-y", "@anthropic/mcp-filesystem"] },
+            "github": { "command": "npx", "args": ["-y", "@anthropic/mcp-github"], "enabled": false }
+          }
+        }
+        """.trimIndent()
+
+        val mcpClient = MCPClient(jsonString, DefaultArbigentAppSettings)
+        val result = mcpClient.getDefaultEnabledServerNames()
+
+        // Should return only enabled servers
+        assertEquals(listOf("filesystem"), result)
+    }
+
+    @Test
+    fun `test getDefaultEnabledServerNames handles explicit enabled true`() {
+        val jsonString = """
+        {
+          "mcpServers": {
+            "filesystem": { "command": "npx", "args": [], "enabled": true },
+            "github": { "command": "npx", "args": [], "enabled": false }
+          }
+        }
+        """.trimIndent()
+
+        val mcpClient = MCPClient(jsonString, DefaultArbigentAppSettings)
+        val result = mcpClient.getDefaultEnabledServerNames()
+
+        assertEquals(listOf("filesystem"), result)
+    }
+
+    @Test
+    fun `test getDefaultEnabledServerNames returns empty when all disabled`() {
+        val jsonString = """
+        {
+          "mcpServers": {
+            "filesystem": { "command": "npx", "args": [], "enabled": false },
+            "github": { "command": "npx", "args": [], "enabled": false }
+          }
+        }
+        """.trimIndent()
+
+        val mcpClient = MCPClient(jsonString, DefaultArbigentAppSettings)
+        val result = mcpClient.getDefaultEnabledServerNames()
+
+        // Empty list = all servers disabled by default
+        assertEquals(emptyList<String>(), result)
+    }
+
 }
