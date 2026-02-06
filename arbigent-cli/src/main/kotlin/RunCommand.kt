@@ -29,8 +29,6 @@ import com.jakewharton.mosaic.ui.Column
 import com.jakewharton.mosaic.ui.Row
 import com.jakewharton.mosaic.ui.Text
 import io.github.takahirom.arbigent.*
-import io.ktor.client.request.*
-import io.ktor.util.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -112,22 +110,6 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     }
     .default(ArbigentShard(1, 1))
 
-  private fun file(workingDirectory: String?, fileName: String): File {
-    return if (workingDirectory.isNullOrBlank()) {
-      File(fileName)
-    } else {
-      File(workingDirectory, fileName)
-    }
-  }
-
-  private fun file(workingDirectory: String?, fileDir: String, fileName: String): File {
-    return if (workingDirectory.isNullOrBlank()) {
-      File(fileDir, fileName)
-    } else {
-      File(workingDirectory, fileDir + File.separator + fileName)
-    }
-  }
-
   override fun run() {
     // If a subcommand (like "task") was invoked, let it handle execution
     if (currentContext.invokedSubcommand != null) return
@@ -136,38 +118,9 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     if (projectFile == null) {
       throw CliktError("Missing option '--project-file'. Please provide a project file path via command line argument or in .arbigent/settings.local.yml")
     }
-    
-    // Validate AI configuration based on selected AI type
-    val currentAiType = aiType
-    when (currentAiType) {
-      is OpenAIAiConfig -> {
-        if (currentAiType.openAiApiKey.isNullOrBlank()) {
-          throw CliktError("Missing OpenAI API key. Please provide via --openai-api-key, OPENAI_API_KEY environment variable, or in .arbigent/settings.local.yml")
-        }
-      }
-      is GeminiAiConfig -> {
-        if (currentAiType.geminiApiKey.isNullOrBlank()) {
-          throw CliktError("Missing Gemini API key. Please provide via --gemini-api-key, GEMINI_API_KEY environment variable, or in .arbigent/settings.local.yml")
-        }
-      }
-      is AzureOpenAiConfig -> {
-        if (currentAiType.azureOpenAIEndpoint.isNullOrBlank()) {
-          throw CliktError("Missing Azure OpenAI endpoint. Please provide via --azure-openai-endpoint or in .arbigent/settings.local.yml")
-        }
-        if (currentAiType.azureOpenAIKey.isNullOrBlank()) {
-          throw CliktError("Missing Azure OpenAI API key. Please provide via --azure-openai-api-key, AZURE_OPENAI_API_KEY environment variable, or in .arbigent/settings.local.yml")
-        }
-      }
-    }
-    
-    // Set log level early to avoid unwanted debug logs
-    arbigentLogLevel =
-      ArbigentLogLevel.entries.find { it.name.toLowerCasePreservingASCIIRules() == logLevel.toLowerCasePreservingASCIIRules() }
-        ?: throw IllegalArgumentException(
-          "Invalid log level. The log level should be one of ${
-            ArbigentLogLevel.entries
-              .joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
-          }")
+
+    validateAiConfig(aiType)
+    applyLogLevel(logLevel)
     
     // Display loaded configuration values for debugging/testing
     arbigentDebugLog("=== Configuration Priority Demonstration ===")
@@ -182,44 +135,8 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     arbigentDebugLog("  log-level: $logLevel (Expected: debug from run.log-level)")
     arbigentDebugLog("==========================================")
     
-    val resultDir = file(workingDirectory, defaultResultPath)
-    resultDir.mkdirs()
-    ArbigentFiles.parentDir = resultDir.absolutePath
-    ArbigentFiles.screenshotsDir = File(resultDir, "screenshots")
-    ArbigentFiles.jsonlsDir = File(resultDir, "jsonls")
-    ArbigentFiles.logFile = file(workingDirectory, logFile)
-    ArbigentFiles.cacheDir = file(workingDirectory, defaultCachePath + File.separator + BuildConfig.VERSION_NAME)
-    ArbigentFiles.cacheDir.mkdirs()
-    val resultFile = File(resultDir, "result.yml")
-    val ai: ArbigentAi = aiType.let { aiType ->
-      when (aiType) {
-        is OpenAIAiConfig -> OpenAIAi(
-          apiKey = aiType.openAiApiKey!!, // Already validated above
-          baseUrl = aiType.openAiEndpoint,
-          modelName = aiType.openAiModelName,
-          loggingEnabled = aiApiLoggingEnabled,
-        )
-
-        is GeminiAiConfig -> OpenAIAi(
-          apiKey = aiType.geminiApiKey!!, // Already validated above
-          baseUrl = aiType.geminiEndpoint,
-          modelName = aiType.geminiModelName,
-          loggingEnabled = aiApiLoggingEnabled,
-          jsonSchemaType = ArbigentAi.JsonSchemaType.GeminiOpenAICompatible
-        )
-
-        is AzureOpenAiConfig -> OpenAIAi(
-          apiKey = aiType.azureOpenAIKey!!, // Already validated above
-          baseUrl = aiType.azureOpenAIEndpoint!!, // Already validated above
-          modelName = aiType.azureOpenAIModelName,
-          loggingEnabled = aiApiLoggingEnabled,
-          requestBuilderModifier = {
-            parameter("api-version", aiType.azureOpenAIApiVersion)
-            header("api-key", aiType.azureOpenAIKey!!)
-          }
-        )
-      }
-    }
+    val (resultDir, resultFile) = setupArbigentFiles(workingDirectory, logFile)
+    val ai = createAi(aiType, aiApiLoggingEnabled)
 
     var device: ArbigentDevice? = null
     val appSettings = CliAppSettings(
@@ -261,15 +178,7 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
 
     // Skip device connection in dry-run mode
     if (!dryRun) {
-      val os =
-        ArbigentDeviceOs.entries.find { it.name.toLowerCasePreservingASCIIRules() == os.toLowerCasePreservingASCIIRules() }
-          ?: throw IllegalArgumentException(
-            "Invalid OS. The OS should be one of ${
-              ArbigentDeviceOs.entries
-                .joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
-            }")
-      device = fetchAvailableDevicesByOs(os).firstOrNull()?.connectToDevice()
-        ?: throw IllegalArgumentException("No available device found")
+      device = connectDevice(os)
     }
     Runtime.getRuntime().addShutdownHook(object : Thread() {
       override fun run() {

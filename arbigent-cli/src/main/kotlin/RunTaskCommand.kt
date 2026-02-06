@@ -6,22 +6,16 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.github.ajalt.clikt.core.CliktCommand
-import com.github.ajalt.clikt.core.CliktError
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.groups.defaultByName
 import com.github.ajalt.clikt.parameters.groups.groupChoice
 import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.int
-import com.jakewharton.mosaic.layout.background
-import com.jakewharton.mosaic.layout.padding
-import com.jakewharton.mosaic.modifier.Modifier
 import com.jakewharton.mosaic.ui.Color.Companion.White
 import com.jakewharton.mosaic.ui.Column
 import com.jakewharton.mosaic.ui.Text
 import io.github.takahirom.arbigent.*
-import io.ktor.client.request.*
-import io.ktor.util.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import java.io.File
@@ -61,103 +55,13 @@ class ArbigentRunTaskCommand : CliktCommand(name = "task") {
   private val logFile by logFileOption()
   private val workingDirectory by workingDirectoryOption()
 
-  private fun file(workingDirectory: String?, fileName: String): File {
-    return if (workingDirectory.isNullOrBlank()) {
-      File(fileName)
-    } else {
-      File(workingDirectory, fileName)
-    }
-  }
-
-  private fun file(workingDirectory: String?, fileDir: String, fileName: String): File {
-    return if (workingDirectory.isNullOrBlank()) {
-      File(fileDir, fileName)
-    } else {
-      File(workingDirectory, fileDir + File.separator + fileName)
-    }
-  }
-
   override fun run() {
-    // Validate AI configuration based on selected AI type
-    val currentAiType = aiType
-    when (currentAiType) {
-      is OpenAIAiConfig -> {
-        if (currentAiType.openAiApiKey.isNullOrBlank()) {
-          throw CliktError("Missing OpenAI API key. Please provide via --openai-api-key, OPENAI_API_KEY environment variable, or in .arbigent/settings.local.yml")
-        }
-      }
-      is GeminiAiConfig -> {
-        if (currentAiType.geminiApiKey.isNullOrBlank()) {
-          throw CliktError("Missing Gemini API key. Please provide via --gemini-api-key, GEMINI_API_KEY environment variable, or in .arbigent/settings.local.yml")
-        }
-      }
-      is AzureOpenAiConfig -> {
-        if (currentAiType.azureOpenAIEndpoint.isNullOrBlank()) {
-          throw CliktError("Missing Azure OpenAI endpoint. Please provide via --azure-openai-endpoint or in .arbigent/settings.local.yml")
-        }
-        if (currentAiType.azureOpenAIKey.isNullOrBlank()) {
-          throw CliktError("Missing Azure OpenAI API key. Please provide via --azure-openai-api-key, AZURE_OPENAI_API_KEY environment variable, or in .arbigent/settings.local.yml")
-        }
-      }
-    }
+    validateAiConfig(aiType)
+    applyLogLevel(logLevel)
 
-    // Set log level early to avoid unwanted debug logs
-    arbigentLogLevel =
-      ArbigentLogLevel.entries.find { it.name.toLowerCasePreservingASCIIRules() == logLevel.toLowerCasePreservingASCIIRules() }
-        ?: throw IllegalArgumentException(
-          "Invalid log level. The log level should be one of ${
-            ArbigentLogLevel.entries
-              .joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
-          }")
-
-    val resultDir = file(workingDirectory, defaultResultPath)
-    resultDir.mkdirs()
-    ArbigentFiles.parentDir = resultDir.absolutePath
-    ArbigentFiles.screenshotsDir = File(resultDir, "screenshots")
-    ArbigentFiles.jsonlsDir = File(resultDir, "jsonls")
-    ArbigentFiles.logFile = file(workingDirectory, logFile)
-    ArbigentFiles.cacheDir = file(workingDirectory, defaultCachePath + File.separator + BuildConfig.VERSION_NAME)
-    ArbigentFiles.cacheDir.mkdirs()
-    val resultFile = File(resultDir, "result.yml")
-    val ai: ArbigentAi = aiType.let { aiType ->
-      when (aiType) {
-        is OpenAIAiConfig -> OpenAIAi(
-          apiKey = aiType.openAiApiKey!!,
-          baseUrl = aiType.openAiEndpoint,
-          modelName = aiType.openAiModelName,
-          loggingEnabled = aiApiLoggingEnabled,
-        )
-
-        is GeminiAiConfig -> OpenAIAi(
-          apiKey = aiType.geminiApiKey!!,
-          baseUrl = aiType.geminiEndpoint,
-          modelName = aiType.geminiModelName,
-          loggingEnabled = aiApiLoggingEnabled,
-          jsonSchemaType = ArbigentAi.JsonSchemaType.GeminiOpenAICompatible
-        )
-
-        is AzureOpenAiConfig -> OpenAIAi(
-          apiKey = aiType.azureOpenAIKey!!,
-          baseUrl = aiType.azureOpenAIEndpoint!!,
-          modelName = aiType.azureOpenAIModelName,
-          loggingEnabled = aiApiLoggingEnabled,
-          requestBuilderModifier = {
-            parameter("api-version", aiType.azureOpenAIApiVersion)
-            header("api-key", aiType.azureOpenAIKey!!)
-          }
-        )
-      }
-    }
-
-    val os =
-      ArbigentDeviceOs.entries.find { it.name.toLowerCasePreservingASCIIRules() == os.toLowerCasePreservingASCIIRules() }
-        ?: throw IllegalArgumentException(
-          "Invalid OS. The OS should be one of ${
-            ArbigentDeviceOs.entries
-              .joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
-          }")
-    val device: ArbigentDevice = fetchAvailableDevicesByOs(os).firstOrNull()?.connectToDevice()
-      ?: throw IllegalArgumentException("No available device found")
+    val (resultDir, resultFile) = setupArbigentFiles(workingDirectory, logFile)
+    val ai = createAi(aiType, aiApiLoggingEnabled)
+    val device = connectDevice(os)
 
     try {
       val scenarioContent = ArbigentScenarioContent(
