@@ -92,7 +92,7 @@ class ArbigentRunTaskCommand : CliktCommand(name = "task") {
             arbigentProject.getResult(scenarios),
             needCopy = false
           )
-          device.close()
+          if (!device.isClosed()) device.close()
         }
       })
 
@@ -103,7 +103,7 @@ class ArbigentRunTaskCommand : CliktCommand(name = "task") {
         runNonInteractiveMode(arbigentProject, scenarios, resultFile, resultDir)
       }
     } catch (e: Exception) {
-      device.close()
+      if (!device.isClosed()) device.close()
       throw e
     }
   }
