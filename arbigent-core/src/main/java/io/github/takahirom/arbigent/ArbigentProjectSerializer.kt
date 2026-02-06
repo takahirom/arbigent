@@ -574,6 +574,10 @@ public class ArbigentProjectSerializer(
     return projectFileContent
   }
 
+  public fun encodeToString(projectFileContent: ArbigentProjectFileContent): String {
+    return yaml.encodeToString(ArbigentProjectFileContent.serializer(), projectFileContent)
+  }
+
   public fun save(projectResult: ArbigentProjectExecutionResult, file: File) {
     val outputStream = file.outputStream()
     val jsonString =
