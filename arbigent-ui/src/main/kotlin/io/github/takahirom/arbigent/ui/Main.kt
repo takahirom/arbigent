@@ -107,12 +107,14 @@ fun AppWindow(
   var showCloseConfirmDialog by remember { mutableStateOf(false) }
   var pendingExitAfterSave by remember { mutableStateOf(false) }
 
-  // Watch for save completion to exit if pending
+  // Watch for save completion to exit if pending (only exit if save actually succeeded)
   val projectDialogState by appStateHolder.projectDialogState.collectAsState()
   LaunchedEffect(projectDialogState) {
     if (pendingExitAfterSave && projectDialogState == ProjectDialogState.NotSelected) {
       pendingExitAfterSave = false
-      onExit()
+      if (!appStateHolder.hasUnsavedChanges()) {
+        onExit()
+      }
     }
   }
 

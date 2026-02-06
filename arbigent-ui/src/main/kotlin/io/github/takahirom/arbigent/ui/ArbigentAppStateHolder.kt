@@ -391,7 +391,8 @@ class ArbigentAppStateHolder(
   private val arbigentProjectSerializer = ArbigentProjectSerializer()
 
   // Track dirty state for unsaved changes warning
-  private var lastSavedYaml: String? = null
+  // Initialized to the initial content so edits to new (never-saved) projects are detected.
+  private var lastSavedYaml: String? = getCurrentContentAsYaml()
 
   private fun getCurrentProjectFileContent(): ArbigentProjectFileContent {
     val sortedScenarios = sortedScenariosAndDepthsStateFlow.value.map { it.first }
