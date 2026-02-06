@@ -73,6 +73,6 @@ fun main(args: Array<String>) {
   LoggingUtils.suppressSlf4jWarnings()
   
   ArbigentCli()
-    .subcommands(ArbigentRunCommand(), ArbigentScenariosCommand(), ArbigentTagsCommand())
+    .subcommands(ArbigentRunCommand().subcommands(ArbigentRunTaskCommand()), ArbigentScenariosCommand(), ArbigentTagsCommand())
     .main(args)
 }

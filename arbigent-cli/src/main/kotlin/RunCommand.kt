@@ -129,6 +129,9 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
   }
 
   override fun run() {
+    // If a subcommand (like "task") was invoked, let it handle execution
+    if (currentContext.invokedSubcommand != null) return
+
     // Check that project-file is provided either via CLI args or settings file
     if (projectFile == null) {
       throw CliktError("Missing option '--project-file'. Please provide a project file path via command line argument or in .arbigent/settings.local.yml")
