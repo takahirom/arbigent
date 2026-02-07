@@ -5,7 +5,6 @@ package io.github.takahirom.arbigent.cli
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.CliktError
 import com.github.ajalt.clikt.parameters.options.default
-import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.choice
 import io.github.takahirom.arbigent.*
 import io.ktor.client.request.*

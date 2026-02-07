@@ -69,9 +69,7 @@ class ArbigentRunTaskCommand : CliktCommand(name = "task") {
         goal = goal,
         maxStep = maxStep,
         maxRetry = maxRetry,
-        initializationMethods = listOf(
-          ArbigentScenarioContent.InitializationMethod.Back(times = 5)
-        )
+        initializationMethods = emptyList()
       )
       val projectFileContent = ArbigentProjectFileContent(
         scenarioContents = listOf(scenarioContent),

@@ -37,6 +37,7 @@ import kotlin.system.exitProcess
 
 @ArbigentInternalApi
 class ArbigentRunCommand : CliktCommand(name = "run") {
+  override val invokeWithoutSubcommand = true
   
   private val aiType by defaultOption("--ai-type", help = "Type of AI to use")
     .groupChoice(
@@ -122,17 +123,16 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     validateAiConfig(aiType)
     applyLogLevel(logLevel)
     
-    // Display loaded configuration values for debugging/testing
     arbigentDebugLog("=== Configuration Priority Demonstration ===")
     arbigentDebugLog("Command: run")
     arbigentDebugLog("Loaded configuration values:")
     arbigentDebugLog("  ai-type: ${when(aiType) {
       is OpenAIAiConfig -> "openai"
-      is GeminiAiConfig -> "gemini"  
+      is GeminiAiConfig -> "gemini"
       is AzureOpenAiConfig -> "azureopenai"
       else -> "unknown"
-    }} (Expected: run-specific-azure from run.ai-type)")
-    arbigentDebugLog("  log-level: $logLevel (Expected: debug from run.log-level)")
+    }}")
+    arbigentDebugLog("  log-level: $logLevel")
     arbigentDebugLog("==========================================")
     
     val (resultDir, resultFile) = setupArbigentFiles(workingDirectory, logFile)
@@ -176,10 +176,13 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     arbigentInfoLog("[Execution Plan] Selected scenarios for execution: ${scenarios.map { it.id }}")
     val scenarioIdSet = scenarios.map { it.id }.toSet()
 
-    // Skip device connection in dry-run mode
-    if (!dryRun) {
-      device = connectDevice(os)
+    if (dryRun) {
+      echo("[Execution Plan] Selected scenarios for execution: ${scenarios.map { it.id }}")
+      echo("Dry run mode is enabled. Exiting without executing scenarios.")
+      return
     }
+
+    device = connectDevice(os)
     Runtime.getRuntime().addShutdownHook(object : Thread() {
       override fun run() {
         arbigentProject.cancel()
@@ -195,9 +198,9 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
 
     val isTerminal = System.console() != null
     if (isTerminal) {
-      runInteractiveMode(arbigentProject, scenarios, scenarioIdSet, shard, resultFile, resultDir, dryRun)
+      runInteractiveMode(arbigentProject, scenarios, scenarioIdSet, shard, resultFile, resultDir)
     } else {
-      runNonInteractiveMode(arbigentProject, scenarios, resultFile, resultDir, dryRun)
+      runNonInteractiveMode(arbigentProject, scenarios, resultFile, resultDir)
     }
   }
 
@@ -207,8 +210,7 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     scenarioIdSet: Set<String>,
     shard: ArbigentShard,
     resultFile: File,
-    resultDir: File,
-    dryRun: Boolean
+    resultDir: File
   ) {
     // Route logs to ArbigentGlobalStatus for Mosaic UI LogComponent display
     printLogger = { log -> ArbigentGlobalStatus.log(log) }
@@ -216,13 +218,7 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     runNoRawMosaicBlocking {
       LaunchedEffect(Unit) {
         logResultsLocation(resultFile, resultDir)
-        
-        if (dryRun) {
-          arbigentInfoLog("🧪 Dry run mode is enabled. Exiting without executing scenarios.")
-          delay(500)
-          exitProcess(0)
-        }
-        
+
         arbigentProject.executeScenarios(scenarios)
         delay(100)
         
@@ -274,19 +270,12 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     arbigentProject: ArbigentProject,
     scenarios: List<ArbigentScenario>,
     resultFile: File,
-    resultDir: File,
-    dryRun: Boolean
+    resultDir: File
   ) {
     // Keep default printLogger for console output
     runBlocking {
       logResultsLocation(resultFile, resultDir)
-      
-      if (dryRun) {
-        arbigentInfoLog("🧪 Dry run mode is enabled. Exiting without executing scenarios.")
-        delay(500)
-        exitProcess(0)
-      }
-      
+
       // Start reactive progress monitoring
       val progressJob = launch {
         // Monitor assignment changes
