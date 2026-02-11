@@ -333,8 +333,7 @@ class CliE2ETest {
         
         // Verify the actual values in the debug output match what help showed
         assertTrue(
-            runOutput.contains("ai-type: azureopenai") && 
-            runOutput.contains("(Expected: run-specific-azure from run.ai-type)"),
+            runOutput.contains("ai-type: azureopenai"),
             "Debug output should confirm azureopenai is actually used from run config"
         )
     }

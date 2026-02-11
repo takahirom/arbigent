@@ -29,8 +29,6 @@ import com.jakewharton.mosaic.ui.Column
 import com.jakewharton.mosaic.ui.Row
 import com.jakewharton.mosaic.ui.Text
 import io.github.takahirom.arbigent.*
-import io.ktor.client.request.*
-import io.ktor.util.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -39,6 +37,7 @@ import kotlin.system.exitProcess
 
 @ArbigentInternalApi
 class ArbigentRunCommand : CliktCommand(name = "run") {
+  override val invokeWithoutSubcommand = true
   
   private val aiType by defaultOption("--ai-type", help = "Type of AI to use")
     .groupChoice(
@@ -112,111 +111,32 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     }
     .default(ArbigentShard(1, 1))
 
-  private fun file(workingDirectory: String?, fileName: String): File {
-    return if (workingDirectory.isNullOrBlank()) {
-      File(fileName)
-    } else {
-      File(workingDirectory, fileName)
-    }
-  }
-
-  private fun file(workingDirectory: String?, fileDir: String, fileName: String): File {
-    return if (workingDirectory.isNullOrBlank()) {
-      File(fileDir, fileName)
-    } else {
-      File(workingDirectory, fileDir + File.separator + fileName)
-    }
-  }
-
   override fun run() {
+    // If a subcommand (like "task") was invoked, let it handle execution
+    if (currentContext.invokedSubcommand != null) return
+
     // Check that project-file is provided either via CLI args or settings file
     if (projectFile == null) {
       throw CliktError("Missing option '--project-file'. Please provide a project file path via command line argument or in .arbigent/settings.local.yml")
     }
+
+    validateAiConfig(aiType)
+    applyLogLevel(logLevel)
     
-    // Validate AI configuration based on selected AI type
-    val currentAiType = aiType
-    when (currentAiType) {
-      is OpenAIAiConfig -> {
-        if (currentAiType.openAiApiKey.isNullOrBlank()) {
-          throw CliktError("Missing OpenAI API key. Please provide via --openai-api-key, OPENAI_API_KEY environment variable, or in .arbigent/settings.local.yml")
-        }
-      }
-      is GeminiAiConfig -> {
-        if (currentAiType.geminiApiKey.isNullOrBlank()) {
-          throw CliktError("Missing Gemini API key. Please provide via --gemini-api-key, GEMINI_API_KEY environment variable, or in .arbigent/settings.local.yml")
-        }
-      }
-      is AzureOpenAiConfig -> {
-        if (currentAiType.azureOpenAIEndpoint.isNullOrBlank()) {
-          throw CliktError("Missing Azure OpenAI endpoint. Please provide via --azure-openai-endpoint or in .arbigent/settings.local.yml")
-        }
-        if (currentAiType.azureOpenAIKey.isNullOrBlank()) {
-          throw CliktError("Missing Azure OpenAI API key. Please provide via --azure-openai-api-key, AZURE_OPENAI_API_KEY environment variable, or in .arbigent/settings.local.yml")
-        }
-      }
-    }
-    
-    // Set log level early to avoid unwanted debug logs
-    arbigentLogLevel =
-      ArbigentLogLevel.entries.find { it.name.toLowerCasePreservingASCIIRules() == logLevel.toLowerCasePreservingASCIIRules() }
-        ?: throw IllegalArgumentException(
-          "Invalid log level. The log level should be one of ${
-            ArbigentLogLevel.entries
-              .joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
-          }")
-    
-    // Display loaded configuration values for debugging/testing
     arbigentDebugLog("=== Configuration Priority Demonstration ===")
     arbigentDebugLog("Command: run")
     arbigentDebugLog("Loaded configuration values:")
     arbigentDebugLog("  ai-type: ${when(aiType) {
       is OpenAIAiConfig -> "openai"
-      is GeminiAiConfig -> "gemini"  
+      is GeminiAiConfig -> "gemini"
       is AzureOpenAiConfig -> "azureopenai"
       else -> "unknown"
-    }} (Expected: run-specific-azure from run.ai-type)")
-    arbigentDebugLog("  log-level: $logLevel (Expected: debug from run.log-level)")
+    }}")
+    arbigentDebugLog("  log-level: $logLevel")
     arbigentDebugLog("==========================================")
     
-    val resultDir = file(workingDirectory, defaultResultPath)
-    resultDir.mkdirs()
-    ArbigentFiles.parentDir = resultDir.absolutePath
-    ArbigentFiles.screenshotsDir = File(resultDir, "screenshots")
-    ArbigentFiles.jsonlsDir = File(resultDir, "jsonls")
-    ArbigentFiles.logFile = file(workingDirectory, logFile)
-    ArbigentFiles.cacheDir = file(workingDirectory, defaultCachePath + File.separator + BuildConfig.VERSION_NAME)
-    ArbigentFiles.cacheDir.mkdirs()
-    val resultFile = File(resultDir, "result.yml")
-    val ai: ArbigentAi = aiType.let { aiType ->
-      when (aiType) {
-        is OpenAIAiConfig -> OpenAIAi(
-          apiKey = aiType.openAiApiKey!!, // Already validated above
-          baseUrl = aiType.openAiEndpoint,
-          modelName = aiType.openAiModelName,
-          loggingEnabled = aiApiLoggingEnabled,
-        )
-
-        is GeminiAiConfig -> OpenAIAi(
-          apiKey = aiType.geminiApiKey!!, // Already validated above
-          baseUrl = aiType.geminiEndpoint,
-          modelName = aiType.geminiModelName,
-          loggingEnabled = aiApiLoggingEnabled,
-          jsonSchemaType = ArbigentAi.JsonSchemaType.GeminiOpenAICompatible
-        )
-
-        is AzureOpenAiConfig -> OpenAIAi(
-          apiKey = aiType.azureOpenAIKey!!, // Already validated above
-          baseUrl = aiType.azureOpenAIEndpoint!!, // Already validated above
-          modelName = aiType.azureOpenAIModelName,
-          loggingEnabled = aiApiLoggingEnabled,
-          requestBuilderModifier = {
-            parameter("api-version", aiType.azureOpenAIApiVersion)
-            header("api-key", aiType.azureOpenAIKey!!)
-          }
-        )
-      }
-    }
+    val (resultDir, resultFile) = setupArbigentFiles(workingDirectory, logFile)
+    val ai = createAi(aiType, aiApiLoggingEnabled)
 
     var device: ArbigentDevice? = null
     val appSettings = CliAppSettings(
@@ -256,18 +176,13 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     arbigentInfoLog("[Execution Plan] Selected scenarios for execution: ${scenarios.map { it.id }}")
     val scenarioIdSet = scenarios.map { it.id }.toSet()
 
-    // Skip device connection in dry-run mode
-    if (!dryRun) {
-      val os =
-        ArbigentDeviceOs.entries.find { it.name.toLowerCasePreservingASCIIRules() == os.toLowerCasePreservingASCIIRules() }
-          ?: throw IllegalArgumentException(
-            "Invalid OS. The OS should be one of ${
-              ArbigentDeviceOs.entries
-                .joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
-            }")
-      device = fetchAvailableDevicesByOs(os).firstOrNull()?.connectToDevice()
-        ?: throw IllegalArgumentException("No available device found")
+    if (dryRun) {
+      echo("[Execution Plan] Selected scenarios for execution: ${scenarios.map { it.id }}")
+      echo("Dry run mode is enabled. Exiting without executing scenarios.")
+      return
     }
+
+    device = connectDevice(os)
     Runtime.getRuntime().addShutdownHook(object : Thread() {
       override fun run() {
         arbigentProject.cancel()
@@ -283,9 +198,9 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
 
     val isTerminal = System.console() != null
     if (isTerminal) {
-      runInteractiveMode(arbigentProject, scenarios, scenarioIdSet, shard, resultFile, resultDir, dryRun)
+      runInteractiveMode(arbigentProject, scenarios, scenarioIdSet, shard, resultFile, resultDir)
     } else {
-      runNonInteractiveMode(arbigentProject, scenarios, resultFile, resultDir, dryRun)
+      runNonInteractiveMode(arbigentProject, scenarios, resultFile, resultDir)
     }
   }
 
@@ -295,8 +210,7 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     scenarioIdSet: Set<String>,
     shard: ArbigentShard,
     resultFile: File,
-    resultDir: File,
-    dryRun: Boolean
+    resultDir: File
   ) {
     // Route logs to ArbigentGlobalStatus for Mosaic UI LogComponent display
     printLogger = { log -> ArbigentGlobalStatus.log(log) }
@@ -304,13 +218,7 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     runNoRawMosaicBlocking {
       LaunchedEffect(Unit) {
         logResultsLocation(resultFile, resultDir)
-        
-        if (dryRun) {
-          arbigentInfoLog("🧪 Dry run mode is enabled. Exiting without executing scenarios.")
-          delay(500)
-          exitProcess(0)
-        }
-        
+
         arbigentProject.executeScenarios(scenarios)
         delay(100)
         
@@ -362,19 +270,12 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     arbigentProject: ArbigentProject,
     scenarios: List<ArbigentScenario>,
     resultFile: File,
-    resultDir: File,
-    dryRun: Boolean
+    resultDir: File
   ) {
     // Keep default printLogger for console output
     runBlocking {
       logResultsLocation(resultFile, resultDir)
-      
-      if (dryRun) {
-        arbigentInfoLog("🧪 Dry run mode is enabled. Exiting without executing scenarios.")
-        delay(500)
-        exitProcess(0)
-      }
-      
+
       // Start reactive progress monitoring
       val progressJob = launch {
         // Monitor assignment changes
