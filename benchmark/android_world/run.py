@@ -86,6 +86,16 @@ _ARBIGENT_MAX_STEP = flags.DEFINE_integer(
     10,
     "Max steps per task for Arbigent.",
 )
+_ARBIGENT_OPENAI_ENDPOINT = flags.DEFINE_string(
+    "arbigent_openai_endpoint",
+    None,
+    "OpenAI-compatible endpoint URL for Arbigent (e.g. https://openrouter.ai/api/v1/).",
+)
+_ARBIGENT_OPENAI_MODEL = flags.DEFINE_string(
+    "arbigent_openai_model",
+    None,
+    "Model name for Arbigent (e.g. google/gemini-2.0-flash-001).",
+)
 _ARBIGENT_MAX_RETRY = flags.DEFINE_integer(
     "arbigent_max_retry",
     3,
@@ -125,7 +135,6 @@ def _main() -> None:
             tasks_env = os.environ.get("BENCHMARK_TASKS")
             if tasks_env:
                 tasks = [t.strip() for t in tasks_env.split(",")]
-        print(f"tasks = {tasks!r} (sys.argv = {sys.argv})")
         suite = suite_utils.create_suite(
             task_registry.get_registry(
                 family=registry.TaskRegistry.ANDROID_WORLD_FAMILY
@@ -141,6 +150,8 @@ def _main() -> None:
             arbigent_bin=_ARBIGENT_BIN.value,
             max_step=_ARBIGENT_MAX_STEP.value,
             max_retry=_ARBIGENT_MAX_RETRY.value,
+            openai_endpoint=_ARBIGENT_OPENAI_ENDPOINT.value,
+            openai_model=_ARBIGENT_OPENAI_MODEL.value,
             name="arbigent",
         )
 

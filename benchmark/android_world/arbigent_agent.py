@@ -20,12 +20,16 @@ class ArbigentAgent(base_agent.EnvironmentInteractingAgent):
         arbigent_bin: str,
         max_step: int = 10,
         max_retry: int = 3,
+        openai_endpoint: str | None = None,
+        openai_model: str | None = None,
         name: str = "ArbigentAgent",
     ):
         super().__init__(env, name, transition_pause=None)
         self._arbigent_bin = arbigent_bin
         self._arbigent_max_step = max_step
         self._arbigent_max_retry = max_retry
+        self._openai_endpoint = openai_endpoint
+        self._openai_model = openai_model
 
     def step(self, goal: str) -> base_agent.AgentInteractionResult:
         # Wait for environment to settle before running CLI
@@ -41,6 +45,10 @@ class ArbigentAgent(base_agent.EnvironmentInteractingAgent):
             "--max-retry",
             str(self._arbigent_max_retry),
         ]
+        if self._openai_endpoint:
+            cmd.extend(["--openai-endpoint", self._openai_endpoint])
+        if self._openai_model:
+            cmd.extend(["--openai-model-name", self._openai_model])
 
         logging.info("Running Arbigent: %s", " ".join(cmd))
         try:

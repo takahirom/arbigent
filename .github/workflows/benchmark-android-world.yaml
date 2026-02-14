@@ -87,6 +87,8 @@ jobs:
           BENCHMARK_TASKS: ${{ inputs.tasks || 'CameraTakePhoto' }}
           BENCHMARK_MAX_STEP: ${{ inputs.max_step || '10' }}
           BENCHMARK_MAX_RETRY: ${{ inputs.max_retry || '3' }}
+          ARBIGENT_OPENAI_ENDPOINT: https://openrouter.ai/api/v1/
+          ARBIGENT_OPENAI_MODEL: google/gemini-2.5-flash-lite
         with:
           api-level: 34
           target: google_apis
@@ -97,7 +99,7 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -grpc 8554
           script: |
             echo "BENCHMARK_TASKS=$BENCHMARK_TASKS"
-            python benchmark/android_world/run.py --tasks="$BENCHMARK_TASKS" --arbigent_max_step="$BENCHMARK_MAX_STEP" --arbigent_max_retry="$BENCHMARK_MAX_RETRY" --output_path=benchmark-results
+            python benchmark/android_world/run.py --tasks="$BENCHMARK_TASKS" --arbigent_max_step="$BENCHMARK_MAX_STEP" --arbigent_max_retry="$BENCHMARK_MAX_RETRY" --arbigent_openai_endpoint="$ARBIGENT_OPENAI_ENDPOINT" --arbigent_openai_model="$ARBIGENT_OPENAI_MODEL" --output_path=benchmark-results
 
       - name: Check API key leakage
         if: always()
