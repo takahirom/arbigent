@@ -120,6 +120,7 @@ def _main() -> None:
 
     try:
         task_registry = registry.TaskRegistry()
+        print(f"_TASKS.value = {_TASKS.value!r} (type={type(_TASKS.value).__name__})")
         suite = suite_utils.create_suite(
             task_registry.get_registry(
                 family=registry.TaskRegistry.ANDROID_WORLD_FAMILY
@@ -128,6 +129,7 @@ def _main() -> None:
             seed=_TASK_RANDOM_SEED.value,
             tasks=_TASKS.value,
         )
+        print(f"Suite tasks: {list(suite.tasks.keys())}")
         suite.suite_family = registry.TaskRegistry.ANDROID_WORLD_FAMILY
 
         agent = ArbigentAgent(
