@@ -11,6 +11,7 @@ Usage:
 """
 
 import os
+import shutil
 import sys
 from collections.abc import Sequence
 
@@ -102,6 +103,9 @@ def _find_adb_directory() -> str:
     for path in potential_paths:
         if os.path.isfile(path):
             return path
+    which_adb = shutil.which("adb")
+    if which_adb:
+        return which_adb
     raise EnvironmentError("adb not found. Set --adb_path explicitly.")
 
 
@@ -131,9 +135,8 @@ def _main() -> None:
             arbigent_bin=_ARBIGENT_BIN.value,
             max_step=_ARBIGENT_MAX_STEP.value,
             max_retry=_ARBIGENT_MAX_RETRY.value,
+            name="arbigent",
         )
-        agent.transition_pause = None
-        agent.name = "arbigent"
 
         if _CHECKPOINT_DIR.value:
             checkpoint_dir = _CHECKPOINT_DIR.value

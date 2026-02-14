@@ -43,7 +43,15 @@ class ArbigentAgent(base_agent.EnvironmentInteractingAgent):
         ]
 
         logging.info("Running Arbigent: %s", " ".join(cmd))
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        except subprocess.TimeoutExpired:
+            logging.error("Arbigent timed out after 600s for goal: %s", goal)
+            final_state = self.get_post_transition_state()
+            return base_agent.AgentInteractionResult(
+                done=False,
+                data={"raw_screenshot": final_state.pixels, "ui_elements": final_state.ui_elements},
+            )
         logging.info("Arbigent exit code: %d", result.returncode)
         if result.stdout:
             logging.info("Arbigent stdout (last 1000 chars): %s", result.stdout[-1000:])
