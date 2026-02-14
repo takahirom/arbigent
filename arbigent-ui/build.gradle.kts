@@ -56,6 +56,7 @@ compose.desktop {
     mainClass = "io.github.takahirom.arbigent.ui.MainKt"
 
     nativeDistributions {
+      modules("java.sql")
       targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
       macOS {
         iconFile.set(project.file("icons/icon.icns"))

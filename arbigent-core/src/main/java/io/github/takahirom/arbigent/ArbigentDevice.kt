@@ -218,7 +218,8 @@ public class MaestroDevice(
   private fun ensureConnected() {
     // Try a simple operation to check connection
     try {
-      maestro.viewHierarchy()
+      val hierarchy = maestro.viewHierarchy()
+      arbigentDebugLog("ensureConnected: hierarchy size = ${hierarchy.toString().length} chars")
     } catch (e: Exception) {
       // Device appears disconnected, reconnect
       arbigentInfoLog("MaestroDevice failed to fetch view hierarchy: ${e.message}. Reconnect device ${maestro.deviceName}")
@@ -270,8 +271,11 @@ public class MaestroDevice(
     for (it in 0..2) {
       try {
         val viewHierarchy = maestro.viewHierarchy(false)
+        val allTreeString = viewHierarchy.toString()
+        arbigentDebugLog("viewTreeString: hierarchy size = ${allTreeString.length} chars (${allTreeString.length * 2 / 1024} KB)")
+        arbigentDebugLog("viewTreeString: hierarchy content = ${allTreeString.take(50000)}")
         return ArbigentUiTreeStrings(
-          allTreeString = viewHierarchy.toString(),
+          allTreeString = allTreeString,
           optimizedTreeString = viewHierarchy.toOptimizedString(
             deviceInfo = maestro.cachedDeviceInfo
           ),
