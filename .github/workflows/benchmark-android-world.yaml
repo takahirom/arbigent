@@ -17,6 +17,9 @@ on:
         description: 'Max retries per task'
         default: '3'
 
+permissions:
+  contents: read
+
 env:
   GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx6g -Dorg.gradle.daemon=false -Dkotlin.incremental=false"
 
