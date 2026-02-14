@@ -78,7 +78,7 @@ jobs:
       - name: Install AndroidWorld
         run: |
           pip install -r tmp/android_world/requirements.txt
-          pip install ./tmp/android_world
+          cd tmp/android_world && python setup.py install
 
       - name: Run AndroidWorld benchmark
         uses: reactivecircus/android-emulator-runner@v2
