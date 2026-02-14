@@ -1,6 +1,10 @@
 name: benchmark-android-world
 
 on:
+  pull_request:
+    paths:
+      - 'benchmark/**'
+      - '.github/workflows/benchmark-android-world.yaml'
   workflow_dispatch:
     inputs:
       tasks:
@@ -80,9 +84,9 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -grpc 8554
           script: |
             python benchmark/android_world/run.py \
-              --tasks=${{ inputs.tasks }} \
-              --arbigent_max_step=${{ inputs.max_step }} \
-              --arbigent_max_retry=${{ inputs.max_retry }} \
+              --tasks=${{ inputs.tasks || 'CameraTakePhoto' }} \
+              --arbigent_max_step=${{ inputs.max_step || '10' }} \
+              --arbigent_max_retry=${{ inputs.max_retry || '3' }} \
               --output_path=benchmark-results
 
       - name: Check API key leakage
