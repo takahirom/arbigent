@@ -79,6 +79,9 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         env:
           OPENAI_API_KEY: ${{ secrets.OPEN_ROUTER_API_KEY }}
+          BENCHMARK_TASKS: ${{ inputs.tasks || 'CameraTakePhoto' }}
+          BENCHMARK_MAX_STEP: ${{ inputs.max_step || '10' }}
+          BENCHMARK_MAX_RETRY: ${{ inputs.max_retry || '3' }}
         with:
           api-level: 34
           target: google_apis
@@ -89,16 +92,18 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -grpc 8554
           script: |
             python benchmark/android_world/run.py \
-              --tasks=${{ inputs.tasks || 'CameraTakePhoto' }} \
-              --arbigent_max_step=${{ inputs.max_step || '10' }} \
-              --arbigent_max_retry=${{ inputs.max_retry || '3' }} \
+              --tasks="$BENCHMARK_TASKS" \
+              --arbigent_max_step="$BENCHMARK_MAX_STEP" \
+              --arbigent_max_retry="$BENCHMARK_MAX_RETRY" \
               --output_path=benchmark-results
 
       - name: Check API key leakage
         if: always()
+        env:
+          API_KEY: ${{ secrets.OPEN_ROUTER_API_KEY }}
         run: |
           for dir in benchmark-results arbigent-result; do
-            if [ -d "$dir" ] && grep -R --quiet "${{ secrets.OPEN_ROUTER_API_KEY }}" "$dir/" 2>/dev/null; then
+            if [ -d "$dir" ] && grep -rF --quiet "$API_KEY" "$dir/" 2>/dev/null; then
               echo "::error::API key leaked in $dir!"
               exit 1
             fi

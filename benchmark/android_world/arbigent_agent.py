@@ -28,7 +28,8 @@ class ArbigentAgent(base_agent.EnvironmentInteractingAgent):
         self._arbigent_max_retry = max_retry
 
     def step(self, goal: str) -> base_agent.AgentInteractionResult:
-        state = self.get_post_transition_state()
+        # Wait for environment to settle before running CLI
+        self.get_post_transition_state()
 
         cmd = [
             self._arbigent_bin,

@@ -11,6 +11,9 @@ Run [AndroidWorld](https://github.com/google-research/android_world) (116 tasks)
 ## Setup
 
 ```bash
+# 0. Clone AndroidWorld
+git clone --depth 1 https://github.com/google-research/android_world tmp/android_world
+
 # 1. Create Python venv and install dependencies
 uv venv --python 3.11 .venv-android-world
 uv pip install --python .venv-android-world/bin/python \

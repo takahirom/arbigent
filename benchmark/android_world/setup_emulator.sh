@@ -84,6 +84,8 @@ from android_world.env import env_launcher
 potential_paths = [
     os.path.expanduser('~/Library/Android/sdk/platform-tools/adb'),
     os.path.expanduser('~/Android/Sdk/platform-tools/adb'),
+    os.path.join(os.environ.get('ANDROID_HOME', ''), 'platform-tools', 'adb'),
+    os.path.join(os.environ.get('ANDROID_SDK_ROOT', ''), 'platform-tools', 'adb'),
 ]
 adb_path = next((p for p in potential_paths if os.path.isfile(p)), None)
 if not adb_path:

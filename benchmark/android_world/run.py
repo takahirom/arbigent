@@ -114,44 +114,46 @@ def _main() -> None:
         adb_path=adb_path,
     )
 
-    task_registry = registry.TaskRegistry()
-    suite = suite_utils.create_suite(
-        task_registry.get_registry(
-            family=registry.TaskRegistry.ANDROID_WORLD_FAMILY
-        ),
-        n_task_combinations=_N_TASK_COMBINATIONS.value,
-        seed=_TASK_RANDOM_SEED.value,
-        tasks=_TASKS.value,
-    )
-    suite.suite_family = registry.TaskRegistry.ANDROID_WORLD_FAMILY
+    try:
+        task_registry = registry.TaskRegistry()
+        suite = suite_utils.create_suite(
+            task_registry.get_registry(
+                family=registry.TaskRegistry.ANDROID_WORLD_FAMILY
+            ),
+            n_task_combinations=_N_TASK_COMBINATIONS.value,
+            seed=_TASK_RANDOM_SEED.value,
+            tasks=_TASKS.value,
+        )
+        suite.suite_family = registry.TaskRegistry.ANDROID_WORLD_FAMILY
 
-    agent = ArbigentAgent(
-        env,
-        arbigent_bin=_ARBIGENT_BIN.value,
-        max_step=_ARBIGENT_MAX_STEP.value,
-        max_retry=_ARBIGENT_MAX_RETRY.value,
-    )
-    agent.transition_pause = None
-    agent.name = "arbigent"
+        agent = ArbigentAgent(
+            env,
+            arbigent_bin=_ARBIGENT_BIN.value,
+            max_step=_ARBIGENT_MAX_STEP.value,
+            max_retry=_ARBIGENT_MAX_RETRY.value,
+        )
+        agent.transition_pause = None
+        agent.name = "arbigent"
 
-    if _CHECKPOINT_DIR.value:
-        checkpoint_dir = _CHECKPOINT_DIR.value
-    else:
-        checkpoint_dir = checkpointer_lib.create_run_directory(
-            _OUTPUT_PATH.value
+        if _CHECKPOINT_DIR.value:
+            checkpoint_dir = _CHECKPOINT_DIR.value
+        else:
+            checkpoint_dir = checkpointer_lib.create_run_directory(
+                _OUTPUT_PATH.value
+            )
+
+        print("Starting AndroidWorld benchmark with Arbigent agent.")
+        print(f"Results will be saved to: {checkpoint_dir}")
+
+        suite_utils.run(
+            suite,
+            agent,
+            checkpointer=checkpointer_lib.IncrementalCheckpointer(checkpoint_dir),
         )
 
-    print("Starting AndroidWorld benchmark with Arbigent agent.")
-    print(f"Results will be saved to: {checkpoint_dir}")
-
-    suite_utils.run(
-        suite,
-        agent,
-        checkpointer=checkpointer_lib.IncrementalCheckpointer(checkpoint_dir),
-    )
-
-    print(f"Finished. Results saved to: {checkpoint_dir}")
-    env.close()
+        print(f"Finished. Results saved to: {checkpoint_dir}")
+    finally:
+        env.close()
 
 
 def main(argv: Sequence[str]) -> None:
