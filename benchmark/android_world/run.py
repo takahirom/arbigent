@@ -120,16 +120,20 @@ def _main() -> None:
 
     try:
         task_registry = registry.TaskRegistry()
-        print(f"_TASKS.value = {_TASKS.value!r} (type={type(_TASKS.value).__name__})")
+        tasks = _TASKS.value
+        if tasks is None:
+            tasks_env = os.environ.get("BENCHMARK_TASKS")
+            if tasks_env:
+                tasks = [t.strip() for t in tasks_env.split(",")]
+        print(f"tasks = {tasks!r} (sys.argv = {sys.argv})")
         suite = suite_utils.create_suite(
             task_registry.get_registry(
                 family=registry.TaskRegistry.ANDROID_WORLD_FAMILY
             ),
             n_task_combinations=_N_TASK_COMBINATIONS.value,
             seed=_TASK_RANDOM_SEED.value,
-            tasks=_TASKS.value,
+            tasks=tasks,
         )
-        print(f"Suite tasks: {list(suite.tasks.keys())}")
         suite.suite_family = registry.TaskRegistry.ANDROID_WORLD_FAMILY
 
         agent = ArbigentAgent(
