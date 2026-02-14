@@ -1,16 +1,10 @@
 package io.github.takahirom.arbigent
 
 import dadb.Dadb
-import ios.LocalIOSDevice
-import ios.simctl.SimctlIOSDevice
-import ios.xctest.XCTestIOSDevice
 import maestro.Maestro
 import maestro.drivers.AndroidDriver
 import maestro.drivers.IOSDriver
 import util.SimctlList
-import util.XCRunnerCLIUtils
-import xcuitest.XCTestClient
-import xcuitest.XCTestDriverClient
 import xcuitest.installer.LocalXCTestInstaller
 
 public enum class ArbigentDeviceOs {
@@ -29,7 +23,7 @@ public sealed interface ArbigentAvailableDevice {
   public class Android(private val dadb: Dadb) : ArbigentAvailableDevice {
     override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Android
     override val name: String = dadb.toString()
-    override fun connectToDevice(): ArbigentDevice {
+    override suspend fun connectToDevice(): ArbigentDevice {
       val driver = AndroidDriver(
         dadb,
       )
@@ -52,53 +46,130 @@ public sealed interface ArbigentAvailableDevice {
 
   public class IOS(
     private val device: SimctlList.Device,
-    private val port: Int = 8080,
-    // local host
-    private val host: String = "[::1]",
+    private val port: Int = 22087,
+    // localhost (matches maestro-cli defaultXcTestPort)
+    private val host: String = "127.0.0.1",
   ) : ArbigentAvailableDevice {
     override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Ios
     override val name: String = device.name
-    override fun connectToDevice(): ArbigentDevice {
-      val port = port
-      val host = host
+    override suspend fun connectToDevice(): ArbigentDevice {
+      val iosDevice = createIOSDevice()
+      var iosDriver: IOSDriver? = null
+      var maestroCreated = false
 
-      val xcTestInstaller = LocalXCTestInstaller(
-        deviceId = device.udid, // Use the device's UDID
-        host = host,
-        defaultPort = port,
-        enableXCTestOutputFileLogging = true,
-      )
+      try {
+        iosDriver = IOSDriver(iosDevice = iosDevice)
+        val maestro = Maestro.ios(iosDriver)
+        maestroCreated = true
+        return MaestroDevice(maestro, availableDevice = this)
+      } catch (e: java.util.concurrent.TimeoutException) {
+        throw RuntimeException("Arbigent can not connect to iOS device in time. The likely reason why we can't connect is that you have multiple instance of Arbigent like UI and CLI of Arbigent", e)
+      } catch (e: Exception) {
+        throw RuntimeException("Failed to create iOS connection: ${e.message}", e)
+      } finally {
+        if (!maestroCreated) {
+          iosDriver?.close()
+          iosDevice.close()
+        }
+      }
+    }
 
-      val xcTestDriverClient = XCTestDriverClient(
-        installer = xcTestInstaller,
-        client = XCTestClient(host, port), // Use the same host and port as above
-      )
-
-      val xcTestDevice = XCTestIOSDevice(
+    private fun createIOSDevice(): device.IOSDevice {
+      return ios.xctest.XCTestIOSDevice(
         deviceId = device.udid,
-        client = xcTestDriverClient,
-        getInstalledApps = { XCRunnerCLIUtils.listApps(device.udid) },
+        client = createXCTestDriverClient(),
+        getInstalledApps = { emptySet() }
+      )
+    }
+
+    private fun createXCTestDriverClient(): xcuitest.XCTestDriverClient {
+      val installer = LocalXCTestInstaller(
+        deviceId = device.udid,
+        host = host,
+        deviceType = util.IOSDeviceType.SIMULATOR,
+        defaultPort = port,
+        iOSDriverConfig = createIOSDriverConfig(),
+        deviceController = createPlaceholderDevice()
       )
 
-      return MaestroDevice(
-        Maestro.ios(
-          IOSDriver(
-            LocalIOSDevice(
-              deviceId = device.udid,
-              xcTestDevice = xcTestDevice,
-              simctlIOSDevice = SimctlIOSDevice(device.udid)
-            )
+      return xcuitest.XCTestDriverClient(installer)
+    }
+
+    private fun createIOSDriverConfig(): LocalXCTestInstaller.IOSDriverConfig {
+      val customResourcesPath = System.getProperty("arbigent.maestro.resources.path")
+          ?: System.getenv("MAESTRO_RESOURCES_PATH")
+
+      return if (customResourcesPath != null) {
+          val resourceDir = java.io.File(customResourcesPath)
+          if (!resourceDir.exists()) {
+              throw IllegalStateException("Maestro resources directory not found: $customResourcesPath")
+          }
+
+          val requiredFiles = listOf("maestro-driver-ios.zip", "maestro-driver-iosUITests-Runner.zip")
+          requiredFiles.forEach { fileName ->
+              if (!java.io.File(resourceDir, fileName).exists()) {
+                  throw IllegalStateException("Required resource file not found: $fileName in $customResourcesPath")
+              }
+          }
+
+          LocalXCTestInstaller.IOSDriverConfig(
+              prebuiltRunner = true,
+              sourceDirectory = customResourcesPath,
+              context = xcuitest.installer.Context.CLI,
+              snapshotKeyHonorModalViews = null
           )
-        ),
-        availableDevice = this
-      )
+      } else {
+          LocalXCTestInstaller.IOSDriverConfig(
+              prebuiltRunner = false,
+              sourceDirectory = "driver-iPhoneSimulator",
+              context = xcuitest.installer.Context.CLI,
+              snapshotKeyHonorModalViews = null
+          )
+      }
+    }
+
+    private fun createPlaceholderDevice(): device.IOSDevice {
+      return object : device.IOSDevice {
+        override val deviceId: String = device.udid
+        override fun open() {}
+        override fun close() {}
+
+        private val error = { operation: String ->
+          throw IllegalStateException("Placeholder device used for operation '$operation'.")
+        }
+        override fun deviceInfo() = error("deviceInfo")
+        override fun viewHierarchy(excludeKeyboardElements: Boolean) = error("viewHierarchy")
+        override fun tap(x: Int, y: Int) = error("tap")
+        override fun longPress(x: Int, y: Int, durationMs: Long) = error("longPress")
+        override fun pressKey(name: String) = error("pressKey")
+        override fun pressButton(name: String) = error("pressButton")
+        override fun scroll(xStart: Double, yStart: Double, xEnd: Double, yEnd: Double, duration: Double) = error("scroll")
+        override fun input(text: String) = error("input")
+        override fun install(stream: java.io.InputStream) = error("install")
+        override fun uninstall(id: String) = error("uninstall")
+        override fun clearAppState(id: String) = error("clearAppState")
+        override fun clearKeychain() = error("clearKeychain")
+        override fun launch(id: String, launchArguments: Map<String, Any>) = error("launch")
+        override fun stop(id: String) = error("stop")
+        override fun isKeyboardVisible() = error("isKeyboardVisible")
+        override fun openLink(link: String) = error("openLink")
+        override fun takeScreenshot(out: okio.Sink, compressed: Boolean) = error("takeScreenshot")
+        override fun startScreenRecording(out: okio.Sink) = error("startScreenRecording")
+        override fun addMedia(path: String) = error("addMedia")
+        override fun setLocation(latitude: Double, longitude: Double) = error("setLocation")
+        override fun setOrientation(orientation: String) = error("setOrientation")
+        override fun isShutdown() = error("isShutdown")
+        override fun isScreenStatic() = error("isScreenStatic")
+        override fun setPermissions(id: String, permissions: Map<String, String>) = error("setPermissions")
+        override fun eraseText(charactersToErase: Int) = error("eraseText")
+      }
     }
   }
 
   public class Web : ArbigentAvailableDevice {
     override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Web
     override val name: String = "Chrome"
-    public override fun connectToDevice(): ArbigentDevice {
+    public override suspend fun connectToDevice(): ArbigentDevice {
       return MaestroDevice(
         Maestro.web(false, false),
         availableDevice = this
@@ -109,11 +180,11 @@ public sealed interface ArbigentAvailableDevice {
   public class Fake : ArbigentAvailableDevice {
     override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Android
     override val name: String = "Fake"
-    public override fun connectToDevice(): ArbigentDevice {
+    public override suspend fun connectToDevice(): ArbigentDevice {
       // This is not called
       throw UnsupportedOperationException("Fake device is not supported")
     }
   }
 
-  public fun connectToDevice(): ArbigentDevice
+  public suspend fun connectToDevice(): ArbigentDevice
 }

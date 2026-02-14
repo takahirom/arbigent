@@ -8,6 +8,7 @@ import maestro.UiElement.Companion.toUiElementOrNull
 import maestro.orchestra.MaestroCommand
 import maestro.orchestra.Orchestra
 import java.io.File
+import kotlinx.coroutines.runBlocking
 import kotlin.math.pow
 import kotlin.system.measureTimeMillis
 
@@ -206,7 +207,7 @@ public class MaestroDevice(
 
   @Volatile private var orchestra = Orchestra(
     maestro = maestro,
-    screenshotsDir = screenshotsDir,
+    screenshotsDir = screenshotsDir.toPath(),
   )
 
   override fun deviceName(): String {
@@ -236,7 +237,9 @@ public class MaestroDevice(
       } else {
         true
       }
-      orchestra.executeCommands(actions, shouldReinitJsEngine = shouldJsReinit)
+      runBlocking {
+        orchestra.executeCommands(actions, shouldReinitJsEngine = shouldJsReinit)
+      }
     }
   }
 
@@ -539,7 +542,8 @@ public class MaestroDevice(
             ),
           ) ?: throw MaestroException.ElementNotFound(
             "Element not found",
-            maestro.viewHierarchy().root
+            maestro.viewHierarchy().root,
+            "Element with id ${selector.id} not found"
           )
           val uiElement: UiElement = element.element
           uiElement
@@ -552,7 +556,8 @@ public class MaestroDevice(
             )
           ) ?: throw MaestroException.ElementNotFound(
             "Element not found",
-            maestro.viewHierarchy().root
+            maestro.viewHierarchy().root,
+            "Element with id containing ${selector.id} not found"
           )
           val uiElement: UiElement = element.element
           uiElement
@@ -569,7 +574,8 @@ public class MaestroDevice(
             ),
           ) ?: throw MaestroException.ElementNotFound(
             "Element not found",
-            maestro.viewHierarchy().root
+            maestro.viewHierarchy().root,
+            "Element with text ${selector.text} not found"
           )
           val uiElement: UiElement = element.element
           uiElement
@@ -582,7 +588,8 @@ public class MaestroDevice(
             )
           ) ?: throw MaestroException.ElementNotFound(
             "Element not found",
-            maestro.viewHierarchy().root
+            maestro.viewHierarchy().root,
+            "Element with text containing ${selector.text} not found"
           )
           val uiElement: UiElement = element.element
           uiElement
@@ -609,7 +616,7 @@ public class MaestroDevice(
   
   private fun updateConnection(newMaestro: Maestro) {
     this.maestro = newMaestro
-    this.orchestra = Orchestra(maestro = this.maestro, screenshotsDir = this.screenshotsDir)
+    this.orchestra = Orchestra(maestro = this.maestro, screenshotsDir = this.screenshotsDir.toPath())
   }
 
   private fun reconnectIfDisconnected() {
@@ -645,7 +652,7 @@ public class MaestroDevice(
 
         // Try to reconnect
         val newDevice = try {
-          availableDevice.connectToDevice()
+          runBlocking { availableDevice.connectToDevice() }
         } catch (e: Exception) {
           lastException = e
           arbigentInfoLog("Reconnection attempt $reconnectAttempts/$maxReconnectAttempts failed: ${e.message}")
