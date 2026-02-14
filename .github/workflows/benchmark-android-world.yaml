@@ -70,8 +70,10 @@ jobs:
       - name: Clone AndroidWorld
         run: git clone --depth 1 https://github.com/google-research/android_world tmp/android_world
 
-      - name: Install AndroidWorld dependencies
-        run: pip install -r tmp/android_world/requirements.txt
+      - name: Install AndroidWorld
+        run: |
+          pip install -r tmp/android_world/requirements.txt
+          cd tmp/android_world && python setup.py install
 
       - name: Run AndroidWorld benchmark
         uses: reactivecircus/android-emulator-runner@v2
