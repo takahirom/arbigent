@@ -22,6 +22,7 @@ build/
 /.idea/workspace.xml
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
+__pycache__/
 .DS_Store
 /build
 /captures

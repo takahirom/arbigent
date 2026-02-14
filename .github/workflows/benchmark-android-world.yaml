@@ -1,0 +1,127 @@
+name: benchmark-android-world
+
+on:
+  pull_request:
+    paths:
+      - 'benchmark/**'
+      - '.github/workflows/benchmark-android-world.yaml'
+  workflow_dispatch:
+    inputs:
+      tasks:
+        description: 'AndroidWorld tasks to run (comma-separated)'
+        default: 'CameraTakePhoto'
+      max_step:
+        description: 'Max steps per task'
+        default: '10'
+      max_retry:
+        description: 'Max retries per task'
+        default: '3'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx6g -Dorg.gradle.daemon=false -Dkotlin.incremental=false"
+
+jobs:
+  benchmark:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Delete unnecessary tools
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          android: false
+          tool-cache: true
+          dotnet: true
+          haskell: true
+          swap-storage: true
+          docker-images: false
+          large-packages: false
+
+      - name: Enable KVM group perms
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls /dev/kvm
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'jetbrains'
+          java-version: '17'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: Build Arbigent CLI
+        run: ./gradlew arbigent-cli:installDist --stacktrace
+
+      - name: Clone AndroidWorld
+        run: git clone --depth 1 https://github.com/google-research/android_world tmp/android_world
+
+      - name: Install AndroidWorld
+        run: |
+          pip install -r tmp/android_world/requirements.txt
+          cd tmp/android_world && python setup.py install
+
+      - name: Run AndroidWorld benchmark
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPEN_ROUTER_API_KEY }}
+          BENCHMARK_TASKS: ${{ inputs.tasks || 'CameraTakePhoto' }}
+          BENCHMARK_MAX_STEP: ${{ inputs.max_step || '10' }}
+          BENCHMARK_MAX_RETRY: ${{ inputs.max_retry || '3' }}
+          ARBIGENT_OPENAI_ENDPOINT: https://openrouter.ai/api/v1/
+          ARBIGENT_OPENAI_MODEL: google/gemini-2.5-flash-lite
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          disk-size: 6000M
+          heap-size: 600M
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -grpc 8554
+          script: |
+            echo "BENCHMARK_TASKS=$BENCHMARK_TASKS"
+            python benchmark/android_world/run.py --tasks="$BENCHMARK_TASKS" --arbigent_max_step="$BENCHMARK_MAX_STEP" --arbigent_max_retry="$BENCHMARK_MAX_RETRY" --arbigent_openai_endpoint="$ARBIGENT_OPENAI_ENDPOINT" --arbigent_openai_model="$ARBIGENT_OPENAI_MODEL" --output_path=benchmark-results
+
+      - name: Check API key leakage
+        if: always()
+        env:
+          API_KEY: ${{ secrets.OPEN_ROUTER_API_KEY }}
+        run: |
+          if [ -z "$API_KEY" ]; then
+            echo "API_KEY not set, skipping leak check"
+            exit 0
+          fi
+          for dir in benchmark-results arbigent-result; do
+            if [ -d "$dir" ] && grep -rF --quiet "$API_KEY" "$dir/" 2>/dev/null; then
+              echo "::error::API key leaked in $dir!"
+              exit 1
+            fi
+          done
+
+      - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
+        if: always()
+        with:
+          name: benchmark-android-world-results
+          path: |
+            benchmark-results/
+            arbigent-result/
+          retention-days: 120
