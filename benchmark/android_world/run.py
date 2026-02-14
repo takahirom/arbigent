@@ -165,13 +165,18 @@ def _main() -> None:
         print("Starting AndroidWorld benchmark with Arbigent agent.")
         print(f"Results will be saved to: {checkpoint_dir}")
 
-        suite_utils.run(
+        results = suite_utils.run(
             suite,
             agent,
             checkpointer=checkpointer_lib.IncrementalCheckpointer(checkpoint_dir),
         )
 
         print(f"Finished. Results saved to: {checkpoint_dir}")
+
+        n_success = sum(1 for r in results if r.get("is_successful", 0) > 0.5)
+        print(f"Success: {n_success}/{len(results)}")
+        if n_success == 0:
+            sys.exit(1)
     finally:
         env.close()
 
