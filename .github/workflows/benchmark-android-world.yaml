@@ -1,0 +1,105 @@
+name: benchmark-android-world
+
+on:
+  workflow_dispatch:
+    inputs:
+      tasks:
+        description: 'AndroidWorld tasks to run (comma-separated)'
+        default: 'CameraTakePhoto'
+      max_step:
+        description: 'Max steps per task'
+        default: '10'
+      max_retry:
+        description: 'Max retries per task'
+        default: '3'
+
+env:
+  GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx6g -Dorg.gradle.daemon=false -Dkotlin.incremental=false"
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Delete unnecessary tools
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          android: false
+          tool-cache: true
+          dotnet: true
+          haskell: true
+          swap-storage: true
+          docker-images: false
+          large-packages: false
+
+      - name: Enable KVM group perms
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls /dev/kvm
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'jetbrains'
+          java-version: '17'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: Build Arbigent CLI
+        run: ./gradlew arbigent-cli:installDist --stacktrace
+
+      - name: Clone AndroidWorld
+        run: git clone --depth 1 https://github.com/google-research/android_world tmp/android_world
+
+      - name: Install AndroidWorld dependencies
+        run: pip install -r tmp/android_world/requirements.txt
+
+      - name: Run AndroidWorld benchmark
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPEN_ROUTER_API_KEY }}
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          disk-size: 6000M
+          heap-size: 600M
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -grpc 8554
+          script: |
+            python benchmark/android_world/run.py \
+              --tasks=${{ inputs.tasks }} \
+              --arbigent_max_step=${{ inputs.max_step }} \
+              --arbigent_max_retry=${{ inputs.max_retry }} \
+              --output_path=benchmark-results
+
+      - name: Check API key leakage
+        if: always()
+        run: |
+          for dir in benchmark-results arbigent-result; do
+            if [ -d "$dir" ] && grep -R --quiet "${{ secrets.OPEN_ROUTER_API_KEY }}" "$dir/" 2>/dev/null; then
+              echo "::error::API key leaked in $dir!"
+              exit 1
+            fi
+          done
+
+      - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
+        if: always()
+        with:
+          name: benchmark-android-world-results
+          path: |
+            benchmark-results/
+            arbigent-result/
+          retention-days: 120
