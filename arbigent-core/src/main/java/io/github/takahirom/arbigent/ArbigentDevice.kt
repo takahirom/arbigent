@@ -223,7 +223,47 @@ public class MaestroDevice(
     } catch (e: Exception) {
       // Device appears disconnected, reconnect
       arbigentInfoLog("MaestroDevice failed to fetch view hierarchy: ${e.message}. Reconnect device ${maestro.deviceName}")
+      if (e.message?.contains("RESOURCE_EXHAUSTED") == true) {
+        dumpAdbDiagnostics("ensureConnected")
+      }
       reconnectIfDisconnected()
+    }
+  }
+
+  // Temporary CI diagnostics: collect device state when RESOURCE_EXHAUSTED occurs
+  // to identify root cause of 30MB view hierarchy on CI emulator. Remove after investigation.
+  private fun dumpAdbDiagnostics(context: String) {
+    try {
+      arbigentInfoLog("[$context] Running adb diagnostics...")
+      val timeoutSec = 10L
+
+      fun runAdb(vararg args: String): String {
+        val process = ProcessBuilder(*args).redirectErrorStream(true).start()
+        if (!process.waitFor(timeoutSec, java.util.concurrent.TimeUnit.SECONDS)) {
+          process.destroyForcibly()
+          return "(timed out after ${timeoutSec}s)"
+        }
+        return process.inputStream.bufferedReader().readText()
+      }
+
+      val windowDump = runAdb("adb", "shell", "dumpsys", "window", "windows")
+      arbigentInfoLog("[$context] dumpsys window windows:\n${windowDump.take(10000)}")
+
+      val activityDump = runAdb("adb", "shell", "dumpsys", "activity", "top")
+      arbigentInfoLog("[$context] dumpsys activity top:\n${activityDump.take(10000)}")
+
+      val uniqueId = "${context}_${System.currentTimeMillis()}"
+      val screenshotPath = File(screenshotsDir, "debug_${uniqueId}.png")
+      runAdb("adb", "shell", "screencap", "-p", "/sdcard/debug_$uniqueId.png")
+      runAdb("adb", "pull", "/sdcard/debug_$uniqueId.png", screenshotPath.absolutePath)
+      arbigentInfoLog("[$context] Screenshot saved to: ${screenshotPath.absolutePath}")
+
+      runAdb("adb", "shell", "uiautomator", "dump", "/sdcard/debug_$uniqueId.xml")
+      val hierarchyXml = runAdb("adb", "shell", "cat", "/sdcard/debug_$uniqueId.xml")
+      arbigentInfoLog("[$context] uiautomator hierarchy size: ${hierarchyXml.length} chars")
+      arbigentInfoLog("[$context] uiautomator hierarchy:\n${hierarchyXml.take(20000)}")
+    } catch (diagError: Exception) {
+      arbigentInfoLog("[$context] adb diagnostics failed: ${diagError.message}")
     }
   }
 
@@ -238,8 +278,15 @@ public class MaestroDevice(
       } else {
         true
       }
-      runBlocking {
-        orchestra.executeCommands(actions, shouldReinitJsEngine = shouldJsReinit)
+      try {
+        runBlocking {
+          orchestra.executeCommands(actions, shouldReinitJsEngine = shouldJsReinit)
+        }
+      } catch (e: Exception) {
+        if (e.message?.contains("RESOURCE_EXHAUSTED") == true) {
+          dumpAdbDiagnostics("executeActions")
+        }
+        throw e
       }
     }
   }
