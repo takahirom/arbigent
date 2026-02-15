@@ -22,7 +22,9 @@ scenarios:
     temperature: 0.7
     imageFormat: "png"
 - id: "5f221744-6a45-4ff2-a980-eaba77049dc6"
-  goal: "Just open Legal information"
+  goal: "Just open Legal information page. If you can see 'Legal information' title\
+    \ at the top of the screen, the goal is achieved. Do NOT open Third-party licenses\
+    \ or any sub-items."
   dependency: "f9c17741-093e-49f0-ad45-8311ba68c1a6"
   tags:
   - name: "Settings"
