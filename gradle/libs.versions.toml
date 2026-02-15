@@ -16,7 +16,7 @@ kotlinx-datetime = "0.7.1"
 kotlinx-io = "0.3.3"
 webpImageio = "0.3.3"
 identityJvm = "202411.1"
-maestro = "1.40.0"
+maestro = "2.1.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -48,6 +48,7 @@ maestro-orchestra = { module = "dev.mobile:maestro-orchestra", version.ref = "ma
 maestro-client = { module = "dev.mobile:maestro-client", version.ref = "maestro" }
 maestro-ios = { module = "dev.mobile:maestro-ios", version.ref = "maestro" }
 maestro-ios-driver = { module = "dev.mobile:maestro-ios-driver", version.ref = "maestro" }
+maestro-web = { module = "dev.mobile:maestro-web", version.ref = "maestro" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
