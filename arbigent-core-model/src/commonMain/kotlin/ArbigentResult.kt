@@ -4,6 +4,7 @@ import com.charleskorn.kaml.PolymorphismStyle
 import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlComment
 import com.charleskorn.kaml.YamlConfiguration
+import io.github.takahirom.arbigent.ArbigentContentTags
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -53,6 +54,7 @@ public sealed interface StepFeedback: StepFeedbackEvent {
 public data class ArbigentScenarioResult(
   public val id: String,
   public val goal: String? = null,
+  public val tags: ArbigentContentTags = setOf(),
   public val executionStatus: String? = null,
   public val isSuccess: Boolean,
   public val histories: List<ArbigentAgentResults>,

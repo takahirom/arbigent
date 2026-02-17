@@ -12,6 +12,7 @@ public data class ArbigentScenarioAssignment(
     return ArbigentScenarioResult(
       id = scenario.id,
       goal = scenario.goal(),
+      tags = scenario.tags,
       executionStatus = scenarioExecutor.runningInfo()?.toString(),
       isSuccess = taskAssignmentsHistory.lastOrNull()?.all { it.agent.isGoalAchieved() } ?: false,
       histories = taskAssignmentsHistory.mapIndexed { index, taskAssignments ->

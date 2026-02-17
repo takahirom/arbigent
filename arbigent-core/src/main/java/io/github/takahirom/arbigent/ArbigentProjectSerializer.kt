@@ -61,13 +61,6 @@ public data class FixedScenario(
   public val yamlText: String
 )
 
-public typealias ArbigentContentTags = Set<ArbigentContentTag>
-
-@Serializable
-public data class ArbigentContentTag(
-  public val name: String
-)
-
 @Serializable
 public enum class ImageDetailLevel {
   @SerialName("high")
