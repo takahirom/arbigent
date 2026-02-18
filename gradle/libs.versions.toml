@@ -16,7 +16,7 @@ kotlinx-datetime = "0.7.1"
 kotlinx-io = "0.3.3"
 webpImageio = "0.3.3"
 identityJvm = "202411.1"
-maestro = "1.40.0"
+maestro = "1.40.0" # 2.0.0 available but requires API compatibility fixes
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
