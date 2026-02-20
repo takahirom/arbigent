@@ -35,6 +35,16 @@ import org.jetbrains.jewel.window.TitleBar
 import org.jetbrains.jewel.window.styling.TitleBarStyle
 import java.awt.Window
 
+private fun isJetBrainsRuntime(): Boolean {
+  return try {
+    val vendor = System.getProperty("java.vendor", "")
+    val vmName = System.getProperty("java.vm.name", "")
+    vendor.contains("JetBrains", ignoreCase = true) || vmName.contains("JBR", ignoreCase = true)
+  } catch (_: Exception) {
+    false
+  }
+}
+
 
 @OptIn(ArbigentInternalApi::class)
 fun main() {
@@ -136,65 +146,119 @@ fun AppWindow(
       )
     }
 
-    DecoratedWindow(
-      title = "App Test AI Agent",
-      onCloseRequest = {
-        if (appStateHolder.hasUnsavedChanges()) {
-          showCloseConfirmDialog = true
-        } else {
-          onExit()
-        }
-      }) {
-      CompositionLocalProvider(
-        LocalWindowExceptionHandlerFactory provides object : WindowExceptionHandlerFactory {
-          override fun exceptionHandler(window: Window): WindowExceptionHandler {
-            return WindowExceptionHandler { throwable ->
-              throwable.printStackTrace()
+    if (isJetBrainsRuntime()) {
+      DecoratedWindow(
+        title = "App Test AI Agent",
+        onCloseRequest = {
+          if (appStateHolder.hasUnsavedChanges()) {
+            showCloseConfirmDialog = true
+          } else {
+            onExit()
+          }
+        }) {
+        CompositionLocalProvider(
+          LocalWindowExceptionHandlerFactory provides object : WindowExceptionHandlerFactory {
+            override fun exceptionHandler(window: Window): WindowExceptionHandler {
+              return WindowExceptionHandler { throwable ->
+                throwable.printStackTrace()
+              }
             }
           }
-        }
-      ) {
-        val deviceConnectionState by appStateHolder.deviceConnectionState.collectAsState()
-        val isDeviceConnected = deviceConnectionState.isConnected()
-        TitleBar(
-          style = TitleBarStyle
-            .lightWithLightHeader(),
-          gradientStartColor = JewelTheme.colorPalette.purple(8),
         ) {
-          if (isDeviceConnected) {
-            Box(Modifier.padding(8.dp).align(Alignment.Start)) {
-              ProjectFileControls(appStateHolder)
-            }
-            Box(Modifier.padding(8.dp).align(Alignment.End)) {
-              ScenarioControls(appStateHolder)
-            }
-          }
-        }
-        MenuBar {
-          Menu("Scenarios") {
-            if (!(isDeviceConnected)) {
-              return@Menu
-            }
-            Item("Add") {
-              appStateHolder.addScenario()
-            }
-            Item("Run all") {
-              appStateHolder.runAll()
-            }
-            Item("Run all failed") {
-              appStateHolder.runAllFailed()
-            }
-            Item("Save") {
-              appStateHolder.projectDialogState.value = ProjectDialogState.SaveProjectContent
-            }
-            Item("Load") {
-              appStateHolder.projectDialogState.value = ProjectDialogState.LoadProjectContent
+          val deviceConnectionState by appStateHolder.deviceConnectionState.collectAsState()
+          val isDeviceConnected = deviceConnectionState.isConnected()
+          TitleBar(
+            style = TitleBarStyle
+              .lightWithLightHeader(),
+            gradientStartColor = JewelTheme.colorPalette.purple(8),
+          ) {
+            if (isDeviceConnected) {
+              Box(Modifier.padding(8.dp).align(Alignment.Start)) {
+                ProjectFileControls(appStateHolder)
+              }
+              Box(Modifier.padding(8.dp).align(Alignment.End)) {
+                ScenarioControls(appStateHolder)
+              }
             }
           }
+          MenuBar {
+            Menu("Scenarios") {
+              if (!(isDeviceConnected)) {
+                return@Menu
+              }
+              Item("Add") {
+                appStateHolder.addScenario()
+              }
+              Item("Run all") {
+                appStateHolder.runAll()
+              }
+              Item("Run all failed") {
+                appStateHolder.runAllFailed()
+              }
+              Item("Save") {
+                appStateHolder.projectDialogState.value = ProjectDialogState.SaveProjectContent
+              }
+              Item("Load") {
+                appStateHolder.projectDialogState.value = ProjectDialogState.LoadProjectContent
+              }
+            }
+          }
+          App(
+            appStateHolder = appStateHolder,
+          )
         }
-        App(
-          appStateHolder = appStateHolder,
-        )
+      }
+    } else {
+      androidx.compose.ui.window.Window(
+        title = "App Test AI Agent",
+        onCloseRequest = {
+          if (appStateHolder.hasUnsavedChanges()) {
+            showCloseConfirmDialog = true
+          } else {
+            onExit()
+          }
+        }) {
+        CompositionLocalProvider(
+          LocalWindowExceptionHandlerFactory provides object : WindowExceptionHandlerFactory {
+            override fun exceptionHandler(window: Window): WindowExceptionHandler {
+              return WindowExceptionHandler { throwable ->
+                throwable.printStackTrace()
+              }
+            }
+          }
+        ) {
+          val deviceConnectionState by appStateHolder.deviceConnectionState.collectAsState()
+          val isDeviceConnected = deviceConnectionState.isConnected()
+          MenuBar {
+            Menu("File") {
+              if (isDeviceConnected) {
+                Item("Save") {
+                  appStateHolder.projectDialogState.value = ProjectDialogState.SaveProjectContent
+                }
+                Item("Load") {
+                  appStateHolder.projectDialogState.value = ProjectDialogState.LoadProjectContent
+                }
+              }
+            }
+            Menu("Scenarios") {
+              if (!(isDeviceConnected)) {
+                return@Menu
+              }
+              Item("Add") {
+                appStateHolder.addScenario()
+              }
+              Item("Run all") {
+                appStateHolder.runAll()
+              }
+              Item("Run all failed") {
+                appStateHolder.runAllFailed()
+              }
+            }
+          }
+          App(
+            appStateHolder = appStateHolder,
+          )
+        }
       }
     }
   }
