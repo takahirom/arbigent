@@ -114,7 +114,7 @@ private fun MainScreen(
     )
   }
   val scenarioIndex by appStateHolder.selectedScenarioIndex.collectAsState()
-  var scenariosWidth by remember { mutableStateOf(200.dp) }
+  var scenariosWidth by remember { mutableStateOf(220.dp) }
   Row(modifier) {
     val scenarioAndDepths by appStateHolder.sortedScenariosAndDepthsStateFlow.collectAsState()
     LeftScenariosPanel(scenarioAndDepths, scenariosWidth, scenarioIndex, appStateHolder)
@@ -129,37 +129,33 @@ private fun MainScreen(
             scenariosWidth += dragAmount.x.toDp()
           }
         },
-      thickness = 8.dp
+      thickness = 4.dp
     )
     val scenarioStateHolderAndDepth = scenarioAndDepths.getOrNull(scenarioIndex)
     val stepFeedbacks by appStateHolder.stepFeedbacks.collectAsState()
     if (scenarioStateHolderAndDepth != null) {
-      Column(Modifier.weight(3f)) {
-        Scenario(
-          scenarioStateHolder = scenarioStateHolderAndDepth.first,
-          stepFeedbacks = stepFeedbacks,
-          onStepFeedback = {
-            appStateHolder.onStepFeedback(it)
-          },
+      val currentScenarioHolder = scenarioStateHolderAndDepth.first
+      var showOptionsSheet by remember { mutableStateOf(false) }
+
+      if (showOptionsSheet) {
+        OptionsSheet(
+          scenarioStateHolder = currentScenarioHolder,
+          scenarioCountById = { appStateHolder.scenarioCountById(it) },
           dependencyScenarioMenu = {
             selectableItem(
-              selected = scenarioStateHolderAndDepth.first.dependencyScenarioStateHolderStateFlow.value == null,
+              selected = currentScenarioHolder.dependencyScenarioStateHolderStateFlow.value == null,
               onClick = {
-                scenarioStateHolderAndDepth.first.dependencyScenarioStateHolderStateFlow.value =
-                  null
+                currentScenarioHolder.dependencyScenarioStateHolderStateFlow.value = null
               },
-              content = {
-                Text("No dependency")
-              }
+              content = { Text("No dependency") }
             )
             appStateHolder.sortedScenariosAndDepthsStateFlow.value.map { it.first }
-              .filter { senario -> senario != scenarioStateHolderAndDepth.first }
+              .filter { s -> s != currentScenarioHolder }
               .forEach { scenarioStateHolder: ArbigentScenarioStateHolder ->
                 selectableItem(
-                  selected = scenarioStateHolderAndDepth.first.dependencyScenarioStateHolderStateFlow.value == scenarioStateHolder,
+                  selected = currentScenarioHolder.dependencyScenarioStateHolderStateFlow.value == scenarioStateHolder,
                   onClick = {
-                    scenarioStateHolderAndDepth.first.dependencyScenarioStateHolderStateFlow.value =
-                      scenarioStateHolder
+                    currentScenarioHolder.dependencyScenarioStateHolderStateFlow.value = scenarioStateHolder
                   },
                   content = {
                     Text(
@@ -170,32 +166,34 @@ private fun MainScreen(
                 )
               }
           },
-          scenarioCountById = {
-            appStateHolder.scenarioCountById(it)
-          },
-          onAddSubScenario = {
-            appStateHolder.addSubScenario(parent = it)
-          },
-          onExecute = {
-            appStateHolder.run(it)
-          },
-          onDebugExecute = {
-            appStateHolder.runDebug(it)
-          },
-          onCancel = {
-            appStateHolder.cancel()
-            scenarioStateHolderAndDepth.first.cancel()
-          },
-          onRemove = {
-            appStateHolder.removeScenario(it)
-          },
+          onAddSubScenario = { appStateHolder.addSubScenario(parent = it) },
+          onRemove = { appStateHolder.removeScenario(it) },
           onShowFixedScenariosDialog = { scenarioStateHolder, index ->
             appStateHolder.onShowFixedScenariosDialogWithContext(scenarioStateHolder, index)
           },
-          getFixedScenarioById = { scenarioId ->
-            appStateHolder.getFixedScenarioById(scenarioId)
+          getFixedScenarioById = { appStateHolder.getFixedScenarioById(it) },
+          mcpServerNames = appStateHolder.mcpServerNamesFlow.collectAsState().value,
+          onDismiss = { showOptionsSheet = false },
+        )
+      }
+
+      Column(Modifier.weight(3f)) {
+        ChatArea(
+          scenarioStateHolder = currentScenarioHolder,
+          stepFeedbacks = stepFeedbacks,
+          onStepFeedback = { appStateHolder.onStepFeedback(it) },
+          modifier = Modifier.weight(1f),
+        )
+        InputBar(
+          scenarioStateHolder = currentScenarioHolder,
+          onExecute = { appStateHolder.run(it) },
+          onDebugExecute = { appStateHolder.runDebug(it) },
+          onCancel = {
+            appStateHolder.cancel()
+            currentScenarioHolder.cancel()
           },
-          mcpServerNames = appStateHolder.mcpServerNamesFlow.collectAsState().value
+          onAddSubScenario = { appStateHolder.addSubScenario(parent = it) },
+          onShowOptions = { showOptionsSheet = true },
         )
       }
     }

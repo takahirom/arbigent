@@ -3,14 +3,19 @@ package io.github.takahirom.arbigent.ui
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -18,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -35,8 +41,10 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import io.github.takahirom.arbigent.ArbigentTag
 import io.github.takahirom.arbigent.ui.ArbigentAppStateHolder.ProjectDialogState
 import org.jetbrains.jewel.foundation.theme.JewelTheme
@@ -46,6 +54,7 @@ import org.jetbrains.jewel.ui.component.DefaultButton
 import org.jetbrains.jewel.ui.component.Divider
 import org.jetbrains.jewel.ui.component.Icon
 import org.jetbrains.jewel.ui.component.IconActionButton
+import org.jetbrains.jewel.ui.component.OutlinedButton
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.TextField
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
@@ -60,7 +69,6 @@ internal fun LeftScenariosPanel(
   selectedScenarioIndex: Int,
   appStateHolder: ArbigentAppStateHolder
 ) {
-  // Map to manage expanded/collapsed state (scenario holder -> expanded state)
   val expandedStates = remember { mutableStateMapOf<ArbigentScenarioStateHolder, Boolean>() }
   Column(
     Modifier
@@ -68,58 +76,45 @@ internal fun LeftScenariosPanel(
         if (scenarioAndDepths.isEmpty()) {
           fillMaxSize()
         } else {
-          width(scenariosWidth)
+          width(scenariosWidth).fillMaxHeight()
         }
-      },
-  ) {
-    Row(
-      modifier = Modifier.padding(8.dp)
-    ) {
-      IconActionButton(
-        key = AllIconsKeys.FileTypes.AddAny,
-        onClick = {
-          appStateHolder.addScenario()
-        },
-        contentDescription = "Add",
-        hint = Size(28),
-        modifier = Modifier.padding(end = 8.dp)
-      ) {
-        Text("Add scenario")
       }
-
+      .background(JewelTheme.globalColors.panelBackground),
+  ) {
+    // Header
+    Row(
+      modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Text(
+        text = "Scenarios",
+        modifier = Modifier.weight(1f),
+      )
       IconActionButton(
-        key = AllIconsKeys.Diff.MagicResolve,
-        onClick = {
-          appStateHolder.projectDialogState.value = ProjectDialogState.ShowGenerateScenarioDialog
-        },
-        contentDescription = "Generate",
-        hint = Size(28)
+        key = AllIconsKeys.General.Add,
+        onClick = { appStateHolder.addScenario() },
+        contentDescription = "New scenario",
+        hint = Size(16),
       ) {
-        Text("Generate scenario")
+        Text("New scenario")
       }
     }
-    Box {
-      if (scenarioAndDepths.isNotEmpty()) {
-        (0..scenarioAndDepths.maxOf { it.second }).forEach {
-          Divider(
-            orientation = Orientation.Vertical,
-            modifier = Modifier.padding(start = 4.dp + 12.dp * it)
-              .fillMaxHeight()
-              .background(JewelTheme.colorPalette.purple(8))
-              .width(2.dp)
-          )
-        }
-      }
+
+    Divider(
+      orientation = Orientation.Horizontal,
+      modifier = Modifier.fillMaxWidth(),
+      thickness = 1.dp,
+    )
+
+    // Scenario list
+    Box(Modifier.weight(1f)) {
       val lazyColumnState = rememberLazyListState()
-      
-      // Pre-compute visibility using derivedStateOf to avoid recomputation on unrelated recompositions
+
       val visibleIndices by remember(scenarioAndDepths, expandedStates) {
         derivedStateOf {
           val indices = mutableSetOf<Int>()
           val ancestorStack = mutableListOf<Pair<Int, ArbigentScenarioStateHolder>>()
-          
           scenarioAndDepths.forEachIndexed { index, (scenarioHolder, depth) ->
-            // Pop ancestors that are at same or deeper level
             while (ancestorStack.isNotEmpty()) {
               val (ancestorIndex, _) = ancestorStack.last()
               if (scenarioAndDepths[ancestorIndex].second >= depth) {
@@ -128,140 +123,179 @@ internal fun LeftScenariosPanel(
                 break
               }
             }
-            
-            // Check if all ancestors are expanded
             val allAncestorsExpanded = ancestorStack.all { (_, ancestorHolder) ->
               expandedStates.getOrDefault(ancestorHolder, true)
             }
-            
             if (allAncestorsExpanded) {
               indices.add(index)
             }
-            
-            // Add current item to ancestor stack for its potential children
             ancestorStack.add(index to scenarioHolder)
           }
           indices
         }
       }
-      
+
       LazyColumn(
         state = lazyColumnState,
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize().padding(vertical = 4.dp),
       ) {
         itemsIndexed(scenarioAndDepths) { index, (scenarioStateHolder, depth) ->
           if (!visibleIndices.contains(index)) {
             return@itemsIndexed
           }
-          
-          // Check if this scenario has children (next item has greater depth)
-          val hasChildren = index < scenarioAndDepths.size - 1 && 
+
+          val hasChildren = index < scenarioAndDepths.size - 1 &&
             scenarioAndDepths[index + 1].second > depth
-          
+
+          val isSelected = index == selectedScenarioIndex
           val goal = scenarioStateHolder.goalState.text
-          Column(
+          val isAchieved by scenarioStateHolder.isAchieved.collectAsState()
+          val isRunning by scenarioStateHolder.isRunning.collectAsState()
+          val scenarioType by scenarioStateHolder.scenarioTypeStateFlow.collectAsState()
+          val isFailed by scenarioStateHolder.isFailed.collectAsState()
+
+          val interactionSource = remember { MutableInteractionSource() }
+          val isHovered by interactionSource.collectIsHoveredAsState()
+
+          // Subtle background: selected = light gray, hovered = very light
+          val bgColor = when {
+            isSelected -> Color(0xFFEBEBEB)
+            isHovered -> Color(0xFFF5F5F5)
+            else -> Color.Transparent
+          }
+
+          Row(
             modifier = Modifier.fillMaxWidth()
+              .padding(horizontal = 6.dp, vertical = 1.dp)
+              .clip(RoundedCornerShape(8.dp))
+              .background(bgColor)
+              .hoverable(interactionSource)
+              .clickable { appStateHolder.selectedScenarioIndex.value = index }
               .padding(
-                start = 8.dp + 12.dp * depth,
-                top = if (depth == 0) 8.dp else 0.dp,
-                end = 8.dp,
-                bottom = 2.dp
-              )
-              .background(
-                if (index == selectedScenarioIndex) {
-                  JewelTheme.colorPalette.purple(9)
-                } else {
-                  Color.White
-                }
-              )
-              .clickable { appStateHolder.selectedScenarioIndex.value = index },
+                start = 10.dp + 12.dp * depth,
+                top = 8.dp,
+                end = 6.dp,
+                bottom = 8.dp,
+              ),
+            verticalAlignment = Alignment.CenterVertically,
           ) {
-            Row(
-              modifier = Modifier.padding(4.dp),
-              verticalAlignment = Alignment.CenterVertically
-            ) {
-              // Show expand/collapse button if this scenario has children
-              if (hasChildren) {
-                val isExpanded = expandedStates.getOrDefault(scenarioStateHolder, true)
-                IconActionButton(
-                  onClick = {
-                    expandedStates[scenarioStateHolder] = !isExpanded
-                  },
-                  key = if (isExpanded) AllIconsKeys.General.ChevronDown else AllIconsKeys.General.ChevronRight,
-                  contentDescription = if (isExpanded) "Collapse" else "Expand",
-                  hint = Size(16),
-                  modifier = Modifier.padding(end = 4.dp)
-                )
-              }
-              
-              val runningInfo by scenarioStateHolder.arbigentScenarioRunningInfo.collectAsState()
-              val scenarioType by scenarioStateHolder.scenarioTypeStateFlow.collectAsState()
-              Text(
-                modifier = Modifier.weight(1f),
-                text = if (scenarioType.isScenario()) {
-                  "Goal: $goal"
-                } else {
-                  val scenarioId by scenarioStateHolder.idStateFlow.collectAsState()
-                  "Execution: $scenarioId"
-                } + if (runningInfo?.toString().orEmpty().isEmpty()) {
-                  ""
-                } else {
-                  "\n" + runningInfo?.toString().orEmpty()
-                }
+            // Expand/collapse chevron for parents
+            if (hasChildren) {
+              val isExpanded = expandedStates.getOrDefault(scenarioStateHolder, true)
+              Icon(
+                key = if (isExpanded) AllIconsKeys.General.ChevronDown else AllIconsKeys.General.ChevronRight,
+                contentDescription = if (isExpanded) "Collapse" else "Expand",
+                hint = Size(12),
+                modifier = Modifier
+                  .padding(end = 4.dp)
+                  .clickable { expandedStates[scenarioStateHolder] = !isExpanded },
               )
-              val isAchieved by scenarioStateHolder.isAchieved.collectAsState()
-              if (isAchieved) {
-                PassedMark(
-                  Modifier.padding(8.dp)
-                )
+            }
+
+            // Status indicator
+            if (isRunning) {
+              CircularProgressIndicator(
+                modifier = Modifier
+                  .size(8.dp)
+                  .testTag("scenario_running"),
+              )
+            } else {
+              val statusColor = when {
+                isAchieved -> JewelTheme.colorPalette.green(6)
+                isFailed -> JewelTheme.colorPalette.red(6)
+                else -> Color(0xFFBBBBBB)
               }
-              val isNewlyGenerated by scenarioStateHolder.isNewlyGenerated.collectAsState()
-              if (isNewlyGenerated) {
-                Icon(
-                  key = AllIconsKeys.Diff.MagicResolve,
-                  contentDescription = "isNewlyGenerated",
-                  modifier = Modifier
-                    .size(32.dp)
-                    .clip(
-                      CircleShape
-                    )
-                    .background(JewelTheme.colorPalette.purple(8))
-                )
-              }
-              val isRunning by scenarioStateHolder.isRunning.collectAsState()
-              if (isRunning) {
-                CircularProgressIndicator(
-                  modifier = Modifier.padding(8.dp)
-                    .size(32.dp)
-                    .testTag("scenario_running")
-                )
+              Box(
+                modifier = Modifier
+                  .size(6.dp)
+                  .clip(CircleShape)
+                  .background(statusColor),
+              )
+            }
+
+            // Scenario text
+            Text(
+              modifier = Modifier.weight(1f).padding(start = 8.dp),
+              text = if (scenarioType.isScenario()) {
+                goal.toString().ifBlank { "New scenario" }
+              } else {
+                val scenarioId by scenarioStateHolder.idStateFlow.collectAsState()
+                scenarioId.ifBlank { "Execution" }
+              },
+              maxLines = 2,
+              overflow = TextOverflow.Ellipsis,
+            )
+
+            // Action icons: visible on hover or when running/selected
+            if (isRunning) {
+              Icon(
+                key = AllIconsKeys.Actions.Cancel,
+                contentDescription = "Stop",
+                hint = Size(14),
+                modifier = Modifier
+                  .padding(start = 4.dp)
+                  .clickable {
+                    appStateHolder.cancel()
+                    scenarioStateHolder.cancel()
+                  },
+              )
+            }
+
+            if (isHovered || isSelected) {
+              var removeDialogShowing by remember { mutableStateOf(false) }
+              Icon(
+                key = AllIconsKeys.General.Delete,
+                contentDescription = "Delete",
+                hint = Size(14),
+                modifier = Modifier
+                  .padding(start = 4.dp)
+                  .clickable { removeDialogShowing = true },
+              )
+              if (removeDialogShowing) {
+                Dialog(onDismissRequest = { removeDialogShowing = false }) {
+                  Column(
+                    modifier = Modifier
+                      .background(JewelTheme.globalColors.panelBackground, RoundedCornerShape(8.dp))
+                      .padding(16.dp)
+                  ) {
+                    Text("Remove this scenario?")
+                    Spacer(Modifier.height(12.dp))
+                    Row {
+                      OutlinedButton(onClick = { removeDialogShowing = false }) {
+                        Text("Cancel")
+                      }
+                      Spacer(Modifier.width(8.dp))
+                      DefaultButton(onClick = {
+                        removeDialogShowing = false
+                        appStateHolder.removeScenario(scenarioStateHolder)
+                      }) {
+                        Text("Remove")
+                      }
+                    }
+                  }
+                }
               }
             }
-            val tags by scenarioStateHolder.tags.collectAsState()
-            Tags(
-              tags,
-              onTagAdded = {
-                scenarioStateHolder.addTag()
-              },
-              onTagRemoved = {
-                scenarioStateHolder.removeTag(it)
-              },
-              onTagChanged = { tag, newName ->
-                scenarioStateHolder.onTagChanged(tag, newName)
-              }
-            )
           }
         }
       }
+
       if (scenarioAndDepths.isEmpty()) {
-        Box(Modifier.fillMaxSize().padding(8.dp)) {
-          DefaultButton(
+        Box(Modifier.fillMaxSize().padding(16.dp)) {
+          Column(
             modifier = Modifier.align(Alignment.Center),
-            onClick = {
-              appStateHolder.addScenario()
-            },
+            horizontalAlignment = Alignment.CenterHorizontally,
           ) {
-            Text("Add a scenario")
+            Text(
+              text = "No scenarios yet",
+              color = JewelTheme.globalColors.text.info,
+            )
+            Spacer(Modifier.height(8.dp))
+            DefaultButton(
+              onClick = { appStateHolder.addScenario() },
+            ) {
+              Text("New scenario")
+            }
           }
         }
       }
@@ -287,9 +321,7 @@ fun Tags(
       )
     }
     IconActionButton(
-      onClick = {
-        onTagAdded()
-      },
+      onClick = { onTagAdded() },
       key = AllIconsKeys.General.Add,
       contentDescription = "Add a tag",
     )
@@ -305,7 +337,8 @@ fun Tag(
   var isEditingMode by remember { mutableStateOf(false) }
   Row(
     modifier = Modifier.padding(4.dp)
-      .background(JewelTheme.colorPalette.purple(8))
+      .background(JewelTheme.colorPalette.purple(2), RoundedCornerShape(4.dp))
+      .padding(horizontal = 2.dp)
   ) {
     if (isEditingMode) {
       val textFieldState = rememberTextFieldState(tagName)
@@ -338,9 +371,7 @@ fun Tag(
       Text(
         text = tagName,
         modifier = Modifier.padding(4.dp)
-          .clickable {
-            isEditingMode = !isEditingMode
-          }
+          .clickable { isEditingMode = !isEditingMode }
       )
     }
   }
