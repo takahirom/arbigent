@@ -654,24 +654,21 @@ class TestRobot(
   }
 
   fun expandOptions() {
-    composeUiTest.onNode(hasContentDescription("Expand Options")).performClick()
-    if (!waitForNodeSafely(hasContentDescription("Collapse Options"))) {
-      kotlin.test.fail("Options did not expand - Collapse Options button not found")
+    composeUiTest.onNode(hasContentDescription("Options")).performClick()
+    // Wait for options sheet to be visible
+    if (!waitForNodeSafely(hasText("Scenario Options"), 2000)) {
+      kotlin.test.fail("Options sheet did not open")
     }
+    waitALittle()
     // To make the test deterministic
     changeScenarioId("default_scenario")
   }
 
   fun collapseOptions() {
-    // There is a case that we need to close other windows before closing the options
-    fun isCollapsed() = try {
-      composeUiTest.onNode(hasContentDescription("Collapse Options")).assertExists()
-      false
-    } catch (e: AssertionError) {
-      true
-    }
-    while (!isCollapsed()) {
-      composeUiTest.onNode(hasContentDescription("Collapse Options")).performClick()
+    // Close the options sheet by clicking the Close button
+    if (waitForNodeSafely(hasText("Close"), 1000)) {
+      composeUiTest.onNode(hasText("Close")).performClick()
+      waitALittle()
     }
   }
 

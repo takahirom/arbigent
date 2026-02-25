@@ -87,6 +87,13 @@ constructor(
       started = SharingStarted.WhileSubscribed(),
       initialValue = false
     )
+  val isFailed = arbigentScenarioExecutorStateFlow
+    .flatMapLatest { it?.isFailedToArchiveFlow ?: flowOf(false) }
+    .stateIn(
+      scope = coroutineScope,
+      started = SharingStarted.WhileSubscribed(),
+      initialValue = false
+    )
 
   val arbigentScenarioRunningInfo: StateFlow<ArbigentScenarioRunningInfo?> =
     arbigentScenarioExecutorStateFlow

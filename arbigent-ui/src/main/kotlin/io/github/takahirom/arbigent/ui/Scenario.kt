@@ -427,7 +427,7 @@ private fun ScenarioFundamentalOptions(
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
-private fun ScenarioOptions(
+internal fun ScenarioOptions(
   scenarioStateHolder: ArbigentScenarioStateHolder,
   scenarioCountById: (String) -> Int,
   dependencyScenarioMenu: MenuScope.() -> Unit,
@@ -1017,7 +1017,7 @@ fun buildSections(tasksToAgent: List<ArbigentTaskAssignment>): List<ScenarioSect
   return sections
 }
 
-private fun formatTimestamp(timestamp: Long): String {
+internal fun formatTimestamp(timestamp: Long): String {
   val date = java.time.Instant.ofEpochMilli(timestamp)
   return date.toString().replace('T', ' ').substringBefore('.')
 }
@@ -1069,7 +1069,7 @@ private fun ContentPanel(
             } else {
               "Dependency scenario goal: "
             }
-            Row(Modifier.background(Color.White)) {
+            Row(Modifier.background(JewelTheme.globalColors.panelBackground)) {
               GroupHeader(
                 modifier = Modifier.padding(8.dp)
                   .weight(1F),

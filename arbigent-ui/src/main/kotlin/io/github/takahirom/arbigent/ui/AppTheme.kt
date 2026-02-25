@@ -13,11 +13,19 @@ import org.jetbrains.jewel.window.styling.TitleBarStyle
 
 @Composable
 fun AppTheme(content: @Composable () -> Unit) {
+  val vendor = System.getProperty("java.vendor", "")
+  val vmName = System.getProperty("java.vm.name", "")
+  val isJbr = vendor.contains("JetBrains", ignoreCase = true) || vmName.contains("JBR", ignoreCase = true)
+
   IntUiTheme(
     theme = JewelTheme.lightThemeDefinition(),
-    styling = ComponentStyling.default().decoratedWindow(
-      titleBarStyle = TitleBarStyle.lightWithLightHeader()
-    ),
+    styling = if (isJbr) {
+      ComponentStyling.default().decoratedWindow(
+        titleBarStyle = TitleBarStyle.lightWithLightHeader()
+      )
+    } else {
+      ComponentStyling.default()
+    },
     swingCompatMode = true,
   ) {
     content()
