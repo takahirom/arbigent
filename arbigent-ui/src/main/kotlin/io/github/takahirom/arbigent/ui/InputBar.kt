@@ -57,13 +57,12 @@ fun InputBar(
     Box(
       modifier = Modifier
         .fillMaxWidth()
-        .heightIn(min = 36.dp, max = 72.dp)
-        .testTag("goal"),
+        .heightIn(min = 36.dp, max = 72.dp),
     ) {
       BasicTextField(
         state = goal,
         enabled = scenarioType.isScenario() && !isRunning,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().testTag("goal"),
         textStyle = JewelTheme.editorTextStyle.copy(
           color = JewelTheme.globalColors.text.normal
         ),

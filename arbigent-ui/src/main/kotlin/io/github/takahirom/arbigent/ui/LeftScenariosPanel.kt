@@ -93,10 +93,10 @@ internal fun LeftScenariosPanel(
       IconActionButton(
         key = AllIconsKeys.General.Add,
         onClick = { appStateHolder.addScenario() },
-        contentDescription = "New scenario",
+        contentDescription = "Add",
         hint = Size(16),
       ) {
-        Text("New scenario")
+        Text("Add")
       }
     }
 
@@ -241,8 +241,9 @@ internal fun LeftScenariosPanel(
               )
             }
 
+            var removeDialogShowing by remember(scenarioStateHolder) { mutableStateOf(false) }
+
             if (isHovered || isSelected) {
-              var removeDialogShowing by remember { mutableStateOf(false) }
               Icon(
                 key = AllIconsKeys.General.Delete,
                 contentDescription = "Delete",
@@ -251,26 +252,27 @@ internal fun LeftScenariosPanel(
                   .padding(start = 4.dp)
                   .clickable { removeDialogShowing = true },
               )
-              if (removeDialogShowing) {
-                Dialog(onDismissRequest = { removeDialogShowing = false }) {
-                  Column(
-                    modifier = Modifier
-                      .background(JewelTheme.globalColors.panelBackground, RoundedCornerShape(8.dp))
-                      .padding(16.dp)
-                  ) {
-                    Text("Remove this scenario?")
-                    Spacer(Modifier.height(12.dp))
-                    Row {
-                      OutlinedButton(onClick = { removeDialogShowing = false }) {
-                        Text("Cancel")
-                      }
-                      Spacer(Modifier.width(8.dp))
-                      DefaultButton(onClick = {
-                        removeDialogShowing = false
-                        appStateHolder.removeScenario(scenarioStateHolder)
-                      }) {
-                        Text("Remove")
-                      }
+            }
+
+            if (removeDialogShowing) {
+              Dialog(onDismissRequest = { removeDialogShowing = false }) {
+                Column(
+                  modifier = Modifier
+                    .background(JewelTheme.globalColors.panelBackground, RoundedCornerShape(8.dp))
+                    .padding(16.dp)
+                ) {
+                  Text("Remove this scenario?")
+                  Spacer(Modifier.height(12.dp))
+                  Row {
+                    OutlinedButton(onClick = { removeDialogShowing = false }) {
+                      Text("Cancel")
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    DefaultButton(onClick = {
+                      removeDialogShowing = false
+                      appStateHolder.removeScenario(scenarioStateHolder)
+                    }) {
+                      Text("Remove")
                     }
                   }
                 }

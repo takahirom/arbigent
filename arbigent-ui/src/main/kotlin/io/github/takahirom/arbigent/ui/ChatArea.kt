@@ -360,12 +360,15 @@ private fun ChatMessage(
       modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
     ) {
       // Screenshot thumbnail
-      val annotatedPath = File(step.screenshotFilePath).getAnnotatedFilePath()
-      val screenshotFile = File(annotatedPath)
-      if (screenshotFile.exists()) {
+      val screenshotFile = remember(step.screenshotFilePath) {
+        val path = File(step.screenshotFilePath).getAnnotatedFilePath()
+        File(path).takeIf { it.exists() }
+      }
+      val annotatedPath = screenshotFile?.absolutePath ?: ""
+      if (screenshotFile != null) {
         val bitmap = remember(annotatedPath) {
           try {
-            loadImageBitmap(FileInputStream(screenshotFile))
+            FileInputStream(screenshotFile).use { loadImageBitmap(it) }
           } catch (_: Exception) {
             null
           }
@@ -378,7 +381,12 @@ private fun ChatMessage(
               .widthIn(max = 180.dp)
               .clip(RoundedCornerShape(6.dp))
               .onClick {
-                Desktop.getDesktop().open(screenshotFile)
+                if (Desktop.isDesktopSupported() &&
+                    Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
+                  try {
+                    Desktop.getDesktop().open(screenshotFile)
+                  } catch (_: Exception) { /* silently ignore */ }
+                }
               },
           )
         }
@@ -498,15 +506,19 @@ private fun StepDetailPanel(
     }
 
     // Full screenshots
-    val annotatedPath = File(step.screenshotFilePath).getAnnotatedFilePath()
-    if (File(annotatedPath).exists()) {
+    val screenshotFileForDetail = remember(step.screenshotFilePath) {
+      val path = File(step.screenshotFilePath).getAnnotatedFilePath()
+      File(path).takeIf { it.exists() }
+    }
+    val annotatedPath = screenshotFileForDetail?.absolutePath ?: ""
+    if (screenshotFileForDetail != null) {
       ExpandableSection(
         title = "Annotated Screenshot",
         defaultExpanded = false,
         modifier = Modifier.fillMaxWidth()
       ) {
         val bitmap = remember(annotatedPath) {
-          try { loadImageBitmap(FileInputStream(annotatedPath)) } catch (_: Exception) { null }
+          try { FileInputStream(annotatedPath).use { loadImageBitmap(it) } } catch (_: Exception) { null }
         }
         bitmap?.let {
           Image(
@@ -516,7 +528,12 @@ private fun StepDetailPanel(
         }
         Text(
           modifier = Modifier.onClick {
-            Desktop.getDesktop().open(File(annotatedPath))
+            if (Desktop.isDesktopSupported() &&
+                Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
+              try {
+                Desktop.getDesktop().open(File(annotatedPath))
+              } catch (_: Exception) { /* silently ignore */ }
+            }
           },
           text = "Open: $annotatedPath",
         )
