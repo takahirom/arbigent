@@ -591,15 +591,17 @@ class TestRobot(
 
   @OptIn(ExperimentalCoroutinesApi::class)
   fun waitUntilScenarioRunning() {
-    // Wait for scenario_running tag to disappear (scenario has finished)
-    // 10 second timeout for image assertion processing
+    // Wait for scenario_running tag to disappear (scenario has finished).
+    // Advance time before each check to ensure Compose recomposition and
+    // coroutine scheduling have a chance to process, even on slower CI.
     repeat(100) {
+      testScope.advanceTimeBy(100)
+      testScope.advanceUntilIdle()
+      composeUiTest.waitForIdle()
       val nodes = composeUiTest.onAllNodes(hasTestTag("scenario_running"), useUnmergedTree = true).fetchSemanticsNodes()
       if (nodes.isEmpty()) {
         return  // Element disappeared, scenario finished
       }
-      testScope.advanceTimeBy(100)
-      testScope.advanceUntilIdle()
     }
     kotlin.test.fail("Scenario did not finish within 10 seconds")
   }
