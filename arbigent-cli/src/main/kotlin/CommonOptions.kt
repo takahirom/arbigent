@@ -111,7 +111,7 @@ fun createAi(aiType: AiConfig, aiApiLoggingEnabled: Boolean): ArbigentAi {
   }
 }
 
-fun connectDevice(os: String): ArbigentDevice {
+suspend fun connectDevice(os: String): ArbigentDevice {
   val deviceOs =
     ArbigentDeviceOs.entries.find { it.name.toLowerCasePreservingASCIIRules() == os.toLowerCasePreservingASCIIRules() }
       ?: throw IllegalArgumentException(
