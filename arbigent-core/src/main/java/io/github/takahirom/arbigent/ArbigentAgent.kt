@@ -881,6 +881,7 @@ public fun defaultAgentActionTypesForVisualMode(): List<AgentActionType> {
 //    ClickWithIdAgentAction,
 //    ClickWithTextAgentAction,
     ClickWithIndex,
+    ClickAtCoordinates,
     InputTextAgentAction,
     BackPressAgentAction,
     KeyPressAgentAction,
