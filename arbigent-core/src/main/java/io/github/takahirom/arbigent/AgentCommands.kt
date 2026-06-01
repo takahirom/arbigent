@@ -96,6 +96,42 @@ public data class ClickWithIndex(val index: Int) : ArbigentAgentAction {
 }
 
 @Serializable
+public data class ClickAtCoordinates(val x: Int, val y: Int) : ArbigentAgentAction {
+  override val actionName: String = Companion.actionName
+
+  override fun stepLogText(): String {
+    return "Click at coordinates: ($x, $y)"
+  }
+
+  override fun runDeviceAction(runInput: ArbigentAgentAction.RunInput) {
+    runInput.device.executeActions(
+      actions = listOf(
+        MaestroCommand(
+          tapOnPointV2Command = TapOnPointV2Command(
+            point = "$x,$y"
+          )
+        )
+      ),
+    )
+  }
+
+  public companion object : AgentActionType {
+    override val actionName: String = "ClickAtCoordinates"
+
+    override fun arguments(): List<AgentActionType.Argument> =
+      listOf(
+        AgentActionType.Argument(
+          name = "text",
+          type = "string",
+          description = "Raw screen coordinates to tap, formatted as \"x,y\" (e.g. \"195,760\"). Use this ONLY when a target element is visible in the screenshot but NOT present in the ELEMENTS/UI-tree list (typical for native iOS system dialogs like Sign in with Apple, permission prompts, etc.). Coordinates are in screen logical points starting at (0,0) top-left."
+        )
+      )
+
+    override fun actionDescription(): String = "Tap at raw screen coordinates. Use only when the target is not in the UI hierarchy."
+  }
+}
+
+@Serializable
 public data class ClickWithTextAgentAction(val textRegex: String) : ArbigentAgentAction {
   override val actionName: String = Companion.actionName
 
