@@ -1,5 +1,6 @@
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import io.github.takahirom.arbigent.ChatCompletionRequest
+import io.github.takahirom.arbigent.ChatCompletionResponse
 import io.github.takahirom.arbigent.ChatMessage
 import io.github.takahirom.arbigent.FunctionDefinition
 import io.github.takahirom.arbigent.OpenAIAi
@@ -57,7 +58,7 @@ class BuildRequestBodyTest {
   }
 
   @Test
-  fun `gpt-5_1 with tools and reasoning effort still uses chat completions path`() {
+  fun `gpt-5 dot 1 with tools and reasoning effort still uses chat completions path`() {
     val request = createToolRequest("gpt-5.1")
     val extraParams = buildJsonObject { put("reasoning_effort", "low") }
 
@@ -65,7 +66,7 @@ class BuildRequestBodyTest {
   }
 
   @Test
-  fun `gpt-5_5 with tools and reasoning effort uses responses path`() {
+  fun `gpt-5 dot 5 with tools and reasoning effort uses responses path`() {
     val request = createToolRequest("gpt-5.5")
     val extraParams = buildJsonObject { put("reasoning_effort", "low") }
 
@@ -93,6 +94,76 @@ class BuildRequestBodyTest {
     val tool = result["tools"]?.jsonArray?.first()?.jsonObject
     assertEquals("function", tool?.get("type")?.jsonPrimitive?.content)
     assertEquals("perform_click", tool?.get("name")?.jsonPrimitive?.content)
+  }
+
+  @Test
+  fun `null reasoning_effort does not use responses path or emit reasoning`() {
+    val request = createToolRequest("gpt-5.5")
+    val extraParams = buildJsonObject { put("reasoning_effort", JsonNull) }
+
+    assertEquals("chat/completions", openAiAi.apiPathForRequest(request, extraParams))
+    val result = openAiAi.buildResponsesRequestBody(request, extraParams).jsonObject
+    assertFalse(result.containsKey("reasoning"))
+  }
+
+  @Test
+  fun `normalizeResponsesApiResponse maps plain message output`() {
+    val responseBody = """
+      {
+        "id": "resp_123",
+        "created_at": 1234567890,
+        "model": "gpt-5.5",
+        "output": [
+          {
+            "type": "message",
+            "content": [
+              {"type": "output_text", "text": "hello "},
+              {"type": "text", "text": "world"}
+            ]
+          }
+        ],
+        "usage": {"input_tokens": 10, "output_tokens": 2, "total_tokens": 12}
+      }
+    """.trimIndent()
+
+    val normalized = Json.decodeFromString<ChatCompletionResponse>(
+      openAiAi.normalizeResponsesApiResponse(responseBody, "fallback-model")
+    )
+
+    assertEquals("gpt-5.5", normalized.model)
+    assertEquals("hello world", normalized.choices.first().message.content)
+    assertEquals(10, normalized.usage?.promptTokens)
+    assertEquals(2, normalized.usage?.completionTokens)
+    assertEquals(12, normalized.usage?.totalTokens)
+  }
+
+  @Test
+  fun `normalizeResponsesApiResponse maps all function call outputs`() {
+    val responseBody = """
+      {
+        "id": "resp_123",
+        "created_at": 1234567890,
+        "model": "gpt-5.5",
+        "output": [
+          {"type": "function_call", "call_id": "call_1", "name": "perform_click", "arguments": "{\"text\":\"1\"}"},
+          {"type": "function_call", "id": "fc_2", "name": "perform_wait", "arguments": "{\"text\":\"1000\"}"},
+          {"type": "message", "content": [{"type": "output_text", "text": "done"}]}
+        ]
+      }
+    """.trimIndent()
+
+    val normalized = Json.decodeFromString<ChatCompletionResponse>(
+      openAiAi.normalizeResponsesApiResponse(responseBody, "fallback-model")
+    )
+    val message = normalized.choices.first().message
+
+    assertEquals("done", message.content)
+    assertEquals(2, message.toolCalls?.size)
+    assertEquals("call_1", message.toolCalls?.get(0)?.id)
+    assertEquals("perform_click", message.toolCalls?.get(0)?.function?.name)
+    assertEquals("{\"text\":\"1\"}", message.toolCalls?.get(0)?.function?.arguments)
+    assertEquals("fc_2", message.toolCalls?.get(1)?.id)
+    assertEquals("perform_wait", message.toolCalls?.get(1)?.function?.name)
   }
 
   @Test

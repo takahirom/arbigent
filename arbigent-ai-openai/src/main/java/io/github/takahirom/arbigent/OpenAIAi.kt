@@ -564,7 +564,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
       } ?: chatCompletionRequest
       val useResponsesApi = shouldUseResponsesApi(requestWithTemp, aiOptions?.extraBody)
       val response: HttpResponse =
-        httpClient.post(baseUrl + apiPathForRequest(requestWithTemp, aiOptions?.extraBody)) {
+        httpClient.post(baseUrl + apiPathForRequest(useResponsesApi)) {
           url {
             parameters.append("requestUuid", requestUuid)
           }
@@ -599,14 +599,19 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
   }
 
   internal fun apiPathForRequest(request: ChatCompletionRequest, extraParams: JsonObject?): String {
-    return if (shouldUseResponsesApi(request, extraParams)) "responses" else "chat/completions"
+    return apiPathForRequest(shouldUseResponsesApi(request, extraParams))
+  }
+
+  private fun apiPathForRequest(useResponsesApi: Boolean): String {
+    return if (useResponsesApi) "responses" else "chat/completions"
   }
 
   internal fun shouldUseResponsesApi(request: ChatCompletionRequest, extraParams: JsonObject?): Boolean {
+    val reasoningEffort = extraParams?.get("reasoning_effort")?.takeUnless { it is JsonNull }
     return jsonSchemaType == ArbigentAi.JsonSchemaType.OpenAI &&
       modelRequiresResponsesApiForReasoningTools(request.model) &&
       !request.tools.isNullOrEmpty() &&
-      extraParams?.containsKey("reasoning_effort") == true
+      reasoningEffort != null
   }
 
   internal fun modelRequiresResponsesApiForReasoningTools(model: String): Boolean {
@@ -699,7 +704,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
         key in responsesProtectedFields -> {
           // Silently ignore protected field override attempt to prevent information disclosure
         }
-        key == "reasoning_effort" -> {
+        key == "reasoning_effort" && value !is JsonNull -> {
           requestJson["reasoning"] = buildJsonObject { put("effort", value) }
         }
         else -> {
@@ -714,32 +719,38 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     val json = Json { encodeDefaults = true; explicitNulls = false }
     val responseJson = json.parseToJsonElement(responseBody).jsonObject
     val output = responseJson["output"]?.jsonArray ?: JsonArray(emptyList())
-    val functionCall = output.firstOrNull { item ->
-      item.jsonObject["type"]?.jsonPrimitive?.contentOrNull == "function_call"
-    }?.jsonObject
-    val messageText = output.firstOrNull { item ->
-      item.jsonObject["type"]?.jsonPrimitive?.contentOrNull == "message"
-    }?.jsonObject?.get("content")?.jsonArray?.firstNotNullOfOrNull { content ->
-      val contentObj = content.jsonObject
-      when (contentObj["type"]?.jsonPrimitive?.contentOrNull) {
-        "output_text", "text" -> contentObj["text"]?.jsonPrimitive?.contentOrNull
-        else -> null
-      }
+    val functionCalls = output.mapNotNull { item ->
+      item.jsonObject.takeIf { it["type"]?.jsonPrimitive?.contentOrNull == "function_call" }
     }
+    val messageText = output
+      .mapNotNull { item -> item.jsonObject.takeIf { it["type"]?.jsonPrimitive?.contentOrNull == "message" } }
+      .flatMap { message -> message["content"]?.jsonArray.orEmpty() }
+      .mapNotNull { content ->
+        val contentObj = content.jsonObject
+        when (contentObj["type"]?.jsonPrimitive?.contentOrNull) {
+          "output_text", "text" -> contentObj["text"]?.jsonPrimitive?.contentOrNull
+          else -> null
+        }
+      }
+      .joinToString("")
+      .ifEmpty { null }
 
-    val message = if (functionCall != null) {
+    val message = if (functionCalls.isNotEmpty()) {
       MessageContent(
         role = "assistant",
-        toolCalls = listOf(
+        content = messageText,
+        toolCalls = functionCalls.map { functionCall ->
           ToolCall(
-            id = functionCall["call_id"]?.jsonPrimitive?.contentOrNull ?: functionCall["id"]?.jsonPrimitive?.contentOrNull ?: "responses_function_call",
+            id = functionCall["call_id"]?.jsonPrimitive?.contentOrNull
+              ?: functionCall["id"]?.jsonPrimitive?.contentOrNull
+              ?: "responses_function_call",
             type = "function",
             function = FunctionCall(
               name = functionCall["name"]?.jsonPrimitive?.contentOrNull ?: "",
               arguments = functionCall["arguments"]?.jsonPrimitive?.contentOrNull ?: "{}"
             )
           )
-        )
+        }
       )
     } else {
       MessageContent(role = "assistant", content = messageText)
