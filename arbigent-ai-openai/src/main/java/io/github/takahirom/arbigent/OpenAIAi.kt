@@ -559,17 +559,24 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     aiOptions: ArbigentAiOptions? = null
   ): String {
     return runBlocking {
+      val requestWithTemp = aiOptions?.temperature?.let { temp ->
+        chatCompletionRequest.copy(temperature = temp)
+      } ?: chatCompletionRequest
+      val useResponsesApi = shouldUseResponsesApi(requestWithTemp, aiOptions?.extraBody)
       val response: HttpResponse =
-        httpClient.post(baseUrl + "chat/completions") {
+        httpClient.post(baseUrl + apiPathForRequest(requestWithTemp, aiOptions?.extraBody)) {
           url {
             parameters.append("requestUuid", requestUuid)
           }
           requestBuilderModifier()
           contentType(ContentType.Application.Json)
-          val requestWithTemp = aiOptions?.temperature?.let { temp ->
-            chatCompletionRequest.copy(temperature = temp)
-          } ?: chatCompletionRequest
-          setBody(buildRequestBody(requestWithTemp, aiOptions?.extraBody))
+          setBody(
+            if (useResponsesApi) {
+              buildResponsesRequestBody(requestWithTemp, aiOptions?.extraBody)
+            } else {
+              buildRequestBody(requestWithTemp, aiOptions?.extraBody)
+            }
+          )
         }
       if (response.status == HttpStatusCode.TooManyRequests) {
         throw ArbigentAiRateLimitExceededException()
@@ -583,8 +590,30 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
         )
       }
       val responseBody = response.bodyAsText()
-      return@runBlocking responseBody
+      return@runBlocking if (useResponsesApi) {
+        normalizeResponsesApiResponse(responseBody, requestWithTemp.model)
+      } else {
+        responseBody
+      }
     }
+  }
+
+  internal fun apiPathForRequest(request: ChatCompletionRequest, extraParams: JsonObject?): String {
+    return if (shouldUseResponsesApi(request, extraParams)) "responses" else "chat/completions"
+  }
+
+  internal fun shouldUseResponsesApi(request: ChatCompletionRequest, extraParams: JsonObject?): Boolean {
+    return jsonSchemaType == ArbigentAi.JsonSchemaType.OpenAI &&
+      modelRequiresResponsesApiForReasoningTools(request.model) &&
+      !request.tools.isNullOrEmpty() &&
+      extraParams?.containsKey("reasoning_effort") == true
+  }
+
+  internal fun modelRequiresResponsesApiForReasoningTools(model: String): Boolean {
+    val match = Regex("^gpt-(\\d+)(?:\\.(\\d+))?").find(model) ?: return false
+    val major = match.groupValues[1].toIntOrNull() ?: return false
+    val minor = match.groupValues[2].takeIf { it.isNotBlank() }?.toIntOrNull() ?: 0
+    return major > 5 || (major == 5 && minor >= 5)
   }
 
   /**
@@ -614,6 +643,123 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
       }
     }
     return JsonObject(requestJson)
+  }
+
+  internal fun buildResponsesRequestBody(request: ChatCompletionRequest, extraParams: JsonObject?): JsonElement {
+    val requestJson = buildJsonObject {
+      put("model", request.model)
+      putJsonArray("input") {
+        request.messages.forEach { message ->
+          addJsonObject {
+            put("role", message.role)
+            putJsonArray("content") {
+              message.contents.forEach { content ->
+                addJsonObject {
+                  when (content.type) {
+                    "text" -> {
+                      put("type", "input_text")
+                      put("text", content.text ?: "")
+                    }
+                    "image_url" -> {
+                      put("type", "input_image")
+                      put("image_url", content.imageUrl?.url ?: "")
+                      content.imageUrl?.detail?.let { put("detail", it) }
+                    }
+                    else -> {
+                      put("type", content.type)
+                      content.text?.let { put("text", it) }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      request.tools?.let { tools ->
+        putJsonArray("tools") {
+          tools.forEach { tool ->
+            addJsonObject {
+              put("type", "function")
+              put("name", tool.function.name)
+              tool.function.description?.let { put("description", it) }
+              put("parameters", tool.function.parameters)
+              put("strict", tool.function.strict)
+            }
+          }
+        }
+      }
+      request.toolChoice?.let { put("tool_choice", it) }
+      request.temperature?.let { put("temperature", it) }
+      request.responseFormat?.let { put("response_format", Json.encodeToJsonElement(it)) }
+    }.toMutableMap()
+
+    extraParams?.forEach { (key, value) ->
+      when {
+        key in responsesProtectedFields -> {
+          // Silently ignore protected field override attempt to prevent information disclosure
+        }
+        key == "reasoning_effort" -> {
+          requestJson["reasoning"] = buildJsonObject { put("effort", value) }
+        }
+        else -> {
+          requestJson[key] = value
+        }
+      }
+    }
+    return JsonObject(requestJson)
+  }
+
+  internal fun normalizeResponsesApiResponse(responseBody: String, model: String): String {
+    val json = Json { encodeDefaults = true; explicitNulls = false }
+    val responseJson = json.parseToJsonElement(responseBody).jsonObject
+    val output = responseJson["output"]?.jsonArray ?: JsonArray(emptyList())
+    val functionCall = output.firstOrNull { item ->
+      item.jsonObject["type"]?.jsonPrimitive?.contentOrNull == "function_call"
+    }?.jsonObject
+    val messageText = output.firstOrNull { item ->
+      item.jsonObject["type"]?.jsonPrimitive?.contentOrNull == "message"
+    }?.jsonObject?.get("content")?.jsonArray?.firstNotNullOfOrNull { content ->
+      val contentObj = content.jsonObject
+      when (contentObj["type"]?.jsonPrimitive?.contentOrNull) {
+        "output_text", "text" -> contentObj["text"]?.jsonPrimitive?.contentOrNull
+        else -> null
+      }
+    }
+
+    val message = if (functionCall != null) {
+      MessageContent(
+        role = "assistant",
+        toolCalls = listOf(
+          ToolCall(
+            id = functionCall["call_id"]?.jsonPrimitive?.contentOrNull ?: functionCall["id"]?.jsonPrimitive?.contentOrNull ?: "responses_function_call",
+            type = "function",
+            function = FunctionCall(
+              name = functionCall["name"]?.jsonPrimitive?.contentOrNull ?: "",
+              arguments = functionCall["arguments"]?.jsonPrimitive?.contentOrNull ?: "{}"
+            )
+          )
+        )
+      )
+    } else {
+      MessageContent(role = "assistant", content = messageText)
+    }
+
+    val usageJson = responseJson["usage"]?.jsonObject
+    val normalized = ChatCompletionResponse(
+      `object` = "chat.completion",
+      created = responseJson["created_at"]?.jsonPrimitive?.longOrNull ?: (System.currentTimeMillis() / 1000),
+      model = responseJson["model"]?.jsonPrimitive?.contentOrNull ?: model,
+      choices = listOf(Choice(index = 0, message = message, finishReason = null)),
+      usage = usageJson?.let {
+        Usage(
+          completionTokens = it["output_tokens"]?.jsonPrimitive?.intOrNull,
+          promptTokens = it["input_tokens"]?.jsonPrimitive?.intOrNull,
+          totalTokens = it["total_tokens"]?.jsonPrimitive?.intOrNull
+        )
+      }
+    )
+    return json.encodeToString(normalized)
   }
 
   private fun buildTools(agentActionTypes: List<AgentActionType>, mcpTools: List<MCPTool>?): List<ToolDefinition> {
@@ -929,6 +1075,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
      * These are critical API fields that could break functionality or cause security issues.
      */
     internal val protectedFields: Set<String> = setOf("model", "messages", "tools", "tool_choice")
+    internal val responsesProtectedFields: Set<String> = setOf("model", "input", "tools", "tool_choice")
   }
 }
 

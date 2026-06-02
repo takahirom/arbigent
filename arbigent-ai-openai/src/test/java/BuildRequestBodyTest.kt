@@ -1,7 +1,9 @@
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import io.github.takahirom.arbigent.ChatCompletionRequest
 import io.github.takahirom.arbigent.ChatMessage
+import io.github.takahirom.arbigent.FunctionDefinition
 import io.github.takahirom.arbigent.OpenAIAi
+import io.github.takahirom.arbigent.ToolDefinition
 import kotlinx.serialization.json.*
 import org.junit.Assert.*
 import org.junit.Test
@@ -24,6 +26,73 @@ class BuildRequestBodyTest {
         )
       )
     )
+  }
+
+  private fun createToolRequest(model: String): ChatCompletionRequest {
+    return createMinimalRequest().copy(
+      model = model,
+      tools = listOf(
+        ToolDefinition(
+          function = FunctionDefinition(
+            name = "perform_click",
+            description = "Click",
+            parameters = buildJsonObject {
+              put("type", "object")
+              putJsonObject("properties") {}
+              putJsonArray("required") {}
+              put("additionalProperties", false)
+            }
+          )
+        )
+      )
+    )
+  }
+
+  @Test
+  fun `existing chat completions model uses chat completions path`() {
+    val request = createToolRequest("gpt-4.1")
+    val extraParams = buildJsonObject { put("reasoning_effort", "low") }
+
+    assertEquals("chat/completions", openAiAi.apiPathForRequest(request, extraParams))
+  }
+
+  @Test
+  fun `gpt-5_1 with tools and reasoning effort still uses chat completions path`() {
+    val request = createToolRequest("gpt-5.1")
+    val extraParams = buildJsonObject { put("reasoning_effort", "low") }
+
+    assertEquals("chat/completions", openAiAi.apiPathForRequest(request, extraParams))
+  }
+
+  @Test
+  fun `gpt-5_5 with tools and reasoning effort uses responses path`() {
+    val request = createToolRequest("gpt-5.5")
+    val extraParams = buildJsonObject { put("reasoning_effort", "low") }
+
+    assertEquals("responses", openAiAi.apiPathForRequest(request, extraParams))
+  }
+
+  @Test
+  fun `newer gpt models with tools and reasoning effort use responses path`() {
+    val request = createToolRequest("gpt-5.6")
+    val extraParams = buildJsonObject { put("reasoning_effort", "low") }
+
+    assertEquals("responses", openAiAi.apiPathForRequest(request, extraParams))
+  }
+
+  @Test
+  fun `responses request maps reasoning_effort to reasoning effort`() {
+    val request = createToolRequest("gpt-5.5")
+    val extraParams = buildJsonObject { put("reasoning_effort", "low") }
+
+    val result = openAiAi.buildResponsesRequestBody(request, extraParams).jsonObject
+
+    assertFalse("reasoning_effort should not be sent to Responses API", result.containsKey("reasoning_effort"))
+    assertEquals("low", result["reasoning"]?.jsonObject?.get("effort")?.jsonPrimitive?.content)
+    assertNotNull(result["input"]?.jsonArray)
+    val tool = result["tools"]?.jsonArray?.first()?.jsonObject
+    assertEquals("function", tool?.get("type")?.jsonPrimitive?.content)
+    assertEquals("perform_click", tool?.get("name")?.jsonPrimitive?.content)
   }
 
   @Test
