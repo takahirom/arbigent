@@ -1,7 +1,11 @@
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
+import io.github.takahirom.arbigent.ArbigentAiOptions
 import io.github.takahirom.arbigent.ChatCompletionRequest
+import io.github.takahirom.arbigent.ChatCompletionResponse
 import io.github.takahirom.arbigent.ChatMessage
+import io.github.takahirom.arbigent.FunctionDefinition
 import io.github.takahirom.arbigent.OpenAIAi
+import io.github.takahirom.arbigent.ToolDefinition
 import kotlinx.serialization.json.*
 import org.junit.Assert.*
 import org.junit.Test
@@ -24,6 +28,152 @@ class BuildRequestBodyTest {
         )
       )
     )
+  }
+
+  private fun createToolRequest(model: String): ChatCompletionRequest {
+    return createMinimalRequest().copy(
+      model = model,
+      tools = listOf(
+        ToolDefinition(
+          function = FunctionDefinition(
+            name = "perform_click",
+            description = "Click",
+            parameters = buildJsonObject {
+              put("type", "object")
+              putJsonObject("properties") {}
+              putJsonArray("required") {}
+              put("additionalProperties", false)
+            }
+          )
+        )
+      )
+    )
+  }
+
+  @Test
+  fun `default aiOptions uses chat completions path`() {
+    assertEquals("chat/completions", openAiAi.apiPathForRequest(null))
+    assertEquals("chat/completions", openAiAi.apiPathForRequest(ArbigentAiOptions()))
+  }
+
+  @Test
+  fun `useResponsesApi false uses chat completions path even for reasoning models`() {
+    val aiOptions = ArbigentAiOptions(
+      useResponsesApi = false,
+      extraBody = buildJsonObject { put("reasoning_effort", "low") }
+    )
+    assertEquals("chat/completions", openAiAi.apiPathForRequest(aiOptions))
+  }
+
+  @Test
+  fun `useResponsesApi true uses responses path`() {
+    val aiOptions = ArbigentAiOptions(
+      useResponsesApi = true,
+      extraBody = buildJsonObject { put("reasoning_effort", "low") }
+    )
+    assertEquals("responses", openAiAi.apiPathForRequest(aiOptions))
+  }
+
+  @Test
+  fun `useResponsesApi true works regardless of model name`() {
+    val aiOptions = ArbigentAiOptions(useResponsesApi = true)
+    assertEquals("responses", openAiAi.apiPathForRequest(aiOptions))
+  }
+
+  @Test
+  fun `responses request maps reasoning_effort to reasoning effort`() {
+    val request = createToolRequest("gpt-5.5")
+    val extraParams = buildJsonObject { put("reasoning_effort", "low") }
+
+    val result = openAiAi.buildResponsesRequestBody(request, extraParams).jsonObject
+
+    assertFalse("reasoning_effort should not be sent to Responses API", result.containsKey("reasoning_effort"))
+    assertEquals("low", result["reasoning"]?.jsonObject?.get("effort")?.jsonPrimitive?.content)
+    assertNotNull(result["input"]?.jsonArray)
+    val tool = result["tools"]?.jsonArray?.first()?.jsonObject
+    assertEquals("function", tool?.get("type")?.jsonPrimitive?.content)
+    assertEquals("perform_click", tool?.get("name")?.jsonPrimitive?.content)
+  }
+
+  @Test
+  fun `null reasoning_effort does not emit reasoning in responses body`() {
+    val request = createToolRequest("gpt-5.5")
+    val extraParams = buildJsonObject { put("reasoning_effort", JsonNull) }
+
+    val result = openAiAi.buildResponsesRequestBody(request, extraParams).jsonObject
+    assertFalse(result.containsKey("reasoning"))
+  }
+
+  @Test
+  fun `modelLikelyRequiresResponsesApi detects gpt-5_5 and newer`() {
+    assertFalse(openAiAi.modelLikelyRequiresResponsesApi("gpt-4.1"))
+    assertFalse(openAiAi.modelLikelyRequiresResponsesApi("gpt-5.1"))
+    assertFalse(openAiAi.modelLikelyRequiresResponsesApi("gpt-5"))
+    assertTrue(openAiAi.modelLikelyRequiresResponsesApi("gpt-5.5"))
+    assertTrue(openAiAi.modelLikelyRequiresResponsesApi("gpt-5.6"))
+    assertTrue(openAiAi.modelLikelyRequiresResponsesApi("gpt-6"))
+    assertFalse(openAiAi.modelLikelyRequiresResponsesApi("o3"))
+    assertFalse(openAiAi.modelLikelyRequiresResponsesApi("openai/gpt-5.5"))
+  }
+
+  @Test
+  fun `normalizeResponsesApiResponse maps plain message output`() {
+    val responseBody = """
+      {
+        "id": "resp_123",
+        "created_at": 1234567890,
+        "model": "gpt-5.5",
+        "output": [
+          {
+            "type": "message",
+            "content": [
+              {"type": "output_text", "text": "hello "},
+              {"type": "text", "text": "world"}
+            ]
+          }
+        ],
+        "usage": {"input_tokens": 10, "output_tokens": 2, "total_tokens": 12}
+      }
+    """.trimIndent()
+
+    val normalized = Json.decodeFromString<ChatCompletionResponse>(
+      openAiAi.normalizeResponsesApiResponse(responseBody, "fallback-model")
+    )
+
+    assertEquals("gpt-5.5", normalized.model)
+    assertEquals("hello world", normalized.choices.first().message.content)
+    assertEquals(10, normalized.usage?.promptTokens)
+    assertEquals(2, normalized.usage?.completionTokens)
+    assertEquals(12, normalized.usage?.totalTokens)
+  }
+
+  @Test
+  fun `normalizeResponsesApiResponse maps all function call outputs`() {
+    val responseBody = """
+      {
+        "id": "resp_123",
+        "created_at": 1234567890,
+        "model": "gpt-5.5",
+        "output": [
+          {"type": "function_call", "call_id": "call_1", "name": "perform_click", "arguments": "{\"text\":\"1\"}"},
+          {"type": "function_call", "id": "fc_2", "name": "perform_wait", "arguments": "{\"text\":\"1000\"}"},
+          {"type": "message", "content": [{"type": "output_text", "text": "done"}]}
+        ]
+      }
+    """.trimIndent()
+
+    val normalized = Json.decodeFromString<ChatCompletionResponse>(
+      openAiAi.normalizeResponsesApiResponse(responseBody, "fallback-model")
+    )
+    val message = normalized.choices.first().message
+
+    assertEquals("done", message.content)
+    assertEquals(2, message.toolCalls?.size)
+    assertEquals("call_1", message.toolCalls?.get(0)?.id)
+    assertEquals("perform_click", message.toolCalls?.get(0)?.function?.name)
+    assertEquals("{\"text\":\"1\"}", message.toolCalls?.get(0)?.function?.arguments)
+    assertEquals("fc_2", message.toolCalls?.get(1)?.id)
+    assertEquals("perform_wait", message.toolCalls?.get(1)?.function?.name)
   }
 
   @Test
