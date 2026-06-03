@@ -1,0 +1,10 @@
+scenarios:
+- id: "responses-api-launch-settings"
+  goal: "All you have to do is launch com.android.settings using mcp launch_app"
+  initializationMethods:
+  - type: "Back"
+    times: 2
+  aiOptions:
+    useResponsesApi: true
+    extraBody:
+      reasoning_effort: "low"
