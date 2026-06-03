@@ -1,4 +1,5 @@
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
+import io.github.takahirom.arbigent.ArbigentAiOptions
 import io.github.takahirom.arbigent.ChatCompletionRequest
 import io.github.takahirom.arbigent.ChatCompletionResponse
 import io.github.takahirom.arbigent.ChatMessage
@@ -50,35 +51,33 @@ class BuildRequestBodyTest {
   }
 
   @Test
-  fun `existing chat completions model uses chat completions path`() {
-    val request = createToolRequest("gpt-4.1")
-    val extraParams = buildJsonObject { put("reasoning_effort", "low") }
-
-    assertEquals("chat/completions", openAiAi.apiPathForRequest(request, extraParams))
+  fun `default aiOptions uses chat completions path`() {
+    assertEquals("chat/completions", openAiAi.apiPathForRequest(null))
+    assertEquals("chat/completions", openAiAi.apiPathForRequest(ArbigentAiOptions()))
   }
 
   @Test
-  fun `gpt-5 dot 1 with tools and reasoning effort still uses chat completions path`() {
-    val request = createToolRequest("gpt-5.1")
-    val extraParams = buildJsonObject { put("reasoning_effort", "low") }
-
-    assertEquals("chat/completions", openAiAi.apiPathForRequest(request, extraParams))
+  fun `useResponsesApi false uses chat completions path even for reasoning models`() {
+    val aiOptions = ArbigentAiOptions(
+      useResponsesApi = false,
+      extraBody = buildJsonObject { put("reasoning_effort", "low") }
+    )
+    assertEquals("chat/completions", openAiAi.apiPathForRequest(aiOptions))
   }
 
   @Test
-  fun `gpt-5 dot 5 with tools and reasoning effort uses responses path`() {
-    val request = createToolRequest("gpt-5.5")
-    val extraParams = buildJsonObject { put("reasoning_effort", "low") }
-
-    assertEquals("responses", openAiAi.apiPathForRequest(request, extraParams))
+  fun `useResponsesApi true uses responses path`() {
+    val aiOptions = ArbigentAiOptions(
+      useResponsesApi = true,
+      extraBody = buildJsonObject { put("reasoning_effort", "low") }
+    )
+    assertEquals("responses", openAiAi.apiPathForRequest(aiOptions))
   }
 
   @Test
-  fun `newer gpt models with tools and reasoning effort use responses path`() {
-    val request = createToolRequest("gpt-5.6")
-    val extraParams = buildJsonObject { put("reasoning_effort", "low") }
-
-    assertEquals("responses", openAiAi.apiPathForRequest(request, extraParams))
+  fun `useResponsesApi true works regardless of model name`() {
+    val aiOptions = ArbigentAiOptions(useResponsesApi = true)
+    assertEquals("responses", openAiAi.apiPathForRequest(aiOptions))
   }
 
   @Test
@@ -97,13 +96,24 @@ class BuildRequestBodyTest {
   }
 
   @Test
-  fun `null reasoning_effort does not use responses path or emit reasoning`() {
+  fun `null reasoning_effort does not emit reasoning in responses body`() {
     val request = createToolRequest("gpt-5.5")
     val extraParams = buildJsonObject { put("reasoning_effort", JsonNull) }
 
-    assertEquals("chat/completions", openAiAi.apiPathForRequest(request, extraParams))
     val result = openAiAi.buildResponsesRequestBody(request, extraParams).jsonObject
     assertFalse(result.containsKey("reasoning"))
+  }
+
+  @Test
+  fun `modelLikelyRequiresResponsesApi detects gpt-5_5 and newer`() {
+    assertFalse(openAiAi.modelLikelyRequiresResponsesApi("gpt-4.1"))
+    assertFalse(openAiAi.modelLikelyRequiresResponsesApi("gpt-5.1"))
+    assertFalse(openAiAi.modelLikelyRequiresResponsesApi("gpt-5"))
+    assertTrue(openAiAi.modelLikelyRequiresResponsesApi("gpt-5.5"))
+    assertTrue(openAiAi.modelLikelyRequiresResponsesApi("gpt-5.6"))
+    assertTrue(openAiAi.modelLikelyRequiresResponsesApi("gpt-6"))
+    assertFalse(openAiAi.modelLikelyRequiresResponsesApi("o3"))
+    assertFalse(openAiAi.modelLikelyRequiresResponsesApi("openai/gpt-5.5"))
   }
 
   @Test

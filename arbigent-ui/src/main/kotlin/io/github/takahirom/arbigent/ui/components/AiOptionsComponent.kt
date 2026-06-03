@@ -235,6 +235,36 @@ fun AiOptionsComponent(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Checkbox(
+            checked = updatedOptions.useResponsesApi == true,
+            onCheckedChange = { enabled: Boolean ->
+                updatedOptionsChanged(
+                    updatedOptions.copy(useResponsesApi = if (enabled) true else null)
+                )
+            },
+            modifier = Modifier.testTag("use_responses_api_checkbox")
+        )
+        Text("Use Responses API", modifier = Modifier.padding(start = 8.dp))
+        val uriHandler = LocalUriHandler.current
+        IconActionButton(
+            key = AllIconsKeys.General.Information,
+            onClick = {
+                uriHandler.openUri(uri = "https://platform.openai.com/docs/api-reference/responses")
+            },
+            modifier = Modifier
+                .padding(start = 4.dp)
+                .testTag("use_responses_api_info"),
+            contentDescription = "Use Responses API Info",
+            hint = Size(16)
+        ) {
+            Text("Route requests to /v1/responses instead of /v1/chat/completions. Required for OpenAI gpt-5.5+ when combining function tools with reasoning_effort. Also works with OpenAI-compatible providers (e.g. OpenRouter) that support the Responses API.")
+        }
+    }
+
+    Row(
+        modifier = Modifier.padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Checkbox(
             checked = updatedOptions.extraBody != null,
             onCheckedChange = { enabled: Boolean ->
                 updatedOptionsChanged(

@@ -227,7 +227,8 @@ public data class ArbigentAiOptions(
   public val imageFormat: ImageFormat? = null,
   public val historicalStepLimit: Int? = null,
   @Serializable(with = YamlCompatibleJsonObjectSerializer::class)
-  public val extraBody: JsonObject? = null
+  public val extraBody: JsonObject? = null,
+  public val useResponsesApi: Boolean? = null
 ) {
   public fun mergeWith(other: ArbigentAiOptions?): ArbigentAiOptions {
     if (other == null) return this
@@ -236,7 +237,8 @@ public data class ArbigentAiOptions(
       imageDetail = other.imageDetail ?: imageDetail,
       imageFormat = other.imageFormat ?: imageFormat,
       historicalStepLimit = other.historicalStepLimit ?: historicalStepLimit,
-      extraBody = mergeJsonObjects(extraBody, other.extraBody)
+      extraBody = mergeJsonObjects(extraBody, other.extraBody),
+      useResponsesApi = other.useResponsesApi ?: useResponsesApi
     )
   }
 

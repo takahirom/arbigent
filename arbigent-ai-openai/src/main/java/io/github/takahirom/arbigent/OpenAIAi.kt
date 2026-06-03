@@ -562,7 +562,8 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
       val requestWithTemp = aiOptions?.temperature?.let { temp ->
         chatCompletionRequest.copy(temperature = temp)
       } ?: chatCompletionRequest
-      val useResponsesApi = shouldUseResponsesApi(requestWithTemp, aiOptions?.extraBody)
+      val useResponsesApi = shouldUseResponsesApi(aiOptions)
+      maybeWarnResponsesApiRecommended(useResponsesApi, requestWithTemp, aiOptions?.extraBody)
       val response: HttpResponse =
         httpClient.post(baseUrl + apiPathForRequest(useResponsesApi)) {
           url {
@@ -598,27 +599,39 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     }
   }
 
-  internal fun apiPathForRequest(request: ChatCompletionRequest, extraParams: JsonObject?): String {
-    return apiPathForRequest(shouldUseResponsesApi(request, extraParams))
+  internal fun apiPathForRequest(aiOptions: ArbigentAiOptions?): String {
+    return apiPathForRequest(shouldUseResponsesApi(aiOptions))
   }
 
   private fun apiPathForRequest(useResponsesApi: Boolean): String {
     return if (useResponsesApi) "responses" else "chat/completions"
   }
 
-  internal fun shouldUseResponsesApi(request: ChatCompletionRequest, extraParams: JsonObject?): Boolean {
-    val reasoningEffort = extraParams?.get("reasoning_effort")?.takeUnless { it is JsonNull }
-    return jsonSchemaType == ArbigentAi.JsonSchemaType.OpenAI &&
-      modelRequiresResponsesApiForReasoningTools(request.model) &&
-      !request.tools.isNullOrEmpty() &&
-      reasoningEffort != null
+  internal fun shouldUseResponsesApi(aiOptions: ArbigentAiOptions?): Boolean {
+    return aiOptions?.useResponsesApi == true
   }
 
-  internal fun modelRequiresResponsesApiForReasoningTools(model: String): Boolean {
+  internal fun modelLikelyRequiresResponsesApi(model: String): Boolean {
     val match = Regex("^gpt-(\\d+)(?:\\.(\\d+))?").find(model) ?: return false
     val major = match.groupValues[1].toIntOrNull() ?: return false
     val minor = match.groupValues[2].takeIf { it.isNotBlank() }?.toIntOrNull() ?: 0
     return major > 5 || (major == 5 && minor >= 5)
+  }
+
+  private fun maybeWarnResponsesApiRecommended(
+    useResponsesApi: Boolean,
+    request: ChatCompletionRequest,
+    extraParams: JsonObject?
+  ) {
+    if (useResponsesApi) return
+    if (jsonSchemaType != ArbigentAi.JsonSchemaType.OpenAI) return
+    val reasoningEffort = extraParams?.get("reasoning_effort")?.takeUnless { it is JsonNull } ?: return
+    if (request.tools.isNullOrEmpty()) return
+    if (!modelLikelyRequiresResponsesApi(request.model)) return
+    arbigentWarnLog(
+      "OpenAI may reject function tools with reasoning_effort=$reasoningEffort on /v1/chat/completions " +
+        "for model ${request.model}. Consider enabling aiOptions.useResponsesApi to route to /v1/responses."
+    )
   }
 
   /**
