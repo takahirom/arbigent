@@ -532,6 +532,19 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
         )
       }
 
+      ClickAtCoordinates -> {
+        val text = argumentsJsonData["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
+        val parts = text.split(",").map { it.trim() }
+        if (parts.size != 2) {
+          throw IllegalArgumentException("text should be \"x,y\" for ${ClickAtCoordinates.actionName}, got: \"$text\"")
+        }
+        val x = parts[0].toIntOrNull()
+          ?: throw IllegalArgumentException("x is not an integer for ${ClickAtCoordinates.actionName}: \"${parts[0]}\"")
+        val y = parts[1].toIntOrNull()
+          ?: throw IllegalArgumentException("y is not an integer for ${ClickAtCoordinates.actionName}: \"${parts[1]}\"")
+        ClickAtCoordinates(x = x, y = y)
+      }
+
       BackPressAgentAction -> BackPressAgentAction()
 
       KeyPressAgentAction -> {
