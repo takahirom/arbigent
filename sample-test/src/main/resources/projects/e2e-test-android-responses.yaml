@@ -4,7 +4,22 @@ scenarios:
   initializationMethods:
   - type: "Back"
     times: 2
+settings:
   aiOptions:
+    temperature: 0.0
+    imageFormat: "lossy_webp"
     useResponsesApi: true
     extraBody:
       reasoning_effort: "low"
+  mcpJson: |-
+    {
+      "mcpServers": {
+        "android-adb": {
+          "command": "npx",
+          "args": ["-y", "@landicefu/android-adb-mcp-server"],
+          "env": {},
+          "disabled": false,
+          "alwaysAllow": []
+        }
+      }
+    }
