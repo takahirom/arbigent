@@ -881,7 +881,6 @@ public fun defaultAgentActionTypesForVisualMode(): List<AgentActionType> {
 //    ClickWithIdAgentAction,
 //    ClickWithTextAgentAction,
     ClickWithIndex,
-    ClickAtCoordinates,
     InputTextAgentAction,
     BackPressAgentAction,
     KeyPressAgentAction,
@@ -917,6 +916,7 @@ public fun defaultAgentActionTypesForTvForVisualMode(): List<AgentActionType> {
 private fun getAgentActionTypeByName(actionName: String): AgentActionType? {
   return when (actionName) {
     "ClickWithText" -> ClickWithTextAgentAction
+    "ClickAtCoordinates" -> ClickAtCoordinates
     else -> null
   }
 }
