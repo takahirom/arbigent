@@ -709,7 +709,16 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
       }
       request.toolChoice?.let { put("tool_choice", it) }
       request.temperature?.let { put("temperature", it) }
-      request.responseFormat?.let { put("response_format", Json.encodeToJsonElement(it)) }
+      request.responseFormat?.let { rf ->
+        // Responses API expects `text.format` instead of top-level `response_format`,
+        // and the inner `json_schema` fields are flattened next to `type`.
+        putJsonObject("text") {
+          putJsonObject("format") {
+            put("type", rf.type)
+            rf.jsonSchema.forEach { (key, value) -> put(key, value) }
+          }
+        }
+      }
     }.toMutableMap()
 
     extraParams?.forEach { (key, value) ->

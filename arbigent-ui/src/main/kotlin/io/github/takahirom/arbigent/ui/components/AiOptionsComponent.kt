@@ -238,7 +238,7 @@ fun AiOptionsComponent(
             checked = updatedOptions.useResponsesApi == true,
             onCheckedChange = { enabled: Boolean ->
                 updatedOptionsChanged(
-                    updatedOptions.copy(useResponsesApi = if (enabled) true else null)
+                    updatedOptions.copy(useResponsesApi = enabled)
                 )
             },
             modifier = Modifier.testTag("use_responses_api_checkbox")

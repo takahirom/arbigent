@@ -144,11 +144,9 @@ jobs:
           disk-size: 6000M
           heap-size: 600M
           script: |
+            set -eu
             arbigent-cli/build/install/arbigent/bin/arbigent run --os=android --project-file=sample-test/src/main/resources/projects/e2e-test-android.yaml --ai-type=openai --openai-endpoint=https://openrouter.ai/api/v1/ --openai-model-name=google/gemini-2.5-flash-lite --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }} --variables "search_term=Bluetooth,app_package=com.android.camera2"
-            # Responses API smoke check (only on shard 1 to avoid duplicate API spend)
-            if [ "${{ matrix.shardIndex }}" = "1" ]; then
-              arbigent-cli/build/install/arbigent/bin/arbigent run --os=android --project-file=sample-test/src/main/resources/projects/e2e-test-android-responses.yaml --ai-type=openai --openai-endpoint=https://openrouter.ai/api/v1/ --openai-model-name=openai/gpt-5.4-mini
-            fi
+            if [ "${{ matrix.shardIndex }}" = "1" ]; then arbigent-cli/build/install/arbigent/bin/arbigent run --os=android --project-file=sample-test/src/main/resources/projects/e2e-test-android-responses.yaml --ai-type=openai --openai-endpoint=https://openrouter.ai/api/v1/ --openai-model-name=openai/gpt-5.4-mini; fi
       - name: Check API key leakage
         run: |
           if grep -R --quiet "${{ secrets.OPEN_ROUTER_API_KEY }}" arbigent-result/; then
