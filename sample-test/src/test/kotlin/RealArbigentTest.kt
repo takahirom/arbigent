@@ -28,7 +28,7 @@ class RealArbigentTest {
       deviceFactory = {
         ArbigentAvailableDevice.Android(
           dadb = Dadb.discover()!!
-        ).connectToDevice()
+        ).let { kotlinx.coroutines.runBlocking { it.connectToDevice() } }
       },
       appSettings = DefaultArbigentAppSettings
     )

@@ -35,6 +35,7 @@ dependencies {
   implementation("dev.mobile:dadb:1.2.9")
   api(libs.maestro.ios)
   api(libs.maestro.ios.driver)
+  api(libs.maestro.web)
 
   api(project(":arbigent-core-model"))
   api(project(":arbigent-mcp-client"))

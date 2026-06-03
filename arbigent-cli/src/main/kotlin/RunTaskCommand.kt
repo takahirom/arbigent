@@ -61,7 +61,7 @@ class ArbigentRunTaskCommand : CliktCommand(name = "task") {
 
     val (resultDir, resultFile) = setupArbigentFiles(workingDirectory, logFile)
     val ai = createAi(aiType, aiApiLoggingEnabled)
-    val device = connectDevice(os)
+    val device = kotlinx.coroutines.runBlocking { connectDevice(os) }
 
     try {
       val scenarioContent = ArbigentScenarioContent(

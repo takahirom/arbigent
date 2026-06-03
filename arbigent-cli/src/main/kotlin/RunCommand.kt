@@ -182,7 +182,7 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
       return
     }
 
-    device = connectDevice(os)
+    device = kotlinx.coroutines.runBlocking { connectDevice(os) }
     Runtime.getRuntime().addShutdownHook(object : Thread() {
       override fun run() {
         arbigentProject.cancel()
