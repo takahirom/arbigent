@@ -40,7 +40,13 @@ fun ParameterHolder.defaultOption(
             settingsInfo.source == "global settings" -> "global settings"
             else -> settingsInfo.source
         }
-        "$help (currently: '${settingsInfo.value}' from $sourceDescription)"
+        // Mask sensitive values (API keys, tokens, secrets) so they don't leak into --help output.
+        val displayValue = if (isSensitiveOptionKey(optionKey)) {
+            maskSensitiveValue(settingsInfo.value)
+        } else {
+            settingsInfo.value
+        }
+        "$help (currently: '$displayValue' from $sourceDescription)"
     } else {
         help
     }
@@ -56,6 +62,24 @@ fun ParameterHolder.defaultOption(
         valueSourceKey = valueSourceKey,
         eager = eager
     )
+}
+
+/**
+ * Returns true if the option key refers to a sensitive value (API key, token, secret, password)
+ * that must not be printed in plain text in help output.
+ */
+internal fun isSensitiveOptionKey(optionKey: String): Boolean {
+    val lower = optionKey.lowercase()
+    return listOf("key", "token", "secret", "password").any { lower.contains(it) }
+}
+
+/**
+ * Masks a sensitive value for display. The entire value is replaced with a fixed mask so that
+ * no part of the secret is exposed in help output, regardless of its length.
+ */
+internal fun maskSensitiveValue(value: String): String {
+    if (value.isEmpty()) return value
+    return "****"
 }
 
 /**
