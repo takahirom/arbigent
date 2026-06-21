@@ -213,6 +213,47 @@ public class MaestroDevice(
     return maestro.deviceName
   }
 
+  private val maxOperationRecoveries = 3
+
+  // A device/runner can crash mid-flow (e.g. the iOS XCTest runner dies, leaving the
+  // port refused). Such errors are recoverable by reconnecting, unlike a real
+  // assertion/logic failure which must surface. Only connection/crash signatures qualify.
+  private fun isRecoverableDeviceError(error: Throwable): Boolean {
+    var cause: Throwable? = error
+    while (cause != null) {
+      if (cause is java.net.ConnectException) return true
+      val message = cause.message ?: ""
+      if (message.contains("App crashed or stopped", ignoreCase = true) ||
+        message.contains("Connection refused", ignoreCase = true) ||
+        message.contains("Failed to connect", ignoreCase = true)
+      ) {
+        return true
+      }
+      cause = cause.cause
+    }
+    return false
+  }
+
+  // Run a device operation, recovering from a mid-flow crash/disconnect by reconnecting
+  // (which reinstalls the runner and waits with backoff) and retrying. Non-recoverable
+  // errors are rethrown immediately so genuine failures are not masked.
+  private fun <T> withDeviceRecovery(operation: () -> T): T {
+    var lastError: Exception? = null
+    for (attempt in 0 until maxOperationRecoveries) {
+      try {
+        return operation()
+      } catch (e: Exception) {
+        if (!isRecoverableDeviceError(e)) throw e
+        lastError = e
+        arbigentInfoLog(
+          "Recoverable device error during operation (recovery ${attempt + 1}/$maxOperationRecoveries): ${e.message}. Reconnecting and retrying."
+        )
+        reconnectIfDisconnected()
+      }
+    }
+    throw RuntimeException("Device operation failed after $maxOperationRecoveries recovery attempts", lastError)
+  }
+
   @Synchronized
   private fun ensureConnected() {
     // Try a simple operation to check connection
@@ -226,17 +267,19 @@ public class MaestroDevice(
   }
 
   override fun executeActions(actions: List<MaestroCommand>) {
-    ensureConnected()
-    ArbigentGlobalStatus.onDevice(actions.joinToString { it.toString() }) {
-      // If the jsEngine is already initialized, we don't need to reinitialize it
-      val shouldJsReinit = if (orchestra::class.java.getDeclaredField("jsEngine").apply {
-          isAccessible = true
-        }.get(orchestra) != null) {
-        false
-      } else {
-        true
+    withDeviceRecovery {
+      ensureConnected()
+      ArbigentGlobalStatus.onDevice(actions.joinToString { it.toString() }) {
+        // If the jsEngine is already initialized, we don't need to reinitialize it
+        val shouldJsReinit = if (orchestra::class.java.getDeclaredField("jsEngine").apply {
+            isAccessible = true
+          }.get(orchestra) != null) {
+          false
+        } else {
+          true
+        }
+        orchestra.executeCommands(actions, shouldReinitJsEngine = shouldJsReinit)
       }
-      orchestra.executeCommands(actions, shouldReinitJsEngine = shouldJsReinit)
     }
   }
 
@@ -245,41 +288,44 @@ public class MaestroDevice(
     maestro.waitForAppToSettle(appId = appId)
   }
 
-  override fun elements(): ArbigentElementList {
+  override fun elements(): ArbigentElementList = withDeviceRecovery {
     ensureConnected()
+    var elementList: ArbigentElementList? = null
     for (it in 0..2) {
       try {
         val viewHierarchy = maestro.viewHierarchy(false)
         val deviceInfo = maestro.cachedDeviceInfo
-        val elementList = ArbigentElementList.from(viewHierarchy, deviceInfo)
-        return elementList
+        elementList = ArbigentElementList.from(viewHierarchy, deviceInfo)
+        break
       } catch (e: ArbigentElementList.NodeInBoundsNotFoundException) {
         arbigentDebugLog("NodeInBoundsNotFoundException. Retry $it")
         Thread.sleep(1000)
       }
     }
-    return ArbigentElementList(emptyList(), maestro.cachedDeviceInfo.widthPixels)
+    elementList ?: ArbigentElementList(emptyList(), maestro.cachedDeviceInfo.widthPixels)
   }
 
 
-  override fun viewTreeString(): ArbigentUiTreeStrings {
+  override fun viewTreeString(): ArbigentUiTreeStrings = withDeviceRecovery {
     ensureConnected()
+    var treeStrings: ArbigentUiTreeStrings? = null
     for (it in 0..2) {
       try {
         val viewHierarchy = maestro.viewHierarchy(false)
-        return ArbigentUiTreeStrings(
+        treeStrings = ArbigentUiTreeStrings(
           allTreeString = viewHierarchy.toString(),
           optimizedTreeString = viewHierarchy.toOptimizedString(
             deviceInfo = maestro.cachedDeviceInfo
           ),
           aiHints = viewHierarchy.root.findAllAiHints()
         )
+        break
       } catch (e: ArbigentElementList.NodeInBoundsNotFoundException) {
         arbigentDebugLog("NodeInBoundsNotFoundException. Retry $it")
         Thread.sleep(1000)
       }
     }
-    return ArbigentUiTreeStrings(
+    treeStrings ?: ArbigentUiTreeStrings(
       allTreeString = "",
       optimizedTreeString = ""
     )
@@ -656,6 +702,26 @@ public class MaestroDevice(
           newDevice.close()
           lastException = IllegalStateException("Unexpected device type after reconnection: ${newDevice.javaClass}")
           continue // Try again
+        }
+
+        // Verify the reconnected device is actually responsive before adopting it.
+        // connectToDevice() only builds the driver objects; it does not confirm that
+        // the underlying XCTest runner / simulator is alive. Probing the view hierarchy
+        // both validates liveness and lets the driver (re)install and relaunch a crashed
+        // runner. Without this probe a dead connection is silently treated as a
+        // successful reconnect, the exponential backoff never engages, and we keep
+        // looping against a refused port.
+        try {
+          newDevice.maestro.viewHierarchy()
+        } catch (e: Exception) {
+          lastException = e
+          arbigentInfoLog("Reconnection attempt $reconnectAttempts/$maxReconnectAttempts connected but device is not responsive: ${e.message}")
+          try {
+            newDevice.close()
+          } catch (_: Exception) {
+            // Ignore close errors, device might already be disconnected
+          }
+          continue // Try again with backoff
         }
 
         // Update to new connection
