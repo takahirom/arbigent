@@ -89,11 +89,20 @@ public sealed interface ArbigentAvailableDevice {
           )
         )
       )
-      warmUp(maestro)
-      return MaestroDevice(
-        maestro,
-        availableDevice = this
-      )
+      try {
+        warmUp(maestro)
+        return MaestroDevice(
+          maestro,
+          availableDevice = this
+        )
+      } catch (e: InterruptedException) {
+        Thread.currentThread().interrupt()
+        maestro.close()
+        throw e
+      } catch (e: Exception) {
+        maestro.close()
+        throw e
+      }
     }
 
     // A freshly booted iOS simulator is still doing post-boot work (e.g. Data
@@ -119,6 +128,7 @@ public sealed interface ArbigentAvailableDevice {
       }
       if (!responsive) {
         arbigentInfoLog("iOS warm-up: device did not become responsive within ${warmUpTimeoutMs}ms; continuing anyway")
+        return
       }
       // Let post-boot work settle before the first scenario interaction.
       Thread.sleep(settleMs)
