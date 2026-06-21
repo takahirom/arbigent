@@ -50,6 +50,31 @@ class MaestroDeviceReconnectionTest {
     }
 
     @Test
+    fun testReconnectFailsWhenLivenessProbeNeverPasses() = runTest {
+        // A connection that establishes but is never responsive (e.g. a crashed
+        // XCTest runner on a refused port) must NOT be treated as a successful
+        // reconnect. It should keep retrying with backoff and finally fail.
+        val device = TestMaestroDeviceWithRetryLimit(probePasses = false)
+
+        val exception = assertFailsWith<RuntimeException> {
+            device.simulateReconnectionWithLivenessProbe()
+        }
+
+        assertTrue(exception.message?.contains("Failed to reconnect after 6 attempts") == true)
+    }
+
+    @Test
+    fun testReconnectSucceedsWhenLivenessProbePasses() = runTest {
+        // When the reconnected device responds to the liveness probe, the reconnect
+        // succeeds and the attempt counter is reset.
+        val device = TestMaestroDeviceWithRetryLimit(probePasses = true)
+
+        device.simulateReconnectionWithLivenessProbe()
+
+        assertEquals(0, device.currentAttempts(), "Counter should reset on a verified reconnect")
+    }
+
+    @Test
     fun testThreadSafetyOfReconnection() = runTest {
         // Test that reconnection is thread-safe
         val device = TestMaestroDeviceWithRetryLimit()
@@ -79,11 +104,34 @@ class MaestroDeviceReconnectionTest {
      * This mimics the actual implementation's behavior for testing.
      */
     private class TestMaestroDeviceWithRetryLimit(
-        private val hasAvailableDevice: Boolean = true
+        private val hasAvailableDevice: Boolean = true,
+        private val probePasses: Boolean = true
     ) {
         private var reconnectAttempts = 0
         private val maxReconnectAttempts = 6
         private val reconnectLock = Any()
+
+        fun currentAttempts(): Int = reconnectAttempts
+
+        // Mirrors reconnectIfDisconnected(): a fresh connection is only adopted when
+        // the liveness probe passes; a failed probe counts as a failed attempt and
+        // keeps the backoff loop going until maxReconnectAttempts is exhausted.
+        fun simulateReconnectionWithLivenessProbe() {
+            synchronized(reconnectLock) {
+                var lastException: Exception? = null
+                while (reconnectAttempts < maxReconnectAttempts) {
+                    reconnectAttempts++
+                    // connectToDevice() succeeds (builds driver objects), then probe.
+                    if (probePasses) {
+                        reconnectAttempts = 0
+                        return
+                    }
+                    lastException = RuntimeException("device not responsive")
+                }
+                reconnectAttempts = 0
+                throw RuntimeException("Failed to reconnect after $maxReconnectAttempts attempts", lastException)
+            }
+        }
 
         fun simulateFailedReconnectionAttempts() {
             synchronized(reconnectLock) {

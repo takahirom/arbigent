@@ -658,6 +658,26 @@ public class MaestroDevice(
           continue // Try again
         }
 
+        // Verify the reconnected device is actually responsive before adopting it.
+        // connectToDevice() only builds the driver objects; it does not confirm that
+        // the underlying XCTest runner / simulator is alive. Probing the view hierarchy
+        // both validates liveness and lets the driver (re)install and relaunch a crashed
+        // runner. Without this probe a dead connection is silently treated as a
+        // successful reconnect, the exponential backoff never engages, and we keep
+        // looping against a refused port.
+        try {
+          newDevice.maestro.viewHierarchy()
+        } catch (e: Exception) {
+          lastException = e
+          arbigentInfoLog("Reconnection attempt $reconnectAttempts/$maxReconnectAttempts connected but device is not responsive: ${e.message}")
+          try {
+            newDevice.close()
+          } catch (_: Exception) {
+            // Ignore close errors, device might already be disconnected
+          }
+          continue // Try again with backoff
+        }
+
         // Update to new connection
         updateConnection(newDevice.maestro)
 
