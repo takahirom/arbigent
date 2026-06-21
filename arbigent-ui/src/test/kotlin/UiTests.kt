@@ -738,14 +738,18 @@ class TestRobot(
 
   fun changePromptTemplate(template: String) {
     composeUiTest.onNode(hasContentDescription("Project Settings")).performClick()
-    if (!waitForNodeSafely(hasText("User Prompt Template"), 1000)) {
+    if (!waitForNodeSafely(hasText("User Prompt Template"))) {
       runCatching { composeUiTest.onNode(hasText("Close")).performClick() }
       kotlin.test.fail("User Prompt Template not found in Project Settings")
     }
     composeUiTest.onNode(hasTestTag("user_prompt_template"))
       .performTextClearance()
+    waitALittle()
     composeUiTest.onNode(hasTestTag("user_prompt_template"))
       .performTextInput(template)
+    // Let the text edit recompose before the following assertion reads it back,
+    // otherwise the assert can race the input under the test dispatcher.
+    waitALittle()
   }
 
   fun assertPromptTemplateContains(expectedText: String) {
