@@ -80,18 +80,49 @@ public sealed interface ArbigentAvailableDevice {
         getInstalledApps = { XCRunnerCLIUtils.listApps(device.udid) },
       )
 
-      return MaestroDevice(
-        Maestro.ios(
-          IOSDriver(
-            LocalIOSDevice(
-              deviceId = device.udid,
-              xcTestDevice = xcTestDevice,
-              simctlIOSDevice = SimctlIOSDevice(device.udid)
-            )
+      val maestro = Maestro.ios(
+        IOSDriver(
+          LocalIOSDevice(
+            deviceId = device.udid,
+            xcTestDevice = xcTestDevice,
+            simctlIOSDevice = SimctlIOSDevice(device.udid)
           )
-        ),
+        )
+      )
+      warmUp(maestro)
+      return MaestroDevice(
+        maestro,
         availableDevice = this
       )
+    }
+
+    // A freshly booted iOS simulator is still doing post-boot work (e.g. Data
+    // Migration), and hitting it with the first scenario action tends to crash the
+    // XCTest runner. Warm it up first: poll the view hierarchy until the runner
+    // responds (this also starts the runner), then let it settle, so the first real
+    // interaction runs on a warm, stable device.
+    private fun warmUp(maestro: Maestro) {
+      val warmUpTimeoutMs = 60_000L
+      val settleMs = 10_000L
+      val pollIntervalMs = 2_000L
+      val start = System.currentTimeMillis()
+      var responsive = false
+      while (System.currentTimeMillis() - start < warmUpTimeoutMs) {
+        try {
+          maestro.viewHierarchy()
+          responsive = true
+          break
+        } catch (e: Exception) {
+          arbigentInfoLog("iOS warm-up: device not responsive yet, retrying: ${e.message}")
+          Thread.sleep(pollIntervalMs)
+        }
+      }
+      if (!responsive) {
+        arbigentInfoLog("iOS warm-up: device did not become responsive within ${warmUpTimeoutMs}ms; continuing anyway")
+      }
+      // Let post-boot work settle before the first scenario interaction.
+      Thread.sleep(settleMs)
+      arbigentInfoLog("iOS warm-up done")
     }
   }
 
