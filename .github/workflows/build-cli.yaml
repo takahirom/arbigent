@@ -231,6 +231,18 @@ jobs:
           done
           echo "Simulator booted successfully."
 
+          # Warm up before the test. A freshly booted simulator is still doing
+          # post-boot work (e.g. Data Migration), and hitting it immediately tends to
+          # crash the XCTest runner on the first app launch. Let it settle, then
+          # pre-launch the target app once so the first real interaction runs warm.
+          echo "Warming up simulator..."
+          sleep 20
+          xcrun simctl launch "iPhone 15 Pro" com.apple.Preferences || true
+          sleep 8
+          xcrun simctl terminate "iPhone 15 Pro" com.apple.Preferences || true
+          sleep 2
+          echo "Warm up done."
+
       - name: CLI E2E test for iOS
         env:
           OPENAI_API_KEY: ${{ secrets.OPEN_ROUTER_API_KEY }}
