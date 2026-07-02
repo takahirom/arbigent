@@ -195,7 +195,9 @@ jobs:
           # Check Xcode version
           xcodebuild -version
       - name: Install applesimutils
-        run: brew tap wix/brew && brew install applesimutils
+        # `brew trust` is required since Homebrew started refusing untrusted third-party taps;
+        # `|| true` keeps this working on older Homebrew versions without the trust command.
+        run: brew tap wix/brew && (brew trust wix/brew || true) && brew install applesimutils
       - name: Start iOS Simulator with Custom Timeout
         run: |
           # List available devices
