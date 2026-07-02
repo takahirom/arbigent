@@ -101,6 +101,43 @@ class ArbigentJourneyXmlImporterTest {
   }
 
   @Test
+  fun missingNameStripsUnderscoreJourneySuffix() {
+    val journey = ArbigentJourneyXmlImporter.parse(
+      tempJourney(
+        "checkout_journey.xml",
+        """
+        <?xml version="1.0" encoding="utf-8"?>
+        <journey>
+            <actions>
+                <action>Tap "Go"</action>
+            </actions>
+        </journey>
+        """.trimIndent()
+      )
+    )
+    assertEquals("checkout", journey.name)
+  }
+
+  @Test
+  fun blankActionsAreIgnored() {
+    val journey = ArbigentJourneyXmlImporter.parse(
+      tempJourney(
+        "blank.journey.xml",
+        """
+        <?xml version="1.0" encoding="utf-8"?>
+        <journey name="Blank actions">
+            <actions>
+                <action>Tap "Go"</action>
+                <action>   </action>
+            </actions>
+        </journey>
+        """.trimIndent()
+      )
+    )
+    assertEquals(listOf("Tap \"Go\""), journey.actions)
+  }
+
+  @Test
   fun zeroActionsThrows() {
     val e = assertFailsWith<IllegalArgumentException> {
       ArbigentJourneyXmlImporter.parse(
@@ -217,6 +254,43 @@ class ArbigentJourneyXmlImporterTest {
     assertEquals(2, content.scenarioContents.size)
     // Sorted by absolute path -> alpha before beta.
     assertEquals(listOf("alpha", "beta"), content.scenarioContents.map { it.id })
+  }
+
+  @Test
+  fun loadProjectContentSanitizesFileNameDerivedIds() {
+    val file = tempJourney(
+      "My Flow.journey.xml",
+      """
+      <?xml version="1.0" encoding="utf-8"?>
+      <journey name="My Flow">
+          <actions>
+              <action>Tap "Go"</action>
+          </actions>
+      </journey>
+      """.trimIndent()
+    )
+    val content = ArbigentJourneyXmlImporter.loadProjectContent(file)
+    assertEquals("my-flow", content.scenarioContents.single().id)
+  }
+
+  @Test
+  fun loadProjectContentDuplicateIdsThrow() {
+    val journeyXml = """
+      <?xml version="1.0" encoding="utf-8"?>
+      <journey name="Foo">
+          <actions>
+              <action>Tap "Go"</action>
+          </actions>
+      </journey>
+    """.trimIndent()
+    val first = tempJourney("foo.journey.xml", journeyXml)
+    File(first.parentFile, "foo_journey.xml").writeText(journeyXml)
+    val e = assertFailsWith<IllegalArgumentException> {
+      ArbigentJourneyXmlImporter.loadProjectContent(first.parentFile)
+    }
+    assertTrue(e.message!!.contains("Duplicate scenario ids"))
+    assertTrue(e.message!!.contains("foo.journey.xml"))
+    assertTrue(e.message!!.contains("foo_journey.xml"))
   }
 
   @Test

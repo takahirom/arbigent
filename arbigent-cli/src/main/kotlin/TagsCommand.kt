@@ -4,7 +4,6 @@ package io.github.takahirom.arbigent.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
 import io.github.takahirom.arbigent.*
-import java.io.File
 
 class ArbigentTagsCommand : CliktCommand(name = "tags") {
   // Same common options as run command
@@ -18,11 +17,8 @@ class ArbigentTagsCommand : CliktCommand(name = "tags") {
       ArbigentLogLevel.entries.find { it.name.lowercase() == logLevel.lowercase() }
         ?: throw IllegalArgumentException("Invalid log level: $logLevel")
     
-    if (projectFile == null) {
-      throw IllegalArgumentException("Missing option '--project-file'. Please provide a project file path via command line argument or in .arbigent/settings.local.yml")
-    }
     val arbigentProject = loadArbigentProject(
-      projectFile = projectFile!!,
+      projectFile = requireProjectFile(projectFile),
       aiFactory = { throw UnsupportedOperationException("AI not needed for listing") },
       deviceFactory = { throw UnsupportedOperationException("Device not needed for listing") },
       appSettings = CliAppSettings(

@@ -61,13 +61,13 @@ public object ArbigentJourneyXmlImporter {
 
     val root = document.documentElement
       ?: throw IllegalArgumentException("Journey file has no root element: ${file.absolutePath}")
-    if (root.localName != "journey" && root.tagName != "journey") {
+    if (root.localOrTagName() != "journey") {
       throw IllegalArgumentException(
         "Journey file root element must be <journey> but was <${root.tagName}>: ${file.absolutePath}"
       )
     }
 
-    val name = root.getAttribute("name").trim().ifBlank { file.name.substringBefore(".") }
+    val name = root.getAttribute("name").trim().ifBlank { journeyIdHint(file) }
 
     val description = childElements(root)
       .firstOrNull { it.localOrTagName() == "description" }
@@ -77,12 +77,18 @@ public object ArbigentJourneyXmlImporter {
 
     val actionsContainer = childElements(root)
       .firstOrNull { it.localOrTagName() == "actions" }
-    val actions: List<String> = actionsContainer
+    val actionTexts = actionsContainer
       ?.let { childElements(it) }
       ?.filter { it.localOrTagName() == "action" }
       ?.map { it.textContent.trim() }
-      ?.filter { it.isNotEmpty() }
       .orEmpty()
+    val blankActionCount = actionTexts.count { it.isEmpty() }
+    if (blankActionCount > 0) {
+      arbigentWarnLog(
+        "Ignoring $blankActionCount blank <action> element(s) in ${file.absolutePath}"
+      )
+    }
+    val actions: List<String> = actionTexts.filter { it.isNotEmpty() }
 
     if (actions.isEmpty()) {
       throw IllegalArgumentException(
@@ -100,10 +106,11 @@ public object ArbigentJourneyXmlImporter {
   /**
    * Converts an [ArbigentJourney] into an [ArbigentScenarioContent].
    *
-   * @param idHint preferred scenario id (typically the file name stem). Falls back to a sanitized name.
+   * @param idHint preferred scenario id source (typically the file name stem). Falls back to the
+   * journey name. Either way the id is sanitized to a lowercase-dash form.
    */
   public fun toScenarioContent(journey: ArbigentJourney, idHint: String? = null): ArbigentScenarioContent {
-    val id = idHint?.takeIf { it.isNotBlank() } ?: sanitizeId(journey.name)
+    val id = sanitizeId(idHint?.takeIf { it.isNotBlank() } ?: journey.name)
     val numberedActions = journey.actions
       .mapIndexed { index, action -> "${index + 1}. $action" }
       .joinToString("\n")
@@ -145,13 +152,23 @@ public object ArbigentJourneyXmlImporter {
       listOf(fileOrDirectory)
     }
 
-    val scenarioContents = files.map { file ->
+    val fileToContent = files.map { file ->
       val journey = parse(file)
       val idHint = journeyIdHint(file)
-      toScenarioContent(journey, idHint)
+      file to toScenarioContent(journey, idHint)
     }
 
-    return ArbigentProjectFileContent(scenarioContents = scenarioContents)
+    val duplicates = fileToContent.groupBy { it.second.id }.filterValues { it.size > 1 }
+    if (duplicates.isNotEmpty()) {
+      val details = duplicates.entries.joinToString("; ") { (id, entries) ->
+        "'$id' from ${entries.joinToString(", ") { it.first.absolutePath }}"
+      }
+      throw IllegalArgumentException(
+        "Duplicate scenario ids derived from journey files: $details"
+      )
+    }
+
+    return ArbigentProjectFileContent(scenarioContents = fileToContent.map { it.second })
   }
 
   private fun journeyIdHint(file: File): String {
