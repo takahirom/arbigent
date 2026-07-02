@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<journey name="Alpha journey">
+    <description>Alpha description</description>
+    <actions xml:space="preserve">
+        <action>Tap "Alpha"</action>
+    </actions>
+</journey>

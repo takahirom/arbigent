@@ -4,7 +4,6 @@ package io.github.takahirom.arbigent.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
 import io.github.takahirom.arbigent.*
-import java.io.File
 
 class ArbigentScenariosCommand : CliktCommand(name = "scenarios") {
   // Same common options as run command
@@ -26,8 +25,8 @@ class ArbigentScenariosCommand : CliktCommand(name = "scenarios") {
     arbigentDebugLog("  ai-type: Not applicable for scenarios command")
     arbigentDebugLog("  Note: ai-type from global would be 'global-openai' if this command used it")
     arbigentDebugLog("==========================================")
-    val arbigentProject = ArbigentProject(
-      file = File(projectFile),
+    val arbigentProject = loadArbigentProject(
+      projectFile = requireProjectFile(projectFile),
       aiFactory = { throw UnsupportedOperationException("AI not needed for listing") },
       deviceFactory = { throw UnsupportedOperationException("Device not needed for listing") },
       appSettings = CliAppSettings(
