@@ -18,8 +18,11 @@ class ArbigentTagsCommand : CliktCommand(name = "tags") {
       ArbigentLogLevel.entries.find { it.name.lowercase() == logLevel.lowercase() }
         ?: throw IllegalArgumentException("Invalid log level: $logLevel")
     
-    val arbigentProject = ArbigentProject(
-      file = File(projectFile),
+    if (projectFile == null) {
+      throw IllegalArgumentException("Missing option '--project-file'. Please provide a project file path via command line argument or in .arbigent/settings.local.yml")
+    }
+    val arbigentProject = loadArbigentProject(
+      projectFile = projectFile!!,
       aiFactory = { throw UnsupportedOperationException("AI not needed for listing") },
       deviceFactory = { throw UnsupportedOperationException("Device not needed for listing") },
       appSettings = CliAppSettings(

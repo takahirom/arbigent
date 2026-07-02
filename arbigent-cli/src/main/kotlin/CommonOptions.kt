@@ -111,6 +111,47 @@ fun createAi(aiType: AiConfig, aiApiLoggingEnabled: Boolean): ArbigentAi {
   }
 }
 
+/**
+ * Returns true when [projectFile] points to an Android Studio Journeys source: a single
+ * `*.journey.xml` / `*_journey.xml` file, or a directory that contains such files.
+ */
+fun isJourneyProjectSource(projectFile: String): Boolean {
+  val file = File(projectFile)
+  if (!file.exists()) return false
+  if (file.isDirectory) {
+    return file.walkTopDown().any { it.isFile && ArbigentJourneyXmlImporter.isJourneyFile(it) }
+  }
+  return ArbigentJourneyXmlImporter.isJourneyFile(file)
+}
+
+/**
+ * Builds an [ArbigentProject] from [projectFile], loading Journeys XML when the path is a
+ * journey source and falling back to the normal YAML loader otherwise.
+ */
+fun loadArbigentProject(
+  projectFile: String,
+  aiFactory: () -> ArbigentAi,
+  deviceFactory: () -> ArbigentDevice,
+  appSettings: ArbigentAppSettings,
+): ArbigentProject {
+  return if (isJourneyProjectSource(projectFile)) {
+    val projectFileContent = ArbigentJourneyXmlImporter.loadProjectContent(File(projectFile))
+    ArbigentProject(
+      projectFileContent = projectFileContent,
+      aiFactory = aiFactory,
+      deviceFactory = deviceFactory,
+      appSettings = appSettings,
+    )
+  } else {
+    ArbigentProject(
+      file = File(projectFile),
+      aiFactory = aiFactory,
+      deviceFactory = deviceFactory,
+      appSettings = appSettings,
+    )
+  }
+}
+
 fun connectDevice(os: String): ArbigentDevice {
   val deviceOs =
     ArbigentDeviceOs.entries.find { it.name.toLowerCasePreservingASCIIRules() == os.toLowerCasePreservingASCIIRules() }

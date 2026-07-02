@@ -26,8 +26,11 @@ class ArbigentScenariosCommand : CliktCommand(name = "scenarios") {
     arbigentDebugLog("  ai-type: Not applicable for scenarios command")
     arbigentDebugLog("  Note: ai-type from global would be 'global-openai' if this command used it")
     arbigentDebugLog("==========================================")
-    val arbigentProject = ArbigentProject(
-      file = File(projectFile),
+    if (projectFile == null) {
+      throw IllegalArgumentException("Missing option '--project-file'. Please provide a project file path via command line argument or in .arbigent/settings.local.yml")
+    }
+    val arbigentProject = loadArbigentProject(
+      projectFile = projectFile!!,
       aiFactory = { throw UnsupportedOperationException("AI not needed for listing") },
       deviceFactory = { throw UnsupportedOperationException("Device not needed for listing") },
       appSettings = CliAppSettings(

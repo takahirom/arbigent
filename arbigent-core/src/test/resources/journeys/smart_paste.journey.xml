@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<journey name="Smart Paste from Clipboard">
+    <description>Verify that pasting multi-line text from the clipboard splits it into multiple items.</description>
+    <actions xml:space="preserve">
+        <action>Open Google Keep</action>
+        <action>Long press the body text to select all content within.</action>
+        <action>Tap "Copy" in the context menu to place the text into the system clipboard.</action>
+        <action>Launch the grocery application</action>
+        <action>Verify that the app automatically splits the text into three separate list items: "Carrots", "Potatoes", and "Onions"</action>
+    </actions>
+</journey>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<journey name="Weather screen">
+    <description>Verify that the Weather screen displays correctly when navigated to</description>
+    <actions xml:space="preserve">
+        <action>Tap "Weather"</action>
+        <action>Verify that the Weather screen is displayed and shows the current temperature</action>
+    </actions>
+</journey>

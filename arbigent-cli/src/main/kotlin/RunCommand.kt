@@ -144,8 +144,8 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
       path = path,
       variables = variables
     )
-    val arbigentProject = ArbigentProject(
-      file = File(projectFile),
+    val arbigentProject = loadArbigentProject(
+      projectFile = projectFile!!,
       aiFactory = { ai },
       deviceFactory = { device ?: throw UnsupportedOperationException("Device not available in dry-run mode") },
       appSettings = appSettings
