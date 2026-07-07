@@ -211,6 +211,25 @@ This enables you to:
 - Reuse existing Maestro test automation assets
 - Combine precise setup sequences with AI-driven testing
 
+### Android Studio Journeys XML Import
+
+Arbigent can run [Android Studio Journeys](https://developer.android.com/studio/gemini/journeys) test files (`*.journey.xml` / `*_journey.xml`) directly, so existing journey files work without converting them to project YAML:
+
+```bash
+# Run a single journey file
+arbigent run --project-file app/src/journeysTest/weather.journey.xml
+
+# Run all journey files under a directory (one scenario per file)
+arbigent run --project-file app/src/journeysTest/
+```
+
+Each journey is imported as one scenario: the `<description>` and ordered `<action>` steps become the scenario goal, and the scenario id is derived from the file name (e.g. `weather.journey.xml` → `weather`), which you can use with `--scenario-ids`.
+
+Notes:
+- The AI follows the actions as an ordered hint within a single goal rather than executing them as strict discrete steps
+- Journey scenarios have no tags, so `--tags` cannot be used with journey sources
+- Export from Arbigent back to journey XML is not supported
+
 ### Test Execution
 
 Run tests either directly through the UI or programmatically via the code interface or CLI.

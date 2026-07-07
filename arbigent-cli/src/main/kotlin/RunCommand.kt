@@ -116,8 +116,9 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     if (currentContext.invokedSubcommand != null) return
 
     // Check that project-file is provided either via CLI args or settings file
-    if (projectFile == null) {
-      throw CliktError("Missing option '--project-file'. Please provide a project file path via command line argument or in .arbigent/settings.local.yml")
+    val projectFilePath = requireProjectFile(projectFile)
+    if (tags.isNotEmpty() && isJourneyProjectSource(projectFilePath)) {
+      throw CliktError("--tags is not supported for Journeys XML projects because journey scenarios have no tags")
     }
 
     validateAiConfig(aiType)
@@ -144,8 +145,8 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
       path = path,
       variables = variables
     )
-    val arbigentProject = ArbigentProject(
-      file = File(projectFile),
+    val arbigentProject = loadArbigentProject(
+      projectFile = projectFilePath,
       aiFactory = { ai },
       deviceFactory = { device ?: throw UnsupportedOperationException("Device not available in dry-run mode") },
       appSettings = appSettings
