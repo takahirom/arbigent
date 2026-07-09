@@ -1,5 +1,6 @@
 package io.github.takahirom.arbigent.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -7,10 +8,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.PointerIcon
@@ -24,6 +27,7 @@ import java.time.format.DateTimeFormatter
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.Orientation
 import org.jetbrains.jewel.ui.component.Divider
+import org.jetbrains.jewel.ui.component.Icon
 import org.jetbrains.jewel.ui.component.IconActionButton
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.TextField
@@ -32,31 +36,51 @@ import org.jetbrains.jewel.ui.painter.hints.Size
 import java.awt.Desktop
 import java.time.ZoneId
 
-@OptIn(ArbigentInternalApi::class)
+@OptIn(ArbigentInternalApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun BottomConsole() {
-  Row(
-    modifier = Modifier.padding(8.dp).fillMaxWidth()
-      .background(JewelTheme.globalColors.panelBackground)
-  ) {
-    var isExpanded by remember { mutableStateOf(false) }
-    val clipboardManager = LocalClipboardManager.current
+  var isExpanded by remember { mutableStateOf(false) }
+  val clipboardManager = LocalClipboardManager.current
+
+  Column(Modifier.fillMaxWidth()) {
+    Divider(
+      orientation = Orientation.Horizontal,
+      modifier = Modifier.fillMaxWidth(),
+      thickness = 1.dp,
+    )
+
     if (!isExpanded) {
+      // Collapsed: single-line status bar
       val globalStatus by ArbigentGlobalStatus.status.collectAsState(ArbigentGlobalStatus.status())
-      Text(
-        text = globalStatus,
-        modifier = Modifier.weight(1f)
-          .clickable { isExpanded = !isExpanded },
-        maxLines = 1
-      )
-    } else {
-      var consoleHeight by remember { mutableStateOf(300.dp) }
-      Column(
-        modifier = Modifier.weight(1f)
-          .height(consoleHeight)
+      Row(
+        modifier = Modifier
+          .fillMaxWidth()
+          .clickable { isExpanded = true }
+          .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
       ) {
+        Icon(
+          key = AllIconsKeys.General.ChevronUp,
+          contentDescription = "Expand console",
+          hint = Size(12),
+          modifier = Modifier.padding(end = 6.dp),
+        )
+        Text(
+          text = globalStatus,
+          modifier = Modifier.weight(1f),
+          maxLines = 1,
+          color = JewelTheme.globalColors.text.info,
+        )
+      }
+    } else {
+      // Expanded console
+      var consoleHeight by remember { mutableStateOf(250.dp) }
+      Column(
+        modifier = Modifier.fillMaxWidth().height(consoleHeight),
+      ) {
+        // Drag handle to resize
         Divider(
-          thickness = 8.dp,
+          thickness = 4.dp,
           orientation = Orientation.Horizontal,
           modifier = Modifier.fillMaxWidth()
             .pointerHoverIcon(PointerIcon.Hand)
@@ -67,26 +91,29 @@ fun BottomConsole() {
               }
             }
         )
+
+        // Console header + filter
         val queryState = rememberTextFieldState()
-        Row {
+        Row(
+          modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
           Text(
             "Console",
-            modifier = Modifier.weight(1f)
-              .align(Alignment.CenterVertically)
+            modifier = Modifier.padding(end = 8.dp),
           )
           TextField(
             state = queryState,
-            modifier = Modifier.padding(4.dp)
-              .width(200.dp)
+            modifier = Modifier.width(180.dp).padding(horizontal = 4.dp),
+            placeholder = { Text("Filter...") },
           )
+          Spacer(Modifier.weight(1f))
           IconActionButton(
             key = AllIconsKeys.Actions.Download,
-            onClick = {
-              Desktop.getDesktop().open(ArbigentFiles.logFile)
-            },
+            onClick = { Desktop.getDesktop().open(ArbigentFiles.logFile) },
             contentDescription = "Open log file",
-            hint = Size(28)
-          )
+            hint = Size(16),
+          ) { Text("Open log file") }
           IconActionButton(
             key = AllIconsKeys.Actions.Copy,
             onClick = {
@@ -104,15 +131,17 @@ fun BottomConsole() {
               )
             },
             contentDescription = "Copy",
-            hint = Size(28)
-          )
+            hint = Size(16),
+          ) { Text("Copy log") }
           IconActionButton(
-            key = AllIconsKeys.General.Close,
-            onClick = { isExpanded = !isExpanded },
-            contentDescription = "Close",
-            hint = Size(28)
-          )
+            key = AllIconsKeys.General.ChevronDown,
+            onClick = { isExpanded = false },
+            contentDescription = "Collapse",
+            hint = Size(16),
+          ) { Text("Collapse console") }
         }
+
+        // Log entries
         val rawHistories by ArbigentGlobalStatus.console.collectAsState(ArbigentGlobalStatus.console())
         val histories by derivedStateOf {
           val hasFilter = queryState.text.isNotEmpty()
@@ -126,29 +155,39 @@ fun BottomConsole() {
         }
         LazyColumn(
           state = lazyColumnState,
-          modifier = Modifier.fillMaxSize()
+          modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
         ) {
           items(histories) { (instant, status) ->
-            Row(Modifier.padding(2.dp)) {
+            Row(
+              Modifier
+                .fillMaxWidth()
+                .padding(vertical = 1.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .clickable {
+                  val timeText = instant.atZone(ZoneId.systemDefault()).format(
+                    DateTimeFormatter.ofPattern("HH:mm:ss.SSS")
+                  )
+                  clipboardManager.setText(
+                    buildAnnotatedString {
+                      append(timeText)
+                      append(" ")
+                      append(status)
+                    }
+                  )
+                }
+                .padding(horizontal = 4.dp, vertical = 2.dp),
+            ) {
               val timeText = instant.atZone(ZoneId.systemDefault()).format(
                 DateTimeFormatter.ofPattern("HH:mm:ss.SSS")
               )
               Text(
                 text = timeText,
+                color = JewelTheme.globalColors.text.info,
+                modifier = Modifier.padding(end = 8.dp),
               )
               Text(
                 text = status.replace(";base64,.*?\"".toRegex(), ";base64,[omitted]\""),
-                modifier = Modifier.weight(1f)
-                  .padding(start = 4.dp)
-                  .clickable {
-                    clipboardManager.setText(
-                      buildAnnotatedString {
-                        append(timeText)
-                        append(" ")
-                        append(status)
-                      }
-                    )
-                  }
+                modifier = Modifier.weight(1f),
               )
             }
           }
