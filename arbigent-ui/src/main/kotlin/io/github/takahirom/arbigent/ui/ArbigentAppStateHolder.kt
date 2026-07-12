@@ -259,6 +259,7 @@ class ArbigentAppStateHolder(
     data object ShowGenerateScenarioDialog : ProjectDialogState
     data object ShowFixedScenariosDialog : ProjectDialogState
     data object ShowReusableScenariosDialog : ProjectDialogState
+    data object ShowScenarioGraphDialog : ProjectDialogState
   }
 
   val deviceConnectionState: MutableStateFlow<DeviceConnectionState> =
@@ -546,6 +547,9 @@ class ArbigentAppStateHolder(
       fixedScenarios = _fixedScenariosFlow.value
     )
   }
+
+  fun scenarioGraph(): ArbigentScenarioGraph =
+    ArbigentScenarioGraph.from(getCurrentProjectFileContent())
 
   private fun getCurrentContentAsYaml(): String {
     return arbigentProjectSerializer.encodeToString(getCurrentProjectFileContent())

@@ -402,6 +402,11 @@ arbigent scenarios
 arbigent tags
 ```
 
+**Print the scenario graph as Mermaid** (dependency edges plus reusable calls expanded per call site — paste into GitHub Markdown or [mermaid.live](https://mermaid.live) to view; the same graph is available in the UI via the "Scenario graph" button):
+```bash
+arbigent graph
+```
+
 
 ### Shard Option to Enable Parallel Tests
 
