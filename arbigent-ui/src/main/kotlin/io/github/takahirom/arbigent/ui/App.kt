@@ -123,6 +123,13 @@ private fun MainScreen(
         appStateHolder.projectDialogState.value = ProjectDialogState.NotSelected
       }
     )
+  } else if (projectDialogState is ProjectDialogState.ShowScenarioGraphDialog) {
+    ScenarioGraphDialog(
+      appStateHolder = appStateHolder,
+      onCloseRequest = {
+        appStateHolder.projectDialogState.value = ProjectDialogState.NotSelected
+      }
+    )
   }
   val scenarioIndex by appStateHolder.selectedScenarioIndex.collectAsState()
   var scenariosWidth by remember { mutableStateOf(200.dp) }

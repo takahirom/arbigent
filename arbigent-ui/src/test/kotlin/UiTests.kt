@@ -171,6 +171,16 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
                 }
               }
             }
+            describe("when show scenario graph") {
+              doIt {
+                clickScenarioGraphButton()
+              }
+              itShould("show the scenario node in the graph") {
+                capture(it)
+                assertScenarioGraphNodeExists("scenario1")
+                closeScenarioGraphDialog()
+              }
+            }
           }
           describe("when enter multiline goal") {
             doIt {
@@ -455,6 +465,22 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
             }
           }
         }
+        describe("when add dependency and show scenario graph") {
+          doIt {
+            expandOptions()
+            changeScenarioId("scenario1")
+            clickDependencyDropDown()
+            selectDependencyDropDown(firstGoal)
+            collapseOptions()
+            clickScenarioGraphButton()
+          }
+          itShould("show the dependency and the scenario in the graph") {
+            capture(it)
+            assertScenarioGraphNodeExists("scenario1")
+            assertScenarioGraphNodeWithTextExists(firstGoal)
+            closeScenarioGraphDialog()
+          }
+        }
         describe("when add dependency and change dependency id and run") {
           doIt {
             expandOptions()
@@ -553,6 +579,29 @@ class TestRobot(
 
   fun assertScenarioListItemDoesNotExist(goal: String) {
     composeUiTest.onNode(hasText("Goal: $goal", substring = true)).assertDoesNotExist()
+  }
+
+  fun clickScenarioGraphButton() {
+    composeUiTest.onNode(hasTestTag("scenario_graph_button")).performClick()
+    waitALittle()
+  }
+
+  fun assertScenarioGraphNodeExists(scenarioId: String) {
+    composeUiTest.onNode(hasTestTag("scenario_graph_dialog")).assertExists()
+    composeUiTest.onNode(hasTestTag("graph_node_scenario:$scenarioId"), useUnmergedTree = true)
+      .assertExists()
+  }
+
+  fun assertScenarioGraphNodeWithTextExists(text: String) {
+    composeUiTest.onAllNodes(
+      hasText(text, substring = true) and hasAnyAncestor(hasTestTag("scenario_graph_dialog")),
+      useUnmergedTree = true
+    ).onFirst().assertExists()
+  }
+
+  fun closeScenarioGraphDialog() {
+    composeUiTest.onNode(hasTestTag("close_scenario_graph_button")).performClick()
+    waitALittle()
   }
 
   fun enterScenariosToGenerate(scenarios: String) {

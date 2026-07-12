@@ -90,6 +90,18 @@ internal fun LeftScenariosPanel(
       }
 
       IconActionButton(
+        key = AllIconsKeys.Graph.Layout,
+        onClick = {
+          appStateHolder.projectDialogState.value = ProjectDialogState.ShowScenarioGraphDialog
+        },
+        contentDescription = "Scenario graph",
+        hint = Size(28),
+        modifier = Modifier.padding(end = 8.dp).testTag("scenario_graph_button")
+      ) {
+        Text("Scenario graph")
+      }
+
+      IconActionButton(
         key = AllIconsKeys.Diff.MagicResolve,
         onClick = {
           appStateHolder.projectDialogState.value = ProjectDialogState.ShowGenerateScenarioDialog

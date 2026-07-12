@@ -35,6 +35,8 @@ dependencies {
   implementation("com.charleskorn.kaml:kaml:0.67.0")
   implementation(libs.kotlinx.serialization.json)
   implementation("com.github.javakeyring:java-keyring:1.0.4")
+  // Scenario graph rendering (hierarchical layout + zoom/pan)
+  implementation("io.github.justdeko:kuiver:0.3.0")
   // kotlin-test
   testImplementation(kotlin("test"))
   @OptIn(ExperimentalComposeLibrary::class)
