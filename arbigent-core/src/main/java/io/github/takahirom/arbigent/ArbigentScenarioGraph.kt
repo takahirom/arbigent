@@ -69,6 +69,9 @@ public data class ArbigentScenarioGraph(
       val reusableById = projectFileContent.reusableScenarios.associateBy { it.id }
       val nodes = mutableListOf<Node>()
       val edges = mutableListOf<Edge>()
+      // Call-node keys carry a monotonic counter so they can never collide with a
+      // scenario key (scenario ids are unrestricted and could imitate any path scheme).
+      var callNodeCounter = 0
 
       /**
        * Expands one call step. Leaves become nodes chained after [previousKey]; composites are
@@ -83,11 +86,9 @@ public data class ArbigentScenarioGraph(
         parentBindings: Map<String, String>,
         viaPath: List<String>,
         previousKey: String,
-        keyPrefix: String,
-        index: Int,
         expansionStack: List<String>,
       ): String {
-        val key = "$keyPrefix/$index:${step.uses}"
+        val key = "call#${callNodeCounter++}:${step.uses}"
         val target = reusableById[step.uses]
         val resolvedWith = step.withValues.mapValues { (_, value) ->
           ReusableInputsResolver.resolve(value, parentBindings)
@@ -108,14 +109,12 @@ public data class ArbigentScenarioGraph(
           return key
         }
         var lastKey = previousKey
-        target.callSteps().forEachIndexed { nestedIndex, nestedStep ->
+        target.callSteps().forEach { nestedStep ->
           lastKey = expandStep(
             step = nestedStep,
             parentBindings = bindings,
             viaPath = viaPath + label,
             previousKey = lastKey,
-            keyPrefix = key,
-            index = nestedIndex,
             expansionStack = expansionStack + step.uses,
           )
         }
@@ -144,14 +143,12 @@ public data class ArbigentScenarioGraph(
           }
         }
         var lastKey = scenarioKey(scenario.id)
-        scenario.callSteps().forEachIndexed { index, step ->
+        scenario.callSteps().forEach { step ->
           lastKey = expandStep(
             step = step,
             parentBindings = emptyMap(),
             viaPath = emptyList(),
             previousKey = lastKey,
-            keyPrefix = scenarioKey(scenario.id),
-            index = index,
             expansionStack = emptyList(),
           )
         }

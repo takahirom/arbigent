@@ -117,6 +117,28 @@ class ArbigentScenarioGraphTest {
   }
 
   @Test
+  fun scenarioIdImitatingCallKeySchemeDoesNotCollide() {
+    // "A/0:B" as a scenario id used to collide with the call node of scenario "A"
+    // step 0 using "B" when call keys were path-based.
+    val graph = ArbigentScenarioGraph.from(
+      load(
+        """
+        scenarios:
+        - id: "A/0:B"
+          goal: "A scenario whose id imitates a call key"
+        - id: "A"
+          uses: "B"
+        reusableScenarios:
+        - id: "B"
+          goal: "Reusable goal"
+        """
+      )
+    )
+    assertEquals(3, graph.nodes.size)
+    assertEquals(3, graph.nodes.map { it.key }.distinct().size)
+  }
+
+  @Test
   fun mermaidOutputEscapesQuotesAndMarksReusableCalls() {
     val mermaid = ArbigentScenarioGraph.from(
       load(
