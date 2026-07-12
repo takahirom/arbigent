@@ -116,11 +116,9 @@ fun AiOptionsComponent(
                 Column {
                     ImageDetailLevel.entries.forEach { item ->
                         val isSelected = item == detail
-                        val isItemHovered = false
-                        val isPreviewSelection = false
                         SimpleListItem(
                             text = item.name.lowercase(),
-                            state = ListItemState(isSelected, isItemHovered, isPreviewSelection),
+                            state = ListItemState(isSelected),
                             modifier = Modifier
                                 .testTag("image_detail_level_item_${item.name.lowercase()}")
                                 .clickable {
@@ -129,7 +127,6 @@ fun AiOptionsComponent(
                                     )
                                 },
                             style = JewelTheme.simpleListItemStyle,
-                            contentDescription = item.name.lowercase()
                         )
                     }
                 }
@@ -168,11 +165,9 @@ fun AiOptionsComponent(
                 Column {
                     listOf(ImageFormat.PNG, ImageFormat.WEBP, ImageFormat.LOSSY_WEBP).forEach { item ->
                         val isSelected = item == updatedOptions.imageFormat
-                        val isItemHovered = false
-                        val isPreviewSelection = false
                         SimpleListItem(
                             text = item.name.lowercase().replace("_", " "),
-                            state = ListItemState(isSelected, isItemHovered, isPreviewSelection),
+                            state = ListItemState(isSelected),
                             modifier = Modifier
                                 .testTag("image_format_item_${item.name.lowercase()}")
                                 .clickable {
@@ -181,7 +176,6 @@ fun AiOptionsComponent(
                                     )
                                 },
                             style = JewelTheme.simpleListItemStyle,
-                            contentDescription = item.name.lowercase().replace("_", " ")
                         )
                     }
                 }

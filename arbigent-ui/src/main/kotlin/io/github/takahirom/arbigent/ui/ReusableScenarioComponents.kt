@@ -96,15 +96,16 @@ internal fun ReusableStepsEditor(
             text = name + if (input.required && input.default == null) " *" else "",
             modifier = Modifier.width(120.dp)
           )
-          TextField(
+          ValueTextField(
             value = step.withValues[name] ?: "",
             onValueChange = { newValue ->
               val newWith = step.withValues.toMutableMap()
               if (newValue.isEmpty()) newWith.remove(name) else newWith[name] = newValue
               scenarioStateHolder.onReusableStepChanged(index, step.copy(withValues = newWith))
             },
-            placeholder = { Text(input.default ?: "") },
-            modifier = Modifier.width(200.dp).testTag("reusable_step_with_${index}_$name")
+            placeholder = input.default ?: "",
+            modifier = Modifier.width(200.dp).testTag("reusable_step_with_${index}_$name"),
+            resetKey = "$index:${step.uses}:$name",
           )
         }
       }
@@ -133,11 +134,12 @@ internal fun ReusableInputsEditor(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.padding(vertical = 2.dp)
       ) {
-        TextField(
+        ValueTextField(
           value = name,
           onValueChange = { scenarioStateHolder.onReusableInputChanged(index, it, input) },
-          placeholder = { Text("Input name") },
-          modifier = Modifier.width(160.dp).testTag("reusable_input_name_$index")
+          placeholder = "Input name",
+          modifier = Modifier.width(160.dp).testTag("reusable_input_name_$index"),
+          resetKey = index,
         )
         Checkbox(
           checked = input.required,
@@ -147,15 +149,16 @@ internal fun ReusableInputsEditor(
           modifier = Modifier.padding(start = 8.dp)
         )
         Text("required")
-        TextField(
+        ValueTextField(
           value = input.default ?: "",
           onValueChange = {
             scenarioStateHolder.onReusableInputChanged(
               index, name, input.copy(default = it.ifEmpty { null })
             )
           },
-          placeholder = { Text("Default value") },
-          modifier = Modifier.width(160.dp).padding(start = 8.dp)
+          placeholder = "Default value",
+          modifier = Modifier.width(160.dp).padding(start = 8.dp),
+          resetKey = index,
         )
         IconActionButton(
           key = AllIconsKeys.General.Delete,

@@ -286,11 +286,9 @@ fun ScenarioControls(appStateHolder: ArbigentAppStateHolder) {
       Column {
         ArbigentDeviceOs.entries.forEach { item ->
           val isSelected = item == deviceOs
-          val isItemHovered = false
-          val isPreviewSelection = false
           SimpleListItem(
             text = item.name,
-            state = ListItemState(isSelected, isItemHovered, isPreviewSelection),
+            state = ListItemState(isSelected),
             modifier = Modifier
               .clickable {
                 devicesStateHolder.selectedDeviceOs.value = item
@@ -298,7 +296,6 @@ fun ScenarioControls(appStateHolder: ArbigentAppStateHolder) {
                 devicesStateHolder.onSelectedDeviceChanged(null)
               },
             style = JewelTheme.simpleListItemStyle,
-            contentDescription = item.name,
           )
         }
       }
@@ -315,11 +312,9 @@ fun ScenarioControls(appStateHolder: ArbigentAppStateHolder) {
       Column {
         items.forEach { itemText ->
           val isSelected = itemText == selectedDevice?.name
-          val isItemHovered = false
-          val isPreviewSelection = false
           SimpleListItem(
             text = itemText,
-            state = ListItemState(isSelected, isItemHovered, isPreviewSelection),
+            state = ListItemState(isSelected),
             modifier = Modifier
               .clickable {
                 devicesStateHolder.onSelectedDeviceChanged(devicesStateHolder.devices.value.firstOrNull { it.name == itemText })
@@ -328,7 +323,6 @@ fun ScenarioControls(appStateHolder: ArbigentAppStateHolder) {
                 }
               },
             style = JewelTheme.simpleListItemStyle,
-            contentDescription = itemText,
           )
         }
       }

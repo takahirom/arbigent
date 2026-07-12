@@ -702,17 +702,18 @@ internal fun ScenarioOptions(
               modifier = Modifier.padding(4.dp),
               text = "Image assertion ${index + 1}"
             )
-            TextField(
+            ValueTextField(
               modifier = Modifier
                 .padding(4.dp)
                 .testTag("image_assertion"),
-              placeholder = { Text("XX button should exist") },
+              placeholder = "XX button should exist",
               value = imageAssertion.assertionPrompt,
               onValueChange = {
                 val newImageAssertions = imageAssertions.toMutableList()
                 newImageAssertions[index] = imageAssertion.copy(assertionPrompt = it)
                 updatedScenarioStateHolder.imageAssertionsStateFlow.value = newImageAssertions
               },
+              resetKey = index,
             )
           }
 
@@ -804,7 +805,7 @@ private fun InitializationOptions(
       verticalAlignment = Alignment.CenterVertically
     ) {
       if (initializeMethod is ArbigentScenarioContent.InitializationMethod.CleanupData) {
-        TextField(
+        ValueTextField(
           modifier = Modifier
             .testTag("cleanup_pacakge")
             .padding(4.dp),
@@ -815,52 +816,43 @@ private fun InitializationOptions(
               index,
               ArbigentScenarioContent.InitializationMethod.CleanupData(it)
             )
-          }
+          },
+          resetKey = index,
         )
       }
       Column {
         if (initializeMethod is ArbigentScenarioContent.InitializationMethod.Back) {
-          var editingText by remember(initializeMethod) {
-            mutableStateOf(
-              (initializeMethod as? ArbigentScenarioContent.InitializationMethod.Back)?.times.toString()
-            )
-          }
-          TextField(
+          ValueTextField(
             modifier = Modifier
               .padding(4.dp),
-            value = editingText,
-            placeholder = { Text("Times") },
+            value = initializeMethod.times.toString(),
+            placeholder = "Times",
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             onValueChange = {
-              editingText = it
               scenarioStateHolder.onInitializationMethodChanged(
                 index,
                 ArbigentScenarioContent.InitializationMethod.Back(it.toIntOrNull() ?: 1)
               )
             },
+            resetKey = index,
           )
         }
       }
       Row {
         if (initializeMethod is ArbigentScenarioContent.InitializationMethod.Wait) {
-          var editingText by remember(initializeMethod) {
-            mutableStateOf(
-              (initializeMethod as? ArbigentScenarioContent.InitializationMethod.Wait)?.durationMs.toString()
-            )
-          }
-          TextField(
+          ValueTextField(
             modifier = Modifier
               .padding(4.dp),
-            value = editingText,
-            placeholder = { Text("Duration(ms)") },
+            value = initializeMethod.durationMs.toString(),
+            placeholder = "Duration(ms)",
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             onValueChange = {
-              editingText = it
               scenarioStateHolder.onInitializationMethodChanged(
                 index,
                 ArbigentScenarioContent.InitializationMethod.Wait(it.toLongOrNull() ?: 0)
               )
             },
+            resetKey = index,
           )
           Text(
             "ms",
@@ -902,17 +894,17 @@ private fun InitializationOptions(
       }
       Column {
         if (initializeMethod is ArbigentScenarioContent.InitializationMethod.OpenLink) {
-          TextField(
+          ValueTextField(
             modifier = Modifier
               .padding(4.dp),
-            value = (initializeMethod as? ArbigentScenarioContent.InitializationMethod.OpenLink)?.link
-              ?: "",
+            value = initializeMethod.link,
             onValueChange = {
               scenarioStateHolder.onInitializationMethodChanged(
                 index,
                 ArbigentScenarioContent.InitializationMethod.OpenLink(it)
               )
             },
+            resetKey = index,
           )
         }
       }
@@ -974,10 +966,10 @@ fun LaunchAppInitializationSetting(
 ) {
   Column {
     if (initializeMethod is ArbigentScenarioContent.InitializationMethod.LaunchApp) {
-      TextField(
+      ValueTextField(
         modifier = Modifier.padding(4.dp).testTag("launch_app_package"),
         value = editingText,
-        placeholder = { Text("Package name") },
+        placeholder = "Package name",
         onValueChange = onPackageChange
       )
       val arguments by rememberUpdatedState(
@@ -986,10 +978,10 @@ fun LaunchAppInitializationSetting(
       )
       arguments.forEach { (key, value: ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue) ->
         Row {
-          TextField(
+          ValueTextField(
             modifier = Modifier.weight(1f).padding(4.dp),
             value = key,
-            placeholder = { Text("key") },
+            placeholder = "key",
             onValueChange = { newKey ->
               val newArguments = arguments.toMutableMap()
               newArguments.remove(key)
@@ -1042,10 +1034,11 @@ fun LaunchAppInitializationSetting(
               }
             )
           } else {
-            TextField(
+            ValueTextField(
               modifier = Modifier.weight(1f).padding(4.dp),
               value = value.value.toString(),
-              placeholder = { Text("value") },
+              placeholder = "value",
+              resetKey = value::class,
               onValueChange = { newValue ->
                 val newArguments = arguments.toMutableMap()
                 newArguments[key] = when (value) {
