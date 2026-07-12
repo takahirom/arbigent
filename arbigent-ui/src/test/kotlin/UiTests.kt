@@ -92,6 +92,23 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
           }
         }
 
+        describe("when search scenarios") {
+          doIt {
+            clickConnectToDeviceButton()
+            clickAddScenarioButton()
+            enterGoal("Login with valid account")
+            clickAddScenarioButton()
+            enterGoal("Open settings screen")
+            clickSearchScenariosButton()
+            enterSearchQuery("login")
+          }
+          itShould("show only matching scenario") {
+            capture(it)
+            assertScenarioListItemExists("Login with valid account")
+            assertScenarioListItemDoesNotExist("Open settings screen")
+          }
+        }
+
         describe("when add scenario") {
           doIt {
             clickConnectToDeviceButton()
@@ -518,6 +535,24 @@ class TestRobot(
   fun clickGenerateScenarioButton() {
     composeUiTest.onNode(hasContentDescription("Generate")).performClick()
     waitALittle()
+  }
+
+  fun clickSearchScenariosButton() {
+    composeUiTest.onNode(hasTestTag("scenario_search_button")).performClick()
+    waitALittle()
+  }
+
+  fun enterSearchQuery(query: String) {
+    composeUiTest.onNode(hasTestTag("scenario_search_field")).performTextInput(query)
+    waitALittle()
+  }
+
+  fun assertScenarioListItemExists(goal: String) {
+    composeUiTest.onNode(hasText("Goal: $goal", substring = true)).assertExists()
+  }
+
+  fun assertScenarioListItemDoesNotExist(goal: String) {
+    composeUiTest.onNode(hasText("Goal: $goal", substring = true)).assertDoesNotExist()
   }
 
   fun enterScenariosToGenerate(scenarios: String) {
