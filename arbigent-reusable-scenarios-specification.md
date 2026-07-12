@@ -1,6 +1,6 @@
 # Reusable Scenarios Specification
 
-Status: Design finalized, not yet implemented.
+Status: Implemented.
 
 ## Motivation
 

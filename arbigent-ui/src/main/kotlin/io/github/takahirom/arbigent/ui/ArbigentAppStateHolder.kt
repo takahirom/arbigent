@@ -77,9 +77,9 @@ class ArbigentAppStateHolder(
     _reusableScenariosFlow.value = _reusableScenariosFlow.value + scenario
   }
 
-  fun updateReusableScenario(scenario: ArbigentScenarioContent) {
+  fun updateReusableScenario(scenario: ArbigentScenarioContent, originalId: String = scenario.id) {
     _reusableScenariosFlow.value = _reusableScenariosFlow.value.map {
-      if (it.id == scenario.id) scenario else it
+      if (it.id == originalId) scenario else it
     }
   }
 

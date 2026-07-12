@@ -149,10 +149,11 @@ fun ReusableScenariosDialog(
             editingScenario = null
           },
           onSave = { content ->
-            if (editingScenario == null) {
+            val original = editingScenario
+            if (original == null) {
               appStateHolder.addReusableScenario(content)
             } else {
-              appStateHolder.updateReusableScenario(content)
+              appStateHolder.updateReusableScenario(content, originalId = original.id)
             }
             showEditor = false
             editingScenario = null
@@ -244,9 +245,13 @@ private fun ReusableScenarioEditorDialog(
       }
 
       stepBrowseIndex?.let { index ->
+        val allReusables = appStateHolder.reusableScenariosFlow.collectAsState().value
         ReusableScenarioPicker(
-          candidates = appStateHolder.reusableScenariosFlow.collectAsState().value
-            .filter { it.id != stateHolder.id },
+          // Exclude candidates that would create a cycle: the candidate itself and any
+          // composite whose expansion reaches the reusable being edited.
+          candidates = allReusables.filter { candidate ->
+            candidate.id != stateHolder.id && !reachesReusable(candidate, stateHolder.id, allReusables)
+          },
           onDismiss = { stepBrowseIndex = null },
           onPicked = { pickedId ->
             val steps = stateHolder.reusableStepsStateFlow.value
@@ -275,6 +280,20 @@ private fun ReusableScenarioEditorDialog(
       }
     }
   )
+}
+
+/** True when [candidate]'s expansion (transitively) references [targetId]. */
+private fun reachesReusable(
+  candidate: ArbigentScenarioContent,
+  targetId: String,
+  allReusables: List<ArbigentScenarioContent>,
+  visited: MutableSet<String> = mutableSetOf(),
+): Boolean {
+  if (!visited.add(candidate.id)) return false
+  return candidate.callSteps().any { step ->
+    step.uses == targetId || allReusables.firstOrNull { it.id == step.uses }
+      ?.let { reachesReusable(it, targetId, allReusables, visited) } == true
+  }
 }
 
 /** Lightweight picker used inside the editor dialog to choose a reusable scenario. */
