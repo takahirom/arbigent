@@ -407,6 +407,18 @@ arbigent tags
 arbigent graph
 ```
 
+**Read built-in guides:**
+
+The CLI ships with built-in guides covering how to write project YAML, inspect a project, run scenarios, and debug failed runs. The topics are also listed at the end of `arbigent --help`, so AI agents operating the CLI can discover them on their own.
+
+```bash
+# List available guide topics
+arbigent guide
+
+# Print a guide
+arbigent guide writing-yaml
+```
+
 
 ### Shard Option to Enable Parallel Tests
 
