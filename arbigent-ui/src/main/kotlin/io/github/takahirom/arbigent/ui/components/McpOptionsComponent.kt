@@ -139,14 +139,13 @@ fun McpOptionsComponent(
                 val isSelected = serverName == selectedServerToAdd
                 SimpleListItem(
                   text = serverName,
-                  state = ListItemState(isSelected, false, false),
+                  state = ListItemState(isSelected),
                   modifier = Modifier
                     .testTag("mcp_add_server_item_$serverName")
                     .clickable {
                       selectedServerToAdd = serverName
                     },
                   style = JewelTheme.simpleListItemStyle,
-                  contentDescription = serverName
                 )
               }
             }

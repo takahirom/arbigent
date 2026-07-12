@@ -29,7 +29,8 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: 'jetbrains'
-          java-version: '17'
+          # Jewel 0.32+ requires Java 21; jpackage bundles this JDK into the app.
+          java-version: '21'
           java-package: 'jdk' # optional (jdk, jre, jdk+jcef, jre+jcef, jdk+ft, or jre+ft) - defaults to jdk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

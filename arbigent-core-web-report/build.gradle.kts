@@ -11,7 +11,7 @@ plugins {
 kotlin {
   explicitApi()
   js(IR) {
-    moduleName = "arbigentreport"
+    outputModuleName.set("arbigentreport")
     browser {
     }
     binaries.executable()
