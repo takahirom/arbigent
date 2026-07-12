@@ -293,6 +293,7 @@ Commands:
   run
   scenarios
   tags
+  graph
   guide      Print guides for AI agents working with arbigent projects
 
 Guides for AI agents (print one with `arbigent guide <topic>`):
@@ -444,7 +445,7 @@ arbigent guide writing-yaml
 The CLI is designed so that AI coding agents (Claude Code, Codex, etc.) can operate Arbigent end to end: inspecting a project, editing scenario YAML, running scenarios, and reading the results. The CLI documents itself, so an agent only needs to be pointed at the `arbigent` command:
 
 - `arbigent --help` ends with the list of built-in guide topics, and `arbigent guide <topic>` prints an agent-oriented guide (`setup`, `writing-yaml`, `inspecting-project`, `running-scenarios`, `debugging-failures`).
-- `arbigent scenarios` and `arbigent tags` let an agent inspect a project without an AI API key or a device, and `arbigent run --dry-run` previews which scenarios would run without needing a device.
+- `arbigent scenarios`, `arbigent tags`, and `arbigent graph` let an agent inspect a project without an AI API key or a device, and `arbigent run --dry-run` previews which scenarios would run without needing a device.
 - `arbigent run` writes machine-readable results to `arbigent-result/result.yml` alongside the HTML report and screenshots, so an agent can check the outcome and debug failures.
 
 For example, you can instruct your agent:
