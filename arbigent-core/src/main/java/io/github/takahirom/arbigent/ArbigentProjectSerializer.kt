@@ -436,7 +436,8 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
     }
     val defaults = reusable.inputs.mapNotNull { (name, input) -> input.default?.let { name to it } }.toMap()
     val bindings = defaults + resolvedWith
-    val crumb = breadcrumb + ReusableInputsResolver.breadcrumbLabel(reusable.id, resolvedWith)
+    // Label with the effective bindings (including defaults) so reports show the full snapshot.
+    val crumb = breadcrumb + ReusableInputsResolver.breadcrumbLabel(reusable.id, bindings)
     if (reusable.isCallForm()) {
       reusable.callSteps().forEach {
         expandStep(taskScenarioId, it, bindings, crumb, expansionStack + step.uses)

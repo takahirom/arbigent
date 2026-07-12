@@ -285,6 +285,81 @@ class ReusableScenariosTest {
     assertEquals(0, project.reusableScenarios.size)
   }
 
+  @Test
+  fun emptyGoalScenariosFromLegacyFilesStillLoad() {
+    // Work-in-progress scenarios could always be saved with an empty goal.
+    val project = load(
+      """
+      scenarios:
+      - id: "wip"
+        goal: ""
+      """
+    )
+    assertEquals(1, project.scenarioContents.size)
+  }
+
+  @Test
+  fun defaultedInputsAppearInBreadcrumb() {
+    val project = load(
+      """
+      scenarios:
+      - id: "call-login"
+        uses: "login"
+      reusableScenarios:
+      - id: "login"
+        inputs:
+          method:
+            default: "email"
+        goal: "Log in via {{inputs.method}}"
+      """
+    )
+    assertEquals(
+      "call-login › login (method=email)",
+      project.tasksOf("call-login")[0].callBreadcrumb
+    )
+  }
+
+  @Test
+  fun callFormMustNotHaveMaxStepOrPromptTemplate() {
+    assertValidationError(
+      "maxStep is not allowed",
+      """
+      scenarios:
+      - id: "caller"
+        uses: "part"
+        maxStep: 25
+      reusableScenarios:
+      - id: "part"
+        goal: "part goal"
+      """
+    )
+    assertValidationError(
+      "userPromptTemplate is not allowed",
+      """
+      scenarios:
+      - id: "caller"
+        uses: "part"
+        userPromptTemplate: "custom {{USER_INPUT_GOAL}}"
+      reusableScenarios:
+      - id: "part"
+        goal: "part goal"
+      """
+    )
+    assertValidationError(
+      "initializeMethods are not allowed",
+      """
+      scenarios:
+      - id: "caller"
+        uses: "part"
+        initializeMethods:
+          type: "Back"
+      reusableScenarios:
+      - id: "part"
+        goal: "part goal"
+      """
+    )
+  }
+
   // ----- Load-time validation -----
 
   private fun assertValidationError(expectedMessagePart: String, yaml: String) {

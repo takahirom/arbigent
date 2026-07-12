@@ -48,6 +48,10 @@ options, exactly as scenarios do today:
   `maxStep`, `maxRetry`, `imageAssertions`, `imageAssertionHistoryCount`,
   `deviceFormFactor`, `userPromptTemplate`, `aiOptions`, `cacheOptions`,
   `additionalActions`, `mcpOptions`.
+- Note: retry is a **scenario-level** mechanism (it re-runs the calling
+  scenario's whole flattened task list), so `maxRetry` declared on a reusable
+  definition is not applied per expanded task — the calling scenario's
+  `maxRetry` governs.
 
 **Call form** (has `uses` or `steps`): a pure reference. Allowed fields:
 
@@ -55,10 +59,16 @@ options, exactly as scenarios do today:
   single-entry `steps`.
 - `steps` — an ordered list of `{ uses, with }` entries. **References only**;
   no inline goals inside `steps`.
-- Execution options (`initializationMethods`, `maxStep`, `mcpOptions`, …) are
+- Execution options (`initializationMethods`, `maxStep`, `mcpOptions`,
+  `imageAssertions`, `userPromptTemplate`, `type: Execution`, …) are
   **not allowed** on the call form. What runs is determined entirely by the
   definition; the call site only binds parameters and tree position.
-  Writing them is a load-time error.
+  Writing them is a load-time error. (Caveat: fields whose schema default is a
+  real value — e.g. `maxStep: 10` — cannot be distinguished from "unset" after
+  decoding; explicitly writing the default is accepted.)
+- Exception: `maxRetry` and `deviceFormFactor` stay **scenario-level** settings
+  and are therefore allowed on the call form — retry wraps the scenario's whole
+  flattened task list, and the scenario-level form factor is tree context.
 
 ### Placement differences
 

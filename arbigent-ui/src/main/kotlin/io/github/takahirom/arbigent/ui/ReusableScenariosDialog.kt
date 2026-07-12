@@ -228,12 +228,29 @@ private fun ReusableScenarioEditorDialog(
             isReusableDefinition = true,
           )
         }
+        var validationError by remember { mutableStateOf<String?>(null) }
+        validationError?.let { error ->
+          Text(
+            text = error,
+            color = androidx.compose.ui.graphics.Color.Red,
+            modifier = Modifier.padding(8.dp).testTag("reusable_validation_error")
+          )
+        }
         Row(
           modifier = Modifier.padding(8.dp).fillMaxWidth(),
           horizontalArrangement = Arrangement.End
         ) {
           DefaultButton(
-            onClick = { onSave(stateHolder.createArbigentScenarioContent()) },
+            onClick = {
+              val content = stateHolder.createArbigentScenarioContent()
+              // Reject definitions that would make the saved project fail to load.
+              val error = appStateHolder.validateReusableScenarioCandidate(content, existingScenario?.id)
+              if (error == null) {
+                onSave(content)
+              } else {
+                validationError = error
+              }
+            },
             modifier = Modifier.padding(end = 8.dp).testTag("save_reusable_button")
           ) {
             Text(if (existingScenario == null) "Add" else "Update")

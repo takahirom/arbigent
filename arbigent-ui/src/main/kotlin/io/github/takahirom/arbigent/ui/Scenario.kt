@@ -396,6 +396,7 @@ internal fun ScenarioFundamentalOptions(
           }
         )
       }
+      var confirmReusableStepsSwitch by remember { mutableStateOf(false) }
       Row(
         verticalAlignment = Alignment.CenterVertically
       ) {
@@ -403,10 +404,48 @@ internal fun ScenarioFundamentalOptions(
           text = "Reusable steps",
           selected = reusableStepsMode,
           onClick = {
-            updatedScenarioStateHolder.onReusableStepsModeChanged(true)
+            val hasLeafContent = updatedScenarioStateHolder.goal.isNotBlank() ||
+              updatedScenarioStateHolder.initializationMethodStateFlow.value.isNotEmpty() ||
+              updatedScenarioStateHolder.imageAssertionsStateFlow.value.isNotEmpty()
+            if (!reusableStepsMode && hasLeafContent) {
+              confirmReusableStepsSwitch = true
+            } else {
+              updatedScenarioStateHolder.onReusableStepsModeChanged(true)
+            }
           },
           modifier = Modifier.testTag("reusable_steps_radio")
         )
+      }
+      if (confirmReusableStepsSwitch) {
+        Dialog(onDismissRequest = { confirmReusableStepsSwitch = false }) {
+          Column(
+            modifier = Modifier.background(JewelTheme.globalColors.panelBackground).padding(16.dp)
+          ) {
+            Text(
+              "Switching to Reusable steps: the goal, initialization methods and image assertions\n" +
+                "of this scenario will not be saved while in this mode.\n" +
+                "To keep them, use \"Make this reusable\" instead — it moves them into a reusable\n" +
+                "scenario and calls it from here."
+            )
+            Row(modifier = Modifier.padding(top = 8.dp)) {
+              OutlinedButton(
+                onClick = { confirmReusableStepsSwitch = false },
+                modifier = Modifier.padding(end = 8.dp)
+              ) {
+                Text("Cancel")
+              }
+              OutlinedButton(
+                onClick = {
+                  confirmReusableStepsSwitch = false
+                  updatedScenarioStateHolder.onReusableStepsModeChanged(true)
+                },
+                modifier = Modifier.testTag("confirm_reusable_steps_switch")
+              ) {
+                Text("Switch anyway")
+              }
+            }
+          }
+        }
       }
     }
     // Form factor

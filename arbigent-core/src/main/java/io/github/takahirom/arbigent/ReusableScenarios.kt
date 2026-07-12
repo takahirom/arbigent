@@ -65,9 +65,26 @@ public fun ArbigentProjectFileContent.validateReusableScenarios() {
       if (content.aiOptions != null || content.mcpOptions != null || content.cacheOptions != null || content.additionalActions != null) {
         errors += "$where: execution options (aiOptions/mcpOptions/cacheOptions/additionalActions) are not allowed on a call-form scenario; set them on the reusable leaf"
       }
+      // Fields with non-null defaults can only be checked against their default values;
+      // an explicitly-written default is indistinguishable after decoding and is accepted.
+      if (content.maxStep != 10) {
+        errors += "$where: maxStep is not allowed on a call-form scenario; set it on the reusable leaf"
+      }
+      if (content.imageAssertionHistoryCount != 1) {
+        errors += "$where: imageAssertionHistoryCount is not allowed on a call-form scenario; set it on the reusable leaf"
+      }
+      if (content.userPromptTemplate != UserPromptTemplate.DEFAULT_TEMPLATE) {
+        errors += "$where: userPromptTemplate is not allowed on a call-form scenario; set it on the reusable leaf"
+      }
+      @Suppress("DEPRECATION")
+      if (content.initializeMethods != ArbigentScenarioContent.InitializationMethod.Noop) {
+        errors += "$where: initializeMethods are not allowed on a call-form scenario; move them into the reusable leaf"
+      }
     } else {
-      if (content.goal.isEmpty()) {
-        errors += "$where: a scenario must have a goal, uses, or steps"
+      // Empty-goal leaves are only rejected in reusableScenarios (a new namespace with no
+      // legacy files); ordinary scenarios could always be saved with an empty goal (WIP).
+      if (content.goal.isEmpty() && isReusable) {
+        errors += "$where: a reusable scenario must have a goal, uses, or steps"
       }
       if (content.withValues.isNotEmpty()) {
         errors += "$where: 'with' requires 'uses'"

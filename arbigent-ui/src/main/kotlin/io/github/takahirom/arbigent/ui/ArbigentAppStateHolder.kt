@@ -156,6 +156,26 @@ class ArbigentAppStateHolder(
     scenarioStateHolder.convertToCallNode(reusableId)
   }
 
+  /**
+   * Validates the project as it would look with [candidate] added (or replacing [originalId]).
+   * Returns the validation error message, or null when valid. Used to reject editor saves
+   * that would produce a project file that fails to load.
+   */
+  fun validateReusableScenarioCandidate(candidate: ArbigentScenarioContent, originalId: String?): String? {
+    val prospectiveReusables = if (originalId == null) {
+      _reusableScenariosFlow.value + candidate
+    } else {
+      _reusableScenariosFlow.value.map { if (it.id == originalId) candidate else it }
+    }
+    return runCatching {
+      ArbigentProjectFileContent(
+        scenarioContents = allScenarioStateHoldersStateFlow.value.map { it.createArbigentScenarioContent() },
+        reusableScenarios = prospectiveReusables,
+        fixedScenarios = _fixedScenariosFlow.value,
+      ).validateReusableScenarios()
+    }.exceptionOrNull()?.message
+  }
+
   // Target of the reusable-scenario selection dialog: scenario holder and step index.
   private val _currentReusableStepTarget = MutableStateFlow<Pair<ArbigentScenarioStateHolder, Int>?>(null)
 
@@ -541,6 +561,11 @@ class ArbigentAppStateHolder(
       return
     }
     val content = getCurrentProjectFileContent()
+    // Never write a project file that would fail to load; surface the problem instead.
+    runCatching { content.validateReusableScenarios() }.exceptionOrNull()?.let { e ->
+      showErrorDialog(e)
+      return
+    }
     arbigentProjectSerializer.save(
       projectFileContent = content,
       file = file
