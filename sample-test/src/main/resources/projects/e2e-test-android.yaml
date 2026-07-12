@@ -73,6 +73,24 @@ scenarios:
   tags:
   - name: "EscapedVariable"
   - name: "Settings"
+- id: "reusable-scenario-test"
+  uses: "search-in-settings"
+  with:
+    term: "Battery"
+  tags:
+  - name: "ReusableScenario"
+  - name: "Settings"
+reusableScenarios:
+- id: "search-in-settings"
+  inputs:
+    term:
+      required: true
+  goal: "Search for {{inputs.term}} in the Settings app and verify it appears in search results"
+  initializationMethods:
+  - type: "Back"
+    times: 5
+  - type: "LaunchApp"
+    packageName: "com.android.settings"
 fixedScenarios:
 - id: "3c441e6f-6178-4b4f-b2a2-fbdbf8fa4266"
   title: "launch setting by maestro"

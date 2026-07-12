@@ -19,7 +19,7 @@ public data class ArbigentScenarioAssignment(
         ArbigentAgentResults(
           status = "History ${index + 1} / " + taskAssignmentsHistory.size,
           agentResults = taskAssignments.map { (task, agent) ->
-            agent.getResult()
+            agent.getResult().copy(callBreadcrumb = task.callBreadcrumb)
           }
         )
       }

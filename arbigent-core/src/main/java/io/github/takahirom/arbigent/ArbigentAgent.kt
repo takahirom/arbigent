@@ -683,21 +683,22 @@ public fun AgentConfigBuilder(
             device: ArbigentDevice,
             chain: ArbigentInitializerInterceptor.Chain
           ) {
-            // Look up the YAML content from the fixed scenarios
-            val fixedScenario = fixedScenarios.find { it.id == initializeMethod.scenarioId }
-            if (fixedScenario == null) {
+            // Prefer inline yamlContent (set when {{inputs.*}} were substituted for a reusable
+            // scenario), otherwise look up the YAML content from the fixed scenarios.
+            val yamlText = initializeMethod.yamlContent
+              ?: fixedScenarios.find { it.id == initializeMethod.scenarioId }?.yamlText
+            if (yamlText == null) {
               arbigentErrorLog("Fixed scenario with id ${initializeMethod.scenarioId} not found")
               chain.proceed(device)
               return
             }
-            // Use the YAML content from the fixed scenario
             device.executeActions(
               MaestroFlowParser.parseFlow(
                 flowPath = Path(ArbigentFiles.parentDir),
-                flow = fixedScenario.yamlText
+                flow = yamlText
               )
             )
-            arbigentDebugLog("Executing Maestro YAML for scenario: ${fixedScenario.title}")
+            arbigentDebugLog("Executing Maestro YAML for scenario: ${initializeMethod.scenarioId}")
             chain.proceed(device)
           }
         })

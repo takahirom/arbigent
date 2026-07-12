@@ -217,6 +217,11 @@ private fun AgentResultView(taskIndex: Int, agentResult: ArbigentAgentResult) {
     Div {
       Text("Task($taskIndex) Goal: ${agentResult.goal}")
     }
+    agentResult.callBreadcrumb?.let { breadcrumb ->
+      Div {
+        Text("Called via: $breadcrumb")
+      }
+    }
     Div {
       Text("Max Steps: ${agentResult.maxStep}")
     }

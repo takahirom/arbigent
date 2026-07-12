@@ -70,6 +70,136 @@ class ArbigentAppStateHolder(
     return _fixedScenariosFlow.value.find { it.id == scenarioId }
   }
 
+  private val _reusableScenariosFlow = MutableStateFlow<List<ArbigentScenarioContent>>(emptyList())
+  val reusableScenariosFlow: StateFlow<List<ArbigentScenarioContent>> = _reusableScenariosFlow.asStateFlow()
+
+  fun addReusableScenario(scenario: ArbigentScenarioContent) {
+    _reusableScenariosFlow.value = _reusableScenariosFlow.value + scenario
+  }
+
+  fun updateReusableScenario(scenario: ArbigentScenarioContent, originalId: String = scenario.id) {
+    _reusableScenariosFlow.value = _reusableScenariosFlow.value.map {
+      if (it.id == originalId) scenario else it
+    }
+    if (originalId != scenario.id) {
+      renameReusableScenarioReferences(originalId, scenario.id)
+    }
+  }
+
+  /** Rewrite every uses/steps reference so a reusable-scenario rename never leaves callers dangling. */
+  private fun renameReusableScenarioReferences(oldId: String, newId: String) {
+    allScenarioStateHoldersStateFlow.value.forEach { holder ->
+      val steps = holder.reusableStepsStateFlow.value
+      if (steps.any { it.uses == oldId }) {
+        holder.reusableStepsStateFlow.value = steps.map {
+          if (it.uses == oldId) it.copy(uses = newId) else it
+        }
+      }
+    }
+    _reusableScenariosFlow.value = _reusableScenariosFlow.value.map { reusable ->
+      if (reusable.callSteps().none { it.uses == oldId }) return@map reusable
+      ArbigentScenarioContent(
+        id = reusable.id,
+        steps = reusable.callSteps().map {
+          if (it.uses == oldId) it.copy(uses = newId) else it
+        },
+        inputs = reusable.inputs,
+        noteForHumans = reusable.noteForHumans,
+      )
+    }
+  }
+
+  fun removeReusableScenario(reusableScenarioId: String) {
+    _reusableScenariosFlow.value = _reusableScenariosFlow.value.filter { it.id != reusableScenarioId }
+  }
+
+  fun getReusableScenarioById(reusableScenarioId: String): ArbigentScenarioContent? {
+    return _reusableScenariosFlow.value.find { it.id == reusableScenarioId }
+  }
+
+  /** Ids of scenarios and reusable scenarios that reference [reusableScenarioId] via uses/steps. */
+  fun reusableScenarioReferences(reusableScenarioId: String): List<String> {
+    val fromScenarios = allScenarioStateHoldersStateFlow.value
+      .filter { holder -> holder.reusableStepsStateFlow.value.any { it.uses == reusableScenarioId } }
+      .map { it.id }
+    val fromReusables = _reusableScenariosFlow.value
+      .filter { reusable -> reusable.callSteps().any { it.uses == reusableScenarioId } }
+      .map { it.id }
+    return fromScenarios + fromReusables
+  }
+
+  /**
+   * Make this reusable: move the scenario's executable content into a new reusable scenario
+   * and turn the scenario itself into a call node. The scenario keeps its id, dependency and
+   * tags, so scenarios depending on it are unaffected.
+   */
+  fun makeScenarioReusable(scenarioStateHolder: ArbigentScenarioStateHolder, reusableId: String) {
+    val content = scenarioStateHolder.createArbigentScenarioContent()
+    addReusableScenario(
+      ArbigentScenarioContent(
+        id = reusableId,
+        goal = content.goal,
+        type = content.type,
+        initializationMethods = content.initializationMethods,
+        maxRetry = content.maxRetry,
+        maxStep = content.maxStep,
+        deviceFormFactor = content.deviceFormFactor,
+        imageAssertionHistoryCount = content.imageAssertionHistoryCount,
+        imageAssertions = content.imageAssertions,
+        userPromptTemplate = content.userPromptTemplate,
+        aiOptions = content.aiOptions,
+        cacheOptions = content.cacheOptions,
+        additionalActions = content.additionalActions,
+        mcpOptions = content.mcpOptions,
+      )
+    )
+    scenarioStateHolder.convertToCallNode(reusableId)
+  }
+
+  /**
+   * Validates the project as it would look with [candidate] added (or replacing [originalId]).
+   * Returns the validation error message, or null when valid. Used to reject editor saves
+   * that would produce a project file that fails to load.
+   */
+  fun validateReusableScenarioCandidate(candidate: ArbigentScenarioContent, originalId: String?): String? {
+    val prospectiveReusables = if (originalId == null) {
+      _reusableScenariosFlow.value + candidate
+    } else {
+      _reusableScenariosFlow.value.map { if (it.id == originalId) candidate else it }
+    }
+    return runCatching {
+      ArbigentProjectFileContent(
+        scenarioContents = allScenarioStateHoldersStateFlow.value.map { it.createArbigentScenarioContent() },
+        reusableScenarios = prospectiveReusables,
+        fixedScenarios = _fixedScenariosFlow.value,
+      ).validateReusableScenarios()
+    }.exceptionOrNull()?.message
+  }
+
+  // Target of the reusable-scenario selection dialog: scenario holder and step index.
+  private val _currentReusableStepTarget = MutableStateFlow<Pair<ArbigentScenarioStateHolder, Int>?>(null)
+
+  fun showReusableScenariosDialog() {
+    _currentReusableStepTarget.value = null
+    projectDialogState.value = ProjectDialogState.ShowReusableScenariosDialog
+  }
+
+  fun onShowReusableScenariosDialogWithContext(scenarioStateHolder: ArbigentScenarioStateHolder, stepIndex: Int) {
+    _currentReusableStepTarget.value = scenarioStateHolder to stepIndex
+    projectDialogState.value = ProjectDialogState.ShowReusableScenariosDialog
+  }
+
+  fun updateReusableStepSelection(reusableScenarioId: String) {
+    val (scenarioStateHolder, index) = _currentReusableStepTarget.value ?: return
+    val steps = scenarioStateHolder.reusableStepsStateFlow.value
+    if (index in steps.indices) {
+      scenarioStateHolder.onReusableStepChanged(
+        index,
+        steps[index].copy(uses = reusableScenarioId)
+      )
+    }
+  }
+
   fun getScenarioReferences(scenarioId: String): List<Pair<ArbigentScenarioStateHolder, Int>> {
     val references = mutableListOf<Pair<ArbigentScenarioStateHolder, Int>>()
     
@@ -128,6 +258,7 @@ class ArbigentAppStateHolder(
     data object ShowProjectSettings : ProjectDialogState
     data object ShowGenerateScenarioDialog : ProjectDialogState
     data object ShowFixedScenariosDialog : ProjectDialogState
+    data object ShowReusableScenariosDialog : ProjectDialogState
   }
 
   val deviceConnectionState: MutableStateFlow<DeviceConnectionState> =
@@ -219,6 +350,10 @@ class ArbigentAppStateHolder(
     allScenarioStateHoldersStateFlow.value += scenarioStateHolder
     selectedScenarioIndex.value =
       sortedScenariosAndDepths().indexOfFirst { it.first.id == scenarioStateHolder.id }
+  }
+
+  internal fun addScenarioStateHolder(scenarioStateHolder: ArbigentScenarioStateHolder) {
+    allScenarioStateHoldersStateFlow.value += scenarioStateHolder
   }
 
   private var job: Job? = null
@@ -319,7 +454,8 @@ class ArbigentAppStateHolder(
         },
         aiDecisionCache = decisionCache.value,
         appSettings = appSettings,
-        fixedScenarios = this@ArbigentAppStateHolder._fixedScenariosFlow.value
+        fixedScenarios = this@ArbigentAppStateHolder._fixedScenariosFlow.value,
+        reusableScenarios = this@ArbigentAppStateHolder._reusableScenariosFlow.value
       )
 
   private fun sortedScenarioAndDepth(allScenarios: List<ArbigentScenarioStateHolder>): List<Pair<ArbigentScenarioStateHolder, Int>> {
@@ -406,6 +542,7 @@ class ArbigentAppStateHolder(
         additionalActions = additionalActionsFlow.value
       ),
       scenarioContents = sortedScenarios.map { it.createArbigentScenarioContent() },
+      reusableScenarios = _reusableScenariosFlow.value,
       fixedScenarios = _fixedScenariosFlow.value
     )
   }
@@ -424,6 +561,11 @@ class ArbigentAppStateHolder(
       return
     }
     val content = getCurrentProjectFileContent()
+    // Never write a project file that would fail to load; surface the problem instead.
+    runCatching { content.validateReusableScenarios() }.exceptionOrNull()?.let { e ->
+      showErrorDialog(e)
+      return
+    }
     arbigentProjectSerializer.save(
       projectFileContent = content,
       file = file
@@ -458,6 +600,7 @@ class ArbigentAppStateHolder(
     defaultDeviceFormFactorFlow.value = projectFile.settings.deviceFormFactor
     additionalActionsFlow.value = projectFile.settings.additionalActions
     _fixedScenariosFlow.value = projectFile.fixedScenarios
+    _reusableScenariosFlow.value = projectFile.reusableScenarios
     projectStateFlow.value = ArbigentProject(
       settings = projectFile.settings,
       initialScenarios = arbigentScenarioStateHolders.map {

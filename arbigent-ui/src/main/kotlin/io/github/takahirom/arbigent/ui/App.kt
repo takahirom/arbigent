@@ -112,6 +112,17 @@ private fun MainScreen(
         appStateHolder.projectDialogState.value = ProjectDialogState.NotSelected
       }
     )
+  } else if (projectDialogState is ProjectDialogState.ShowReusableScenariosDialog) {
+    ReusableScenariosDialog(
+      appStateHolder = appStateHolder,
+      onCloseRequest = {
+        appStateHolder.projectDialogState.value = ProjectDialogState.NotSelected
+      },
+      onScenarioSelected = { reusableScenarioId ->
+        appStateHolder.updateReusableStepSelection(reusableScenarioId)
+        appStateHolder.projectDialogState.value = ProjectDialogState.NotSelected
+      }
+    )
   }
   val scenarioIndex by appStateHolder.selectedScenarioIndex.collectAsState()
   var scenariosWidth by remember { mutableStateOf(200.dp) }
@@ -164,7 +175,7 @@ private fun MainScreen(
                   content = {
                     Text(
                       modifier = Modifier.testTag("dependency_scenario"),
-                      text = scenarioStateHolder.goal
+                      text = scenarioStateHolder.goal.ifBlank { scenarioStateHolder.id }
                     )
                   }
                 )
@@ -195,7 +206,16 @@ private fun MainScreen(
           getFixedScenarioById = { scenarioId ->
             appStateHolder.getFixedScenarioById(scenarioId)
           },
-          mcpServerNames = appStateHolder.mcpServerNamesFlow.collectAsState().value
+          mcpServerNames = appStateHolder.mcpServerNamesFlow.collectAsState().value,
+          onShowReusableScenariosDialog = { scenarioStateHolder, index ->
+            appStateHolder.onShowReusableScenariosDialogWithContext(scenarioStateHolder, index)
+          },
+          getReusableScenarioById = { reusableScenarioId ->
+            appStateHolder.getReusableScenarioById(reusableScenarioId)
+          },
+          onMakeReusable = { scenarioStateHolder, newReusableId ->
+            appStateHolder.makeScenarioReusable(scenarioStateHolder, newReusableId)
+          }
         )
       }
     }

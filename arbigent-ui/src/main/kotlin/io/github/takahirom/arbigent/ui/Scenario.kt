@@ -79,9 +79,13 @@ fun Scenario(
   onShowFixedScenariosDialog: (ArbigentScenarioStateHolder, Int) -> Unit = { _, _ -> },
   getFixedScenarioById: (String) -> FixedScenario? = { null },
   mcpServerNames: List<String> = emptyList(),
+  onShowReusableScenariosDialog: (ArbigentScenarioStateHolder, Int) -> Unit = { _, _ -> },
+  getReusableScenarioById: (String) -> ArbigentScenarioContent? = { null },
+  onMakeReusable: (ArbigentScenarioStateHolder, String) -> Unit = { _, _ -> },
 ) {
   val arbigentScenarioExecutor: ArbigentScenarioExecutor? by scenarioStateHolder.arbigentScenarioExecutorStateFlow.collectAsState()
   val scenarioType by scenarioStateHolder.scenarioTypeStateFlow.collectAsState()
+  val reusableStepsMode by scenarioStateHolder.reusableStepsModeStateFlow.collectAsState()
   val goal = scenarioStateHolder.goalState
   var goalTextAreaHeight by remember { mutableStateOf(48.dp) }
   Column(
@@ -93,14 +97,22 @@ fun Scenario(
       Column(
         modifier = Modifier.weight(1f)
       ) {
-        TextArea(
-          modifier = Modifier.fillMaxWidth().padding(4.dp).testTag("goal").height(goalTextAreaHeight),
-          enabled = scenarioType.isScenario(),
-          state = goal,
-          placeholder = { Text("Goal") },
-          textStyle = JewelTheme.editorTextStyle,
-          decorationBoxModifier = Modifier.padding(horizontal = 8.dp)
-        )
+        if (reusableStepsMode) {
+          ReusableStepsEditor(
+            scenarioStateHolder = scenarioStateHolder,
+            getReusableScenarioById = getReusableScenarioById,
+            onBrowseReusableScenarios = onShowReusableScenariosDialog,
+          )
+        } else {
+          TextArea(
+            modifier = Modifier.fillMaxWidth().padding(4.dp).testTag("goal").height(goalTextAreaHeight),
+            enabled = scenarioType.isScenario(),
+            state = goal,
+            placeholder = { Text("Goal") },
+            textStyle = JewelTheme.editorTextStyle,
+            decorationBoxModifier = Modifier.padding(horizontal = 8.dp)
+          )
+        }
         Divider(
           orientation = Orientation.Horizontal,
           modifier = Modifier
@@ -161,6 +173,32 @@ fun Scenario(
       ) {
         Text(
           text = "Add sub scenario",
+        )
+      }
+      var makeReusableDialogShowing by remember { mutableStateOf(false) }
+      if (!reusableStepsMode) {
+        IconActionButton(
+          key = AllIconsKeys.Actions.MoveToButton,
+          onClick = {
+            makeReusableDialogShowing = true
+          },
+          contentDescription = "Make this reusable",
+          hint = Size(28),
+          modifier = Modifier.testTag("make_reusable_button")
+        ) {
+          Text(
+            text = "Make this reusable: move the goal and execution options into a reusable scenario and call it from here",
+          )
+        }
+      }
+      if (makeReusableDialogShowing) {
+        MakeReusableDialog(
+          scenarioStateHolder = scenarioStateHolder,
+          onDismiss = { makeReusableDialogShowing = false },
+          onConfirm = { newReusableId ->
+            makeReusableDialogShowing = false
+            onMakeReusable(scenarioStateHolder, newReusableId)
+          }
         )
       }
       var removeDialogShowing by remember { mutableStateOf(false) }
@@ -235,10 +273,11 @@ fun Scenario(
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
-private fun ScenarioFundamentalOptions(
+internal fun ScenarioFundamentalOptions(
   scenarioStateHolder: ArbigentScenarioStateHolder,
   scenarioCountById: (String) -> Int,
-  dependencyScenarioMenu: MenuScope.() -> Unit
+  dependencyScenarioMenu: MenuScope.() -> Unit,
+  isReusableDefinition: Boolean = false,
 ) {
   val updatedScenarioStateHolder by rememberUpdatedState(scenarioStateHolder)
   FlowRow {
@@ -294,20 +333,22 @@ private fun ScenarioFundamentalOptions(
         decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
       )
     }
-    // Dependency
-    Column(
-      modifier = Modifier.padding(8.dp).width(160.dp)
-    ) {
-      GroupHeader("Scenario dependency")
-      val dependency by updatedScenarioStateHolder.dependencyScenarioStateHolderStateFlow.collectAsState()
-
-      Dropdown(
-        modifier = Modifier
-          .testTag("dependency_dropdown")
-          .padding(4.dp),
-        menuContent = dependencyScenarioMenu
+    // Dependency (not allowed on reusable scenario definitions)
+    if (!isReusableDefinition) {
+      Column(
+        modifier = Modifier.padding(8.dp).width(160.dp)
       ) {
-        Text(dependency?.goal ?: "Select dependency")
+        GroupHeader("Scenario dependency")
+        val dependency by updatedScenarioStateHolder.dependencyScenarioStateHolderStateFlow.collectAsState()
+
+        Dropdown(
+          modifier = Modifier
+            .testTag("dependency_dropdown")
+            .padding(4.dp),
+          menuContent = dependencyScenarioMenu
+        ) {
+          Text(dependency?.let { it.goal.ifBlank { it.id } } ?: "Select dependency")
+        }
       }
     }
     // Scenario type
@@ -324,18 +365,21 @@ private fun ScenarioFundamentalOptions(
         ) {
           Text(
             text = "Scenario: The agent will try to achieve the goal. \n" +
-              "Execution: Just execute the initializations and image assertions.",
+              "Execution: Just execute the initializations and image assertions. \n" +
+              "Reusable steps: Call reusable scenarios in order instead of having a goal.",
           )
         }
       }
       val inputActionType by updatedScenarioStateHolder.scenarioTypeStateFlow.collectAsState()
+      val reusableStepsMode by updatedScenarioStateHolder.reusableStepsModeStateFlow.collectAsState()
       Row(
         verticalAlignment = Alignment.CenterVertically
       ) {
         RadioButtonRow(
           text = "Scenario",
-          selected = inputActionType == ArbigentScenarioType.Scenario,
+          selected = !reusableStepsMode && inputActionType == ArbigentScenarioType.Scenario,
           onClick = {
+            updatedScenarioStateHolder.onReusableStepsModeChanged(false)
             updatedScenarioStateHolder.scenarioTypeStateFlow.value = ArbigentScenarioType.Scenario
           }
         )
@@ -345,11 +389,63 @@ private fun ScenarioFundamentalOptions(
       ) {
         RadioButtonRow(
           text = "Execution",
-          selected = inputActionType == ArbigentScenarioType.Execution,
+          selected = !reusableStepsMode && inputActionType == ArbigentScenarioType.Execution,
           onClick = {
+            updatedScenarioStateHolder.onReusableStepsModeChanged(false)
             updatedScenarioStateHolder.scenarioTypeStateFlow.value = ArbigentScenarioType.Execution
           }
         )
+      }
+      var confirmReusableStepsSwitch by remember { mutableStateOf(false) }
+      Row(
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        RadioButtonRow(
+          text = "Reusable steps",
+          selected = reusableStepsMode,
+          onClick = {
+            val hasLeafContent = updatedScenarioStateHolder.goal.isNotBlank() ||
+              updatedScenarioStateHolder.initializationMethodStateFlow.value.isNotEmpty() ||
+              updatedScenarioStateHolder.imageAssertionsStateFlow.value.isNotEmpty()
+            if (!reusableStepsMode && hasLeafContent) {
+              confirmReusableStepsSwitch = true
+            } else {
+              updatedScenarioStateHolder.onReusableStepsModeChanged(true)
+            }
+          },
+          modifier = Modifier.testTag("reusable_steps_radio")
+        )
+      }
+      if (confirmReusableStepsSwitch) {
+        Dialog(onDismissRequest = { confirmReusableStepsSwitch = false }) {
+          Column(
+            modifier = Modifier.background(JewelTheme.globalColors.panelBackground).padding(16.dp)
+          ) {
+            Text(
+              "Switching to Reusable steps: the goal, initialization methods and image assertions\n" +
+                "of this scenario will not be saved while in this mode.\n" +
+                "To keep them, use \"Make this reusable\" instead — it moves them into a reusable\n" +
+                "scenario and calls it from here."
+            )
+            Row(modifier = Modifier.padding(top = 8.dp)) {
+              OutlinedButton(
+                onClick = { confirmReusableStepsSwitch = false },
+                modifier = Modifier.padding(end = 8.dp)
+              ) {
+                Text("Cancel")
+              }
+              OutlinedButton(
+                onClick = {
+                  confirmReusableStepsSwitch = false
+                  updatedScenarioStateHolder.onReusableStepsModeChanged(true)
+                },
+                modifier = Modifier.testTag("confirm_reusable_steps_switch")
+              ) {
+                Text("Switch anyway")
+              }
+            }
+          }
+        }
       }
     }
     // Form factor
@@ -427,17 +523,28 @@ private fun ScenarioFundamentalOptions(
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
-private fun ScenarioOptions(
+internal fun ScenarioOptions(
   scenarioStateHolder: ArbigentScenarioStateHolder,
   scenarioCountById: (String) -> Int,
   dependencyScenarioMenu: MenuScope.() -> Unit,
   onShowFixedScenariosDialog: (ArbigentScenarioStateHolder, Int) -> Unit = { _, _ -> },
   getFixedScenarioById: (String) -> FixedScenario? = { null },
-  mcpServerNames: List<String> = emptyList()
+  mcpServerNames: List<String> = emptyList(),
+  isReusableDefinition: Boolean = false,
 ) {
   val updatedScenarioStateHolder by rememberUpdatedState(scenarioStateHolder)
+  val reusableStepsMode by scenarioStateHolder.reusableStepsModeStateFlow.collectAsState()
   GroupHeader("Fundamental options")
-  ScenarioFundamentalOptions(scenarioStateHolder, scenarioCountById, dependencyScenarioMenu)
+  ScenarioFundamentalOptions(scenarioStateHolder, scenarioCountById, dependencyScenarioMenu, isReusableDefinition)
+  if (isReusableDefinition) {
+    GroupHeader("Inputs")
+    ReusableInputsEditor(scenarioStateHolder)
+  }
+  if (reusableStepsMode) {
+    // A call-form scenario has no execution options of its own; what runs is
+    // determined entirely by the reusable definitions it calls.
+    return
+  }
   GroupHeader("Other options")
   FlowRow(modifier = Modifier.padding(4.dp)) {
     Column(
@@ -985,7 +1092,12 @@ fun LaunchAppInitializationSetting(
   }
 }
 
-data class ScenarioSection(val goal: String, val isRunning: Boolean, val steps: List<StepItem>) {
+data class ScenarioSection(
+  val goal: String,
+  val isRunning: Boolean,
+  val steps: List<StepItem>,
+  val callBreadcrumb: String? = null,
+) {
   fun isAchieved(): Boolean {
     return steps.any { it.isAchieved() }
   }
@@ -1012,7 +1124,9 @@ fun buildSections(tasksToAgent: List<ArbigentTaskAssignment>): List<ScenarioSect
     sections += ScenarioSection(
       goal = tasks.goal,
       isRunning = isRunning,
-      steps = steps.map { StepItem(it) })
+      steps = steps.map { StepItem(it) },
+      callBreadcrumb = tasks.callBreadcrumb,
+    )
   }
   return sections
 }
@@ -1064,7 +1178,9 @@ private fun ContentPanel(
       LazyColumn(state = lazyColumnState, modifier = Modifier.weight(1.5f)) {
         sections.forEachIndexed { index, section ->
           stickyHeader {
-            val prefix = if (index + 1 == tasksToAgent.size) {
+            val prefix = if (section.callBreadcrumb != null) {
+              section.callBreadcrumb + ": "
+            } else if (index + 1 == tasksToAgent.size) {
               "Goal: "
             } else {
               "Dependency scenario goal: "
