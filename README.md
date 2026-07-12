@@ -296,6 +296,7 @@ Commands:
   guide      Print guides for AI agents working with arbigent projects
 
 Guides for AI agents (print one with `arbigent guide <topic>`):
+setup: How to set up a repository: settings files, AI API keys, gitignore
 writing-yaml: How to write the project YAML: scenarios, reusable scenarios,
 variables, assertions
 inspecting-project: How to discover what is in a project: list scenarios and
@@ -427,7 +428,7 @@ arbigent run task "Open the Settings app and turn on dark theme" --max-step=15
 
 **Read built-in guides:**
 
-The CLI ships with built-in guides covering how to write project YAML, inspect a project, run scenarios, and debug failed runs. The topics are also listed at the end of `arbigent --help`, so AI agents operating the CLI can discover them on their own.
+The CLI ships with built-in guides covering how to set up a repository (settings files and API keys), write project YAML, inspect a project, run scenarios, and debug failed runs. The topics are also listed at the end of `arbigent --help`, so AI agents operating the CLI can discover them on their own.
 
 ```bash
 # List available guide topics
@@ -442,7 +443,7 @@ arbigent guide writing-yaml
 
 The CLI is designed so that AI coding agents (Claude Code, Codex, etc.) can operate Arbigent end to end: inspecting a project, editing scenario YAML, running scenarios, and reading the results. The CLI documents itself, so an agent only needs to be pointed at the `arbigent` command:
 
-- `arbigent --help` ends with the list of built-in guide topics, and `arbigent guide <topic>` prints an agent-oriented guide (`writing-yaml`, `inspecting-project`, `running-scenarios`, `debugging-failures`).
+- `arbigent --help` ends with the list of built-in guide topics, and `arbigent guide <topic>` prints an agent-oriented guide (`setup`, `writing-yaml`, `inspecting-project`, `running-scenarios`, `debugging-failures`).
 - `arbigent scenarios` and `arbigent tags` let an agent inspect a project without an AI API key or a device, and `arbigent run --dry-run` previews which scenarios would run without needing a device.
 - `arbigent run` writes machine-readable results to `arbigent-result/result.yml` alongside the HTML report and screenshots, so an agent can check the outcome and debug failures.
 
