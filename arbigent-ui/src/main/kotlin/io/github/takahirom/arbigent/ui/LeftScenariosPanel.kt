@@ -196,9 +196,17 @@ internal fun LeftScenariosPanel(
               
               val runningInfo by scenarioStateHolder.arbigentScenarioRunningInfo.collectAsState()
               val scenarioType by scenarioStateHolder.scenarioTypeStateFlow.collectAsState()
+              val reusableStepsMode by scenarioStateHolder.reusableStepsModeStateFlow.collectAsState()
+              val reusableSteps by scenarioStateHolder.reusableStepsStateFlow.collectAsState()
               Text(
                 modifier = Modifier.weight(1f),
-                text = if (scenarioType.isScenario()) {
+                text = if (reusableStepsMode) {
+                  "↻ " + reusableSteps.joinToString(" -> ") { step ->
+                    step.uses.ifBlank { "?" } +
+                      if (step.withValues.isEmpty()) ""
+                      else " (" + step.withValues.entries.joinToString(", ") { "${it.key}=${it.value}" } + ")"
+                  }
+                } else if (scenarioType.isScenario()) {
                   "Goal: $goal"
                 } else {
                   val scenarioId by scenarioStateHolder.idStateFlow.collectAsState()

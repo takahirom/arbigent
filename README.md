@@ -211,6 +211,44 @@ This enables you to:
 - Reuse existing Maestro test automation assets
 - Combine precise setup sequences with AI-driven testing
 
+### Reusable Scenarios
+
+Arbigent lets you define AI scenario parts once at the project level and call them from any scenario with parameters — modeled after GitHub Actions reusable workflows (`uses` / `with` / `inputs`):
+
+```yaml
+scenarios:
+# A scenario can be a call to a reusable scenario instead of having a goal.
+- id: "premium-content-with-paid-user"
+  steps:
+  - uses: "login"
+    with: { user: "paid" }
+  - uses: "play-premium-content"
+
+# Ordinary and reusable nodes mix freely along a dependency chain.
+- id: "become-paid-user"
+  dependency: "launch-app"
+  uses: "login"
+  with: { user: "paid" }
+
+reusableScenarios:
+- id: "login"
+  inputs:
+    user:
+      required: true
+  goal: "Log in with the {{inputs.user}} account"
+- id: "play-premium-content"
+  goal: "Open and play any premium content"
+  maxStep: 15
+```
+
+Key points:
+- A scenario (or reusable scenario) is either a **leaf** (has `goal` plus the full option set: `initializationMethods`, `mcpOptions`, `maxStep`, image assertions, …) or a **call** (`uses` + `with`, or a `steps` list of calls). `uses` is sugar for a single-entry `steps`.
+- Reusable scenarios declare their parameters via `inputs` (`required` / `default`) and reference them as `{{inputs.name}}` in the goal — bare `{{name}}` still resolves project variables. `{{inputs.*}}` also works inside Maestro YAML referenced from a reusable scenario's initialization methods, and combined with `type: Execution` this gives deterministic, parameterized steps with zero AI calls.
+- Composites can call other composites; unknown references, cycles, undeclared `with` keys and missing required inputs are all rejected when the project loads.
+- In the GUI, choose the "Reusable steps" scenario type to build calls, manage the library in the Reusable Scenarios dialog, and use "Make this reusable" to extract an existing scenario into the library without breaking scenarios that depend on it.
+
+See [arbigent-reusable-scenarios-specification.md](arbigent-reusable-scenarios-specification.md) for the full specification.
+
 ### Android Studio Journeys XML Import
 
 Arbigent can run [Android Studio Journeys](https://developer.android.com/studio/gemini/journeys) test files (`*.journey.xml` / `*_journey.xml`) directly, so existing journey files work without converting them to project YAML:
