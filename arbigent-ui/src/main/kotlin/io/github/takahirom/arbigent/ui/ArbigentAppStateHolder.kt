@@ -81,6 +81,32 @@ class ArbigentAppStateHolder(
     _reusableScenariosFlow.value = _reusableScenariosFlow.value.map {
       if (it.id == originalId) scenario else it
     }
+    if (originalId != scenario.id) {
+      renameReusableScenarioReferences(originalId, scenario.id)
+    }
+  }
+
+  /** Rewrite every uses/steps reference so a reusable-scenario rename never leaves callers dangling. */
+  private fun renameReusableScenarioReferences(oldId: String, newId: String) {
+    allScenarioStateHoldersStateFlow.value.forEach { holder ->
+      val steps = holder.reusableStepsStateFlow.value
+      if (steps.any { it.uses == oldId }) {
+        holder.reusableStepsStateFlow.value = steps.map {
+          if (it.uses == oldId) it.copy(uses = newId) else it
+        }
+      }
+    }
+    _reusableScenariosFlow.value = _reusableScenariosFlow.value.map { reusable ->
+      if (reusable.callSteps().none { it.uses == oldId }) return@map reusable
+      ArbigentScenarioContent(
+        id = reusable.id,
+        steps = reusable.callSteps().map {
+          if (it.uses == oldId) it.copy(uses = newId) else it
+        },
+        inputs = reusable.inputs,
+        noteForHumans = reusable.noteForHumans,
+      )
+    }
   }
 
   fun removeReusableScenario(reusableScenarioId: String) {
@@ -115,7 +141,9 @@ class ArbigentAppStateHolder(
         goal = content.goal,
         type = content.type,
         initializationMethods = content.initializationMethods,
+        maxRetry = content.maxRetry,
         maxStep = content.maxStep,
+        deviceFormFactor = content.deviceFormFactor,
         imageAssertionHistoryCount = content.imageAssertionHistoryCount,
         imageAssertions = content.imageAssertions,
         userPromptTemplate = content.userPromptTemplate,
@@ -302,6 +330,10 @@ class ArbigentAppStateHolder(
     allScenarioStateHoldersStateFlow.value += scenarioStateHolder
     selectedScenarioIndex.value =
       sortedScenariosAndDepths().indexOfFirst { it.first.id == scenarioStateHolder.id }
+  }
+
+  internal fun addScenarioStateHolder(scenarioStateHolder: ArbigentScenarioStateHolder) {
+    allScenarioStateHoldersStateFlow.value += scenarioStateHolder
   }
 
   private var job: Job? = null

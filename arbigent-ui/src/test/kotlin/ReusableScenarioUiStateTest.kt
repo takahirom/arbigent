@@ -103,6 +103,31 @@ class ReusableScenarioUiStateTest {
   }
 
   @Test
+  fun `renaming a reusable scenario rewrites references from scenarios and composites`() {
+    val appStateHolder = ArbigentAppStateHolder(aiFactory = { FakeAi() })
+    appStateHolder.addReusableScenario(ArbigentScenarioContent(id = "part", goal = "goal"))
+    appStateHolder.addReusableScenario(
+      ArbigentScenarioContent(id = "composite", steps = listOf(ArbigentScenarioContent.ReusableStep(uses = "part")))
+    )
+    val callerHolder = ArbigentScenarioStateHolder(id = "caller", tagManager = ArbigentTagManager()).apply {
+      load(ArbigentScenarioContent(id = "caller", uses = "part"))
+    }
+    // Register the caller so the rename can reach it (mirrors loadProjectContents wiring).
+    appStateHolder.addScenarioStateHolder(callerHolder)
+
+    appStateHolder.updateReusableScenario(
+      ArbigentScenarioContent(id = "part-renamed", goal = "goal"),
+      originalId = "part"
+    )
+
+    assertEquals(
+      "part-renamed",
+      appStateHolder.getReusableScenarioById("composite")!!.callSteps().single().uses
+    )
+    assertEquals("part-renamed", callerHolder.reusableStepsStateFlow.value.single().uses)
+  }
+
+  @Test
   fun `reusable scenario references are detected for delete protection`() {
     val appStateHolder = ArbigentAppStateHolder(aiFactory = { FakeAi() })
     appStateHolder.addReusableScenario(ArbigentScenarioContent(id = "part", goal = "goal"))

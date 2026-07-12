@@ -307,6 +307,27 @@ public sealed interface AiDecisionCacheStrategy {
 
 }
 
+/**
+ * Resolves {{inputs.*}} inside Maestro YAML referenced from a reusable leaf's initialization
+ * methods, so the initializer can run the substituted flow (it prefers yamlContent when present).
+ */
+private fun resolveMaestroYamlInputs(
+  methods: List<ArbigentScenarioContent.InitializationMethod>,
+  inputBindings: Map<String, String>?,
+  fixedScenarios: List<FixedScenario>
+): List<ArbigentScenarioContent.InitializationMethod> {
+  if (inputBindings == null) return methods
+  return methods.map { method ->
+    if (method !is ArbigentScenarioContent.InitializationMethod.MaestroYaml) return@map method
+    val yamlText = fixedScenarios.firstOrNull { it.id == method.scenarioId }?.yamlText
+    if (yamlText != null && ReusableInputsResolver.containsInputPlaceholder(yamlText)) {
+      method.copy(yamlContent = ReusableInputsResolver.resolve(yamlText, inputBindings))
+    } else {
+      method
+    }
+  }
+}
+
 public fun List<ArbigentScenarioContent>.createArbigentScenario(
   projectSettings: ArbigentProjectSettings,
   scenario: ArbigentScenarioContent,
@@ -351,21 +372,11 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
     } else {
       nodeScenario.goal
     }
-    val initializationMethods = nodeScenario.initializationMethods.ifEmpty { listOf(nodeScenario.initializeMethods) }
-      .map { method ->
-        // Resolve {{inputs.*}} inside referenced Maestro YAML for reusable leaves so the
-        // initializer can run the substituted flow (it prefers yamlContent when present).
-        if (inputBindings != null && method is ArbigentScenarioContent.InitializationMethod.MaestroYaml) {
-          val yamlText = fixedScenarios.firstOrNull { it.id == method.scenarioId }?.yamlText
-          if (yamlText != null && ReusableInputsResolver.containsInputPlaceholder(yamlText)) {
-            method.copy(yamlContent = ReusableInputsResolver.resolve(yamlText, inputBindings))
-          } else {
-            method
-          }
-        } else {
-          method
-        }
-      }
+    val initializationMethods = resolveMaestroYamlInputs(
+      methods = nodeScenario.initializationMethods.ifEmpty { listOf(nodeScenario.initializeMethods) },
+      inputBindings = inputBindings,
+      fixedScenarios = fixedScenarios
+    )
 
     result.add(
       ArbigentAgentTask(

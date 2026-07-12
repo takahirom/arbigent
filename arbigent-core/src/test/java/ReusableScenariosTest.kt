@@ -180,7 +180,16 @@ class ReusableScenariosTest {
 
   @Test
   fun maestroYamlInputsAreSubstitutedAndExecuted() = runTest {
+    val previousDispatcher = ArbigentCoroutinesDispatcher.dispatcher
     ArbigentCoroutinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
+    try {
+      maestroYamlInputsAreSubstitutedAndExecutedBody()
+    } finally {
+      ArbigentCoroutinesDispatcher.dispatcher = previousDispatcher
+    }
+  }
+
+  private suspend fun maestroYamlInputsAreSubstitutedAndExecutedBody() {
     val executedCommands = mutableListOf<MaestroCommand>()
     val fakeDevice = FakeDevice()
     val recordingDevice = object : ArbigentDevice by fakeDevice {

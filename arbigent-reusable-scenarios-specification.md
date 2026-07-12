@@ -168,7 +168,7 @@ Expanded tasks appear individually in the scenario's result (composite
 one scenario). Each task is labeled with its **call breadcrumb and bound
 inputs**, e.g.:
 
-```
+```text
 premium-content-with-paid-user › login (user=paid)
 change-language-to-english › navigate-to-language-settings
 ```
@@ -190,9 +190,9 @@ hand-written `reusableScenarios` / `steps` / `inputs` / `uses` / `with`.
 ### Call-site editing: the three-way type selector
 
 The existing "Scenario / Execution" `RadioButtonRow` group in the scenario
-editor (`Scenario.kt:331-353`) is extended to three options:
+editor (the scenario-type `RadioButtonRow` group in `Scenario.kt`) is extended to three options:
 
-```
+```text
 ( ) Scenario        — The agent will try to achieve the goal.
 ( ) Execution       — Just execute the initializations and image assertions.
 ( ) Reusable steps  — Call reusable scenarios in order.
@@ -214,7 +214,7 @@ editor (`Scenario.kt:331-353`) is extended to three options:
 
 Steps list editor:
 
-```
+```text
 ┌─ Steps ─────────────────────────────────┐
 │ 1. [login ▾][Browse]                     │
 │    with:                                 │
@@ -225,7 +225,8 @@ Steps list editor:
 ```
 
 - Each step row selects its target with the "title + Browse" pattern already
-  used by the Maestro initialization row (`Scenario.kt:766-793`), opening the
+  used by the Maestro initialization row (the `MaestroYaml` branch of
+  `InitializationOptions` in `Scenario.kt`), opening the
   Reusable Scenarios dialog in selection mode (same mechanism as
   `FixedScenariosDialog`'s `onScenarioSelected`).
 - The `with` editor is **generated from the target's `inputs` declaration**:
@@ -338,6 +339,10 @@ reusableScenarios:
 - id: "login"
   inputs:
     user: { required: true }
+  initializationMethods:
+  - type: "MaestroYaml"
+    scenarioId: "login-deeplink-flow"   # -> fixedScenarios below; its yamlText
+                                        #    also receives {{inputs.user}}
   goal: "Log in with the {{inputs.user}} account on {{app_name}}"
                               # {{app_name}} is a project variable (bare form)
 - id: "play-premium-content"
