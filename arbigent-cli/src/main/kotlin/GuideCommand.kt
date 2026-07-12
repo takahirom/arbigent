@@ -52,6 +52,65 @@ fun guideHelpEpilog(): String {
 
 val arbigentGuideTopics: List<ArbigentGuideTopic> = listOf(
   ArbigentGuideTopic(
+    name = "setup",
+    description = "How to set up a repository: settings files, AI API keys, gitignore",
+    body = """
+# Setting up arbigent in a repository
+
+Goal: `arbigent` commands run with no flags, and secrets stay out of git.
+
+## 1. Shared settings: .arbigent/settings.yml (commit this)
+
+Create `.arbigent/settings.yml` in the repository root with the non-secret
+defaults the whole team shares:
+
+    project-file: "e2e/arbigent-project.yaml"
+    os: "android"
+    ai-type: "openai"
+    openai-model-name: "gpt-4.1"
+
+Keys are CLI option names without `--`. A key nested under a command name
+(e.g. `run:` / `log-level:`) applies only to that command and overrides the
+global key. Full resolution order: `arbigent guide inspecting-project`.
+
+## 2. Secrets and machine-local overrides: .arbigent/settings.local.yml (gitignore this)
+
+    openai-api-key: "sk-..."
+
+Add the file to `.gitignore` in the same change that introduces it:
+
+    .arbigent/settings.local.yml
+
+`settings.local.yml` has the highest priority of all settings files, so it can
+also override any shared setting on one machine (e.g. a different model name).
+Never put API keys in `settings.yml` or in committed scripts.
+
+In CI, prefer environment variables over files: OPENAI_API_KEY, GEMINI_API_KEY,
+or AZURE_OPENAI_API_KEY (mapped to the same options).
+
+## AI provider settings
+
+- `ai-type: "openai"` (default) — `openai-api-key` (or OPENAI_API_KEY); optional
+  `openai-model-name`, `openai-endpoint`. Any OpenAI-compatible endpoint works.
+- `ai-type: "gemini"` — `gemini-api-key` (or GEMINI_API_KEY); optional
+  `gemini-model-name`, `gemini-endpoint`.
+- `ai-type: "azureopenai"` — `azure-openai-endpoint`, `azure-openai-api-version`,
+  `azure-openai-model-name` (the deployment name), `azure-openai-api-key`
+  (or AZURE_OPENAI_API_KEY).
+
+## Verify
+
+    arbigent scenarios      # project-file resolves from settings; no AI key needed
+    arbigent run --dry-run  # also validates the AI key configuration; no device needed
+
+`arbigent run --help` annotates options already configured in
+`settings.local.yml` as `(currently: '...' from ...)`, with API keys masked.
+
+Done when: both commands above succeed with no flags, and `git status` shows
+`.gitignore` updated and no `settings.local.yml` staged.
+""".trimIndent(),
+  ),
+  ArbigentGuideTopic(
     name = "writing-yaml",
     description = "How to write the project YAML: scenarios, reusable scenarios, variables, assertions",
     body = """
