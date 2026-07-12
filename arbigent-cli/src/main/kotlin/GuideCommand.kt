@@ -231,6 +231,13 @@ Use the ids with `run --scenario-ids`.
 Prints the distinct tag names used across scenarios (or "No tags found"). Use them
 with `run --tags`.
 
+## Show the dependency graph
+
+    arbigent graph --project-file=path/to/project.yaml
+
+Prints the scenario dependency graph (`dependency` edges and reusable `uses` edges)
+as Mermaid text, ready to embed in Markdown.
+
 ## How --project-file is resolved
 
 If you omit `--project-file`, arbigent reads it from the first existing settings file
