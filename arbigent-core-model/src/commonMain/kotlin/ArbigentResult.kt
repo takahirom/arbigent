@@ -76,6 +76,9 @@ public data class ArbigentAgentResults(
 @Serializable
 public data class ArbigentAgentResult(
   public val goal: String,
+  // Call chain like "scenario-id › reusable-id (user=paid)" when this task was expanded
+  // from a reusable scenario; null for ordinary goal-based tasks.
+  public val callBreadcrumb: String? = null,
   public val maxStep: Int = 10,
   public val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Unspecified,
   public val isGoalAchieved: Boolean,
