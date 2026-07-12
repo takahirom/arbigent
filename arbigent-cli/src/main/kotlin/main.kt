@@ -5,6 +5,7 @@ package io.github.takahirom.arbigent.cli
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.context
+import com.github.ajalt.clikt.core.Context
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.sources.ValueSource
 import com.github.ajalt.clikt.sources.ChainedValueSource
@@ -65,14 +66,22 @@ class ArbigentCli : CliktCommand(name = "arbigent") {
       }
     }
   }
+  override fun helpEpilog(context: Context): String = guideHelpEpilog()
+
   override fun run() = Unit
 }
 
+fun arbigentCli(): ArbigentCli = ArbigentCli()
+  .subcommands(
+    ArbigentRunCommand().subcommands(ArbigentRunTaskCommand()),
+    ArbigentScenariosCommand(),
+    ArbigentTagsCommand(),
+    ArbigentGraphCommand(),
+    ArbigentGuideCommand(),
+  )
 
 fun main(args: Array<String>) {
   LoggingUtils.suppressSlf4jWarnings()
-  
-  ArbigentCli()
-    .subcommands(ArbigentRunCommand().subcommands(ArbigentRunTaskCommand()), ArbigentScenariosCommand(), ArbigentTagsCommand(), ArbigentGraphCommand())
-    .main(args)
+
+  arbigentCli().main(args)
 }
