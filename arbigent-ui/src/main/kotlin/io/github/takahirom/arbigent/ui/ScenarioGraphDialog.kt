@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextOverflow
 import com.dk.kuiver.model.KuiverEdge
@@ -39,12 +40,31 @@ import org.jetbrains.jewel.ui.component.OutlinedButton
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.typography
 
+private fun colorFromHex(hex: String): Color =
+  Color(0xFF000000L or hex.removePrefix("#").toLong(16))
+
 private val scenarioNodeColor = Color(0xFFF5F5F5)
 private val scenarioBorderColor = Color(0xFF9E9E9E)
-private val reusableNodeColor = Color(0xFFE8F0FE)
-private val reusableBorderColor = Color(0xFF4285F4)
+private val reusableNodeColor = colorFromHex(ArbigentScenarioGraph.REUSABLE_FILL_HEX)
+private val reusableBorderColor = colorFromHex(ArbigentScenarioGraph.REUSABLE_STROKE_HEX)
 private val dependencyEdgeColor = Color(0xFF616161)
-private val callEdgeColor = Color(0xFF4285F4)
+private val callEdgeColor = reusableBorderColor
+
+/** Per-[ArbigentScenarioGraph.NodeKind] rendering, resolved in one place. */
+private data class NodeStyle(
+  val titlePrefix: String,
+  val background: Color,
+  val borderWidth: Dp,
+  val borderColor: Color,
+)
+
+private val ArbigentScenarioGraph.NodeKind.style: NodeStyle
+  get() = when (this) {
+    ArbigentScenarioGraph.NodeKind.Scenario ->
+      NodeStyle(titlePrefix = "", background = scenarioNodeColor, borderWidth = 1.dp, borderColor = scenarioBorderColor)
+    ArbigentScenarioGraph.NodeKind.ReusableCall ->
+      NodeStyle(titlePrefix = "↻ ", background = reusableNodeColor, borderWidth = 2.dp, borderColor = reusableBorderColor)
+  }
 
 /**
  * Zoomable/pannable view of the scenario graph: dependency edges between scenarios and
@@ -161,7 +181,7 @@ private fun ScenarioGraphViewer(
  * the buildKuiver call); [GraphNode] renders at exactly this size and ellipsizes overflow.
  */
 private fun ArbigentScenarioGraph.Node.dimensions(): NodeDimensions {
-  val textLength = maxOf(title.length + if (kind == ArbigentScenarioGraph.NodeKind.ReusableCall) 2 else 0, subtitle.length)
+  val textLength = maxOf(title.length + kind.style.titlePrefix.length, subtitle.length)
   val width = (textLength * 7 + 24).coerceIn(80, 260)
   val height = if (subtitle.isEmpty()) 34 else 52
   return NodeDimensions(width.dp, height.dp)
@@ -169,7 +189,7 @@ private fun ArbigentScenarioGraph.Node.dimensions(): NodeDimensions {
 
 @Composable
 private fun GraphNode(node: ArbigentScenarioGraph.Node, dimensions: NodeDimensions?) {
-  val isReusable = node.kind == ArbigentScenarioGraph.NodeKind.ReusableCall
+  val style = node.kind.style
   Column(
     verticalArrangement = Arrangement.Center,
     modifier = Modifier
@@ -177,19 +197,19 @@ private fun GraphNode(node: ArbigentScenarioGraph.Node, dimensions: NodeDimensio
         if (dimensions != null) Modifier.size(dimensions.width, dimensions.height) else Modifier
       )
       .background(
-        color = if (isReusable) reusableNodeColor else scenarioNodeColor,
+        color = style.background,
         shape = RoundedCornerShape(4.dp)
       )
       .border(
-        width = if (isReusable) 2.dp else 1.dp,
-        color = if (isReusable) reusableBorderColor else scenarioBorderColor,
+        width = style.borderWidth,
+        color = style.borderColor,
         shape = RoundedCornerShape(4.dp)
       )
       .padding(horizontal = 8.dp, vertical = 4.dp)
       .testTag("graph_node_${node.key}")
   ) {
     Text(
-      text = if (isReusable) "↻ ${node.title}" else node.title,
+      text = style.titlePrefix + node.title,
       color = Color.Black,
       maxLines = 1,
       overflow = TextOverflow.Ellipsis,
