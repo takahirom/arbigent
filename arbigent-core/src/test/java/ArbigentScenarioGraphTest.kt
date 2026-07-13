@@ -33,6 +33,57 @@ class ArbigentScenarioGraphTest {
   }
 
   @Test
+  fun dependencyEdgeStartsFromLastCallNodeOfDependency() {
+    // "setup" executes "login", so "buy" runs after "login":
+    // setup -.-> login --> buy, not a parallel-looking branch off "setup".
+    val graph = ArbigentScenarioGraph.from(
+      load(
+        """
+        scenarios:
+        - id: "setup"
+          uses: "login"
+        - id: "buy"
+          goal: "Buy an item"
+          dependency: "setup"
+        reusableScenarios:
+        - id: "login"
+          goal: "Log in"
+        """
+      )
+    )
+    val callEdge = graph.edges.single { it.kind == ArbigentScenarioGraph.EdgeKind.Call }
+    val dependencyEdge = graph.edges.single { it.kind == ArbigentScenarioGraph.EdgeKind.Dependency }
+    assertEquals("scenario:setup", callEdge.fromKey)
+    assertTrue(callEdge.toKey.endsWith(":login"))
+    assertEquals(callEdge.toKey, dependencyEdge.fromKey)
+    assertEquals("scenario:buy", dependencyEdge.toKey)
+  }
+
+  @Test
+  fun everyNodeHasAtMostOneIncomingEdge() {
+    val graph = ArbigentScenarioGraph.from(
+      load(
+        """
+        scenarios:
+        - id: "setup"
+          uses: "login"
+        - id: "buy"
+          goal: "Buy an item"
+          dependency: "setup"
+        - id: "browse"
+          goal: "Browse items"
+          dependency: "setup"
+        reusableScenarios:
+        - id: "login"
+          goal: "Log in"
+        """
+      )
+    )
+    val incomingCounts = graph.edges.groupingBy { it.toKey }.eachCount()
+    assertTrue(incomingCounts.values.all { it == 1 })
+  }
+
+  @Test
   fun sameReusableCalledTwiceBecomesTwoNodes() {
     val graph = ArbigentScenarioGraph.from(
       load(
