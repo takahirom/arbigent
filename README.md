@@ -287,12 +287,25 @@ brew install takahirom/repo/arbigent
 Usage: arbigent [<options>] <command> [<args>]...
 
 Options:
-  -h, --help   Show this message and exit
+  -h, --help  Show this message and exit
 
 Commands:
-  run        Execute test scenarios
-  scenarios  List available scenarios
-  tags       Manage scenario tags
+  run
+  scenarios
+  tags
+  graph
+  guide      Print guides for AI agents working with arbigent projects
+
+Guides for AI agents (print one with `arbigent guide <topic>`):
+setup: How to set up a repository: settings files, AI API keys, gitignore
+writing-yaml: How to write the project YAML: scenarios, reusable scenarios,
+variables, assertions
+inspecting-project: How to discover what is in a project: list scenarios and
+tags, settings resolution
+running-scenarios: How to select and run scenarios and where results are
+written
+debugging-failures: How to investigate a failed run: results, logs,
+screenshots, common causes
 ```
 
 #### Configuration with Settings Files
@@ -349,7 +362,7 @@ When using a settings file, you can run tests with the simplified command:
 arbigent run
 ```
 
-All parameters configured in the settings files will be shown as `(source: already provided by property file)` in the help output, indicating which settings are already configured.
+Options already configured in `.arbigent/settings.local.yml` are annotated in the help output, e.g. `Log level (currently: 'debug' from global settings)`, indicating which settings are already configured (sensitive values such as API keys are masked).
 
 #### arbigent run command
 
@@ -369,7 +382,7 @@ Options for Gemini API AI:
 Options for Azure OpenAI:
   --azure-openai-endpoint=<text>         Endpoint URL
   --azure-openai-api-version=<text>      API version
-  --azure-openai-model-name=<text>       Model name (default: gpt-4.1)  
+  --azure-openai-model-name=<text>       Deployment name (default: gpt-4.1)  
   --azure-openai-api-key, --azure-openai-key=<text> API key
 
 Options:
@@ -381,14 +394,13 @@ Options:
   --log-file=<text>                      Log file path
   --working-directory=<text>             Working directory for the project
   --path=<text>                          Path to a file
+  --variables=<value>                    Variables to replace {{placeholders}} in goals (e.g., key1=value1,key2=value2)
   --scenario-ids=<text>                  Scenario IDs to execute (comma-separated)
   --tags=<text>                          Tags to filter scenarios (comma-separated)
   --dry-run                              Dry run mode
   --shard=<value>                        Shard specification (e.g., 1/5)
   -h, --help                             Show this message and exit
 ```
-
-When parameters are provided via the settings files, the help output will indicate `(source: already provided by property file)` for those options, so you know which parameters are already configured.
 
 #### Other commands
 
@@ -407,6 +419,38 @@ arbigent tags
 arbigent graph
 ```
 
+**Run a one-shot task without a project file:**
+
+`arbigent run task` executes a single ad-hoc goal on the connected device, using the same AI and OS options as `arbigent run`:
+
+```bash
+arbigent run task "Open the Settings app and turn on dark theme" --max-step=15
+```
+
+**Read built-in guides:**
+
+The CLI ships with built-in guides covering how to set up a repository (settings files and API keys), write project YAML, inspect a project, run scenarios, and debug failed runs. The topics are also listed at the end of `arbigent --help`, so AI agents operating the CLI can discover them on their own.
+
+```bash
+# List available guide topics
+arbigent guide
+
+# Print a guide
+arbigent guide writing-yaml
+```
+
+
+### Using Arbigent from AI Coding Agents
+
+The CLI is designed so that AI coding agents (Claude Code, Codex, etc.) can operate Arbigent end to end: inspecting a project, editing scenario YAML, running scenarios, and reading the results. The CLI documents itself, so an agent only needs to be pointed at the `arbigent` command:
+
+- `arbigent --help` ends with the list of built-in guide topics, and `arbigent guide <topic>` prints an agent-oriented guide (`setup`, `writing-yaml`, `inspecting-project`, `running-scenarios`, `debugging-failures`).
+- `arbigent scenarios`, `arbigent tags`, and `arbigent graph` let an agent inspect a project without an AI API key or a device, and `arbigent run --dry-run` previews which scenarios would run without needing a device.
+- `arbigent run` writes machine-readable results to `arbigent-result/result.yml` alongside the HTML report and screenshots, so an agent can check the outcome and debug failures.
+
+For example, you can instruct your agent:
+
+> Run `arbigent guide writing-yaml` and follow it to add a scenario that verifies the login flow, then run it with `arbigent run --scenario-ids="login-flow"`.
 
 ### Shard Option to Enable Parallel Tests
 
