@@ -5,8 +5,12 @@ package io.github.takahirom.arbigent
  * with reusable calls expanded per call site into the reusable leaves that actually execute
  * (composites are flattened, mirroring how calls become agent tasks at runtime; the composite
  * path is kept as the node's subtitle). The same reusable called from two places becomes two
- * nodes, so each scenario's flow stays separate. Shared by the CLI (`arbigent graph`, Mermaid
- * output) and the UI (scenario graph dialog).
+ * nodes, so each scenario's flow stays separate — every node has at most one incoming edge,
+ * making the graph a forest. A dependency edge starts from the last node the dependency
+ * scenario executes (its last call node, or the scenario itself when it has no calls), so
+ * edges read as execution order: `A -.-> login --> B` means B runs after A including its
+ * calls. Shared by the CLI (`arbigent graph`, Mermaid output) and the UI (scenario graph
+ * dialog).
  */
 public data class ArbigentScenarioGraph(
   public val nodes: List<Node>,
@@ -135,17 +139,10 @@ public data class ArbigentScenarioGraph(
           kind = NodeKind.Scenario,
         )
       }
-      val scenarioIds = projectFileContent.scenarioContents.map { it.id }.toSet()
+      // First expand every scenario's call chain and remember where it ends, because a
+      // dependency edge starts from the dependency scenario's last executed node.
+      val lastKeyByScenarioId = mutableMapOf<String, String>()
       projectFileContent.scenarioContents.forEach { scenario ->
-        scenario.dependencyId?.let { dependencyId ->
-          if (dependencyId in scenarioIds) {
-            edges += Edge(
-              fromKey = scenarioKey(dependencyId),
-              toKey = scenarioKey(scenario.id),
-              kind = EdgeKind.Dependency,
-            )
-          }
-        }
         var lastKey = scenarioKey(scenario.id)
         scenario.callSteps().forEach { step ->
           lastKey = expandStep(
@@ -155,6 +152,18 @@ public data class ArbigentScenarioGraph(
             previousKey = lastKey,
             expansionStack = emptyList(),
           )
+        }
+        lastKeyByScenarioId[scenario.id] = lastKey
+      }
+      projectFileContent.scenarioContents.forEach { scenario ->
+        scenario.dependencyId?.let { dependencyId ->
+          lastKeyByScenarioId[dependencyId]?.let { fromKey ->
+            edges += Edge(
+              fromKey = fromKey,
+              toKey = scenarioKey(scenario.id),
+              kind = EdgeKind.Dependency,
+            )
+          }
         }
       }
 
