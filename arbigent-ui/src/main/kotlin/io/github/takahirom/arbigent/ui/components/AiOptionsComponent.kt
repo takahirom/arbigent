@@ -1,7 +1,6 @@
 package io.github.takahirom.arbigent.ui.components
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -31,7 +30,6 @@ import org.jetbrains.jewel.ui.component.*
 import org.jetbrains.jewel.ui.theme.colorPalette
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
-import org.jetbrains.jewel.ui.theme.simpleListItemStyle
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -116,17 +114,16 @@ fun AiOptionsComponent(
                 Column {
                     ImageDetailLevel.entries.forEach { item ->
                         val isSelected = item == detail
-                        SimpleListItem(
+                        ComboBoxItem(
                             text = item.name.lowercase(),
-                            state = ListItemState(isSelected),
+                            isSelected = isSelected,
+                            onClick = {
+                                updatedOptionsChanged(
+                                    updatedOptions.copy(imageDetail = item)
+                                )
+                            },
                             modifier = Modifier
                                 .testTag("image_detail_level_item_${item.name.lowercase()}")
-                                .clickable {
-                                    updatedOptionsChanged(
-                                        updatedOptions.copy(imageDetail = item)
-                                    )
-                                },
-                            style = JewelTheme.simpleListItemStyle,
                         )
                     }
                 }
@@ -165,17 +162,16 @@ fun AiOptionsComponent(
                 Column {
                     listOf(ImageFormat.PNG, ImageFormat.WEBP, ImageFormat.LOSSY_WEBP).forEach { item ->
                         val isSelected = item == updatedOptions.imageFormat
-                        SimpleListItem(
+                        ComboBoxItem(
                             text = item.name.lowercase().replace("_", " "),
-                            state = ListItemState(isSelected),
+                            isSelected = isSelected,
+                            onClick = {
+                                updatedOptionsChanged(
+                                    updatedOptions.copy(imageFormat = item)
+                                )
+                            },
                             modifier = Modifier
                                 .testTag("image_format_item_${item.name.lowercase()}")
-                                .clickable {
-                                    updatedOptionsChanged(
-                                        updatedOptions.copy(imageFormat = item)
-                                    )
-                                },
-                            style = JewelTheme.simpleListItemStyle,
                         )
                     }
                 }
