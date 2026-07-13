@@ -429,6 +429,11 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
       describe("when add scenarios $secondGoal") {
         doIt {
           enterGoal(firstGoal)
+          // Fix the id here: the scenario graph shows scenario ids, and the random
+          // default id would make the graph screenshot non-deterministic.
+          expandOptions()
+          changeScenarioId("first_scenario")
+          collapseOptions()
           clickAddScenarioButton()
           enterGoal(secondGoal)
         }
