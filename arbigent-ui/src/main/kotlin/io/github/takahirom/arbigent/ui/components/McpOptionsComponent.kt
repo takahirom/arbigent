@@ -22,13 +22,10 @@ import io.github.takahirom.arbigent.McpServerOption
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.CheckboxRow
 import org.jetbrains.jewel.ui.component.IconActionButton
-import org.jetbrains.jewel.ui.component.ListItemState
-import org.jetbrains.jewel.ui.component.SimpleListItem
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.ComboBox
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
-import org.jetbrains.jewel.ui.theme.simpleListItemStyle
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -137,15 +134,14 @@ fun McpOptionsComponent(
             Column {
               availableToAdd.forEach { serverName ->
                 val isSelected = serverName == selectedServerToAdd
-                SimpleListItem(
+                ComboBoxItem(
                   text = serverName,
-                  state = ListItemState(isSelected),
+                  isSelected = isSelected,
+                  onClick = {
+                    selectedServerToAdd = serverName
+                  },
                   modifier = Modifier
                     .testTag("mcp_add_server_item_$serverName")
-                    .clickable {
-                      selectedServerToAdd = serverName
-                    },
-                  style = JewelTheme.simpleListItemStyle,
                 )
               }
             }
