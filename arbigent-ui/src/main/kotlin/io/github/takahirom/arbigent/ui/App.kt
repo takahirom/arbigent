@@ -2,7 +2,6 @@ package io.github.takahirom.arbigent.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
@@ -17,13 +16,13 @@ import io.github.takahirom.arbigent.ArbigentDeviceOs
 import io.github.takahirom.arbigent.arbigentDebugLog
 import io.github.takahirom.arbigent.ui.ArbigentAppStateHolder.DeviceConnectionState
 import io.github.takahirom.arbigent.ui.ArbigentAppStateHolder.ProjectDialogState
+import io.github.takahirom.arbigent.ui.components.ComboBoxItem
 import kotlinx.coroutines.launch
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.Orientation
 import org.jetbrains.jewel.ui.component.*
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
-import org.jetbrains.jewel.ui.theme.simpleListItemStyle
 
 @Composable
 fun App(
@@ -293,16 +292,14 @@ fun ScenarioControls(appStateHolder: ArbigentAppStateHolder) {
       Column {
         ArbigentDeviceOs.entries.forEach { item ->
           val isSelected = item == deviceOs
-          SimpleListItem(
+          ComboBoxItem(
             text = item.name,
-            state = ListItemState(isSelected),
-            modifier = Modifier
-              .clickable {
-                devicesStateHolder.selectedDeviceOs.value = item
-                devicesStateHolder.fetchDevices()
-                devicesStateHolder.onSelectedDeviceChanged(null)
-              },
-            style = JewelTheme.simpleListItemStyle,
+            isSelected = isSelected,
+            onClick = {
+              devicesStateHolder.selectedDeviceOs.value = item
+              devicesStateHolder.fetchDevices()
+              devicesStateHolder.onSelectedDeviceChanged(null)
+            },
           )
         }
       }
@@ -319,17 +316,15 @@ fun ScenarioControls(appStateHolder: ArbigentAppStateHolder) {
       Column {
         items.forEach { itemText ->
           val isSelected = itemText == selectedDevice?.name
-          SimpleListItem(
+          ComboBoxItem(
             text = itemText,
-            state = ListItemState(isSelected),
-            modifier = Modifier
-              .clickable {
-                devicesStateHolder.onSelectedDeviceChanged(devicesStateHolder.devices.value.firstOrNull { it.name == itemText })
-                devicesStateHolder.selectedDevice.value?.let {
-                  appStateHolder.onClickConnect(devicesStateHolder)
-                }
-              },
-            style = JewelTheme.simpleListItemStyle,
+            isSelected = isSelected,
+            onClick = {
+              devicesStateHolder.onSelectedDeviceChanged(devicesStateHolder.devices.value.firstOrNull { it.name == itemText })
+              devicesStateHolder.selectedDevice.value?.let {
+                appStateHolder.onClickConnect(devicesStateHolder)
+              }
+            },
           )
         }
       }

@@ -42,7 +42,7 @@ public data class ArbigentScenarioGraph(
     val mermaidIds = nodes.withIndex().associate { (index, node) -> node.key to "n$index" }
     val lines = mutableListOf(
       "graph LR",
-      "  classDef reusable fill:#e8f0fe,stroke:#4285f4",
+      "  classDef reusable fill:$REUSABLE_FILL_HEX,stroke:$REUSABLE_STROKE_HEX",
     )
     nodes.forEach { node ->
       val id = mermaidIds.getValue(node.key)
@@ -67,6 +67,10 @@ public data class ArbigentScenarioGraph(
   private fun escapeMermaid(text: String): String = text.replace("\"", "#quot;")
 
   public companion object {
+    // Reusable-call node colors, shared by every renderer (Mermaid classDef and the UI dialog).
+    public const val REUSABLE_FILL_HEX: String = "#e8f0fe"
+    public const val REUSABLE_STROKE_HEX: String = "#4285f4"
+
     private const val MAX_GOAL_LENGTH = 60
 
     public fun from(projectFileContent: ArbigentProjectFileContent): ArbigentScenarioGraph {
