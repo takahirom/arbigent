@@ -12,6 +12,7 @@ import java.io.File
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertContains
+import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 
 class CliTest {
@@ -158,6 +159,74 @@ scenarios:
     // Should succeed using settings file value
     assertContains(globalTest.output, "Selected scenarios for execution")
     
+    settingsFile.delete()
+  }
+
+  @Test
+  fun `ios real-device options resolve from settings yaml global keys`() {
+    // Placeholder team id / UDID only — never real values.
+    val settingsFile = File("build/test-.arbigent/settings-ios.yml")
+    settingsFile.parentFile.mkdirs()
+    settingsFile.writeText(
+      """
+      project-file: ${yaml.absolutePath}
+      ios-xctest-apple-team-id: ABCDE12345
+      ios-real-device-id: 00008110-XXXXXXXXXXXXXXXX
+      ios-real-device-port: "22090"
+      """.trimIndent()
+    )
+
+    val runCommand = ArbigentRunCommand().subcommands(ArbigentRunTaskCommand())
+    val command = ArbigentCli().apply {
+      context {
+        valueSource = ChainedValueSource(
+          listOf(
+            YamlValueSource.from(settingsFile.absolutePath, getKey = ValueSource.getKey(joinSubcommands = ".")),
+            YamlValueSource.from(settingsFile.absolutePath, getKey = { _, option -> option.names.first().removePrefix("--") })
+          )
+        )
+      }
+    }.subcommands(runCommand)
+
+    // --dry-run resolves every option but never connects a device, so this stays hermetic.
+    val test = command.test("run --dry-run --os=ios", envvars = mapOf("OPENAI_API_KEY" to "key"))
+    assertContains(test.output, "Selected scenarios for execution")
+
+    assertEquals("ABCDE12345", runCommand.iosAppleTeamId)
+    assertEquals("00008110-XXXXXXXXXXXXXXXX", runCommand.iosRealDeviceId)
+    assertEquals("22090", runCommand.iosRealDevicePort)
+
+    settingsFile.delete()
+  }
+
+  @Test
+  fun `ios real-device options resolve from command-specific run keys`() {
+    val settingsFile = File("build/test-.arbigent/settings-ios-run.yml")
+    settingsFile.parentFile.mkdirs()
+    settingsFile.writeText(
+      """
+      project-file: ${yaml.absolutePath}
+      run:
+        ios-real-device-port: "22091"
+      """.trimIndent()
+    )
+
+    val runCommand = ArbigentRunCommand().subcommands(ArbigentRunTaskCommand())
+    val command = ArbigentCli().apply {
+      context {
+        valueSource = ChainedValueSource(
+          listOf(
+            YamlValueSource.from(settingsFile.absolutePath, getKey = ValueSource.getKey(joinSubcommands = ".")),
+            YamlValueSource.from(settingsFile.absolutePath, getKey = { _, option -> option.names.first().removePrefix("--") })
+          )
+        )
+      }
+    }.subcommands(runCommand)
+
+    val test = command.test("run --dry-run --os=ios", envvars = mapOf("OPENAI_API_KEY" to "key"))
+    assertContains(test.output, "Selected scenarios for execution")
+    assertEquals("22091", runCommand.iosRealDevicePort)
+
     settingsFile.delete()
   }
 
