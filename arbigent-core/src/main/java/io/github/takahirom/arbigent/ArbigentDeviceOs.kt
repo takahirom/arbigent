@@ -179,6 +179,9 @@ public sealed interface ArbigentAvailableDevice {
         null
       }
 
+      // Hoisted so a warm-up failure can close the maestro session (and its XCTest driver) as well
+      // as the forwarder; both must be released exactly once on the failure path.
+      var maestro: Maestro? = null
       try {
         val tempFileHandler = TempFileHandler()
         // Our devicectl-backed controller fills maestro's stubbed real-device lifecycle methods.
@@ -216,7 +219,7 @@ public sealed interface ArbigentAvailableDevice {
           getInstalledApps = { xcRunnerCLIUtils.listApps(hardwareUdid) },
         )
 
-        val maestro = Maestro.ios(
+        maestro = Maestro.ios(
           IOSDriver(
             LocalIOSDevice(
               deviceId = hardwareUdid,
@@ -234,9 +237,11 @@ public sealed interface ArbigentAvailableDevice {
         )
       } catch (e: InterruptedException) {
         Thread.currentThread().interrupt()
+        maestro?.close()
         forwarder?.close()
         throw e
       } catch (e: Exception) {
+        maestro?.close()
         forwarder?.close()
         throw e
       }
