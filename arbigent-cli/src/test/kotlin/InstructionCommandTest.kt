@@ -130,6 +130,77 @@ scenarios:
   }
 
   @Test
+  fun `cyclic dependency fails with the chain in the message`() {
+    yaml.writeText(
+      """
+scenarios:
+- id: "a"
+  goal: "First"
+  dependency: "b"
+- id: "b"
+  goal: "Second"
+  dependency: "a"
+      """.trimIndent()
+    )
+    val result = run("--scenario-ids=a")
+    assertNotEquals(0, result.statusCode, result.output)
+    assertContains(result.output, "Cyclic scenario dependency detected")
+    assertContains(result.output, "a -> b -> a")
+  }
+
+  @Test
+  fun `self dependency fails as a cycle`() {
+    yaml.writeText(
+      """
+scenarios:
+- id: "selfie"
+  goal: "Loop"
+  dependency: "selfie"
+      """.trimIndent()
+    )
+    val result = run("--scenario-ids=selfie")
+    assertNotEquals(0, result.statusCode, result.output)
+    assertContains(result.output, "Cyclic scenario dependency detected")
+  }
+
+  @Test
+  fun `classifies unbound inputs and scans placeholders beyond goal`() {
+    yaml.writeText(
+      """
+scenarios:
+- id: "prep"
+  goal: "Prepare the device"
+  noteForHumans: "Ask {{owner}} before running"
+  initializationMethods:
+  - type: "LaunchApp"
+    packageName: "{{app_package}}"
+- id: "unbound-call"
+  dependency: "prep"
+  uses: "search"
+reusableScenarios:
+- id: "search"
+  inputs:
+    term:
+      required: false
+  goal: "Search for {{inputs.term}}"
+      """.trimIndent()
+    )
+    val result = run("--scenario-ids=unbound-call")
+    assertEquals(0, result.statusCode, result.output)
+    val output = result.output
+
+    // Unbound reusable input goes to its own section with `with:` guidance.
+    assertContains(output, "Unbound reusable inputs (provide via `with:` at the call site):")
+    assertContains(output, "{{inputs.term}}")
+
+    // Placeholders in initialization fields are surfaced, not only those in goals.
+    val variablesSection = output.substringAfter("Variables (unresolved")
+      .substringBefore("Unbound reusable inputs")
+    assertContains(variablesSection, "{{app_package}}")
+    assertContains(variablesSection, "{{owner}}")
+  }
+
+  @Test
   fun `renders legacy singular initializeMethods field`() {
     yaml.writeText(
       """

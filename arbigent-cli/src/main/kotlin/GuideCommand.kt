@@ -389,8 +389,11 @@ concrete goal, with `{{inputs.*}}` bindings already resolved.
 - Pass multiple ids: `--scenario-ids=first,second` prints one section per id.
 - `--include-app-ui-structure` also prints the project's `appUiStructure` (when set),
   giving the agent a map of the app before it starts.
-- Bare `{{name}}` placeholders that are not reusable inputs stay unresolved and are
-  listed in a "Variables" section; supply them at runtime with `run --variables`.
+- Bare `{{name}}` placeholders left unresolved in any rendered field (goal, note,
+  verification, or an initialization field such as `packageName`/`link`) are listed in a
+  "Variables" section; supply them at runtime with `run --variables`. Leftover
+  `{{inputs.*}}` reusable inputs are listed separately as "Unbound reusable inputs";
+  bind them with `with:` at the call site.
 
 Discover ids first with `arbigent scenarios`. For the example scenario below:
 

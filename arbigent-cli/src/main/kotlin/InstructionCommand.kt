@@ -85,13 +85,20 @@ class ArbigentInstructionCommand : CliktCommand(name = "instruction") {
       }
     }
 
-    val unresolvedVariables = steps
-      .flatMap { unresolvedPlaceholders(it.goal) }
+    val unresolved = steps
+      .flatMap { step -> renderedTexts(step).flatMap { unresolvedPlaceholders(it) } }
       .distinct()
+    val unboundInputs = unresolved.filter { isInputPlaceholder(it) }
+    val unresolvedVariables = unresolved.filterNot { isInputPlaceholder(it) }
     if (unresolvedVariables.isNotEmpty()) {
       out.appendLine()
       out.appendLine("Variables (unresolved; provide with `run --variables`):")
       unresolvedVariables.forEach { out.appendLine("- $it") }
+    }
+    if (unboundInputs.isNotEmpty()) {
+      out.appendLine()
+      out.appendLine("Unbound reusable inputs (provide via `with:` at the call site):")
+      unboundInputs.forEach { out.appendLine("- $it") }
     }
 
     steps.forEachIndexed { index, step ->
@@ -172,13 +179,18 @@ class ArbigentInstructionCommand : CliktCommand(name = "instruction") {
       }
     }
 
-    fun dfs(scenario: ArbigentScenarioContent) {
+    fun dfs(scenario: ArbigentScenarioContent, dependencyStack: List<String>) {
+      if (dependencyStack.contains(scenario.id)) {
+        throw CliktError(
+          "Cyclic scenario dependency detected: ${(dependencyStack + scenario.id).joinToString(" -> ")}"
+        )
+      }
       if (!visited.add(scenario.id)) return
       scenario.dependencyId?.let { dependencyId ->
         val dependency = scenariosById[dependencyId] ?: throw CliktError(
           "Scenario '${scenario.id}' depends on unknown scenario '$dependencyId'."
         )
-        dfs(dependency)
+        dfs(dependency, dependencyStack + scenario.id)
       }
       if (scenario.isCallForm()) {
         scenario.callSteps().forEach { expandStep(it, emptyMap(), emptyList()) }
@@ -187,7 +199,7 @@ class ArbigentInstructionCommand : CliktCommand(name = "instruction") {
       }
     }
 
-    dfs(target)
+    dfs(target, emptyList())
     return steps
   }
 
@@ -196,7 +208,16 @@ class ArbigentInstructionCommand : CliktCommand(name = "instruction") {
     bindings: Map<String, String>,
   ): ArbigentScenarioContent.InitializationMethod = when (method) {
     is ArbigentScenarioContent.InitializationMethod.LaunchApp ->
-      method.copy(packageName = ReusableInputsResolver.resolve(method.packageName, bindings))
+      method.copy(
+        packageName = ReusableInputsResolver.resolve(method.packageName, bindings),
+        launchArguments = method.launchArguments.mapValues { (_, value) ->
+          when (value) {
+            is ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue.StringVal ->
+              value.copy(value = ReusableInputsResolver.resolve(value.value, bindings))
+            else -> value
+          }
+        },
+      )
     is ArbigentScenarioContent.InitializationMethod.CleanupData ->
       method.copy(packageName = ReusableInputsResolver.resolve(method.packageName, bindings))
     is ArbigentScenarioContent.InitializationMethod.OpenLink ->
@@ -249,7 +270,31 @@ class ArbigentInstructionCommand : CliktCommand(name = "instruction") {
   private fun unresolvedPlaceholders(text: String): List<String> =
     PLACEHOLDER_PATTERN.findAll(text).map { it.value }.toList()
 
+  private fun isInputPlaceholder(placeholder: String): Boolean =
+    INPUT_PLACEHOLDER_PATTERN.matches(placeholder)
+
+  /** Every rendered string of a step, so leftover placeholders anywhere get surfaced. */
+  private fun renderedTexts(step: ResolvedStep): List<String> = buildList {
+    add(step.goal)
+    add(step.note)
+    step.imageAssertions.forEach { add(it.assertionPrompt) }
+    step.initializationMethods.forEach { addAll(initializationMethodTexts(it)) }
+  }
+
+  private fun initializationMethodTexts(
+    method: ArbigentScenarioContent.InitializationMethod,
+  ): List<String> = when (method) {
+    is ArbigentScenarioContent.InitializationMethod.LaunchApp ->
+      listOf(method.packageName) + method.launchArguments.values.mapNotNull {
+        (it as? ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue.StringVal)?.value
+      }
+    is ArbigentScenarioContent.InitializationMethod.CleanupData -> listOf(method.packageName)
+    is ArbigentScenarioContent.InitializationMethod.OpenLink -> listOf(method.link)
+    else -> emptyList()
+  }
+
   private companion object {
     private val PLACEHOLDER_PATTERN = """(?<!\\)\{\{\s*[^}]+\}\}""".toRegex()
+    private val INPUT_PLACEHOLDER_PATTERN = """\{\{\s*inputs\.[^}]+\}\}""".toRegex()
   }
 }
