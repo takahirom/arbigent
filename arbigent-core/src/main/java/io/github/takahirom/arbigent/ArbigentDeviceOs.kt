@@ -129,7 +129,7 @@ public sealed interface ArbigentAvailableDevice {
         )
       )
       try {
-        warmUp(maestro)
+        warmUpIosDevice(maestro)
         return MaestroDevice(
           maestro,
           availableDevice = this
@@ -143,41 +143,104 @@ public sealed interface ArbigentAvailableDevice {
         throw e
       }
     }
+  }
 
-    // A freshly booted iOS simulator is still doing post-boot work (e.g. Data
-    // Migration), and hitting it with the first scenario action tends to crash the
-    // XCTest runner. Warm it up first: poll the view hierarchy until the runner
-    // responds (this also starts the runner), then let it settle, so the first real
-    // interaction runs on a warm, stable device.
-    private fun warmUp(maestro: Maestro) {
-      val warmUpTimeoutMs = 60_000L
-      val settleMs = 10_000L
-      val pollIntervalMs = 2_000L
-      val start = System.currentTimeMillis()
-      var responsive = false
-      while (System.currentTimeMillis() - start < warmUpTimeoutMs) {
-        try {
-          runBlocking { maestro.viewHierarchy() }
-          responsive = true
-          break
-        } catch (e: Exception) {
-          arbigentInfoLog("iOS warm-up: device not responsive yet, retrying: ${e.message}")
-          Thread.sleep(pollIntervalMs)
-        }
+  /**
+   * Physical iPhone driven over XCTest, discovered via `xcrun devicectl`.
+   *
+   * Unlike a simulator, a real device needs three things maestro's consumable jars do not provide
+   * (see the PR-B research): a runner re-signed with the user's Apple team (built on demand by
+   * [IosRealDriverProducts]), `iproxy` port forwarding from host to device
+   * ([IosRealXCTestPortForwarder]), and a working app-lifecycle controller
+   * ([ArbigentDevicectlIOSDevice]). Everything else — the XCTest HTTP protocol, UI interaction —
+   * is identical to the simulator path once the runner port is reachable.
+   *
+   * @param coreDeviceIdentifier CoreDevice identifier used with `xcrun devicectl --device`.
+   * @param hardwareUdid hardware UDID used for xcodebuild's `-destination id=` and iproxy.
+   */
+  public class IosReal(
+    private val coreDeviceIdentifier: String,
+    private val hardwareUdid: String,
+    override val name: String,
+  ) : ArbigentAvailableDevice {
+    override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Ios
+
+    override fun connectToDevice(): ArbigentDevice {
+      val config = ArbigentIosRealDeviceSettings.current
+      val host = "127.0.0.1"
+      val port = ArbigentIosRealDeviceSettings.resolvedPort()
+      val teamId = IosCodeSigningTeamResolver.resolve(config)
+      val productsDir = IosRealDriverProducts(teamId = teamId, deviceUdid = hardwareUdid)
+        .resolveBuildProductsDir()
+
+      val forwarder = if (config.autoStartIproxy) {
+        IosRealXCTestPortForwarder(deviceUdid = hardwareUdid, port = port).also { it.start() }
+      } else {
+        null
       }
-      if (!responsive) {
-        arbigentInfoLog("iOS warm-up: device did not become responsive within ${warmUpTimeoutMs}ms; continuing anyway")
-        return
+
+      try {
+        val tempFileHandler = TempFileHandler()
+        // Our devicectl-backed controller fills maestro's stubbed real-device lifecycle methods.
+        val deviceController = ArbigentDevicectlIOSDevice(coreDeviceIdentifier)
+
+        val xcTestInstaller = LocalXCTestInstaller(
+          deviceId = hardwareUdid,
+          host = host,
+          deviceType = IOSDeviceType.REAL,
+          defaultPort = port,
+          reinstallDriver = true,
+          iOSDriverConfig = IOSDriverConfig(
+            prebuiltRunner = false,
+            // For REAL the installer reads the locally-built, user-signed products from this path
+            // (unlike SIMULATOR, which loads a bundled classpath driver).
+            sourceDirectory = productsDir.absolutePath,
+            context = Context.CLI,
+            snapshotKeyHonorModalViews = null,
+          ),
+          deviceController = deviceController,
+          tempFileHandler = tempFileHandler,
+          logsDir = xctestLogsDir(),
+        )
+
+        val xcTestDriverClient = XCTestDriverClient(
+          installer = xcTestInstaller,
+          client = XCTestClient(host, port),
+          reinstallDriver = true,
+        )
+        val xcRunnerCLIUtils = XCRunnerCLIUtils(tempFileHandler)
+
+        val xcTestDevice = XCTestIOSDevice(
+          deviceId = hardwareUdid,
+          client = xcTestDriverClient,
+          getInstalledApps = { xcRunnerCLIUtils.listApps(hardwareUdid) },
+        )
+
+        val maestro = Maestro.ios(
+          IOSDriver(
+            LocalIOSDevice(
+              deviceId = hardwareUdid,
+              xcTestDevice = xcTestDevice,
+              deviceController = deviceController,
+              insights = NoopInsights,
+            )
+          )
+        )
+        warmUpIosDevice(maestro)
+        return MaestroDevice(
+          maestro,
+          availableDevice = this,
+          onClose = { forwarder?.close() },
+        )
+      } catch (e: InterruptedException) {
+        Thread.currentThread().interrupt()
+        forwarder?.close()
+        throw e
+      } catch (e: Exception) {
+        forwarder?.close()
+        throw e
       }
-      // Let post-boot work settle before the first scenario interaction.
-      Thread.sleep(settleMs)
-      arbigentInfoLog("iOS warm-up done")
     }
-
-    // LocalXCTestInstaller writes XCTest runner logs here, replacing the removed
-    // enableXCTestOutputFileLogging flag.
-    private fun xctestLogsDir(): File =
-      File(ArbigentFiles.parentDir, "xctest-logs").apply { mkdirs() }
   }
 
   public class Web : ArbigentAvailableDevice {
@@ -203,3 +266,37 @@ public sealed interface ArbigentAvailableDevice {
 
   public fun connectToDevice(): ArbigentDevice
 }
+
+// A freshly booted iOS simulator (or a real device whose runner just launched) is still doing
+// post-launch work, and hitting it with the first scenario action tends to crash the XCTest
+// runner. Warm it up first: poll the view hierarchy until the runner responds (this also starts
+// the runner), then let it settle, so the first real interaction runs on a warm, stable device.
+internal fun warmUpIosDevice(maestro: Maestro) {
+  val warmUpTimeoutMs = 60_000L
+  val settleMs = 10_000L
+  val pollIntervalMs = 2_000L
+  val start = System.currentTimeMillis()
+  var responsive = false
+  while (System.currentTimeMillis() - start < warmUpTimeoutMs) {
+    try {
+      runBlocking { maestro.viewHierarchy() }
+      responsive = true
+      break
+    } catch (e: Exception) {
+      arbigentInfoLog("iOS warm-up: device not responsive yet, retrying: ${e.message}")
+      Thread.sleep(pollIntervalMs)
+    }
+  }
+  if (!responsive) {
+    arbigentInfoLog("iOS warm-up: device did not become responsive within ${warmUpTimeoutMs}ms; continuing anyway")
+    return
+  }
+  // Let post-launch work settle before the first scenario interaction.
+  Thread.sleep(settleMs)
+  arbigentInfoLog("iOS warm-up done")
+}
+
+// LocalXCTestInstaller writes XCTest runner logs here, replacing the removed
+// enableXCTestOutputFileLogging flag.
+internal fun xctestLogsDir(): File =
+  File(ArbigentFiles.parentDir, "xctest-logs").apply { mkdirs() }

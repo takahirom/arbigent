@@ -201,7 +201,10 @@ public data class ArbigentElementList(
 public class MaestroDevice(
   @Volatile private var maestro: Maestro,
   private val screenshotsDir: File = ArbigentFiles.screenshotsDir,
-  private val availableDevice: ArbigentAvailableDevice? = null
+  private val availableDevice: ArbigentAvailableDevice? = null,
+  // Extra teardown tied to this connection (e.g. the iproxy port forwarder for a physical
+  // iPhone), run after maestro.close() so session-scoped child processes stop with the device.
+  private val onClose: (() -> Unit)? = null,
 ) : ArbigentDevice, ArbigentTvCompatDevice {
   init {
     arbigentInfoLog("MaestroDevice created: screenshotsDir:${screenshotsDir.absolutePath}")
@@ -700,6 +703,7 @@ public class MaestroDevice(
   override fun close() {
     isClosed = true
     maestro.close()
+    runCatching { onClose?.invoke() }
   }
 
   override fun isClosed(): Boolean {
