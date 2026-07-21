@@ -39,5 +39,6 @@ class ArbigentScenariosCommand : CliktCommand(name = "scenarios") {
     arbigentProject.scenarios.forEach { scenario ->
       arbigentInfoLog("- ${scenario.id}: ${scenario.agentTasks.lastOrNull()?.goal?.take(80)}...")
     }
+    arbigentInfoLog("Run 'arbigent instruction --scenario-ids=<id>' to get reproduction instructions for a scenario.")
   }
 }
