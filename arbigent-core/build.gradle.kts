@@ -25,6 +25,7 @@ kotlin {
 buildConfig {
   packageName("io.github.takahirom.arbigent")
   buildConfigField("VERSION_NAME", version.toString())
+  buildConfigField("MAESTRO_VERSION", rootProject.extra["maestroVersion"] as String)
   useKotlinOutput { internalVisibility = false }
 }
 
@@ -33,6 +34,21 @@ buildConfig {
 // re-exposes (MaestroCommand, MaestroException, MaestroFlowParser, ...).
 @Suppress("UNCHECKED_CAST")
 val maestroJars = rootProject.extra["maestroJars"] as FileCollection
+
+// iOS XCTest runner source (driver/ios/**), packaged as a resource under ios-real-driver/ so
+// the real-device runner builder can copy it out and run xcodebuild build-for-testing at
+// runtime. See gradle/maestro.gradle.kts.
+@Suppress("UNCHECKED_CAST")
+val maestroIosDriverSource = rootProject.extra["maestroIosDriverSource"] as FileCollection
+
+tasks.named<ProcessResources>("processResources") {
+  // Final resource layout: ios-real-driver/driver/ios/** (the fileTree preserves the
+  // driver/ios/** relative paths). The FileCollection's builtBy carries the extraction task
+  // dependency so the source is materialized before packaging.
+  from(maestroIosDriverSource) {
+    into("ios-real-driver")
+  }
+}
 
 dependencies {
   implementation(project(":arbigent-core-web-report"))
