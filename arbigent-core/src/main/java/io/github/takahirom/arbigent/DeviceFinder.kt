@@ -20,11 +20,14 @@ public fun fetchAvailableDevicesByOs(deviceType: ArbigentDeviceOs): List<Arbigen
             .filter { it.isAvailable && it.state == "Booted" }
         }
         .map { ArbigentAvailableDevice.IOS(it) }
-      val realDevices = fetchConnectedIosRealDevices()
-      // Prefer a physical device only when the user has opted in by configuring an Apple team id
-      // (real devices need it to build a signed runner). Otherwise a booted simulator wins, keeping
-      // the common `--os=ios` dev flow unchanged. connectDevice() picks the first entry.
-      if (isRealIosDeviceOptedIn()) realDevices + simulators else simulators + realDevices
+      val optedIn = isRealIosDeviceOptedIn()
+      // Wake the CoreDevice tunnel (read-only) when the user opted in, or when there is no booted
+      // simulator to fall back on so a lone connected iPhone still "just works".
+      val realDevices = fetchConnectedIosRealDevices(wakeTunnels = optedIn || simulators.isEmpty())
+      // Prefer a physical device only when the user has opted in (Apple team id or a specific
+      // real-device id). Otherwise a booted simulator wins, keeping the common `--os=ios` dev flow
+      // unchanged. connectDevice() picks the first entry.
+      if (optedIn) realDevices + simulators else simulators + realDevices
     }
 
     else -> {
@@ -38,12 +41,27 @@ public fun fetchAvailableDevicesByOs(deviceType: ArbigentDeviceOs): List<Arbigen
  * connected tunnel — the same criterion maestro uses. Returns empty (never throws) when devicectl
  * is unavailable or no device is connected, so simulator discovery keeps working without Xcode
  * command-line tools set up for real devices.
+ *
+ * CoreDevice only reports `tunnelState == connected` while a tunnel is actively held; a paired,
+ * USB-connected iPhone otherwise lists as `disconnected` even though it is perfectly usable. When
+ * the user has opted into real devices we first wake the tunnel with a read-only
+ * `devicectl device info` (see [wakeIosRealDeviceTunnels]) so discovery is not flaky.
  */
 @ArbigentInternalApi
-public fun fetchConnectedIosRealDevices(): List<ArbigentAvailableDevice.IosReal> {
+public fun fetchConnectedIosRealDevices(
+  wakeTunnels: Boolean = true,
+  executor: ArbigentCommandExecutor = DefaultArbigentCommandExecutor(),
+): List<ArbigentAvailableDevice.IosReal> {
   val deviceIdFilter = ArbigentIosRealDeviceSettings.resolvedDeviceId()
   return try {
-    util.LocalIOSDevice().listDeviceViaDeviceCtl()
+    val localDevice = util.LocalIOSDevice()
+    var devices = localDevice.listDeviceViaDeviceCtl()
+    val hasConnected = devices.any { it.connectionProperties?.tunnelState.equals("connected", ignoreCase = true) }
+    if (!hasConnected && wakeTunnels) {
+      wakeIosRealDeviceTunnels(devices.mapNotNull { it.identifier }, executor)
+      devices = localDevice.listDeviceViaDeviceCtl()
+    }
+    devices
       .filter { it.connectionProperties?.tunnelState.equals("connected", ignoreCase = true) }
       .mapNotNull { device ->
         val identifier = device.identifier ?: return@mapNotNull null
@@ -61,8 +79,23 @@ public fun fetchConnectedIosRealDevices(): List<ArbigentAvailableDevice.IosReal>
   }
 }
 
+// Reads device info to establish the CoreDevice tunnel (read-only; no device state changes), so the
+// subsequent `list devices` reports the device as connected. Failures are ignored — a device that
+// stays disconnected simply won't be surfaced.
+private fun wakeIosRealDeviceTunnels(identifiers: List<String>, executor: ArbigentCommandExecutor) {
+  identifiers.forEach { identifier ->
+    arbigentInfoLog("iOS real device: waking CoreDevice tunnel for a paired device")
+    executor.execute(
+      listOf("xcrun", "devicectl", "device", "info", "details", "--device", identifier),
+      timeoutMs = 20_000,
+    )
+  }
+}
+
 private fun isRealIosDeviceOptedIn(env: (String) -> String? = System::getenv): Boolean {
   val config = ArbigentIosRealDeviceSettings.current
   if (!config.appleTeamId.isNullOrBlank()) return true
-  return !env(ArbigentIosRealDeviceSettings.ENV_APPLE_TEAM_ID).isNullOrBlank()
+  if (!config.deviceId.isNullOrBlank()) return true
+  if (!env(ArbigentIosRealDeviceSettings.ENV_APPLE_TEAM_ID).isNullOrBlank()) return true
+  return !env(ArbigentIosRealDeviceSettings.ENV_DEVICE_ID).isNullOrBlank()
 }
