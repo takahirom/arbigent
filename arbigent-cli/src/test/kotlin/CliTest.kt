@@ -176,27 +176,29 @@ scenarios:
       """.trimIndent()
     )
 
-    val runCommand = ArbigentRunCommand().subcommands(ArbigentRunTaskCommand())
-    val command = ArbigentCli().apply {
-      context {
-        valueSource = ChainedValueSource(
-          listOf(
-            YamlValueSource.from(settingsFile.absolutePath, getKey = ValueSource.getKey(joinSubcommands = ".")),
-            YamlValueSource.from(settingsFile.absolutePath, getKey = { _, option -> option.names.first().removePrefix("--") })
+    try {
+      val runCommand = ArbigentRunCommand().subcommands(ArbigentRunTaskCommand())
+      val command = ArbigentCli().apply {
+        context {
+          valueSource = ChainedValueSource(
+            listOf(
+              YamlValueSource.from(settingsFile.absolutePath, getKey = ValueSource.getKey(joinSubcommands = ".")),
+              YamlValueSource.from(settingsFile.absolutePath, getKey = { _, option -> option.names.first().removePrefix("--") })
+            )
           )
-        )
-      }
-    }.subcommands(runCommand)
+        }
+      }.subcommands(runCommand)
 
-    // --dry-run resolves every option but never connects a device, so this stays hermetic.
-    val test = command.test("run --dry-run --os=ios", envvars = mapOf("OPENAI_API_KEY" to "key"))
-    assertContains(test.output, "Selected scenarios for execution")
+      // --dry-run resolves every option but never connects a device, so this stays hermetic.
+      val test = command.test("run --dry-run --os=ios", envvars = mapOf("OPENAI_API_KEY" to "key"))
+      assertContains(test.output, "Selected scenarios for execution")
 
-    assertEquals("ABCDE12345", runCommand.iosAppleTeamId)
-    assertEquals("00008110-XXXXXXXXXXXXXXXX", runCommand.iosRealDeviceId)
-    assertEquals("22090", runCommand.iosRealDevicePort)
-
-    settingsFile.delete()
+      assertEquals("ABCDE12345", runCommand.iosAppleTeamId)
+      assertEquals("00008110-XXXXXXXXXXXXXXXX", runCommand.iosRealDeviceId)
+      assertEquals("22090", runCommand.iosRealDevicePort)
+    } finally {
+      settingsFile.delete()
+    }
   }
 
   @Test
@@ -211,23 +213,25 @@ scenarios:
       """.trimIndent()
     )
 
-    val runCommand = ArbigentRunCommand().subcommands(ArbigentRunTaskCommand())
-    val command = ArbigentCli().apply {
-      context {
-        valueSource = ChainedValueSource(
-          listOf(
-            YamlValueSource.from(settingsFile.absolutePath, getKey = ValueSource.getKey(joinSubcommands = ".")),
-            YamlValueSource.from(settingsFile.absolutePath, getKey = { _, option -> option.names.first().removePrefix("--") })
+    try {
+      val runCommand = ArbigentRunCommand().subcommands(ArbigentRunTaskCommand())
+      val command = ArbigentCli().apply {
+        context {
+          valueSource = ChainedValueSource(
+            listOf(
+              YamlValueSource.from(settingsFile.absolutePath, getKey = ValueSource.getKey(joinSubcommands = ".")),
+              YamlValueSource.from(settingsFile.absolutePath, getKey = { _, option -> option.names.first().removePrefix("--") })
+            )
           )
-        )
-      }
-    }.subcommands(runCommand)
+        }
+      }.subcommands(runCommand)
 
-    val test = command.test("run --dry-run --os=ios", envvars = mapOf("OPENAI_API_KEY" to "key"))
-    assertContains(test.output, "Selected scenarios for execution")
-    assertEquals("22091", runCommand.iosRealDevicePort)
-
-    settingsFile.delete()
+      val test = command.test("run --dry-run --os=ios", envvars = mapOf("OPENAI_API_KEY" to "key"))
+      assertContains(test.output, "Selected scenarios for execution")
+      assertEquals("22091", runCommand.iosRealDevicePort)
+    } finally {
+      settingsFile.delete()
+    }
   }
 
   @Test
