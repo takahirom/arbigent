@@ -56,6 +56,20 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     .choice("android", "ios", "web")
     .default("android")
 
+  private val iosAppleTeamId by defaultOption(
+    "--ios-xctest-apple-team-id",
+    help = "Apple developer team id used to sign the XCTest runner for a physical iPhone (--os=ios). " +
+      "Falls back to ${ArbigentIosRealDeviceSettings.ENV_APPLE_TEAM_ID}, then single-identity auto-detect."
+  )
+  private val iosRealDeviceId by defaultOption(
+    "--ios-real-device-id",
+    help = "Hardware UDID selecting a specific physical iPhone (--os=ios)."
+  )
+  private val iosRealDevicePort by defaultOption(
+    "--ios-real-device-port",
+    help = "Host/device port for the XCTest runner on a physical iPhone (default 22087)."
+  )
+
   // Common options using extension functions with automatic property file detection
   private val projectFile by projectFileOption()
   private val logLevel by logLevelOption()
@@ -183,7 +197,12 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
       return
     }
 
-    device = connectDevice(os)
+    device = connectDevice(
+      os = os,
+      iosAppleTeamId = iosAppleTeamId,
+      iosRealDeviceId = iosRealDeviceId,
+      iosRealDevicePort = iosRealDevicePort?.trim()?.toIntOrNull(),
+    )
     Runtime.getRuntime().addShutdownHook(object : Thread() {
       override fun run() {
         arbigentProject.cancel()

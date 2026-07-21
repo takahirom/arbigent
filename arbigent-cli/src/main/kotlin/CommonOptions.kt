@@ -159,7 +159,12 @@ fun loadArbigentProject(
   }
 }
 
-fun connectDevice(os: String): ArbigentDevice {
+fun connectDevice(
+  os: String,
+  iosAppleTeamId: String? = null,
+  iosRealDeviceId: String? = null,
+  iosRealDevicePort: Int? = null,
+): ArbigentDevice {
   val deviceOs =
     ArbigentDeviceOs.entries.find { it.name.toLowerCasePreservingASCIIRules() == os.toLowerCasePreservingASCIIRules() }
       ?: throw IllegalArgumentException(
@@ -167,6 +172,13 @@ fun connectDevice(os: String): ArbigentDevice {
           ArbigentDeviceOs.entries
             .joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
         }")
+  // Publish iOS real-device options for discovery/connection to read. Only relevant for --os=ios
+  // with a physical iPhone; simulators and other OSes ignore it.
+  ArbigentIosRealDeviceSettings.current = ArbigentIosRealDeviceConfiguration(
+    appleTeamId = iosAppleTeamId?.takeIf { it.isNotBlank() },
+    deviceId = iosRealDeviceId?.takeIf { it.isNotBlank() },
+    port = iosRealDevicePort,
+  )
   return fetchAvailableDevicesByOs(deviceOs).firstOrNull()?.connectToDevice()
     ?: throw IllegalArgumentException("No available device found")
 }
