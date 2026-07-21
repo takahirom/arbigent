@@ -76,6 +76,11 @@ dependencies {
   runtimeOnly("org.graalvm.polyglot:js-community:24.2.0")
   // Selenium backs Maestro.web() (arbigent's Web device); runtime-only.
   runtimeOnly("org.seleniumhq.selenium:selenium-java:4.43.0")
+  // maestro-web's CdpClient speaks CDP over ktor's client websockets; runtime-only.
+  runtimeOnly("io.ktor:ktor-client-core:2.3.13")
+  runtimeOnly("io.ktor:ktor-client-cio:2.3.13")
+  runtimeOnly("io.ktor:ktor-client-content-negotiation:2.3.13")
+  runtimeOnly("io.ktor:ktor-serialization-kotlinx-json:2.3.13")
   // jcodec backs Maestro screen recording; runtime-only.
   runtimeOnly("org.jcodec:jcodec:0.2.5")
   runtimeOnly("org.jcodec:jcodec-javase:0.2.5")

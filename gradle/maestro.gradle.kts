@@ -24,6 +24,7 @@ val maestroJarEntries = listOf(
   "maestro/lib/maestro-ios-driver.jar",
   "maestro/lib/maestro-utils.jar",
   "maestro/lib/maestro-ai.jar",
+  "maestro/lib/maestro-web.jar",
 )
 
 // Cache under the Gradle user home so the download survives `clean` and is shared across
