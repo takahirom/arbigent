@@ -38,8 +38,31 @@ public class IosRealDriverProducts(
       arbigentInfoLog("iOS real device: reusing cached runner at ${productsDir.absolutePath}")
       return productsDir
     }
-    build(cacheDir, productsDir)
-    return productsDir
+    // The cache dir is shared across arbigent processes (e.g. UI + CLI); serialize the
+    // check-then-build so two runs cannot wipe each other's in-progress build. See [withBuildLock].
+    return withBuildLock(cacheDir) {
+      // Another run may have finished the build while we waited for the lock.
+      if (isUpToDate(cacheDir, productsDir)) {
+        arbigentInfoLog("iOS real device: reusing cached runner at ${productsDir.absolutePath}")
+      } else {
+        build(cacheDir, productsDir)
+      }
+      productsDir
+    }
+  }
+
+  // Serialize the shared-cache build both across threads (synchronized on [buildLock]) and across
+  // processes (an exclusive FileLock on a `.lock` file kept in the cache PARENT, so it survives the
+  // cache dir being replaced). synchronized is required around the FileLock too: a second thread in
+  // the same JVM locking the same channel would hit OverlappingFileLockException.
+  private fun <T> withBuildLock(cacheDir: File, block: () -> T): T {
+    val lockParent = cacheDir.parentFile.apply { mkdirs() }
+    val lockFile = File(lockParent, "${cacheDir.name}.build.lock")
+    return synchronized(buildLock) {
+      java.io.RandomAccessFile(lockFile, "rw").use { raf ->
+        raf.channel.lock().use { block() }
+      }
+    }
   }
 
   private fun isUpToDate(cacheDir: File, productsDir: File): Boolean {
@@ -57,9 +80,13 @@ public class IosRealDriverProducts(
       "iOS real device: building signed XCTest runner (team ${IosCodeSigningTeamResolver.maskTeamId(teamId)}); " +
         "first build can take several minutes"
     )
-    // Rebuild from a clean cache dir to avoid stale products from an older maestro/team.
-    cacheDir.deleteRecursively()
-    cacheDir.mkdirs()
+    // Build into a process-unique sibling dir and only swap it into place once complete, so a
+    // partially-built or failed build never leaves a corrupt runner at the shared cache path.
+    val buildDir = Files.createTempDirectory(
+      cacheDir.parentFile.apply { mkdirs() }.toPath(),
+      "${cacheDir.name}.building",
+    ).toFile()
+    val buildProductsDir = File(buildDir, "Build/Products")
 
     val sourceDir = Files.createTempDirectory("arbigent-ios-driver-src")
     try {
@@ -73,16 +100,17 @@ public class IosRealDriverProducts(
       // build description is sometimes computed before the profile lands on disk ("Build input
       // file cannot be found: …/<uuid>.mobileprovision"). The profile exists by the time the run
       // fails, so a single clean rebuild picks it up. Retry once on that transient race.
-      var result = runXcodebuild(project, cacheDir)
+      var result = runXcodebuild(project, buildDir)
       if (!result.isSuccess && isTransientProvisioningFailure(result)) {
         arbigentInfoLog("iOS real device: transient provisioning race on first build; retrying once")
-        result = runXcodebuild(project, cacheDir)
+        result = runXcodebuild(project, buildDir)
       }
       if (!result.isSuccess) {
         // xcodebuild echoes the full invocation (including DEVELOPMENT_TEAM=<teamId>) into its
         // output; redact the team id before persisting so it never lands in cleartext on disk.
         val masked = IosCodeSigningTeamResolver.maskTeamId(teamId)
-        val log = File(cacheDir, "xcodebuild-output.log").apply {
+        cacheDir.parentFile.mkdirs()
+        val log = File(cacheDir.parentFile, "${cacheDir.name}-xcodebuild-output.log").apply {
           writeText((result.stdout + "\n" + result.stderr).replace(teamId, masked))
         }
         throw IllegalStateException(
@@ -91,17 +119,26 @@ public class IosRealDriverProducts(
             "provision this device. Build log: ${log.absolutePath}"
         )
       }
-      check(productsDir.isDirectory && productsDir.walkTopDown().any { it.extension == "xctestrun" }) {
-        "xcodebuild reported success but no .xctestrun was produced under ${productsDir.absolutePath}"
+      check(buildProductsDir.isDirectory && buildProductsDir.walkTopDown().any { it.extension == "xctestrun" }) {
+        "xcodebuild reported success but no .xctestrun was produced under ${buildProductsDir.absolutePath}"
       }
-      writeMarker(cacheDir)
+      writeMarker(buildDir)
+      // Swap the freshly built dir into place. We hold the build lock, so no other run is building;
+      // replace any stale cache dir and move atomically where the filesystem supports it.
+      cacheDir.deleteRecursively()
+      try {
+        Files.move(buildDir.toPath(), cacheDir.toPath(), StandardCopyOption.ATOMIC_MOVE)
+      } catch (e: java.nio.file.AtomicMoveNotSupportedException) {
+        Files.move(buildDir.toPath(), cacheDir.toPath())
+      }
       arbigentInfoLog("iOS real device: runner built at ${productsDir.absolutePath}")
     } finally {
       sourceDir.toFile().deleteRecursively()
+      buildDir.deleteRecursively()
     }
   }
 
-  private fun runXcodebuild(project: java.nio.file.Path, cacheDir: File): ArbigentCommandResult =
+  private fun runXcodebuild(project: java.nio.file.Path, derivedDataPath: File): ArbigentCommandResult =
     executor.execute(
       listOf(
         "xcodebuild",
@@ -111,7 +148,7 @@ public class IosRealDriverProducts(
         "-scheme", "maestro-driver-ios",
         "-destination", "platform=iOS,id=$deviceUdid",
         "-allowProvisioningUpdates",
-        "-derivedDataPath", cacheDir.absolutePath,
+        "-derivedDataPath", derivedDataPath.absolutePath,
         "DEVELOPMENT_TEAM=$teamId",
         "CODE_SIGN_IDENTITY=Apple Development",
       ),
@@ -179,6 +216,9 @@ public class IosRealDriverProducts(
   public companion object {
     public const val DRIVER_SOURCE_RESOURCE: String = "ios-real-driver/runner"
     private const val MARKER_FILE = "arbigent-driver.properties"
+
+    // In-process guard around the cross-process FileLock (a channel can't be locked twice in one JVM).
+    private val buildLock = Any()
 
     // First builds (clean + provisioning) routinely exceed maestro's 120s default; give xcodebuild
     // more room while still honoring an explicit MAESTRO_XCODEBUILD_WAIT_TIME override.
