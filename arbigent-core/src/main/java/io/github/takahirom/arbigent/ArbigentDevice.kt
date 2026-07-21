@@ -2,11 +2,14 @@ package io.github.takahirom.arbigent
 
 import io.github.takahirom.arbigent.MaestroDevice.OptimizationResult
 import io.github.takahirom.arbigent.result.ArbigentUiTreeStrings
+import kotlinx.coroutines.runBlocking
 import maestro.*
 import maestro.UiElement.Companion.toUiElement
 import maestro.UiElement.Companion.toUiElementOrNull
+import maestro.device.Platform
 import maestro.orchestra.MaestroCommand
 import maestro.orchestra.Orchestra
+import okio.sink
 import java.io.File
 import kotlin.math.pow
 import kotlin.system.measureTimeMillis
@@ -204,9 +207,12 @@ public class MaestroDevice(
     arbigentInfoLog("MaestroDevice created: screenshotsDir:${screenshotsDir.absolutePath}")
   }
 
+  // Maestro's Orchestra artifact refactor (#3282) removed the screenshotsDir constructor
+  // parameter; takeScreenshot commands now write under an artifacts dir instead of
+  // screenshotsDir/<path>.png. Arbigent captures screenshots itself in executeActions()
+  // (see below) to keep that path contract, so Orchestra needs no screenshots dir here.
   @Volatile private var orchestra = Orchestra(
     maestro = maestro,
-    screenshotsDir = screenshotsDir,
   )
 
   override fun deviceName(): String {
@@ -217,7 +223,7 @@ public class MaestroDevice(
   private fun ensureConnected() {
     // Try a simple operation to check connection
     try {
-      maestro.viewHierarchy()
+      runBlocking { maestro.viewHierarchy() }
     } catch (e: Exception) {
       // Device appears disconnected, reconnect
       arbigentInfoLog("MaestroDevice failed to fetch view hierarchy: ${e.message}. Reconnect device ${maestro.deviceName}")
@@ -227,29 +233,35 @@ public class MaestroDevice(
 
   override fun executeActions(actions: List<MaestroCommand>) {
     ensureConnected()
+    // A lone takeScreenshot (how arbigent always issues one, see ArbigentAgent) is captured
+    // directly to screenshotsDir/<path>.png. Maestro's Orchestra artifact refactor (#3282)
+    // moved takeScreenshot output under an artifacts dir, which no longer matches where
+    // arbigent reads the file, so screenshots bypass Orchestra to keep the path contract.
+    // Every other command still runs through Orchestra via runFlow (which manages the JS
+    // engine lifecycle internally, replacing the old shouldReinitJsEngine reflection).
+    val screenshot = actions.singleOrNull()?.takeScreenshotCommand
     ArbigentGlobalStatus.onDevice(actions.joinToString { it.toString() }) {
-      // If the jsEngine is already initialized, we don't need to reinitialize it
-      val shouldJsReinit = if (orchestra::class.java.getDeclaredField("jsEngine").apply {
-          isAccessible = true
-        }.get(orchestra) != null) {
-        false
-      } else {
-        true
+      runBlocking {
+        if (screenshot != null) {
+          val file = File(screenshotsDir, "${screenshot.path}.png").apply { parentFile?.mkdirs() }
+          maestro.takeScreenshot(file.sink(), false)
+        } else {
+          orchestra.runFlow(actions)
+        }
       }
-      orchestra.executeCommands(actions, shouldReinitJsEngine = shouldJsReinit)
     }
   }
 
   public override fun waitForAppToSettle(appId: String?) {
     ensureConnected()
-    maestro.waitForAppToSettle(appId = appId)
+    runBlocking { maestro.waitForAppToSettle(appId = appId) }
   }
 
   override fun elements(): ArbigentElementList {
     ensureConnected()
     for (it in 0..2) {
       try {
-        val viewHierarchy = maestro.viewHierarchy(false)
+        val viewHierarchy = runBlocking { maestro.viewHierarchy(false) }
         val deviceInfo = maestro.cachedDeviceInfo
         val elementList = ArbigentElementList.from(viewHierarchy, deviceInfo)
         return elementList
@@ -266,7 +278,7 @@ public class MaestroDevice(
     ensureConnected()
     for (it in 0..2) {
       try {
-        val viewHierarchy = maestro.viewHierarchy(false)
+        val viewHierarchy = runBlocking { maestro.viewHierarchy(false) }
         return ArbigentUiTreeStrings(
           allTreeString = viewHierarchy.toString(),
           optimizedTreeString = viewHierarchy.toOptimizedString(
@@ -362,7 +374,7 @@ public class MaestroDevice(
     ensureConnected()
     moveFocusToElement(
       fetchTarget = {
-        val newElement = maestro.viewHierarchy().refreshedElement(element.identifierData)
+        val newElement = runBlocking { maestro.viewHierarchy() }.refreshedElement(element.identifierData)
         val bounds = newElement?.toUiElement()?.bounds
         if (bounds == null) {
           arbigentInfoLog("Element(${element.treeNode.getIdentifierDataForFocus()}) not found in current ViewHierarchy.")
@@ -522,8 +534,10 @@ public class MaestroDevice(
 
       val direction = directionCandidates.random()
       arbigentDebugLog("directionCandidates: $directionCandidates \ndirection: $direction")
-      maestro.pressKey(direction)
-      maestro.waitForAnimationToEnd(100)
+      runBlocking {
+        maestro.pressKey(direction)
+        maestro.waitForAnimationToEnd("100")
+      }
     }
   }
 
@@ -531,28 +545,30 @@ public class MaestroDevice(
     return when (selector) {
       is ArbigentTvCompatDevice.Selector.ById -> {
         try {
-          val element: FindElementResult = maestro.findElementWithTimeout(
+          val element: FindElementResult = runBlocking { maestro.findElementWithTimeout(
             timeoutMs = 100,
             filter = Filters.compose(
               Filters.idMatches(selector.id.toRegex()),
               Filters.index(selector.index)
             ),
-          ) ?: throw MaestroException.ElementNotFound(
+          ) } ?: throw MaestroException.ElementNotFound(
             "Element not found",
-            maestro.viewHierarchy().root
+            runBlocking { maestro.viewHierarchy() }.root,
+            "Element not found",
           )
           val uiElement: UiElement = element.element
           uiElement
         } catch (e: MaestroException.ElementNotFound) {
-          val element: FindElementResult = maestro.findElementWithTimeout(
+          val element: FindElementResult = runBlocking { maestro.findElementWithTimeout(
             timeoutMs = 100,
             filter = Filters.compose(
               Filters.idMatches((".*" + selector.id + ".*").toRegex()),
               Filters.index(selector.index)
             )
-          ) ?: throw MaestroException.ElementNotFound(
+          ) } ?: throw MaestroException.ElementNotFound(
             "Element not found",
-            maestro.viewHierarchy().root
+            runBlocking { maestro.viewHierarchy() }.root,
+            "Element not found",
           )
           val uiElement: UiElement = element.element
           uiElement
@@ -561,28 +577,30 @@ public class MaestroDevice(
 
       is ArbigentTvCompatDevice.Selector.ByText -> {
         try {
-          val element: FindElementResult = maestro.findElementWithTimeout(
+          val element: FindElementResult = runBlocking { maestro.findElementWithTimeout(
             timeoutMs = 100,
             filter = Filters.compose(
               Filters.textMatches(selector.text.toRegex()),
               Filters.index(selector.index)
             ),
-          ) ?: throw MaestroException.ElementNotFound(
+          ) } ?: throw MaestroException.ElementNotFound(
             "Element not found",
-            maestro.viewHierarchy().root
+            runBlocking { maestro.viewHierarchy() }.root,
+            "Element not found",
           )
           val uiElement: UiElement = element.element
           uiElement
         } catch (e: MaestroException.ElementNotFound) {
-          val element: FindElementResult = maestro.findElementWithTimeout(
+          val element: FindElementResult = runBlocking { maestro.findElementWithTimeout(
             timeoutMs = 100,
             filter = Filters.compose(
               Filters.textMatches((".*" + selector.text + ".*").toRegex()),
               Filters.index(selector.index)
             )
-          ) ?: throw MaestroException.ElementNotFound(
+          ) } ?: throw MaestroException.ElementNotFound(
             "Element not found",
-            maestro.viewHierarchy().root
+            runBlocking { maestro.viewHierarchy() }.root,
+            "Element not found",
           )
           val uiElement: UiElement = element.element
           uiElement
@@ -592,7 +610,7 @@ public class MaestroDevice(
   }
 
   private fun findCurrentFocus(): TreeNode? {
-    val viewHierarchy = maestro.viewHierarchy(false)
+    val viewHierarchy = runBlocking { maestro.viewHierarchy(false) }
     return dfs(viewHierarchy.root) {
       // If keyboard is focused, return the focused node with keyboard
       it.attributes["resource-id"]?.startsWith("com.google.android.inputmethod.latin:id/") == true && it.focused == true
@@ -609,7 +627,7 @@ public class MaestroDevice(
   
   private fun updateConnection(newMaestro: Maestro) {
     this.maestro = newMaestro
-    this.orchestra = Orchestra(maestro = this.maestro, screenshotsDir = this.screenshotsDir)
+    this.orchestra = Orchestra(maestro = this.maestro)
   }
 
   private fun reconnectIfDisconnected() {

@@ -16,8 +16,9 @@ tasks.withType<Test> {
 dependencies {
     implementation(project(":arbigent-core"))
     implementation(project(":arbigent-ai-openai"))
-    // maestro client
-    api(libs.maestro.client)
+    // maestro client (jars extracted from the pinned Maestro CLI zip; see gradle/maestro.gradle.kts)
+    @Suppress("UNCHECKED_CAST")
+    api(rootProject.extra["maestroJars"] as FileCollection)
     testImplementation(kotlin("test"))
     // coroutine test
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.5.2")

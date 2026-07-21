@@ -7,6 +7,10 @@ plugins {
     alias(libs.plugins.buildconfig) apply false
 }
 
+// Registers downloadMaestroZip / extractMaestroJars and exposes the extracted maestro-*
+// jars via rootProject.extra["maestroJars"]. See gradle/maestro.gradle.kts.
+apply(from = "gradle/maestro.gradle.kts")
+
 allprojects {
     tasks.withType(Test::class).configureEach {
         testLogging {

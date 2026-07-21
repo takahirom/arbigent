@@ -229,8 +229,12 @@ fun AddFixedScenarioDialog(
                         if (text.isNotBlank()) {
                             yamlError = try {
                                 // Try to parse the YAML to check syntax
+                                // checkSyntax now requires a flow path to resolve relative
+                                // includes; this dialog validates a standalone snippet, so the
+                                // working directory is a sufficient, behavior-preserving base.
                                 MaestroFlowParser.checkSyntax(
-                                    maestroCode = text
+                                    text,
+                                    java.nio.file.Paths.get(".")
                                 )
                                 null
                             } catch (e: Exception) {
@@ -358,8 +362,12 @@ fun EditFixedScenarioDialog(
                         if (text.isNotBlank()) {
                             yamlError = try {
                                 // Try to parse the YAML to check syntax
+                                // checkSyntax now requires a flow path to resolve relative
+                                // includes; this dialog validates a standalone snippet, so the
+                                // working directory is a sufficient, behavior-preserving base.
                                 MaestroFlowParser.checkSyntax(
-                                    maestroCode = text
+                                    text,
+                                    java.nio.file.Paths.get(".")
                                 )
                                 null
                             } catch (e: Exception) {
