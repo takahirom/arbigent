@@ -84,8 +84,11 @@ public class IosRealDriverProducts(
         timeoutMs = xcodebuildTimeoutMs(),
       )
       if (!result.isSuccess) {
+        // xcodebuild echoes the full invocation (including DEVELOPMENT_TEAM=<teamId>) into its
+        // output; redact the team id before persisting so it never lands in cleartext on disk.
+        val masked = IosCodeSigningTeamResolver.maskTeamId(teamId)
         val log = File(cacheDir, "xcodebuild-output.log").apply {
-          writeText(result.stdout + "\n" + result.stderr)
+          writeText((result.stdout + "\n" + result.stderr).replace(teamId, masked))
         }
         throw IllegalStateException(
           "Failed to build the iOS XCTest runner for the connected device. " +
