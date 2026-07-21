@@ -369,4 +369,50 @@ Done when: you can state the root cause (selection, environment, starting state,
 wording, or assertion), not just that the run went red.
 """.trimIndent(),
   ),
+  ArbigentGuideTopic(
+    name = "reproducing-manually",
+    description = "How to get AI-oriented reproduction instructions for a scenario",
+    body = """
+# Reproducing a scenario manually
+
+When you want to reproduce a scenario on a device yourself (instead of letting
+`arbigent run` drive it), print its reproduction instructions:
+
+    arbigent instruction --scenario-ids=open-about-page
+
+This prints Markdown listing, in order, every scenario from the root dependency down
+to the target. Each step has a concrete goal describing what to accomplish on the
+device, plus its initialization (app launch, data cleanup, etc.), any human note, and
+verification checks. Reusable `uses`/`steps` calls are expanded so every step is a
+concrete goal, with `{{inputs.*}}` bindings already resolved.
+
+- Pass multiple ids: `--scenario-ids=first,second` prints one section per id.
+- `--include-app-ui-structure` also prints the project's `appUiStructure` (when set),
+  giving the agent a map of the app before it starts.
+- Bare `{{name}}` placeholders that are not reusable inputs stay unresolved and are
+  listed in a "Variables" section; supply them at runtime with `run --variables`.
+
+Discover ids first with `arbigent scenarios`. For the example scenario below:
+
+    arbigent instruction --scenario-ids=open-about-page --project-file=project.yaml
+
+```yaml
+scenarios:
+- id: "launch-settings"
+  goal: "Open the Settings app and confirm the top screen is shown"
+  initializationMethods:
+  - type: "CleanupData"
+    packageName: "com.android.settings"
+  - type: "LaunchApp"
+    packageName: "com.android.settings"
+- id: "open-about-page"
+  goal: "Scroll down and open the 'About emulated device' page"
+  dependency: "launch-settings"
+  imageAssertions:
+  - assertionPrompt: "The About page is displayed"
+```
+
+Done when: you have an ordered, human-readable step list you can follow on the device.
+""".trimIndent(),
+  ),
 )
