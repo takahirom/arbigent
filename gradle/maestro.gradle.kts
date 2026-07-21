@@ -81,7 +81,13 @@ val downloadMaestroZip = tasks.register("downloadMaestroZip") {
       check(actual == maestroZipSha256) {
         "Maestro zip checksum mismatch for $maestroZipUrl: expected $maestroZipSha256 but got $actual"
       }
-      tmp.copyTo(maestroZipFile, overwrite = true)
+      // Publish atomically: rename is atomic within a filesystem, so a concurrent build never
+      // observes a half-written zip the way an incremental copyTo could expose. tmp lives in
+      // maestroCacheDir alongside the target, so rename succeeds here; fall back to copy+delete
+      // only if it fails (e.g. across filesystems).
+      if (!tmp.renameTo(maestroZipFile)) {
+        tmp.copyTo(maestroZipFile, overwrite = true)
+      }
     } finally {
       tmp.delete()
     }
