@@ -36,7 +36,12 @@ public class ArbigentDevicectlIOSDevice(
       "--device", coreDeviceIdentifier,
       id,
     )
-    launchArguments.values.forEach { command.add(it.toString()) }
+    // devicectl parses `-`-prefixed tokens as its own options wherever they appear (Swift
+    // ArgumentParser), so terminate option parsing with `--` before passing app launch arguments.
+    if (launchArguments.isNotEmpty()) {
+      command.add("--")
+      launchArguments.values.forEach { command.add(it.toString()) }
+    }
     val result = executor.execute(command)
     check(result.isSuccess) {
       "Failed to launch $id on the connected device: ${result.stderr.ifBlank { result.stdout }}"

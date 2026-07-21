@@ -174,6 +174,27 @@ class IosRealDeviceTest {
   }
 
   @Test
+  fun launch_separatesLaunchArgumentsWithDoubleDash() {
+    val executor = FakeExecutor()
+    val controller = ArbigentDevicectlIOSDevice(
+      coreDeviceIdentifier = "CORE-ID-1",
+      executor = executor,
+      delegate = NoopIOSDevice(),
+    )
+    // A `-`-prefixed arg must not be consumed by devicectl as one of its own options.
+    controller.launch("com.example", linkedMapOf("-cartColor" to "Orange", "count" to 3))
+    val cmd = executor.commands.single()
+    assertEquals(
+      listOf(
+        "xcrun", "devicectl", "device", "process", "launch",
+        "--terminate-existing", "--device", "CORE-ID-1", "com.example",
+        "--", "Orange", "3",
+      ),
+      cmd,
+    )
+  }
+
+  @Test
   fun launch_failsWithMessageOnNonZeroExit() {
     val executor = FakeExecutor(
       responses = mapOf("xcrun devicectl" to ArbigentCommandResult(1, "", "no such device")),
