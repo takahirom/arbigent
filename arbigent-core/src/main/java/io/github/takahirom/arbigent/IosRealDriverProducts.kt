@@ -14,8 +14,8 @@ import java.util.Properties
  * Builds and caches the XCTest runner for a physical iPhone, re-signed with the user's Apple team.
  *
  * The runner Xcode project + Swift sources ship as a classpath resource under
- * [DRIVER_SOURCE_RESOURCE] (extracted from the pinned maestro-cli jar at build time). We mirror
- * maestro-cli's `DriverBuilder`: copy the source to a temp dir and run
+ * [DRIVER_SOURCE_RESOURCE] (extracted from the pinned Maestro source archive at build time). We
+ * mirror maestro-cli's `DriverBuilder`: copy the source to a temp dir and run
  * `xcodebuild clean build-for-testing` with `DEVELOPMENT_TEAM` and `CODE_SIGN_IDENTITY`. Products
  * land in `<cache>/Build/Products`, which is what [xcuitest.installer.LocalXCTestInstaller] consumes
  * as `sourceDirectory` for `IOSDeviceType.REAL`.
@@ -68,21 +68,16 @@ public class IosRealDriverProducts(
       check(Files.exists(project)) {
         "Bundled iOS driver source is missing maestro-driver-ios.xcodeproj at $project"
       }
-      val result = executor.execute(
-        listOf(
-          "xcodebuild",
-          "clean",
-          "build-for-testing",
-          "-project", project.toString(),
-          "-scheme", "maestro-driver-ios",
-          "-destination", "platform=iOS,id=$deviceUdid",
-          "-allowProvisioningUpdates",
-          "-derivedDataPath", cacheDir.absolutePath,
-          "DEVELOPMENT_TEAM=$teamId",
-          "CODE_SIGN_IDENTITY=Apple Development",
-        ),
-        timeoutMs = xcodebuildTimeoutMs(),
-      )
+
+      // `-allowProvisioningUpdates` creates a fresh provisioning profile on first run, but the
+      // build description is sometimes computed before the profile lands on disk ("Build input
+      // file cannot be found: …/<uuid>.mobileprovision"). The profile exists by the time the run
+      // fails, so a single clean rebuild picks it up. Retry once on that transient race.
+      var result = runXcodebuild(project, cacheDir)
+      if (!result.isSuccess && isTransientProvisioningFailure(result)) {
+        arbigentInfoLog("iOS real device: transient provisioning race on first build; retrying once")
+        result = runXcodebuild(project, cacheDir)
+      }
       if (!result.isSuccess) {
         // xcodebuild echoes the full invocation (including DEVELOPMENT_TEAM=<teamId>) into its
         // output; redact the team id before persisting so it never lands in cleartext on disk.
@@ -105,6 +100,23 @@ public class IosRealDriverProducts(
       sourceDir.toFile().deleteRecursively()
     }
   }
+
+  private fun runXcodebuild(project: java.nio.file.Path, cacheDir: File): ArbigentCommandResult =
+    executor.execute(
+      listOf(
+        "xcodebuild",
+        "clean",
+        "build-for-testing",
+        "-project", project.toString(),
+        "-scheme", "maestro-driver-ios",
+        "-destination", "platform=iOS,id=$deviceUdid",
+        "-allowProvisioningUpdates",
+        "-derivedDataPath", cacheDir.absolutePath,
+        "DEVELOPMENT_TEAM=$teamId",
+        "CODE_SIGN_IDENTITY=Apple Development",
+      ),
+      timeoutMs = xcodebuildTimeoutMs(),
+    )
 
   private fun writeMarker(cacheDir: File) {
     val props = Properties()
@@ -150,6 +162,14 @@ public class IosRealDriverProducts(
     return digest.take(8).joinToString("") { "%02x".format(it) }
   }
 
+  // First-run `-allowProvisioningUpdates` races: a just-created provisioning profile the build
+  // description referenced before it was written to disk. Re-running finds the now-present profile.
+  private fun isTransientProvisioningFailure(result: ArbigentCommandResult): Boolean {
+    val text = result.stdout + result.stderr
+    return text.contains(".mobileprovision") &&
+      (text.contains("Build input file cannot be found") || text.contains("No profiles for"))
+  }
+
   private fun xcodebuildTimeoutMs(): Long {
     val seconds = System.getenv("MAESTRO_XCODEBUILD_WAIT_TIME")?.trim()?.toLongOrNull()
       ?: DEFAULT_XCODEBUILD_WAIT_SECONDS
@@ -157,7 +177,7 @@ public class IosRealDriverProducts(
   }
 
   public companion object {
-    public const val DRIVER_SOURCE_RESOURCE: String = "ios-real-driver/driver/ios"
+    public const val DRIVER_SOURCE_RESOURCE: String = "ios-real-driver/runner"
     private const val MARKER_FILE = "arbigent-driver.properties"
 
     // First builds (clean + provisioning) routinely exceed maestro's 120s default; give xcodebuild
