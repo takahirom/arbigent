@@ -41,15 +41,18 @@ public fun fetchAvailableDevicesByOs(
   }
 }
 
-// LocalSimulatorUtils is now a class taking a TempFileHandler instead of an object.
+// LocalSimulatorUtils is now a class taking a TempFileHandler instead of an object. TempFileHandler
+// is Closeable and we own this instance, so scope it with use {} to clean up any temp files.
 private fun fetchBootedIosSimulators(): List<ArbigentAvailableDevice.IOS> =
-  LocalSimulatorUtils(TempFileHandler()).list()
-    .devices
-    .flatMap { runtime ->
-      runtime.value
-        .filter { it.isAvailable && it.state == "Booted" }
-    }
-    .map { ArbigentAvailableDevice.IOS(it) }
+  TempFileHandler().use { tempFileHandler ->
+    LocalSimulatorUtils(tempFileHandler).list()
+      .devices
+      .flatMap { runtime ->
+        runtime.value
+          .filter { it.isAvailable && it.state == "Booted" }
+      }
+      .map { ArbigentAvailableDevice.IOS(it) }
+  }
 
 /**
  * Lists physical iPhones reachable over CoreDevice (`xcrun devicectl`), filtered to the ones with a
