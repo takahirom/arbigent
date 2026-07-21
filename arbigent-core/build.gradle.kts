@@ -42,6 +42,9 @@ dependencies {
   // pinned Maestro CLI (maestro/lib/) since those jars carry no POM. Only what arbigent needs
   // to compile and run is declared; Gradle resolves the rest (netty, guava, jackson-core,
   // truffle, ...) transitively.
+  // The mixed grpc versions below (grpc-api/stub 1.57.2, grpc-core/netty/okhttp/protobuf
+  // 1.50.2) intentionally mirror what the Maestro CLI zip itself bundles; do NOT bump them
+  // to a single version or the runtime classpath diverges from the one Maestro was built against.
   api("dev.mobile:dadb:2.0.0")
   api("io.grpc:grpc-stub:1.57.2")
   implementation("io.grpc:grpc-kotlin-stub:1.4.1")
