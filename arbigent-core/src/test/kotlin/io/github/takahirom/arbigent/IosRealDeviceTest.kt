@@ -23,41 +23,47 @@ class IosRealDeviceTest {
 
   // --- Team resolution -------------------------------------------------------------------
 
+  // openssl `-nameopt multiline` subject dump. The team id is the OU, NOT the CN parenthetical
+  // (which is the individual/user id — xcodebuild rejects it as an unknown team).
+  private fun subject(teamOu: String, userId: String) = """
+    subject=
+        countryName               = US
+        organizationName          = Jane Doe
+        organizationalUnitName    = $teamOu
+        commonName                = Apple Development: Jane Doe ($userId)
+  """.trimIndent()
+
   @Test
-  fun autoDetect_singleAppleDevelopmentIdentity_returnsTeamId() {
-    val output = """
-      Policy: Code Signing
-        Matching identities
-        1) A1B2C3D4 "Apple Development: Jane Doe (ABCDE12345)"
-           1 valid identities found
-    """.trimIndent()
-    assertEquals("ABCDE12345", IosCodeSigningTeamResolver.autoDetect(output))
+  fun teamIdFromSubjects_returnsOuNotCommonNameParenthetical() {
+    // OU (team) differs from the CN parenthetical (user id); we must return the OU.
+    assertEquals("84ABCDE123", IosCodeSigningTeamResolver.teamIdFromSubjects(listOf(subject("84ABCDE123", "TNWZJXLBJF"))))
   }
 
   @Test
-  fun autoDetect_noIdentity_throwsActionableError() {
+  fun teamIdFromSubjects_noTeam_throwsActionableError() {
     val e = assertFailsWith<IllegalStateException> {
-      IosCodeSigningTeamResolver.autoDetect("  0 valid identities found")
+      IosCodeSigningTeamResolver.teamIdFromSubjects(emptyList())
     }
     assertTrue(e.message!!.contains(ArbigentIosRealDeviceSettings.ENV_APPLE_TEAM_ID))
   }
 
   @Test
-  fun autoDetect_multipleTeams_throws() {
-    val output = """
-      1) AAAA "Apple Development: A (TEAM111111)"
-      2) BBBB "Apple Development: B (TEAM222222)"
-    """.trimIndent()
-    assertFailsWith<IllegalStateException> { IosCodeSigningTeamResolver.autoDetect(output) }
+  fun teamIdFromSubjects_multipleTeams_throws() {
+    assertFailsWith<IllegalStateException> {
+      IosCodeSigningTeamResolver.teamIdFromSubjects(
+        listOf(subject("84ABCDE123", "U000000001"), subject("99ZZZZZ000", "U000000002"))
+      )
+    }
   }
 
   @Test
-  fun autoDetect_sameTeamTwice_isSingle() {
-    val output = """
-      1) AAAA "Apple Development: A (TEAM111111)"
-      2) BBBB "Apple Development: A2 (TEAM111111)"
-    """.trimIndent()
-    assertEquals("TEAM111111", IosCodeSigningTeamResolver.autoDetect(output))
+  fun teamIdFromSubjects_sameTeamTwice_isSingle() {
+    assertEquals(
+      "84ABCDE123",
+      IosCodeSigningTeamResolver.teamIdFromSubjects(
+        listOf(subject("84ABCDE123", "U000000001"), subject("84ABCDE123", "U000000002"))
+      ),
+    )
   }
 
   @Test
