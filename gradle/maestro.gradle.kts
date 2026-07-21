@@ -239,42 +239,62 @@ extra["maestroVersion"] = maestroVersion
 // --- iOS real-device driver source ------------------------------------------------------
 //
 // Building the XCTest runner for a physical iPhone requires re-signing it with the user's
-// Apple team (maestro's mobile-dev signature is useless off their machines). maestro does
-// this in its `maestro-cli` module (DriverBuilder), which arbigent does not depend on, but
-// the runner's Xcode project + Swift sources ship as the `driver/ios/**` resource inside
-// `maestro/lib/maestro-cli-<version>.jar` within the same pinned zip. We extract that source
-// so arbigent-core can package it and run its own `xcodebuild build-for-testing` at runtime.
-val maestroCliJarEntry = "maestro/lib/maestro-cli-$maestroVersion.jar"
-val maestroCliJarDir: File = maestroCacheDir.resolve("cli-jar")
+// Apple team (maestro's mobile-dev signature is useless off their machines). maestro does this
+// in its `maestro-cli` module (DriverBuilder), which arbigent does not depend on. We therefore
+// build the runner ourselves, from the COMPLETE runner Xcode project in the pinned source
+// archive (`maestro-ios-xctest-runner/`). Note: the `driver/ios` copy bundled inside
+// maestro-cli-<version>.jar is incomplete — it omits the MaestroDriverLib sub-project its own
+// xcodeproj references — so the source archive, not that jar resource, is the source of truth.
+val maestroSourceSha256 = "6ff65eba63ec4910df59ddb1007044f964753c3b4a66464447c6676594809c0b"
+val maestroSourceUrl =
+  "https://github.com/mobile-dev-inc/Maestro/archive/refs/tags/cli-$maestroVersion.tar.gz"
+val maestroSourceTar: File = maestroCacheDir.resolve("maestro-source.tar.gz")
 val maestroDriverSourceDir: File = maestroCacheDir.resolve("ios-driver-source")
+// Path prefix inside the GitHub source tarball (repo name + tag) that wraps every entry.
+val maestroSourceRootPrefix = "Maestro-cli-$maestroVersion"
 
-val extractMaestroCliJar = tasks.register<Copy>("extractMaestroCliJar") {
-  description = "Extract the maestro-cli jar (carrier of the iOS driver source) from the pinned zip."
+val downloadMaestroSource = tasks.register("downloadMaestroSource") {
+  description = "Download the pinned Maestro source archive (carrier of the iOS runner Xcode project)."
   group = "maestro"
-  dependsOn(downloadMaestroZip)
-  from(zipTree(maestroZipFile)) {
-    include(maestroCliJarEntry)
-    eachFile { path = name } // flatten maestro/lib/<jar> -> <jar>
+  outputs.file(maestroSourceTar)
+  outputs.upToDateWhen { maestroSourceTar.exists() && sha256(maestroSourceTar) == maestroSourceSha256 }
+  doLast {
+    maestroCacheDir.mkdirs()
+    if (maestroSourceTar.exists() && sha256(maestroSourceTar) == maestroSourceSha256) return@doLast
+    logger.lifecycle("Downloading Maestro source $maestroVersion from $maestroSourceUrl")
+    val tmp = File.createTempFile("maestro-source", ".tar.gz", maestroCacheDir)
+    try {
+      uri(maestroSourceUrl).toURL().openStream().use { input ->
+        tmp.outputStream().use { output -> input.copyTo(output) }
+      }
+      val actual = sha256(tmp)
+      check(actual == maestroSourceSha256) {
+        "Maestro source checksum mismatch for $maestroSourceUrl: expected $maestroSourceSha256 but got $actual"
+      }
+      tmp.copyTo(maestroSourceTar, overwrite = true)
+    } finally {
+      tmp.delete()
+    }
   }
-  includeEmptyDirs = false
-  into(maestroCliJarDir)
 }
 
 val extractMaestroIosDriverSource = tasks.register<Copy>("extractMaestroIosDriverSource") {
-  description = "Extract the iOS XCTest runner source (driver/ios) used to build a signed real-device runner."
+  description = "Extract the complete iOS XCTest runner Xcode project used to build a signed real-device runner."
   group = "maestro"
-  dependsOn(extractMaestroCliJar)
-  from(zipTree(maestroCliJarDir.resolve("maestro-cli-$maestroVersion.jar"))) {
-    include("driver/ios/**")
+  dependsOn(downloadMaestroSource)
+  from(tarTree(resources.gzip(maestroSourceTar))) {
+    include("$maestroSourceRootPrefix/maestro-ios-xctest-runner/**")
+    // Strip the "<root>/maestro-ios-xctest-runner/" prefix so maestro-driver-ios.xcodeproj sits
+    // at the top of the extracted tree.
+    eachFile { relativePath = RelativePath(true, *relativePath.segments.drop(2).toTypedArray()) }
   }
   includeEmptyDirs = false
   into(maestroDriverSourceDir)
 }
 
-// Packaged into arbigent-core resources under ios-real-driver/driver/ios/**; the runtime
-// runner builder copies it out and runs xcodebuild against maestro-driver-ios.xcodeproj.
+// Packaged into arbigent-core resources under ios-real-driver/runner/**; the runtime runner
+// builder copies it out and runs xcodebuild against maestro-driver-ios.xcodeproj.
 val maestroIosDriverSource: FileCollection = fileTree(maestroDriverSourceDir) {
-  include("driver/ios/**")
   builtBy(extractMaestroIosDriverSource)
 }
 extra["maestroIosDriverSource"] = maestroIosDriverSource

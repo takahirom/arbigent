@@ -42,11 +42,11 @@ val maestroJars = rootProject.extra["maestroJars"] as FileCollection
 val maestroIosDriverSource = rootProject.extra["maestroIosDriverSource"] as FileCollection
 
 tasks.named<ProcessResources>("processResources") {
-  // Final resource layout: ios-real-driver/driver/ios/** (the fileTree preserves the
-  // driver/ios/** relative paths). The FileCollection's builtBy carries the extraction task
-  // dependency so the source is materialized before packaging.
+  // Final resource layout: ios-real-driver/runner/** (maestro-driver-ios.xcodeproj + sources at
+  // the top). The FileCollection's builtBy carries the extraction task dependency so the source
+  // is materialized before packaging.
   from(maestroIosDriverSource) {
-    into("ios-real-driver")
+    into("ios-real-driver/runner")
   }
 }
 
