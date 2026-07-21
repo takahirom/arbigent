@@ -41,8 +41,12 @@ public sealed interface ArbigentAvailableDevice {
       // Maestro's AndroidDeviceConnection refactor (#3372) made AndroidDriver take an
       // AndroidDeviceConnection instead of a raw Dadb. byId() selects the same device by
       // serial that Dadb.list() gave us, so this keeps behavior identical.
-      val connection = AndroidDeviceConnection.byId(dadb.toString())
-        ?: throw RuntimeException("Arbigent could not open an AndroidDeviceConnection for device: $dadb")
+      val serial = dadb.toString()
+      // AndroidDriver/Maestro opens and manages its own connection via byId(serial), so the
+      // Dadb we were handed from Dadb.list() is no longer needed once we have the serial.
+      dadb.close()
+      val connection = AndroidDeviceConnection.byId(serial)
+        ?: throw RuntimeException("Arbigent could not open an AndroidDeviceConnection for device: $serial")
       val driver = AndroidDriver(
         connection,
       )
@@ -52,11 +56,9 @@ public sealed interface ArbigentAvailableDevice {
         )
       } catch (e: java.util.concurrent.TimeoutException) {
         driver.close()
-        dadb.close()
         throw RuntimeException("Arbigent can not connect to device in time. The likely reason why we can't connect is that you have multiple instance of Arbigent like UI and CLI of Arbigent", e)
       } catch (e: Exception) {
         driver.close()
-        dadb.close()
         throw e
       }
       return MaestroDevice(maestro, availableDevice = this)
