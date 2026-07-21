@@ -1,5 +1,19 @@
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import java.io.File
 import java.security.MessageDigest
+
+// Shadow (gradleup fork) provides the ShadowJar task type used below to relocate ktor
+// inside maestro-web. It works on arbitrary jar/config inputs, so no project sources are shaded.
+buildscript {
+  repositories {
+    mavenCentral()
+    gradlePluginPortal()
+  }
+  dependencies {
+    classpath("com.gradleup.shadow:shadow-gradle-plugin:8.3.6")
+  }
+}
 
 // Single source of truth for the pinned Maestro release consumed by arbigent.
 //
@@ -32,6 +46,9 @@ val maestroJarEntries = listOf(
 val maestroCacheDir: File = gradle.gradleUserHomeDir.resolve("caches/arbigent-maestro/$maestroVersion")
 val maestroZipFile: File = maestroCacheDir.resolve("maestro.zip")
 val maestroJarsDir: File = maestroCacheDir.resolve("jars")
+// Shaded maestro-web lives outside maestroJarsDir so the maestroJars fileTree doesn't pick up
+// the plain jar; only the shaded one reaches the classpath.
+val maestroShadedDir: File = maestroCacheDir.resolve("shaded")
 
 fun sha256(file: File): String {
   val digest = MessageDigest.getInstance("SHA-256")
@@ -86,13 +103,54 @@ val extractMaestroJars = tasks.register<Copy>("extractMaestroJars") {
   into(maestroJarsDir)
 }
 
+// maestro-web.jar's CdpClient is compiled against ktor 2.3.13, but arbigent-mcp-client pulls
+// the MCP kotlin-sdk which requires ktor 3.x, so Gradle bumps ktor to 3.x on the shared
+// classpath. ktor 3 dropped io.ktor.client.plugins.contentnegotiation.ContentNegotiation (and
+// more), so maestro-web hits NoClassDefFoundError at runtime. maestro-client's CdpWebDriver
+// touches no ktor type across the boundary (it only calls maestro.web.* ), so relocating ktor
+// *inside* maestro-web is safe: we bundle the matching ktor 2.3.13 classes under a private
+// package and rewrite maestro-web's references to point at them, leaving the rest of arbigent
+// on ktor 3.x. Nothing else in the maestro jars references ktor except maestro-ai, which
+// arbigent never loads.
+val maestroWebKtor2: Configuration = configurations.detachedConfiguration(
+  dependencies.create("io.ktor:ktor-client-core:2.3.13"),
+  dependencies.create("io.ktor:ktor-client-cio:2.3.13"),
+  dependencies.create("io.ktor:ktor-client-content-negotiation:2.3.13"),
+  dependencies.create("io.ktor:ktor-client-websockets:2.3.13"),
+  dependencies.create("io.ktor:ktor-serialization-kotlinx-json:2.3.13"),
+)
+
+// Only the io.ktor artifacts from the resolved graph get shaded in; kotlinx/kotlin/slf4j stay
+// as ordinary (unrelocated) classpath deps supplied by arbigent so we don't ship duplicates.
+val maestroWebKtor2Jars: FileCollection = maestroWebKtor2.incoming.artifactView {
+  componentFilter { it is ModuleComponentIdentifier && it.group == "io.ktor" }
+}.files
+
+val shadeMaestroWeb = tasks.register<ShadowJar>("shadeMaestroWeb") {
+  description = "Relocate ktor 2.3.13 inside maestro-web to avoid clashing with arbigent's ktor 3.x."
+  group = "maestro"
+  dependsOn(extractMaestroJars)
+  from(zipTree(maestroJarsDir.resolve("maestro-web.jar")))
+  from({ maestroWebKtor2Jars.map { zipTree(it) } })
+  relocate("io.ktor", "arbigent.shaded.io.ktor")
+  mergeServiceFiles() // ktor engines register via META-INF/services; merge + relocate their entries
+  exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA", "**/module-info.class")
+  duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+  archiveFileName.set("maestro-web-shaded.jar")
+  destinationDirectory.set(maestroShadedDir)
+}
+
 // Individual jars (not the directory) so they land on the compile/runtime classpath as
 // libraries. builtBy carries the extraction task dependency to any consumer that uses this
-// collection as a dependency.
-val maestroJars: FileCollection = fileTree(maestroJarsDir) {
-  include("*.jar")
-  builtBy(extractMaestroJars)
-}
+// collection as a dependency. The plain maestro-web.jar is excluded in favour of the shaded one.
+val maestroJars: FileCollection = files(
+  fileTree(maestroJarsDir) {
+    include("*.jar")
+    exclude("maestro-web.jar")
+    builtBy(extractMaestroJars)
+  },
+  shadeMaestroWeb,
+)
 
 // Consumed by modules via rootProject.extra: dependencies { api(rootMaestroJars()) }.
 extra["maestroJars"] = maestroJars
