@@ -204,6 +204,25 @@ class IosRealDeviceTest {
     assertTrue(e.message!!.contains("no such device"))
   }
 
+  @Test
+  fun install_rejectsZipSlipEntry() {
+    val executor = FakeExecutor()
+    val controller = ArbigentDevicectlIOSDevice("CORE-ID-1", executor, NoopIOSDevice())
+    // An archive entry that resolves outside the extraction dir must be rejected, not written.
+    val malicious = java.io.ByteArrayOutputStream().also { bytes ->
+      java.util.zip.ZipOutputStream(bytes).use { zip ->
+        zip.putNextEntry(java.util.zip.ZipEntry("../arbigent-zip-slip-escape.txt"))
+        zip.write("pwned".toByteArray())
+        zip.closeEntry()
+      }
+    }.toByteArray()
+    val e = assertFailsWith<IllegalStateException> {
+      controller.install(java.io.ByteArrayInputStream(malicious))
+    }
+    assertTrue(e.message!!.contains("escapes target directory"))
+    assertTrue(executor.commands.isEmpty(), "install must not run devicectl for a rejected archive")
+  }
+
   /** Minimal IOSDevice delegate so the controller can be built without maestro's stub. */
   private class NoopIOSDevice : IOSDevice {
     override val deviceId: String get() = "noop"
