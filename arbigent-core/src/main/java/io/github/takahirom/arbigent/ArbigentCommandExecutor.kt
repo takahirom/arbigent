@@ -26,26 +26,65 @@ public class DefaultArbigentCommandExecutor : ArbigentCommandExecutor {
     val process = ProcessBuilder(command)
       .redirectErrorStream(false)
       .start()
-    // Drain both streams concurrently so a chatty tool can't deadlock on a full pipe buffer.
+    // Drain both streams concurrently so a chatty tool can't deadlock on a full pipe buffer. Daemon
+    // threads so a reader stuck on a pipe inherited by a surviving descendant can never keep the JVM
+    // alive. Appends/reads on each StringBuilder are guarded so the final read is safe even if a
+    // reader has not finished.
     val stdout = StringBuilder()
     val stderr = StringBuilder()
-    val outThread = Thread { process.inputStream.bufferedReader().forEachLine { stdout.appendLine(it) } }
-    val errThread = Thread { process.errorStream.bufferedReader().forEachLine { stderr.appendLine(it) } }
+    val outThread = drainThread("arbigent-cmd-stdout", process.inputStream, stdout)
+    val errThread = drainThread("arbigent-cmd-stderr", process.errorStream, stderr)
     outThread.start()
     errThread.start()
-    val finished = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
-    if (!finished) {
-      process.destroyForcibly()
-      outThread.join(1_000)
-      errThread.join(1_000)
-      return ArbigentCommandResult(
-        exitCode = -1,
-        stdout = stdout.toString(),
-        stderr = stderr.toString() + "\nCommand timed out after ${timeoutMs}ms: ${command.joinToString(" ")}",
-      )
+
+    var timedOut = false
+    try {
+      timedOut = !process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
+    } finally {
+      // Guaranteed cleanup: kill the whole process tree, wait for it to actually die, and join the
+      // drain threads — closing the pipes to unblock them if they are still stuck.
+      if (timedOut) destroyTree(process)
+      if (!process.waitFor(5, TimeUnit.SECONDS)) destroyTree(process)
+      joinQuietly(outThread, 2_000)
+      joinQuietly(errThread, 2_000)
+      if (outThread.isAlive || errThread.isAlive) {
+        runCatching { process.inputStream.close() }
+        runCatching { process.errorStream.close() }
+        joinQuietly(outThread, 1_000)
+        joinQuietly(errThread, 1_000)
+      }
     }
-    outThread.join(1_000)
-    errThread.join(1_000)
-    return ArbigentCommandResult(process.exitValue(), stdout.toString(), stderr.toString())
+
+    val out = synchronized(stdout) { stdout.toString() }
+    val err = synchronized(stderr) { stderr.toString() }
+    return if (timedOut) {
+      ArbigentCommandResult(
+        exitCode = -1,
+        stdout = out,
+        stderr = err + "\nCommand timed out after ${timeoutMs}ms: ${command.joinToString(" ")}",
+      )
+    } else {
+      ArbigentCommandResult(process.exitValue(), out, err)
+    }
+  }
+
+  private fun drainThread(name: String, stream: java.io.InputStream, sink: StringBuilder): Thread =
+    Thread {
+      runCatching {
+        stream.bufferedReader().forEachLine { line -> synchronized(sink) { sink.appendLine(line) } }
+      }
+    }.apply { isDaemon = true; this.name = name }
+
+  private fun destroyTree(process: Process) {
+    runCatching { process.descendants().forEach { it.destroyForcibly() } }
+    process.destroyForcibly()
+  }
+
+  private fun joinQuietly(thread: Thread, millis: Long) {
+    try {
+      thread.join(millis)
+    } catch (e: InterruptedException) {
+      Thread.currentThread().interrupt()
+    }
   }
 }
