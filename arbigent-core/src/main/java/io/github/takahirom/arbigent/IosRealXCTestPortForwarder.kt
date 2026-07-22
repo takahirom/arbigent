@@ -1,6 +1,9 @@
 package io.github.takahirom.arbigent
 
 import java.io.File
+import java.io.RandomAccessFile
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.concurrent.TimeUnit
 
 /**
@@ -23,9 +26,25 @@ public class IosRealXCTestPortForwarder(
 ) : AutoCloseable {
   private var process: Process? = null
   private var shutdownHook: Thread? = null
+  // The record this instance published, so close() only deletes the shared pidfile while it still
+  // names us (never a record a newer instance rewrote in our place).
+  @Volatile private var ownershipRecord: IproxyOwnershipRecord? = null
 
   private val ownershipRecordFile: File
     get() = File(File(System.getProperty("user.home"), ".arbigent/iproxy-locks"), "port-$port.pid")
+
+  // Sibling lock file guarding every read/write/delete of the shared per-port pidfile, so
+  // concurrent arbigent runs racing the same port can't clobber or half-observe each other's
+  // record. The lock file itself is never a payload, so creating it is harmless.
+  private val ownershipLockFile: File
+    get() = File(ownershipRecordFile.parentFile, "port-$port.pid.lock")
+
+  private fun <T> withOwnershipLock(block: () -> T): T {
+    val lock = ownershipLockFile.apply { parentFile?.mkdirs() }
+    return RandomAccessFile(lock, "rw").use { raf ->
+      raf.channel.lock().use { block() }
+    }
+  }
 
   public fun start() {
     ensureIproxyInstalled()
@@ -73,7 +92,20 @@ public class IosRealXCTestPortForwarder(
       runCatching { Runtime.getRuntime().removeShutdownHook(it) }
     }
     shutdownHook = null
-    runCatching { ownershipRecordFile.delete() }
+    deleteOwnershipRecordIfOurs()
+    ownershipRecord = null
+  }
+
+  // Delete the shared pidfile only if it still names the record we wrote. If start() failed before
+  // publishing (ownershipRecord null) or a newer instance already rewrote it, we leave it intact so
+  // a live forwarder never appears unowned.
+  private fun deleteOwnershipRecordIfOurs() {
+    val ours = ownershipRecord ?: return
+    withOwnershipLock {
+      if (readOwnershipRecord() == ours) {
+        runCatching { ownershipRecordFile.delete() }
+      }
+    }
   }
 
   private fun ensureIproxyInstalled() {
@@ -95,21 +127,30 @@ public class IosRealXCTestPortForwarder(
         executor.execute(listOf("ps", "-p", pid, "-o", "comm=")).stdout.trim()
       },
     )
-    val decision = reapDecision(
-      port = port,
-      listeningIproxyPids = listening,
-      record = readOwnershipRecord(),
-      isOwnerAlive = ::isProcessAlive,
-      iproxyStartOf = { pid -> processStartMillis(pid) },
-    )
-    when (decision) {
-      is ReapDecision.Fail -> throw IllegalStateException("iOS real device: ${decision.reason}")
-      is ReapDecision.Reap -> {
-        decision.pids.forEach { pid ->
-          arbigentInfoLog("iOS real device: reaping orphaned iproxy (pid $pid) from a crashed run holding port $port")
-          executor.execute(listOf("kill", "-9", pid))
+    // Read the record, decide, and clear it all under the lock so a concurrent instance can't
+    // publish a fresh record between our decision and our delete (which would clobber it).
+    withOwnershipLock {
+      val record = readOwnershipRecord()
+      val decision = reapDecision(
+        port = port,
+        listeningIproxyPids = listening,
+        record = record,
+        isOwnerAlive = ::isProcessAlive,
+        iproxyStartOf = { pid -> processStartMillis(pid) },
+      )
+      when (decision) {
+        is ReapDecision.Fail -> throw IllegalStateException("iOS real device: ${decision.reason}")
+        is ReapDecision.Reap -> {
+          decision.pids.forEach { pid ->
+            arbigentInfoLog("iOS real device: reaping orphaned iproxy (pid $pid) from a crashed run holding port $port")
+            executor.execute(listOf("kill", "-9", pid))
+          }
+          // Only clear the record we just validated as belonging to a dead owner; if another
+          // instance rewrote it meanwhile it no longer matches and we leave it alone.
+          if (decision.pids.isNotEmpty() && readOwnershipRecord() == record) {
+            runCatching { ownershipRecordFile.delete() }
+          }
         }
-        if (decision.pids.isNotEmpty()) runCatching { ownershipRecordFile.delete() }
       }
     }
   }
@@ -122,7 +163,22 @@ public class IosRealXCTestPortForwarder(
       ownerPid = self.pid(),
       ownerStart = self.info().startInstant().map { it.toEpochMilli() }.orElse(0L),
     )
-    ownershipRecordFile.apply { parentFile?.mkdirs() }.writeText(record.serialize())
+    // Publish atomically under the lock: write a sibling temp then rename into place, so a reader
+    // never sees a half-written record and a concurrent writer can't interleave with ours.
+    withOwnershipLock {
+      val dir = ownershipRecordFile.parentFile.apply { mkdirs() }
+      val tmp = File.createTempFile("port-$port", ".pid", dir)
+      try {
+        tmp.writeText(record.serialize())
+        Files.move(
+          tmp.toPath(), ownershipRecordFile.toPath(),
+          StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE,
+        )
+      } finally {
+        tmp.delete()
+      }
+    }
+    ownershipRecord = record
   }
 
   private fun readOwnershipRecord(): IproxyOwnershipRecord? =
