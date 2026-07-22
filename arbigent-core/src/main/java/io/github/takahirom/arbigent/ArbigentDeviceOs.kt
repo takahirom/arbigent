@@ -33,10 +33,19 @@ public sealed interface ArbigentAvailableDevice {
   public val deviceOs: ArbigentDeviceOs
   public val name: String
 
+  // Stable, full identity for INTERNAL use only (UI selection reconciliation, dropdown keying).
+  // It carries the full device identifier (hardware UDID / adb serial) and is never displayed, so
+  // the masking rules that apply to shown strings (see [IosReal.maskedUdid]) do not apply here.
+  // Names alone collide (two iPhones of the same model, a simulator and a phone), so keying by
+  // name would re-point a selection at the wrong device after a rediscovery.
+  public val stableKey: String
+
   // Do not use data class because dadb return true for equals
   public class Android(private val dadb: Dadb) : ArbigentAvailableDevice {
     override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Android
     override val name: String = dadb.toString()
+    // The adb serial (dadb.toString()) already uniquely identifies the device.
+    override val stableKey: String get() = "android:$name"
     override fun connectToDevice(): ArbigentDevice {
       // Maestro's AndroidDeviceConnection refactor (#3372) made AndroidDriver take an
       // AndroidDeviceConnection instead of a raw Dadb. byId() selects the same device by
@@ -73,6 +82,8 @@ public sealed interface ArbigentAvailableDevice {
   ) : ArbigentAvailableDevice {
     override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Ios
     override val name: String = device.name
+    // Simulator UDID uniquely identifies the device even when models share a name.
+    override val stableKey: String get() = "iossimulator:${device.udid}"
     override fun connectToDevice(): ArbigentDevice {
       val port = port
       val host = host
@@ -165,6 +176,10 @@ public sealed interface ArbigentAvailableDevice {
   ) : ArbigentAvailableDevice {
     override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Ios
 
+    // Full hardware UDID for internal identity only (never displayed — see the interface doc and
+    // [maskedUdid]); real iPhones share model names so name alone would collide.
+    override val stableKey: String get() = "iosreal:$hardwareUdid"
+
     // First 8 chars of the UDID: enough to point at a device in a message without ever printing the
     // full hardware UDID. When several candidates share this prefix, use [maskedUdidLabels] instead
     // so the shown prefix is extended until unique.
@@ -256,12 +271,13 @@ public sealed interface ArbigentAvailableDevice {
       /**
        * Labels each candidate with the shortest masked UDID prefix that is unique among
        * [candidates], so colliding 8-char prefixes are disambiguated by revealing a few more
-       * characters. The full UDID is never printed: the prefix is capped one character short of the
-       * shortest UDID, and if a collision somehow survives that cap a positional #index is appended
-       * instead of more UDID characters.
+       * characters. The revealed prefix is capped at [MAX_MASKED_UDID_PREFIX] characters (and never
+       * reaches the full UDID); if a collision survives that cap, a positional #index is appended
+       * instead of exposing more of the UDID.
        */
       public fun maskedUdidLabels(candidates: List<IosReal>): List<String> {
-        val maxPrefix = (candidates.minOfOrNull { it.hardwareUdid.length } ?: 1).minus(1).coerceAtLeast(1)
+        val shortest = candidates.minOfOrNull { it.hardwareUdid.length } ?: 1
+        val maxPrefix = minOf(MAX_MASKED_UDID_PREFIX, (shortest - 1).coerceAtLeast(1))
         fun collides(udid: String, length: Int): Boolean =
           candidates.count { it.hardwareUdid.take(length) == udid.take(length) } > 1
         return candidates.mapIndexed { index, candidate ->
@@ -272,12 +288,17 @@ public sealed interface ArbigentAvailableDevice {
           if (collides(udid, length)) "$prefix #${index + 1}" else prefix
         }
       }
+
+      // Cap on how many leading UDID characters a disambiguating label may reveal. Extending further
+      // would expose nearly the whole hardware UDID; past this, fall back to positional #index.
+      private const val MAX_MASKED_UDID_PREFIX = 12
     }
   }
 
   public class Web : ArbigentAvailableDevice {
     override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Web
     override val name: String = "Chrome"
+    override val stableKey: String get() = "web:$name"
     public override fun connectToDevice(): ArbigentDevice {
       return MaestroDevice(
         // Maestro.web() gained a third arg (custom Chrome binary path); null keeps the default.
@@ -290,6 +311,7 @@ public sealed interface ArbigentAvailableDevice {
   public class Fake : ArbigentAvailableDevice {
     override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Android
     override val name: String = "Fake"
+    override val stableKey: String get() = "fake:$name"
     public override fun connectToDevice(): ArbigentDevice {
       // This is not called
       throw UnsupportedOperationException("Fake device is not supported")

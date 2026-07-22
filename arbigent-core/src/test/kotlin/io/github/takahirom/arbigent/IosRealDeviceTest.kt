@@ -252,6 +252,22 @@ class IosRealDeviceTest {
     assertEquals(2, labels.toSet().size, "labels must be distinct")
   }
 
+  @Test
+  fun maskedUdidLabels_capsRevealedPrefixAtTwelveCharsThenUsesIndex() {
+    // UDIDs sharing more than the 12-char cap (identical for the first 13 chars): disambiguation
+    // must NOT reveal a 13th UDID character; it falls back to a positional #index instead.
+    val labels = ArbigentAvailableDevice.IosReal.maskedUdidLabels(
+      listOf(iosReal("SHARED0000000AAAAAAA"), iosReal("SHARED0000000BBBBBBB"))
+    )
+    labels.forEach { label ->
+      assertTrue(
+        label.substringBefore("…").length <= 12,
+        "must not reveal more than 12 UDID characters: $label",
+      )
+    }
+    assertEquals(2, labels.toSet().size, "labels must be distinct")
+  }
+
   // --- provisioning profile validity ----------------------------------------------------
 
   private fun profileXml(expiration: String, devices: List<String>?): String {
