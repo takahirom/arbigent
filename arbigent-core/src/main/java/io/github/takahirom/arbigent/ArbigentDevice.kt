@@ -243,7 +243,7 @@ public class MaestroDevice(
     ArbigentGlobalStatus.onDevice(actions.joinToString { it.toString() }) {
       runBlocking {
         if (screenshot != null) {
-          val file = File(screenshotsDir, "${screenshot.path}.png").apply { parentFile?.mkdirs() }
+          val file = resolveScreenshotFile(screenshotsDir, screenshot.path)
           maestro.takeScreenshot(file.sink(), false)
         } else {
           orchestra.runFlow(actions)
@@ -969,4 +969,24 @@ public fun TreeNode.optimizeTree(
 private fun TreeNode.getIdentifierDataForFocus(): List<Any> {
   val sortedAttributes = (attributes - "bounds" - "focused" - "selected").toSortedMap()
   return listOf(sortedAttributes) + children.map { it.getIdentifierDataForFocus() }
+}
+
+// takeScreenshot paths come from user-authored flows, so they must not escape screenshotsDir.
+// Reject absolute or parent-traversing paths lexically, then canonicalize after creating the
+// parent so a symlinked component that escapes the base is resolved and caught here too.
+internal fun resolveScreenshotFile(screenshotsDir: File, path: String): File {
+  val base = screenshotsDir.canonicalFile
+  val requested = File("$path.png")
+  require(!requested.isAbsolute) {
+    "Screenshot path must be relative to the screenshots directory: $path"
+  }
+  require(requested.invariantSeparatorsPath.split('/').none { it == ".." }) {
+    "Screenshot path must not traverse outside the screenshots directory: $path"
+  }
+  val target = File(base, requested.path).apply { parentFile?.mkdirs() }
+  val canonical = target.canonicalFile
+  require(canonical.toPath().startsWith(base.toPath())) {
+    "Screenshot path escapes the screenshots directory: $path"
+  }
+  return canonical
 }
