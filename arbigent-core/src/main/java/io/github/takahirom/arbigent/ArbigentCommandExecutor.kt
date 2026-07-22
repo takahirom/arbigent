@@ -41,10 +41,19 @@ public class DefaultArbigentCommandExecutor : ArbigentCommandExecutor {
     try {
       timedOut = !process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
     } finally {
-      // Guaranteed cleanup: kill the whole process tree, wait for it to actually die, and join the
-      // drain threads — closing the pipes to unblock them if they are still stuck.
-      if (timedOut) destroyTree(process)
-      if (!process.waitFor(5, TimeUnit.SECONDS)) destroyTree(process)
+      // Guaranteed cleanup within a bounded ~5s budget: kill the whole process tree, then wait for
+      // the process AND its descendants to actually die — re-enumerating descendants once so a child
+      // spawned or reparented during teardown is also awaited — before joining the drain threads
+      // (closing the pipes to unblock any that are still stuck). Anything still alive past the budget
+      // is abandoned deliberately: readers are daemon threads, so we never block the caller
+      // indefinitely on a wedged external tool.
+      val deadline = System.currentTimeMillis() + TEARDOWN_BUDGET_MS
+      var descendants = if (timedOut) destroyTree(process) else emptyList()
+      if (!process.waitFor(remainingMs(deadline), TimeUnit.MILLISECONDS)) {
+        descendants = destroyTree(process)
+      }
+      awaitHandles(descendants, deadline)
+      awaitHandles(runCatching { process.descendants().toList() }.getOrDefault(emptyList()), deadline)
       joinQuietly(outThread, 2_000)
       joinQuietly(errThread, 2_000)
       if (outThread.isAlive || errThread.isAlive) {
@@ -75,10 +84,26 @@ public class DefaultArbigentCommandExecutor : ArbigentCommandExecutor {
       }
     }.apply { isDaemon = true; this.name = name }
 
-  private fun destroyTree(process: Process) {
-    runCatching { process.descendants().forEach { it.destroyForcibly() } }
+  // Snapshot the descendant handles before killing so we can await them afterwards: once the parent
+  // is destroyed its children are reparented and no longer enumerate as its descendants, but the
+  // captured ProcessHandles stay valid for awaiting termination.
+  private fun destroyTree(process: Process): List<ProcessHandle> {
+    val descendants = runCatching { process.descendants().toList() }.getOrDefault(emptyList())
+    descendants.forEach { runCatching { it.destroyForcibly() } }
     process.destroyForcibly()
+    return descendants
   }
+
+  private fun awaitHandles(handles: List<ProcessHandle>, deadline: Long) {
+    handles.forEach { handle ->
+      val timeLeft = remainingMs(deadline)
+      if (timeLeft <= 0L) return
+      runCatching { handle.onExit().get(timeLeft, TimeUnit.MILLISECONDS) }
+    }
+  }
+
+  private fun remainingMs(deadline: Long): Long =
+    (deadline - System.currentTimeMillis()).coerceAtLeast(0L)
 
   private fun joinQuietly(thread: Thread, millis: Long) {
     try {
@@ -86,5 +111,9 @@ public class DefaultArbigentCommandExecutor : ArbigentCommandExecutor {
     } catch (e: InterruptedException) {
       Thread.currentThread().interrupt()
     }
+  }
+
+  private companion object {
+    const val TEARDOWN_BUDGET_MS = 5_000L
   }
 }
