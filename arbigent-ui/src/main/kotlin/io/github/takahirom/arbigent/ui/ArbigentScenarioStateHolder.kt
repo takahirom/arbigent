@@ -4,7 +4,9 @@ import androidx.compose.foundation.text.input.TextFieldState
 import io.github.takahirom.arbigent.*
 import io.github.takahirom.arbigent.coroutines.buildSingleSourceStateFlow
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -20,7 +22,9 @@ class ArbigentScenarioStateHolder
 @OptIn(ExperimentalUuidApi::class)
 constructor(
   id: String = Uuid.random().toString(),
-  private val tagManager: ArbigentTagManager
+  private val tagManager: ArbigentTagManager,
+  // Injected so tests run this holder's flows on a TestDispatcher instead of a process-wide global.
+  dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
   private val _id = MutableStateFlow(id)
   val idStateFlow: StateFlow<String> = _id
@@ -76,7 +80,7 @@ constructor(
   val isNewlyGenerated = MutableStateFlow(false)
 
   private val coroutineScope = CoroutineScope(
-    ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob()
+    dispatcher + SupervisorJob()
   )
   @OptIn(ArbigentInternalApi::class)
   val tags = coroutineScope.buildSingleSourceStateFlow(tagManager.scenarioToTagsStateFlow) {

@@ -25,7 +25,10 @@ class ArbigentAppStateHolder(
     // The UI selects a device explicitly, so list every connected iOS device (simulators and
     // paired iPhones) rather than the CLI's auto-select subset.
     fetchAvailableDevicesByOs(os, includeAllIosDevices = true)
-  }
+  },
+  // Threaded into every holder and scope this owns so tests drive them on a TestDispatcher instead
+  // of mutating a process-wide global.
+  private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
   private val _fixedScenariosFlow = MutableStateFlow<List<FixedScenario>>(emptyList())
   val fixedScenariosFlow: StateFlow<List<FixedScenario>> = _fixedScenariosFlow.asStateFlow()
@@ -243,7 +246,7 @@ class ArbigentAppStateHolder(
   // AppSettings for working directory
   val appSettingsStateHolder = AppSettingsStateHolder()
   val appSettings get() = appSettingsStateHolder.appSettings
-  val devicesStateHolder = DevicesStateHolder(availableDeviceListFactory)
+  val devicesStateHolder = DevicesStateHolder(availableDeviceListFactory, dispatcher)
 
   sealed interface DeviceConnectionState {
     data object NotConnected : DeviceConnectionState
@@ -287,7 +290,7 @@ class ArbigentAppStateHolder(
         result
       }
       .stateIn(
-        scope = CoroutineScope(ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob()),
+        scope = CoroutineScope(dispatcher + SupervisorJob()),
         started = SharingStarted.WhileSubscribed(),
         initialValue = emptyList()
       )
@@ -299,7 +302,7 @@ class ArbigentAppStateHolder(
   val mcpServerNamesFlow: StateFlow<List<String>> = mcpJsonFlow
     .map { json -> parseMcpServerNames(json) }
     .stateIn(
-      scope = CoroutineScope(ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob()),
+      scope = CoroutineScope(dispatcher + SupervisorJob()),
       started = SharingStarted.Eagerly,
       initialValue = emptyList()
     )
@@ -312,7 +315,7 @@ class ArbigentAppStateHolder(
       decisionCacheStrategy.toCache()
     }
     .stateIn(
-      scope = CoroutineScope(ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob()),
+      scope = CoroutineScope(dispatcher + SupervisorJob()),
       started = SharingStarted.Eagerly,
       initialValue = ArbigentAiDecisionCache.Disabled
     )
@@ -321,7 +324,7 @@ class ArbigentAppStateHolder(
 
   val selectedScenarioIndex: MutableStateFlow<Int> = MutableStateFlow(0)
   private val coroutineScope =
-    CoroutineScope(ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob())
+    CoroutineScope(dispatcher + SupervisorJob())
 
   val stepFeedbacks: MutableStateFlow<Set<StepFeedback>> = MutableStateFlow(setOf())
   
@@ -340,7 +343,7 @@ class ArbigentAppStateHolder(
   }
 
   fun addSubScenario(parent: ArbigentScenarioStateHolder) {
-    val scenarioStateHolder = ArbigentScenarioStateHolder(tagManager = tagManager).apply {
+    val scenarioStateHolder = ArbigentScenarioStateHolder(tagManager = tagManager, dispatcher = dispatcher).apply {
       onAddAsSubScenario(parent)
     }
     allScenarioStateHoldersStateFlow.value += scenarioStateHolder
@@ -349,7 +352,7 @@ class ArbigentAppStateHolder(
   }
 
   fun addScenario() {
-    val scenarioStateHolder = ArbigentScenarioStateHolder(tagManager = tagManager)
+    val scenarioStateHolder = ArbigentScenarioStateHolder(tagManager = tagManager, dispatcher = dispatcher)
     allScenarioStateHoldersStateFlow.value += scenarioStateHolder
     selectedScenarioIndex.value =
       sortedScenariosAndDepths().indexOfFirst { it.first.id == scenarioStateHolder.id }
@@ -589,6 +592,7 @@ class ArbigentAppStateHolder(
       ArbigentScenarioStateHolder(
         id = scenarioContent.id,
         tagManager = tagManager,
+        dispatcher = dispatcher,
       ).apply {
         load(scenarioContent)
       }
@@ -765,7 +769,7 @@ class ArbigentAppStateHolder(
     )
     allScenarioStateHoldersStateFlow.value.forEach { it.cancel() }
     val scenarios = allScenarioStateHoldersStateFlow.value + generatedScenarios.scenarios.map {
-      ArbigentScenarioStateHolder(tagManager = tagManager).apply {
+      ArbigentScenarioStateHolder(tagManager = tagManager, dispatcher = dispatcher).apply {
         load(it)
         isNewlyGenerated.value = true
       }

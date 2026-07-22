@@ -11,13 +11,14 @@ class ArbigentScenarioContentExecutorTest {
   @OptIn(ExperimentalStdlibApi::class)
   @Test
   fun tests() = runTest {
-    ArbigentCoroutinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
+    val testDispatcher = coroutineContext[CoroutineDispatcher]!!
     val fakeAi = FakeAi()
     val agentConfig = AgentConfig {
       deviceFactory { FakeDevice() }
       aiFactory { fakeAi }
     }
     val arbigentScenarioExecutor = ArbigentScenarioExecutor {
+      dispatcher = testDispatcher
     }
     val arbigentScenario = ArbigentScenario(
       id = "id2",
@@ -39,7 +40,7 @@ class ArbigentScenarioContentExecutorTest {
   @OptIn(ExperimentalStdlibApi::class)
   @Test
   fun lastInitializerInterceptorCalledFirst() = runTest {
-    ArbigentCoroutinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
+    val testDispatcher = coroutineContext[CoroutineDispatcher]!!
     val order = mutableListOf<String>()
     val fakeAi = FakeAi()
     val agentConfig = AgentConfig {
@@ -71,6 +72,7 @@ class ArbigentScenarioContentExecutorTest {
       )
     }
     val arbigentScenarioExecutor = ArbigentScenarioExecutor {
+      dispatcher = testDispatcher
     }
     val arbigentScenario = ArbigentScenario(
       id = "id2",
@@ -108,7 +110,7 @@ class ArbigentScenarioContentExecutorTest {
   @OptIn(ExperimentalStdlibApi::class)
   @Test
   fun lastStepInterceptorCalledFirst() = runTest {
-    ArbigentCoroutinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
+    val testDispatcher = coroutineContext[CoroutineDispatcher]!!
     val order = mutableListOf<String>()
     val fakeAi = FakeAi()
     val agentConfig = AgentConfig {
@@ -142,6 +144,7 @@ class ArbigentScenarioContentExecutorTest {
       )
     }
     val arbigentScenarioExecutor = ArbigentScenarioExecutor {
+      dispatcher = testDispatcher
     }
     val arbigentScenario = ArbigentScenario(
       id = "id2",

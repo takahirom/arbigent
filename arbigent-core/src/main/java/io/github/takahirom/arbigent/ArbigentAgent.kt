@@ -28,7 +28,10 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 
 public class ArbigentAgent(
-  agentConfig: AgentConfig
+  agentConfig: AgentConfig,
+  // Injected so tests can drive execution on a TestDispatcher instead of mutating a process-wide
+  // global. The scenario executor threads its own dispatcher in here.
+  dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
   private val ai by lazy { agentConfig.aiFactory() }
   public val device: ArbigentDevice by lazy { agentConfig.deviceFactory() }
@@ -132,7 +135,7 @@ public class ArbigentAgent(
   }
   
   private val coroutineScope =
-    CoroutineScope(ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob())
+    CoroutineScope(dispatcher + SupervisorJob())
   private var job: Job? = null
   private val arbigentContextHistoryStateFlow: MutableStateFlow<List<ArbigentContextHolder>> =
     MutableStateFlow(listOf())

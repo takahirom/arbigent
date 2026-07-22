@@ -64,7 +64,13 @@ public sealed interface ArbigentScenarioExecutorState {
   }
 }
 
-public class ArbigentScenarioExecutor {
+public class ArbigentScenarioExecutor internal constructor(
+  // Injected (via Builder, which defaults it to Dispatchers.Default) so tests drive execution on a
+  // TestDispatcher rather than mutating a process-wide global. Threaded into every ArbigentAgent
+  // this executor creates. No default here so the no-arg `ArbigentScenarioExecutor()` factory
+  // function stays unambiguous against this constructor.
+  private val dispatcher: CoroutineDispatcher,
+) {
   private val _taskAssignmentsStateFlow =
     MutableStateFlow<List<ArbigentTaskAssignment>>(listOf())
   private val _taskAssignmentsHistoryStateFlow =
@@ -81,7 +87,7 @@ public class ArbigentScenarioExecutor {
   public fun taskAssignments(): List<ArbigentTaskAssignment> = _taskAssignmentsStateFlow.value
   private var executeJob: Job? = null
   private val coroutineScope =
-    CoroutineScope(ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob())
+    CoroutineScope(dispatcher + SupervisorJob())
   private val _arbigentScenarioRunningInfoStateFlow: MutableStateFlow<ArbigentScenarioRunningInfo?> =
     MutableStateFlow(null)
   public val runningInfoFlow: StateFlow<ArbigentScenarioRunningInfo?> =
@@ -192,7 +198,7 @@ public class ArbigentScenarioExecutor {
           it.agent.cancel()
         }
         _taskAssignmentsStateFlow.value = scenario.agentTasks.map { task ->
-          ArbigentTaskAssignment(task, ArbigentAgent(task.agentConfig))
+          ArbigentTaskAssignment(task, ArbigentAgent(task.agentConfig, dispatcher))
         }
         _taskAssignmentsHistoryStateFlow.value += listOf(taskAssignments())
         for ((index, taskAgent) in taskAssignments().withIndex()) {
@@ -285,8 +291,10 @@ public class ArbigentScenarioExecutor {
   }
 
   public class Builder {
+    // Defaults to Dispatchers.Default; tests set a TestDispatcher so execution is deterministic.
+    public var dispatcher: CoroutineDispatcher = Dispatchers.Default
     public fun build(): ArbigentScenarioExecutor {
-      return ArbigentScenarioExecutor()
+      return ArbigentScenarioExecutor(dispatcher)
     }
   }
 }

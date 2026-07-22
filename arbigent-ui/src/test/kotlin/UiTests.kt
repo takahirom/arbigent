@@ -19,6 +19,7 @@ import io.github.takahirom.robospec.DescribedBehaviors
 import io.github.takahirom.robospec.describeBehaviors
 import io.github.takahirom.robospec.execute
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
@@ -36,7 +37,6 @@ class UiTests(private val behavior: DescribedBehavior<TestRobot>) {
   @Test
   fun test() {
     val testDispatcher = StandardTestDispatcher()
-    ArbigentCoroutinesDispatcher.dispatcher = testDispatcher
     globalKeyStoreFactory = TestKeyStoreFactory()
     // Use fixed timestamp for deterministic UI tests
     TimeProvider.set(TestTimeProvider(1234567890000L))
@@ -899,6 +899,9 @@ class TestRobot(
       availableDeviceListFactory = {
         listOf(ArbigentAvailableDevice.Fake())
       },
+      // Run the holder's coroutines on the same test dispatcher runTest is driving, so the UI test
+      // stays deterministic now that there is no process-wide dispatcher global.
+      dispatcher = testScope.coroutineContext[CoroutineDispatcher]!!,
     )
     setContent {
       CompositionLocalProvider(
