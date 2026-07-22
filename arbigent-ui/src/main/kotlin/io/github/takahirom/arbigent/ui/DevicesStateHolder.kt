@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 
 
@@ -29,6 +30,10 @@ class DevicesStateHolder(val arbigentAvailableDeviceListFactory: (ArbigentDevice
   // collectors or let a slow discovery overwrite a newer result out of order.
   private val scope = CoroutineScope(ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob())
   private var fetchJob: Job? = null
+  // Serializes the cancel-then-replace of fetchJob: the OS-change collector and the UI refresh
+  // handler can both call fetchDevices() from different threads, and an unguarded swap could leave
+  // an older discovery running (and later clobbering a newer result).
+  private val fetchLock = Any()
 
   init {
     selectedDeviceOs.onEach { fetchDevices() }.launchIn(scope)
@@ -40,16 +45,36 @@ class DevicesStateHolder(val arbigentAvailableDeviceListFactory: (ArbigentDevice
   }
 
   fun fetchDevices() {
-    fetchJob?.cancel()
-    fetchJob = scope.launch {
-      val os = selectedDeviceOs.value
-      // Device discovery (e.g. devicectl) blocks, so run it off the caller and drop the result if a
-      // newer fetch cancelled us while it ran.
-      val result = withContext(ArbigentCoroutinesDispatcher.dispatcher) {
-        arbigentAvailableDeviceListFactory(os)
+    synchronized(fetchLock) {
+      fetchJob?.cancel()
+      fetchJob = scope.launch {
+        val os = selectedDeviceOs.value
+        // Device discovery (e.g. devicectl) blocks, so run it off the caller under runInterruptible
+        // so cancelling the job actually interrupts the blocking call, and drop the result if a
+        // newer fetch cancelled us while it ran.
+        val result = withContext(ArbigentCoroutinesDispatcher.dispatcher) {
+          runInterruptible { arbigentAvailableDeviceListFactory(os) }
+        }
+        ensureActive()
+        devices.value = result
+        reconcileSelection(result)
       }
-      ensureActive()
-      devices.value = result
     }
+  }
+
+  // Rediscovery produces fresh device objects that are never reference-equal to the previously
+  // selected one (these device classes deliberately don't override equals), so re-point the
+  // selection at the matching entry in the new list by a stable identity, or clear it if the
+  // device is gone. Without this the UI keeps a stale object selected that no list entry matches.
+  private fun reconcileSelection(newDevices: List<ArbigentAvailableDevice>) {
+    val previous = _selectedDevice.value ?: return
+    _selectedDevice.value = newDevices.firstOrNull { deviceIdentity(it) == deviceIdentity(previous) }
+  }
+
+  private fun deviceIdentity(device: ArbigentAvailableDevice): String = when (device) {
+    // Real iPhones share model names, so key on the masked UDID (never the raw one) plus name.
+    is ArbigentAvailableDevice.IosReal -> "iosreal:${device.maskedUdid}:${device.name}"
+    // Android name is the adb serial; simulator/web names are stable per device.
+    else -> "${device.deviceOs.name}:${device.name}"
   }
 }
