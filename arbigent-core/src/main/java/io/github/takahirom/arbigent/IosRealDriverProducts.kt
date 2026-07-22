@@ -45,6 +45,10 @@ public class IosRealDriverProducts(
       } else {
         build(cacheDir, productsDir)
       }
+      // Accepted tradeoff: the returned dir is validated/built under the lock but not lifetime-
+      // protected once the lock is released — a *different process* could later replace this cache
+      // (same device+team) while a caller still holds the path. Concurrent multi-process runs
+      // against the same device+team are out of scope, so we do not pin or copy the products here.
       productsDir
     }
   }

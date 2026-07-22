@@ -87,6 +87,10 @@ public class DefaultArbigentCommandExecutor : ArbigentCommandExecutor {
   // Snapshot the descendant handles before killing so we can await them afterwards: once the parent
   // is destroyed its children are reparented and no longer enumerate as its descendants, but the
   // captured ProcessHandles stay valid for awaiting termination.
+  //
+  // Accepted tradeoff: a grandchild spawned by a descendant *between* this snapshot and the destroy
+  // can escape teardown. Killing a process tree race-free needs OS process groups, which the JDK
+  // Process API does not expose; this is intentionally bounded-effort teardown, not a guarantee.
   private fun destroyTree(process: Process): List<ProcessHandle> {
     val descendants = runCatching { process.descendants().toList() }.getOrDefault(emptyList())
     descendants.forEach { runCatching { it.destroyForcibly() } }
