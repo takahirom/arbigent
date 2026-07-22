@@ -71,8 +71,32 @@ public class IosRealDriverProducts(
     val hasXctestRun = productsDir.walkTopDown().any { it.extension == "xctestrun" }
     if (!hasXctestRun) return false
     val props = Properties().apply { marker.inputStream().use { load(it) } }
-    return props.getProperty("maestroVersion") == maestroVersion &&
-      props.getProperty("teamHash") == teamHash()
+    // Every input that changes the signed products must be part of the reuse decision: schema (so a
+    // format change forces a rebuild), maestro version, team, target device, Xcode/toolchain and the
+    // exact runner source. The device is also in the cache path, but validating it here guards against
+    // a hand-edited marker or path collision.
+    if (props.getProperty("schemaVersion") != CACHE_SCHEMA_VERSION) return false
+    if (props.getProperty("maestroVersion") != maestroVersion) return false
+    if (props.getProperty("teamHash") != teamHash()) return false
+    if (props.getProperty("deviceHash") != deviceHash()) return false
+    if (props.getProperty("xcodeVersion") != xcodeVersion()) return false
+    if (props.getProperty("runnerSourceChecksum") != runnerSourceChecksum()) return false
+    // Free (7-day) provisioning profiles expire; a cached-but-expired runner would fail to install.
+    // Rebuild if the embedded profile is expired or does not cover the target device.
+    if (!isProvisioningProfileUsable(productsDir)) {
+      arbigentInfoLog("iOS real device: cached runner's provisioning profile is expired or missing this device; rebuilding")
+      return false
+    }
+    return true
+  }
+
+  /** Decodes the built runner's embedded.mobileprovision and checks expiry + device eligibility. */
+  private fun isProvisioningProfileUsable(productsDir: File): Boolean {
+    val profile = productsDir.walkTopDown().firstOrNull { it.name == "embedded.mobileprovision" }
+      ?: return false
+    val decoded = executor.execute(listOf("security", "cms", "-D", "-i", profile.absolutePath))
+    if (!decoded.isSuccess || decoded.stdout.isBlank()) return false
+    return MobileProvisionInspector.isUsable(decoded.stdout, deviceUdid, java.time.Instant.now())
   }
 
   private fun build(cacheDir: File, productsDir: File) {
@@ -157,29 +181,45 @@ public class IosRealDriverProducts(
 
   private fun writeMarker(cacheDir: File) {
     val props = Properties()
+    props["schemaVersion"] = CACHE_SCHEMA_VERSION
     props["maestroVersion"] = maestroVersion
     props["teamHash"] = teamHash()
+    props["deviceHash"] = deviceHash()
+    props["xcodeVersion"] = xcodeVersion()
+    props["runnerSourceChecksum"] = runnerSourceChecksum()
     File(cacheDir, MARKER_FILE).outputStream().use { props.store(it, "arbigent iOS real-device runner") }
   }
 
-  /** Copies the bundled driver/ios resource tree to [target], handling jar and file layouts. */
-  private fun copyDriverSource(target: Path) {
+  /**
+   * Resolves the bundled driver/ios resource tree and runs [block] against its root, handling both
+   * jar and exploded-directory layouts. When the resource lives in a jar whose FileSystem we had to
+   * open ourselves, we close it afterwards; a FileSystem the JVM already owns (e.g. the app jar) is
+   * left open so we don't break other consumers.
+   */
+  private fun <T> withDriverSourceRoot(block: (Path) -> T): T {
     val url = javaClass.classLoader.getResource(DRIVER_SOURCE_RESOURCE)
       ?: throw IllegalStateException(
         "Bundled iOS driver source not found on classpath at $DRIVER_SOURCE_RESOURCE. " +
           "This build was produced without the iOS real-device runner source."
       )
     val uri = url.toURI()
-    val sourceRoot: Path = if (uri.scheme == "jar") {
-      val fs = try {
-        FileSystems.getFileSystem(uri)
-      } catch (e: FileSystemNotFoundException) {
-        FileSystems.newFileSystem(uri, emptyMap<String, Any>())
-      }
-      fs.getPath("/$DRIVER_SOURCE_RESOURCE")
-    } else {
-      Paths.get(uri)
+    if (uri.scheme != "jar") return block(Paths.get(uri))
+    var createdFs = false
+    val fs = try {
+      FileSystems.getFileSystem(uri)
+    } catch (e: FileSystemNotFoundException) {
+      createdFs = true
+      FileSystems.newFileSystem(uri, emptyMap<String, Any>())
     }
+    return try {
+      block(fs.getPath("/$DRIVER_SOURCE_RESOURCE"))
+    } finally {
+      if (createdFs) fs.close()
+    }
+  }
+
+  /** Copies the bundled driver/ios resource tree to [target], handling jar and file layouts. */
+  private fun copyDriverSource(target: Path): Unit = withDriverSourceRoot { sourceRoot ->
     Files.walk(sourceRoot).use { paths ->
       paths.filter { Files.isRegularFile(it) }.forEach { path ->
         val relative = sourceRoot.relativize(path).toString()
@@ -190,12 +230,35 @@ public class IosRealDriverProducts(
     }
   }
 
+  // Fingerprint of the packaged runner source (relative paths + contents), so a runner cached from a
+  // different or tampered source tree is rebuilt even though the maestro version matches.
+  private fun runnerSourceChecksum(): String = withDriverSourceRoot { sourceRoot ->
+    val digest = MessageDigest.getInstance("SHA-256")
+    Files.walk(sourceRoot).use { paths ->
+      paths.filter { Files.isRegularFile(it) }.sorted().forEach { path ->
+        digest.update(sourceRoot.relativize(path).toString().toByteArray())
+        digest.update(Files.readAllBytes(path))
+      }
+    }
+    digest.digest().take(8).joinToString("") { "%02x".format(it) }
+  }
+
+  private fun xcodeVersion(): String =
+    executor.execute(listOf("xcodebuild", "-version")).stdout.trim().replace("\n", " ").ifBlank { "unknown" }
+
+  // Scope the cache path by team AND device so a runner signed/provisioned for one iPhone is never
+  // reused for another; other build inputs (Xcode, source, schema) are validated via the marker.
   private fun cacheDir(): File =
-    File(arbigentHomeDir(), "ios-real-driver/$maestroVersion/${teamHash()}")
+    File(arbigentHomeDir(), "ios-real-driver/$maestroVersion/${teamHash()}/${deviceHash()}")
 
   // Hash the team id so it never appears in cleartext in filesystem paths.
-  private fun teamHash(): String {
-    val digest = MessageDigest.getInstance("SHA-256").digest(teamId.toByteArray())
+  private fun teamHash(): String = shortHash(teamId)
+
+  // Hash the device udid too, so real UDIDs never appear in cleartext on disk.
+  private fun deviceHash(): String = shortHash(deviceUdid)
+
+  private fun shortHash(value: String): String {
+    val digest = MessageDigest.getInstance("SHA-256").digest(value.toByteArray())
     return digest.take(8).joinToString("") { "%02x".format(it) }
   }
 
@@ -217,6 +280,9 @@ public class IosRealDriverProducts(
     public const val DRIVER_SOURCE_RESOURCE: String = "ios-real-driver/runner"
     private const val MARKER_FILE = "arbigent-driver.properties"
 
+    // Bump when the marker format or the set of validated inputs changes, so old caches are ignored.
+    private const val CACHE_SCHEMA_VERSION = "2"
+
     // In-process guard around the cross-process FileLock (a channel can't be locked twice in one JVM).
     private val buildLock = Any()
 
@@ -229,3 +295,33 @@ public class IosRealDriverProducts(
 /** `~/.arbigent`, the on-disk home for cached artifacts shared across arbigent runs. */
 internal fun arbigentHomeDir(): File =
   File(System.getProperty("user.home"), ".arbigent").apply { mkdirs() }
+
+/**
+ * Reads the two fields that decide whether a cached, signed runner is still usable from a decoded
+ * `embedded.mobileprovision` plist (as produced by `security cms -D -i`). Kept string-based and pure
+ * so it is unit-testable without a real profile.
+ */
+internal object MobileProvisionInspector {
+  private val expirationRegex = Regex("""<key>ExpirationDate</key>\s*<date>([^<]+)</date>""")
+  private val provisionedDevicesRegex =
+    Regex("""<key>ProvisionedDevices</key>\s*<array>(.*?)</array>""", RegexOption.DOT_MATCHES_ALL)
+  private val stringRegex = Regex("""<string>([^<]+)</string>""")
+
+  fun expirationDate(plistXml: String): java.time.Instant? =
+    expirationRegex.find(plistXml)?.groupValues?.get(1)?.let {
+      runCatching { java.time.Instant.parse(it.trim()) }.getOrNull()
+    }
+
+  /** The provisioned device UDIDs, or null when the profile lists none (wildcard/enterprise). */
+  fun provisionedDevices(plistXml: String): List<String>? {
+    val block = provisionedDevicesRegex.find(plistXml)?.groupValues?.get(1) ?: return null
+    return stringRegex.findAll(block).map { it.groupValues[1].trim() }.toList()
+  }
+
+  fun isUsable(plistXml: String, deviceUdid: String, now: java.time.Instant): Boolean {
+    val expiry = expirationDate(plistXml) ?: return false
+    if (!expiry.isAfter(now)) return false
+    val devices = provisionedDevices(plistXml) ?: return true
+    return devices.any { it.equals(deviceUdid, ignoreCase = true) }
+  }
+}
