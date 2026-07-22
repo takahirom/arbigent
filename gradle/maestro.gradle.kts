@@ -63,40 +63,68 @@ fun sha256(file: File): String {
   return digest.digest().joinToString("") { "%02x".format(it) }
 }
 
+// The maestro cache lives under the shared Gradle user home, so concurrent Gradle invocations
+// (CI matrix, parallel module builds) can race to write the same zip/jar while another process
+// reads it. Serialize every write to the cache with a cross-process file lock; the lock file is
+// never a published artifact, so creating it is harmless.
+fun <T> withMaestroCacheLock(block: () -> T): T {
+  maestroCacheDir.mkdirs()
+  val lockFile = maestroCacheDir.resolve(".lock")
+  return java.io.RandomAccessFile(lockFile, "rw").use { raf ->
+    raf.channel.lock().use { block() }
+  }
+}
+
+// Publish a fully-built file into its shared location atomically, so a concurrent reader never
+// observes a half-written target. Copy into a sibling temp in the destination dir first (works
+// even when source and target are on different filesystems), then rename it into place: rename
+// within a filesystem is atomic. The source is left intact so callers can keep it as a build
+// output for up-to-date checking.
+fun publishFileAtomically(source: File, target: File) {
+  target.parentFile.mkdirs()
+  val sibling = File.createTempFile("publish", ".tmp", target.parentFile)
+  try {
+    source.copyTo(sibling, overwrite = true)
+    java.nio.file.Files.move(
+      sibling.toPath(), target.toPath(),
+      java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+      java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+    )
+  } finally {
+    sibling.delete()
+  }
+}
+
 val downloadMaestroZip = tasks.register("downloadMaestroZip") {
   description = "Download the pinned Maestro release artifact and verify its sha256 checksum."
   group = "maestro"
   outputs.file(maestroZipFile)
   outputs.upToDateWhen { maestroZipFile.exists() && sha256(maestroZipFile) == maestroZipSha256 }
   doLast {
-    maestroCacheDir.mkdirs()
-    if (maestroZipFile.exists() && sha256(maestroZipFile) == maestroZipSha256) return@doLast
-    logger.lifecycle("Downloading Maestro $maestroVersion from $maestroZipUrl")
-    val tmp = File.createTempFile("maestro", ".zip", maestroCacheDir)
-    try {
-      uri(maestroZipUrl).toURL().openStream().use { input ->
-        tmp.outputStream().use { output -> input.copyTo(output) }
+    withMaestroCacheLock {
+      if (maestroZipFile.exists() && sha256(maestroZipFile) == maestroZipSha256) return@withMaestroCacheLock
+      logger.lifecycle("Downloading Maestro $maestroVersion from $maestroZipUrl")
+      val tmp = File.createTempFile("maestro", ".zip", maestroCacheDir)
+      try {
+        uri(maestroZipUrl).toURL().openStream().use { input ->
+          tmp.outputStream().use { output -> input.copyTo(output) }
+        }
+        val actual = sha256(tmp)
+        check(actual == maestroZipSha256) {
+          "Maestro zip checksum mismatch for $maestroZipUrl: expected $maestroZipSha256 but got $actual"
+        }
+        publishFileAtomically(tmp, maestroZipFile)
+      } finally {
+        tmp.delete()
       }
-      val actual = sha256(tmp)
-      check(actual == maestroZipSha256) {
-        "Maestro zip checksum mismatch for $maestroZipUrl: expected $maestroZipSha256 but got $actual"
-      }
-      // Publish atomically: rename is atomic within a filesystem, so a concurrent build never
-      // observes a half-written zip the way an incremental copyTo could expose. tmp lives in
-      // maestroCacheDir alongside the target, so rename succeeds here; fall back to copy+delete
-      // only if it fails (e.g. across filesystems).
-      if (!tmp.renameTo(maestroZipFile)) {
-        tmp.copyTo(maestroZipFile, overwrite = true)
-      }
-    } finally {
-      tmp.delete()
     }
   }
 }
 
-// Extracts the maestro-* jars into a flat directory. A later PR adding real-device support
-// can extract the zip's driver-iphoneos/ products here too by registering a sibling task
-// against the same downloaded zip.
+// Extract into the (per-build, non-shared) build directory so Gradle's own up-to-date checking
+// applies, then publish each jar into the shared cache atomically via publishMaestroJars. A
+// later PR adding real-device support can extract the zip's driver-iphoneos/ products here too.
+val maestroJarsStagingDir: File = layout.buildDirectory.dir("maestro/jars-staging").get().asFile
 val extractMaestroJars = tasks.register<Copy>("extractMaestroJars") {
   description = "Extract the maestro-* jars arbigent depends on from the pinned release artifact."
   group = "maestro"
@@ -106,7 +134,21 @@ val extractMaestroJars = tasks.register<Copy>("extractMaestroJars") {
     eachFile { path = name } // flatten maestro/lib/<jar> -> <jar>
   }
   includeEmptyDirs = false
-  into(maestroJarsDir)
+  into(maestroJarsStagingDir)
+}
+
+val publishMaestroJars = tasks.register("publishMaestroJars") {
+  description = "Atomically publish the extracted maestro-* jars into the shared cache."
+  group = "maestro"
+  dependsOn(extractMaestroJars)
+  outputs.dir(maestroJarsDir)
+  doLast {
+    withMaestroCacheLock {
+      maestroJarsStagingDir.listFiles()?.forEach { jar ->
+        publishFileAtomically(jar, maestroJarsDir.resolve(jar.name))
+      }
+    }
+  }
 }
 
 // maestro-web.jar's CdpClient is compiled against ktor 2.3.13, but arbigent-mcp-client pulls
@@ -132,30 +174,48 @@ val maestroWebKtor2Jars: FileCollection = maestroWebKtor2.incoming.artifactView 
   componentFilter { it is ModuleComponentIdentifier && it.group == "io.ktor" }
 }.files
 
+// Shade into the (per-build, non-shared) build directory so Gradle's own up-to-date checking
+// applies and concurrent builds never write the same shared jar; publishShadedMaestroWeb then
+// moves it into the shared cache atomically. Read the plain maestro-web.jar from the extraction
+// staging dir rather than the shared cache to avoid reading a jar another build is publishing.
+val maestroShadedStagingDir: File = layout.buildDirectory.dir("maestro/shaded-staging").get().asFile
 val shadeMaestroWeb = tasks.register<ShadowJar>("shadeMaestroWeb") {
   description = "Relocate ktor 2.3.13 inside maestro-web to avoid clashing with arbigent's ktor 3.x."
   group = "maestro"
   dependsOn(extractMaestroJars)
-  from(zipTree(maestroJarsDir.resolve("maestro-web.jar")))
+  from(zipTree(maestroJarsStagingDir.resolve("maestro-web.jar")))
   from({ maestroWebKtor2Jars.map { zipTree(it) } })
   relocate("io.ktor", "arbigent.shaded.io.ktor")
   mergeServiceFiles() // ktor engines register via META-INF/services; merge + relocate their entries
   exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA", "**/module-info.class")
   duplicatesStrategy = DuplicatesStrategy.EXCLUDE
   archiveFileName.set("maestro-web-shaded.jar")
-  destinationDirectory.set(maestroShadedDir)
+  destinationDirectory.set(maestroShadedStagingDir)
+}
+
+val shadedMaestroWebJar: File = maestroShadedDir.resolve("maestro-web-shaded.jar")
+val publishShadedMaestroWeb = tasks.register("publishShadedMaestroWeb") {
+  description = "Atomically publish the shaded maestro-web jar into the shared cache."
+  group = "maestro"
+  dependsOn(shadeMaestroWeb)
+  outputs.file(shadedMaestroWebJar)
+  doLast {
+    withMaestroCacheLock {
+      publishFileAtomically(maestroShadedStagingDir.resolve("maestro-web-shaded.jar"), shadedMaestroWebJar)
+    }
+  }
 }
 
 // Individual jars (not the directory) so they land on the compile/runtime classpath as
-// libraries. builtBy carries the extraction task dependency to any consumer that uses this
+// libraries. builtBy carries the publication task dependency to any consumer that uses this
 // collection as a dependency. The plain maestro-web.jar is excluded in favour of the shaded one.
 val maestroJars: FileCollection = files(
   fileTree(maestroJarsDir) {
     include("*.jar")
     exclude("maestro-web.jar")
-    builtBy(extractMaestroJars)
+    builtBy(publishMaestroJars)
   },
-  shadeMaestroWeb,
+  files(shadedMaestroWebJar).builtBy(publishShadedMaestroWeb),
 )
 
 // Consumed by modules via rootProject.extra: dependencies { api(rootMaestroJars()) }.
