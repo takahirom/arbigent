@@ -107,8 +107,8 @@ or AZURE_OPENAI_API_KEY (mapped to the same options).
 `settings.local.yml` as `(currently: '...' from ...)`, with API keys masked.
 
 For a full flag ↔ settings-key ↔ environment-variable mapping table (all commands,
-with defaults and precedence), see `arbigent-cli-reference.md` in the arbigent
-repository.
+with defaults and precedence), see
+https://github.com/takahirom/arbigent/blob/main/arbigent-cli-reference.md
 
 Done when: both commands above succeed with no flags, and `git status` shows
 `.gitignore` updated and no `settings.local.yml` staged.
@@ -210,7 +210,7 @@ Real examples live in `sample-test/src/main/resources/projects/` in the arbigent
 repository (e.g. `e2e-test-android.yaml`).
 
 For an exhaustive field-by-field reference (every YAML key, its type and default),
-see `arbigent-yaml-reference.md` in the arbigent repository.
+see https://github.com/takahirom/arbigent/blob/main/arbigent-yaml-reference.md
 
 Done when: `arbigent scenarios --project-file=<file>` lists your scenario ids without errors.
 """.trimIndent(),
