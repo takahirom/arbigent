@@ -11,6 +11,7 @@ import maestro.orchestra.MaestroCommand
 import maestro.orchestra.Orchestra
 import okio.sink
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.pow
 import kotlin.system.measureTimeMillis
 
@@ -218,7 +219,12 @@ public class MaestroDevice(
     val maestro: Maestro,
     val orchestra: Orchestra,
     val onClose: (() -> Unit)?,
-  )
+  ) {
+    // Teardown runs at most once per Connection: a failed reconnect closes the broken connection up
+    // front and then a later close() would otherwise close the same object again (double maestro.close
+    // + double onClose, freeing a port a newer connection may already own).
+    val closed = AtomicBoolean(false)
+  }
 
   @Volatile private var connection: Connection =
     Connection(maestro, Orchestra(maestro = maestro), onClose)
@@ -637,6 +643,10 @@ public class MaestroDevice(
   }
 
   @Volatile private var isClosed = false
+  // Set once a full reconnect sequence has exhausted every attempt: the current connection is torn
+  // down and no replacement was installed, so the device is unusable. Further operations fail fast
+  // with a clear error instead of endlessly re-tearing-down the already-closed connection.
+  @Volatile private var connectionLost = false
   private var reconnectAttempts = 0
   private val maxReconnectAttempts = 6  // Allows retries with exponential backoff up to ~64 seconds
   // Guards the connection swap in reconnect against close(): whoever holds it either replaces the
@@ -646,8 +656,11 @@ public class MaestroDevice(
 
   // Close a connection exactly once: shut down maestro, then always run its onClose (which stops
   // and de-registers the iproxy forwarder) even if maestro.close() throws, so the forwarder and
-  // its port are released rather than leaked.
+  // its port are released rather than leaked. The compareAndSet guard makes this idempotent per
+  // Connection so a close() after a failed reconnect (which already tore this connection down)
+  // never double-closes maestro or double-runs onClose.
   private fun closeConnection(target: Connection) {
+    if (!target.closed.compareAndSet(false, true)) return
     try {
       target.maestro.close()
     } catch (_: Exception) {
@@ -664,6 +677,9 @@ public class MaestroDevice(
       }
       if (isClosed) {
         throw IllegalStateException("Cannot reconnect: device is closed")
+      }
+      if (connectionLost) {
+        throw IllegalStateException("Device connection lost: reconnection already failed permanently")
       }
 
       // Tear down the current (broken) connection up front — closing its maestro and running its
@@ -720,8 +736,11 @@ public class MaestroDevice(
         return // Success!
       }
 
-      // All attempts failed - reset counter for future retry sequences
+      // All attempts failed. The broken connection was already torn down above and no replacement
+      // was installed, so mark the device permanently lost: further operations throw the clear
+      // "connection lost" error rather than re-closing the dead connection.
       reconnectAttempts = 0
+      connectionLost = true
       throw RuntimeException("Failed to reconnect after $maxReconnectAttempts attempts", lastException)
     }
   }
