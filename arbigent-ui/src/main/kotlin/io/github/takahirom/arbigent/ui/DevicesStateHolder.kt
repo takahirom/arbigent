@@ -9,7 +9,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,9 +30,12 @@ class DevicesStateHolder(val arbigentAvailableDeviceListFactory: (ArbigentDevice
   // collectors or let a slow discovery overwrite a newer result out of order.
   private val scope = CoroutineScope(ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob())
   private var fetchJob: Job? = null
-  // Serializes the cancel-then-replace of fetchJob: the OS-change collector and the UI refresh
-  // handler can both call fetchDevices() from different threads, and an unguarded swap could leave
-  // an older discovery running (and later clobbering a newer result).
+  // Monotonic id of the latest fetch. A job publishes only if it still matches this when it finishes,
+  // which makes the "am I still the newest?" check and the state writes atomic under fetchLock.
+  private var fetchGeneration = 0
+  // Serializes the cancel-then-replace of fetchJob (and the generation bump/publish): the OS-change
+  // collector and the UI refresh handler can both call fetchDevices() from different threads, and an
+  // unguarded swap could leave an older discovery running and later clobbering a newer result.
   private val fetchLock = Any()
 
   init {
@@ -47,22 +49,27 @@ class DevicesStateHolder(val arbigentAvailableDeviceListFactory: (ArbigentDevice
 
   fun fetchDevices() {
     synchronized(fetchLock) {
-      // Accepted tradeoff: cancel() only requests cancellation, so a just-cancelled predecessor may
-      // still be unwinding its (read-only) discovery when the replacement starts, briefly running
-      // two discoveries. That is harmless — discovery mutates no device state, and the ensureActive()
-      // guard below means only the latest job ever publishes its result.
+      // cancel() only requests cancellation, so a just-cancelled predecessor may still be unwinding
+      // its (read-only, state-free) discovery when the replacement starts, briefly running two
+      // discoveries — harmless. What is NOT harmless is a stale job publishing after a newer one: a
+      // job that already passed a cancellation check can still be preempted before its writes, so a
+      // bare ensureActive() leaves a check-then-act window. Instead each job captures the generation
+      // it was launched under and, holding fetchLock, publishes only if it is still the latest — so
+      // the newest fetch always wins regardless of completion order.
       fetchJob?.cancel()
+      val generation = ++fetchGeneration
       fetchJob = scope.launch {
         val os = selectedDeviceOs.value
         // Device discovery (e.g. devicectl) blocks, so run it off the caller under runInterruptible
-        // so cancelling the job actually interrupts the blocking call, and drop the result if a
-        // newer fetch cancelled us while it ran.
+        // so cancelling the job actually interrupts the blocking call.
         val result = withContext(ArbigentCoroutinesDispatcher.dispatcher) {
           runInterruptible { arbigentAvailableDeviceListFactory(os) }
         }
-        ensureActive()
-        devices.value = result
-        reconcileSelection(result)
+        synchronized(fetchLock) {
+          if (generation != fetchGeneration) return@launch
+          devices.value = result
+          reconcileSelection(result)
+        }
       }
     }
   }
