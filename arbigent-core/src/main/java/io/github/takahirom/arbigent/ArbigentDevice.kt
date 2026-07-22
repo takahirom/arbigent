@@ -636,10 +636,25 @@ public class MaestroDevice(
     }
   }
 
-  private var isClosed = false
+  @Volatile private var isClosed = false
   private var reconnectAttempts = 0
   private val maxReconnectAttempts = 6  // Allows retries with exponential backoff up to ~64 seconds
+  // Guards the connection swap in reconnect against close(): whoever holds it either replaces the
+  // connection or tears it down, never both at once, so close() can't capture the old connection
+  // while reconnect installs a new one (which would leak the replacement's iproxy forwarder).
   private val reconnectLock = Any()
+
+  // Close a connection exactly once: shut down maestro, then always run its onClose (which stops
+  // and de-registers the iproxy forwarder) even if maestro.close() throws, so the forwarder and
+  // its port are released rather than leaked.
+  private fun closeConnection(target: Connection) {
+    try {
+      target.maestro.close()
+    } catch (_: Exception) {
+      // Ignore close errors, device might already be disconnected
+    }
+    runCatching { target.onClose?.invoke() }
+  }
 
   private fun reconnectIfDisconnected() {
     synchronized(reconnectLock) {
@@ -647,9 +662,20 @@ public class MaestroDevice(
       if (availableDevice == null) {
         throw IllegalStateException("Cannot reconnect: no available device reference")
       }
+      if (isClosed) {
+        throw IllegalStateException("Cannot reconnect: device is closed")
+      }
+
+      // Tear down the current (broken) connection up front — closing its maestro and running its
+      // onClose, which stops the iproxy forwarder and frees the port — BEFORE building the
+      // replacement. Building first would start a second forwarder on the same port, and the
+      // ownership check would reject it because this very JVM still owns the port, so reconnect
+      // could never succeed. Readers are serialized behind ensureConnected()'s monitor, so no one
+      // observes the closed connection during the swap; a transient failure that retries is fine.
+      closeConnection(this.connection)
 
       var lastException: Exception? = null
-      
+
       // Retry with exponential backoff
       while (reconnectAttempts < maxReconnectAttempts) {
         // Exponential backoff: 2^attempt seconds (2s, 4s, 8s, 16s, 32s, 64s...)
@@ -667,10 +693,8 @@ public class MaestroDevice(
           arbigentInfoLog("Waiting ${actualWaitTimeMs}ms before reconnection attempt ${reconnectAttempts + 1}")
           Thread.sleep(actualWaitTimeMs)
         }
-        
-        reconnectAttempts++
 
-        val oldConnection = this.connection
+        reconnectAttempts++
 
         // Try to reconnect
         val newDevice = try {
@@ -688,21 +712,14 @@ public class MaestroDevice(
         }
 
         // Adopt the new device's whole Connection (maestro + orchestra + its onClose, which owns the
-        // new iproxy) in one volatile swap, then tear down the old connection exactly once — closing
-        // the old maestro AND running the old onClose so the previous iproxy is not leaked.
+        // new iproxy) in one volatile swap. The old connection was already torn down above.
         this.connection = newDevice.connection
-        try {
-          oldConnection.maestro.close()
-        } catch (_: Exception) {
-          // Ignore close errors, device might already be disconnected
-        }
-        runCatching { oldConnection.onClose?.invoke() }
 
         // Reset counter on successful reconnection
         reconnectAttempts = 0
         return // Success!
       }
-      
+
       // All attempts failed - reset counter for future retry sequences
       reconnectAttempts = 0
       throw RuntimeException("Failed to reconnect after $maxReconnectAttempts attempts", lastException)
@@ -710,14 +727,12 @@ public class MaestroDevice(
   }
 
   override fun close() {
-    isClosed = true
-    val current = connection
-    // onClose owns the iproxy forwarder; run it in finally so a failure closing maestro still tears
-    // the forwarder down instead of leaking it.
-    try {
-      current.maestro.close()
-    } finally {
-      runCatching { current.onClose?.invoke() }
+    // Same lock as reconnect so a close racing an in-progress reconnect tears down whichever
+    // connection reconnect ultimately installs, instead of capturing the old one and leaking the
+    // replacement's forwarder.
+    synchronized(reconnectLock) {
+      isClosed = true
+      closeConnection(connection)
     }
   }
 
