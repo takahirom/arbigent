@@ -59,4 +59,25 @@ class ScreenshotPathContainmentTest {
       resolveScreenshotFile(base, "link/shot")
     }
   }
+
+  @Test
+  fun symlinkEscapeCreatesNoDirectoryOutsideBase() {
+    val base = newBaseDir()
+    val outside = Files.createTempDirectory("outside").toFile()
+    val link = File(base, "link").toPath()
+    try {
+      Files.createSymbolicLink(link, outside.toPath())
+    } catch (_: UnsupportedOperationException) {
+      return // platform without symlink support (e.g. some Windows configs)
+    }
+    // A nested path under the symlink must be rejected before any parent directory is created,
+    // so the escape target gains no new subdirectory.
+    assertFailsWith<IllegalArgumentException> {
+      resolveScreenshotFile(base, "link/deep/shot")
+    }
+    assertTrue(
+      File(outside, "deep").listFiles() == null,
+      "no directory should be created outside the screenshots base"
+    )
+  }
 }

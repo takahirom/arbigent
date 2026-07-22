@@ -972,8 +972,9 @@ private fun TreeNode.getIdentifierDataForFocus(): List<Any> {
 }
 
 // takeScreenshot paths come from user-authored flows, so they must not escape screenshotsDir.
-// Reject absolute or parent-traversing paths lexically, then canonicalize after creating the
-// parent so a symlinked component that escapes the base is resolved and caught here too.
+// Reject absolute or parent-traversing paths lexically, then canonicalize (without creating any
+// directories) so a symlinked component that escapes the base is resolved and caught before we
+// create the parent directory.
 internal fun resolveScreenshotFile(screenshotsDir: File, path: String): File {
   val base = screenshotsDir.canonicalFile
   val requested = File("$path.png")
@@ -983,10 +984,10 @@ internal fun resolveScreenshotFile(screenshotsDir: File, path: String): File {
   require(requested.invariantSeparatorsPath.split('/').none { it == ".." }) {
     "Screenshot path must not traverse outside the screenshots directory: $path"
   }
-  val target = File(base, requested.path).apply { parentFile?.mkdirs() }
-  val canonical = target.canonicalFile
+  val canonical = File(base, requested.path).canonicalFile
   require(canonical.toPath().startsWith(base.toPath())) {
     "Screenshot path escapes the screenshots directory: $path"
   }
+  canonical.parentFile?.mkdirs()
   return canonical
 }
