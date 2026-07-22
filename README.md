@@ -654,6 +654,8 @@ ArbigentProject o--"*" ArbigentScenario
 The project file is saved in YAML format and contains scenarios with goals, initialization methods, and cleanup data. Dependencies between scenarios are also defined.
 You can write a project file in YAML format by hand or create it using the Arbigent UI.
 
+For a complete field-by-field reference of every project YAML key (type, default, and description), see [arbigent-yaml-reference.md](arbigent-yaml-reference.md). For the CLI flags and how they map to `.arbigent/settings*.yml` / `.yaml` keys and environment variables, see [arbigent-cli-reference.md](arbigent-cli-reference.md).
+
 The id is auto-generated UUID by Arbigent UI but you can change it to any string.
 
 #### Available Initialization Methods
@@ -664,7 +666,6 @@ The id is auto-generated UUID by Arbigent UI but you can change it to any string
 - **CleanupData**: Clear application data
 - **OpenLink**: Open a URL/link
 - **MaestroYaml**: Execute a predefined Maestro YAML scenario
-- **Reconnect**: Disconnect and reconnect the device
 
 ```yaml
 scenarios:
