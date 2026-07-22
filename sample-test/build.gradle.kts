@@ -16,7 +16,7 @@ tasks.withType<Test> {
 dependencies {
     implementation(project(":arbigent-core"))
     implementation(project(":arbigent-ai-openai"))
-    // maestro client (jars extracted from the pinned Maestro CLI zip; see gradle/maestro.gradle.kts)
+    // maestro client (jars extracted from the pinned Maestro release artifact; see gradle/maestro.gradle.kts)
     @Suppress("UNCHECKED_CAST")
     api(rootProject.extra["maestroJars"] as FileCollection)
     testImplementation(kotlin("test"))

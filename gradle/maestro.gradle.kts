@@ -18,7 +18,7 @@ buildscript {
 // Single source of truth for the pinned Maestro release consumed by arbigent.
 //
 // Maestro stopped publishing its `dev.mobile:maestro-*` artifacts to Maven Central at
-// 1.40.0; 2.x is distributed only as jars bundled inside the official CLI zip. We pin
+// 1.40.0; 2.x is distributed only as jars bundled inside the official release artifact. We pin
 // that zip by version + sha256, download and verify it once, extract the maestro-* jars
 // arbigent needs, and expose them as file dependencies (see arbigent-core/build.gradle.kts).
 // The maestro jars' own transitive dependencies (grpc, jackson, okhttp, dadb, ...) are on
@@ -64,7 +64,7 @@ fun sha256(file: File): String {
 }
 
 val downloadMaestroZip = tasks.register("downloadMaestroZip") {
-  description = "Download the pinned Maestro CLI release zip and verify its sha256 checksum."
+  description = "Download the pinned Maestro release artifact and verify its sha256 checksum."
   group = "maestro"
   outputs.file(maestroZipFile)
   outputs.upToDateWhen { maestroZipFile.exists() && sha256(maestroZipFile) == maestroZipSha256 }
@@ -98,7 +98,7 @@ val downloadMaestroZip = tasks.register("downloadMaestroZip") {
 // can extract the zip's driver-iphoneos/ products here too by registering a sibling task
 // against the same downloaded zip.
 val extractMaestroJars = tasks.register<Copy>("extractMaestroJars") {
-  description = "Extract the maestro-* jars arbigent depends on from the pinned CLI zip."
+  description = "Extract the maestro-* jars arbigent depends on from the pinned release artifact."
   group = "maestro"
   dependsOn(downloadMaestroZip)
   from(zipTree(maestroZipFile)) {

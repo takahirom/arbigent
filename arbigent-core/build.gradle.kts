@@ -28,7 +28,7 @@ buildConfig {
   useKotlinOutput { internalVisibility = false }
 }
 
-// maestro-* jars extracted from the pinned Maestro CLI zip (2.x is not on Maven Central).
+// maestro-* jars extracted from the pinned Maestro release artifact (2.x is not on Maven Central).
 // See gradle/maestro.gradle.kts. api() so downstream modules see the maestro types arbigent
 // re-exposes (MaestroCommand, MaestroException, MaestroFlowParser, ...).
 @Suppress("UNCHECKED_CAST")
@@ -43,7 +43,7 @@ dependencies {
   // to compile and run is declared; Gradle resolves the rest (netty, guava, jackson-core,
   // truffle, ...) transitively.
   // The mixed grpc versions below (grpc-api/stub 1.57.2, grpc-core/netty/okhttp/protobuf
-  // 1.50.2) intentionally mirror what the Maestro CLI zip itself bundles; do NOT bump them
+  // 1.50.2) intentionally mirror what the Maestro release artifact itself bundles; do NOT bump them
   // to a single version or the runtime classpath diverges from the one Maestro was built against.
   api("dev.mobile:dadb:2.0.0")
   api("io.grpc:grpc-stub:1.57.2")
