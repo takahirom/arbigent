@@ -192,7 +192,7 @@ fun connectDevice(
       throw IllegalArgumentException(
         "Multiple connected iPhones found. Set --ios-real-device-id (or ${ArbigentIosRealDeviceSettings.ENV_DEVICE_ID}) " +
           "to choose one. Candidates: " +
-          realCandidates.joinToString(", ") { it.maskedUdid }
+          ArbigentAvailableDevice.IosReal.maskedUdidLabels(realCandidates).joinToString(", ")
       )
     }
   }

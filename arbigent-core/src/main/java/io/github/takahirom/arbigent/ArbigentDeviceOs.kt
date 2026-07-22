@@ -165,8 +165,9 @@ public sealed interface ArbigentAvailableDevice {
   ) : ArbigentAvailableDevice {
     override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Ios
 
-    // First 8 chars of the UDID, enough to disambiguate connected iPhones in a message without ever
-    // printing the full hardware UDID.
+    // First 8 chars of the UDID: enough to point at a device in a message without ever printing the
+    // full hardware UDID. When several candidates share this prefix, use [maskedUdidLabels] instead
+    // so the shown prefix is extended until unique.
     public val maskedUdid: String get() = hardwareUdid.take(8) + "…"
 
     override fun connectToDevice(): ArbigentDevice {
@@ -248,6 +249,28 @@ public sealed interface ArbigentAvailableDevice {
         maestro?.close()
         forwarder?.close()
         throw e
+      }
+    }
+
+    public companion object {
+      /**
+       * Labels each candidate with the shortest masked UDID prefix that is unique among
+       * [candidates], so colliding 8-char prefixes are disambiguated by revealing a few more
+       * characters. The full UDID is never printed: the prefix is capped one character short of the
+       * shortest UDID, and if a collision somehow survives that cap a positional #index is appended
+       * instead of more UDID characters.
+       */
+      public fun maskedUdidLabels(candidates: List<IosReal>): List<String> {
+        val maxPrefix = (candidates.minOfOrNull { it.hardwareUdid.length } ?: 1).minus(1).coerceAtLeast(1)
+        fun collides(udid: String, length: Int): Boolean =
+          candidates.count { it.hardwareUdid.take(length) == udid.take(length) } > 1
+        return candidates.mapIndexed { index, candidate ->
+          val udid = candidate.hardwareUdid
+          var length = 8.coerceAtMost(maxPrefix)
+          while (length < maxPrefix && collides(udid, length)) length++
+          val prefix = udid.take(length) + "…"
+          if (collides(udid, length)) "$prefix #${index + 1}" else prefix
+        }
       }
     }
   }

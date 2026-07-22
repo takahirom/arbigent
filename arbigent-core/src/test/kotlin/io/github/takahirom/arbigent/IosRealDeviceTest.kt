@@ -219,6 +219,39 @@ class IosRealDeviceTest {
     assertEquals(IosRealXCTestPortForwarder.ReapDecision.Reap(emptyList()), decision)
   }
 
+  // --- masked UDID disambiguation --------------------------------------------------------
+
+  private fun iosReal(udid: String) =
+    ArbigentAvailableDevice.IosReal(coreDeviceIdentifier = "core-$udid", hardwareUdid = udid, name = "iPhone")
+
+  @Test
+  fun maskedUdidLabels_extendsPrefixUntilUnique() {
+    val labels = ArbigentAvailableDevice.IosReal.maskedUdidLabels(
+      listOf(iosReal("AAAAAAAA1111zzzz"), iosReal("AAAAAAAA2222zzzz"))
+    )
+    // 8-char prefixes collide (AAAAAAAA), so the shown prefix extends until the differing character.
+    assertEquals(listOf("AAAAAAAA1…", "AAAAAAAA2…"), labels)
+  }
+
+  @Test
+  fun maskedUdidLabels_keepsEightCharsWhenPrefixesDiffer() {
+    val labels = ArbigentAvailableDevice.IosReal.maskedUdidLabels(
+      listOf(iosReal("ABCDEFGH0000"), iosReal("ZYXWVUTS0000"))
+    )
+    assertEquals(listOf("ABCDEFGH…", "ZYXWVUTS…"), labels)
+  }
+
+  @Test
+  fun maskedUdidLabels_neverPrintsFullUdidOnLastCharCollision() {
+    // Two UDIDs identical except the final character: the prefix is capped one short of full length
+    // so the last char is never revealed, and a positional #index disambiguates instead.
+    val labels = ArbigentAvailableDevice.IosReal.maskedUdidLabels(
+      listOf(iosReal("SAMESAME9"), iosReal("SAMESAME8"))
+    )
+    assertTrue(labels.none { it.contains("SAMESAME9") || it.contains("SAMESAME8") })
+    assertEquals(2, labels.toSet().size, "labels must be distinct")
+  }
+
   // --- provisioning profile validity ----------------------------------------------------
 
   private fun profileXml(expiration: String, devices: List<String>?): String {
