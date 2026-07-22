@@ -4,6 +4,7 @@ import java.io.File
 import java.io.RandomAccessFile
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 /**
@@ -39,12 +40,17 @@ public class IosRealXCTestPortForwarder(
   private val ownershipLockFile: File
     get() = File(ownershipRecordFile.parentFile, "port-$port.pid.lock")
 
-  private fun <T> withOwnershipLock(block: () -> T): T {
-    val lock = ownershipLockFile.apply { parentFile?.mkdirs() }
-    return RandomAccessFile(lock, "rw").use { raf ->
-      raf.channel.lock().use { block() }
+  private fun <T> withOwnershipLock(block: () -> T): T =
+    // Serialize same-JVM callers on a shared per-port monitor BEFORE touching the OS file lock:
+    // a FileChannel lock is held by the whole JVM, so two threads (or two instances) in this
+    // process locking the same file would throw OverlappingFileLockException. The monitor makes
+    // same-JVM access sequential; the file lock still guards against other processes.
+    synchronized(portMonitor(port)) {
+      val lock = ownershipLockFile.apply { parentFile?.mkdirs() }
+      RandomAccessFile(lock, "rw").use { raf ->
+        raf.channel.lock().use { block() }
+      }
     }
-  }
 
   public fun start() {
     ensureIproxyInstalled()
@@ -100,8 +106,12 @@ public class IosRealXCTestPortForwarder(
   // publishing (ownershipRecord null) or a newer instance already rewrote it, we leave it intact so
   // a live forwarder never appears unowned.
   private fun deleteOwnershipRecordIfOurs() {
-    val ours = ownershipRecord ?: return
+    // Read our published record under the same per-port lock that writeOwnershipRecord assigns it
+    // under, so a close() racing an in-progress start() is serialized against the publish: either it
+    // sees the record and deletes the matching pidfile, or it runs before the publish (when no file
+    // exists yet) — it can never see a null record while the pidfile is already on disk.
     withOwnershipLock {
+      val ours = ownershipRecord ?: return@withOwnershipLock
       if (readOwnershipRecord() == ours) {
         runCatching { ownershipRecordFile.delete() }
       }
@@ -164,7 +174,10 @@ public class IosRealXCTestPortForwarder(
       ownerStart = self.info().startInstant().map { it.toEpochMilli() }.orElse(0L),
     )
     // Publish atomically under the lock: write a sibling temp then rename into place, so a reader
-    // never sees a half-written record and a concurrent writer can't interleave with ours.
+    // never sees a half-written record and a concurrent writer can't interleave with ours. Assign
+    // the in-memory ownershipRecord under the SAME lock as (and only after) the file publish, so a
+    // close() serialized on the same per-port monitor never observes a null record while the
+    // pidfile already exists — which would leave the pidfile orphaned.
     withOwnershipLock {
       val dir = ownershipRecordFile.parentFile.apply { mkdirs() }
       val tmp = File.createTempFile("port-$port", ".pid", dir)
@@ -174,11 +187,11 @@ public class IosRealXCTestPortForwarder(
           tmp.toPath(), ownershipRecordFile.toPath(),
           StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE,
         )
+        ownershipRecord = record
       } finally {
         tmp.delete()
       }
     }
-    ownershipRecord = record
   }
 
   private fun readOwnershipRecord(): IproxyOwnershipRecord? =
@@ -215,6 +228,13 @@ public class IosRealXCTestPortForwarder(
   }
 
   public companion object {
+    // One monitor per port, shared across all forwarder instances in this JVM, so same-JVM callers
+    // serialize before acquiring the per-port OS file lock (which is JVM-wide and would otherwise
+    // throw OverlappingFileLockException). See [withOwnershipLock].
+    private val portMonitors = ConcurrentHashMap<Int, Any>()
+
+    private fun portMonitor(port: Int): Any = portMonitors.computeIfAbsent(port) { Any() }
+
     /**
      * Filters [lsofOutput] (newline-separated PIDs) to those whose process command name is
      * `iproxy`, so we never kill an unrelated process that happens to hold the port.
