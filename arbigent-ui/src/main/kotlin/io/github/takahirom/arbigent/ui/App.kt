@@ -25,14 +25,21 @@ import org.jetbrains.jewel.ui.component.*
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
 
-// Label for a device in the picker. Names alone can collide (a simulator and a phone, or two phones,
-// with the same model name), so when a name is shared we append the device kind and, for a physical
-// iPhone, its masked UDID to disambiguate. Selection itself is keyed by the device object, not this.
+// Label for a device in the picker. Names alone can collide (a simulator and a phone, two phones,
+// two simulators, or two Android devices with the same model name), so when a name is shared we
+// append a disambiguating hint: a physical iPhone shows its masked UDID; anything else shows its OS
+// plus an ordinal among the same-named devices, so two simulators (or two Android devices) never
+// render identically without leaking a raw identifier. Selection itself is keyed by the device
+// object, not this label.
 private fun deviceItemLabel(device: ArbigentAvailableDevice, all: List<ArbigentAvailableDevice>): String {
-  if (all.count { it.name == device.name } <= 1) return device.name
+  val sameName = all.filter { it.name == device.name }
+  if (sameName.size <= 1) return device.name
   val hint = when (device) {
     is ArbigentAvailableDevice.IosReal -> "iOS device ${device.maskedUdid}"
-    else -> device.deviceOs.name
+    else -> {
+      val ordinal = sameName.indexOfFirst { it.stableKey == device.stableKey } + 1
+      "${device.deviceOs.name} #$ordinal"
+    }
   }
   return "${device.name} ($hint)"
 }

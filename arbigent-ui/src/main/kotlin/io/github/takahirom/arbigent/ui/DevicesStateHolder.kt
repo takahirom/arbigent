@@ -7,6 +7,7 @@ import io.github.takahirom.arbigent.ArbigentDeviceOs
 import io.github.takahirom.arbigent.arbigentDebugLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -75,5 +76,11 @@ class DevicesStateHolder(val arbigentAvailableDeviceListFactory: (ArbigentDevice
   private fun reconcileSelection(newDevices: List<ArbigentAvailableDevice>) {
     val previous = _selectedDevice.value ?: return
     _selectedDevice.value = newDevices.firstOrNull { it.stableKey == previous.stableKey }
+  }
+
+  // Cancel the holder-owned scope so the OS collector and any in-flight discovery don't outlive the
+  // owning app state holder. Called from ArbigentAppStateHolder.close().
+  fun close() {
+    scope.cancel()
   }
 }

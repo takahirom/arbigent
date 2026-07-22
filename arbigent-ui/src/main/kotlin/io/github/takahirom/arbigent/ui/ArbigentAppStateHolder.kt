@@ -629,6 +629,7 @@ class ArbigentAppStateHolder(
     job?.cancel()
     projectStateFlow.value?.cancel()
     allScenarioStateHoldersStateFlow.value.forEach { it.cancel() }
+    devicesStateHolder.close()
     deviceConnectionState.value = DeviceConnectionState.NotConnected
     ArbigentGlobalStatus.onDisconnect {
       deviceCache.values.forEach { it.close() }
