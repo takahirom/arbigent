@@ -4,9 +4,10 @@ package io.github.takahirom.arbigent
  * Runtime configuration for the iOS real-device (physical iPhone) XCTest backend.
  *
  * These knobs only apply to physical devices discovered via `xcrun devicectl`; simulators are
- * unaffected. Values flow from the CLI/settings into [ArbigentIosRealDeviceSettings.current] before
- * device discovery, and each field falls back to an environment variable and finally a sensible
- * default (see [ArbigentIosRealDeviceSettings]).
+ * unaffected. The CLI/settings build one of these and thread it explicitly through discovery
+ * ([fetchAvailableDevicesByOs]) into each discovered [ArbigentAvailableDevice.IosReal], which
+ * carries it to connection time. Each field falls back to an environment variable and finally a
+ * sensible default (see the resolver functions on [ArbigentIosRealDeviceSettings]).
  */
 public class ArbigentIosRealDeviceConfiguration(
   /**
@@ -24,9 +25,10 @@ public class ArbigentIosRealDeviceConfiguration(
 )
 
 /**
- * Process-wide holder for [ArbigentIosRealDeviceConfiguration], mirroring [ArbigentFiles]. The CLI
- * populates [current] from options/settings; discovery and connection read it. Environment-variable
- * fallbacks live here so both the holder default and callers agree on precedence.
+ * Environment-variable names, the default port, and the resolver functions for
+ * [ArbigentIosRealDeviceConfiguration]. This is a stateless namespace: every resolver takes the
+ * config explicitly (there is no process-wide `current`), so precedence lives in one place while the
+ * config itself is threaded through discovery and carried on each device instance.
  */
 public object ArbigentIosRealDeviceSettings {
   public const val ENV_APPLE_TEAM_ID: String = "ARBIGENT_IOS_XCTEST_APPLE_TEAM_ID"
@@ -37,19 +39,23 @@ public object ArbigentIosRealDeviceSettings {
   // PORT env is unset). Keeping this as the host/iproxy port keeps both ends in sync.
   public const val DEFAULT_PORT: Int = 22087
 
-  public var current: ArbigentIosRealDeviceConfiguration = ArbigentIosRealDeviceConfiguration()
-
   /** Resolved device UDID filter: explicit config, then env, else null (auto-select single device). */
-  public fun resolvedDeviceId(env: (String) -> String? = System::getenv): String? =
-    current.deviceId?.takeIf { it.isNotBlank() } ?: env(ENV_DEVICE_ID)?.takeIf { it.isNotBlank() }
+  public fun resolvedDeviceId(
+    config: ArbigentIosRealDeviceConfiguration,
+    env: (String) -> String? = System::getenv,
+  ): String? =
+    config.deviceId?.takeIf { it.isNotBlank() } ?: env(ENV_DEVICE_ID)?.takeIf { it.isNotBlank() }
 
   /**
    * Resolved runner port: explicit config, then env, else [DEFAULT_PORT]. A configured or env value
    * outside `1..65535` — or non-numeric env text — fails loudly rather than silently falling back to
    * the default, which would mask a misconfiguration.
    */
-  public fun resolvedPort(env: (String) -> String? = System::getenv): Int {
-    current.port?.let { return requireValidPort(it) { "configured iOS real-device port" } }
+  public fun resolvedPort(
+    config: ArbigentIosRealDeviceConfiguration,
+    env: (String) -> String? = System::getenv,
+  ): Int {
+    config.port?.let { return requireValidPort(it) { "configured iOS real-device port" } }
     val raw = env(ENV_PORT)?.trim()
     if (!raw.isNullOrEmpty()) {
       val parsed = raw.toIntOrNull()
@@ -57,6 +63,21 @@ public object ArbigentIosRealDeviceSettings {
       return requireValidPort(parsed) { ENV_PORT }
     }
     return DEFAULT_PORT
+  }
+
+  /**
+   * Whether the user opted into physical-iPhone selection — an explicit Apple team id or device id
+   * (config or env). Discovery uses this to decide whether a physical device should be preferred
+   * over a booted simulator.
+   */
+  public fun isOptedIn(
+    config: ArbigentIosRealDeviceConfiguration,
+    env: (String) -> String? = System::getenv,
+  ): Boolean {
+    if (!config.appleTeamId.isNullOrBlank()) return true
+    if (!config.deviceId.isNullOrBlank()) return true
+    if (!env(ENV_APPLE_TEAM_ID).isNullOrBlank()) return true
+    return !env(ENV_DEVICE_ID).isNullOrBlank()
   }
 
   private inline fun requireValidPort(port: Int, name: () -> String): Int {

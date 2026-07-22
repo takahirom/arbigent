@@ -112,22 +112,25 @@ class IosRealDeviceTest {
 
   @Test
   fun resolvedPort_defaultsToRunnerPort() {
-    ArbigentIosRealDeviceSettings.current = ArbigentIosRealDeviceConfiguration()
-    assertEquals(ArbigentIosRealDeviceSettings.DEFAULT_PORT, ArbigentIosRealDeviceSettings.resolvedPort { null })
+    assertEquals(
+      ArbigentIosRealDeviceSettings.DEFAULT_PORT,
+      ArbigentIosRealDeviceSettings.resolvedPort(ArbigentIosRealDeviceConfiguration()) { null },
+    )
   }
 
   @Test
   fun resolvedPort_configWinsOverEnv() {
-    ArbigentIosRealDeviceSettings.current = ArbigentIosRealDeviceConfiguration(port = 30000)
-    assertEquals(30000, ArbigentIosRealDeviceSettings.resolvedPort { "40000" })
+    assertEquals(
+      30000,
+      ArbigentIosRealDeviceSettings.resolvedPort(ArbigentIosRealDeviceConfiguration(port = 30000)) { "40000" },
+    )
   }
 
   @Test
   fun resolvedDeviceId_fallsBackToEnv() {
-    ArbigentIosRealDeviceSettings.current = ArbigentIosRealDeviceConfiguration(deviceId = null)
     assertEquals(
       "UDID-FROM-ENV",
-      ArbigentIosRealDeviceSettings.resolvedDeviceId { name ->
+      ArbigentIosRealDeviceSettings.resolvedDeviceId(ArbigentIosRealDeviceConfiguration(deviceId = null)) { name ->
         if (name == ArbigentIosRealDeviceSettings.ENV_DEVICE_ID) "UDID-FROM-ENV" else null
       },
     )
