@@ -60,11 +60,17 @@ public fun fetchConnectedIosRealDevices(
       device.connectionProperties?.tunnelState.equals("connected", ignoreCase = true)
     fun matchesFilter(device: util.DeviceCtlResponse.Device) =
       deviceIdFilter == null || device.hardwareProperties?.udid == deviceIdFilter
-    // The device we actually need (the configured one, or any device when none was specified) must
-    // have a connected tunnel. Waking only when *nothing* is connected would strand a configured
-    // UDID that is disconnected while some other iPhone happens to be connected.
-    val satisfied = devices.any { isConnected(it) && matchesFilter(it) }
-    if (!satisfied && wakeTunnels) {
+    // When a specific device is configured we only need THAT device's tunnel up, so it is enough
+    // that it is connected — waking only when *nothing* is connected would strand a configured UDID
+    // that is disconnected while some other iPhone happens to be connected. When no device is
+    // configured (all-device discovery, e.g. the UI list), every paired-but-disconnected phone
+    // should be surfaced, so we wake all of them rather than stopping at the first connected one.
+    val needsWake = if (deviceIdFilter != null) {
+      devices.none { isConnected(it) && matchesFilter(it) }
+    } else {
+      devices.any { matchesFilter(it) && !isConnected(it) }
+    }
+    if (needsWake && wakeTunnels) {
       val toWake = devices.filter { matchesFilter(it) && !isConnected(it) }.mapNotNull { it.identifier }
       wakeIosRealDeviceTunnels(toWake, executor)
       devices = localDevice.listDeviceViaDeviceCtl()
