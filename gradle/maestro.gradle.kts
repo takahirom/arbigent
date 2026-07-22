@@ -121,10 +121,17 @@ val downloadMaestroZip = tasks.register("downloadMaestroZip") {
   }
 }
 
-// Extract into the (per-build, non-shared) build directory so Gradle's own up-to-date checking
-// applies, then publish each jar into the shared cache atomically via publishMaestroJars. A
-// later PR adding real-device support can extract the zip's driver-iphoneos/ products here too.
-val maestroJarsStagingDir: File = layout.buildDirectory.dir("maestro/jars-staging").get().asFile
+// Stage into a unique temp directory under the (per-checkout) build directory rather than a fixed
+// path, so two Gradle invocations sharing the same checkout never overwrite each other's staging
+// jars while one is mid-extract/shade. Each staged jar is then published into the shared cache
+// atomically. The temp dirs are created lazily (only when a maestro task actually runs) so
+// unrelated builds don't litter the build directory. A later PR adding real-device support can
+// extract the zip's driver-iphoneos/ products into the same staging area.
+val maestroStagingBase: File = layout.buildDirectory.dir("maestro").get().asFile
+val maestroJarsStagingDir: File by lazy {
+  maestroStagingBase.mkdirs()
+  java.nio.file.Files.createTempDirectory(maestroStagingBase.toPath(), "jars-staging").toFile()
+}
 val extractMaestroJars = tasks.register<Copy>("extractMaestroJars") {
   description = "Extract the maestro-* jars arbigent depends on from the pinned release artifact."
   group = "maestro"
@@ -134,7 +141,7 @@ val extractMaestroJars = tasks.register<Copy>("extractMaestroJars") {
     eachFile { path = name } // flatten maestro/lib/<jar> -> <jar>
   }
   includeEmptyDirs = false
-  into(maestroJarsStagingDir)
+  into(java.util.concurrent.Callable { maestroJarsStagingDir })
 }
 
 val publishMaestroJars = tasks.register("publishMaestroJars") {
@@ -143,8 +150,9 @@ val publishMaestroJars = tasks.register("publishMaestroJars") {
   dependsOn(extractMaestroJars)
   outputs.dir(maestroJarsDir)
   doLast {
+    val staged = maestroJarsStagingDir.listFiles().orEmpty()
     withMaestroCacheLock {
-      maestroJarsStagingDir.listFiles()?.forEach { jar ->
+      staged.forEach { jar ->
         publishFileAtomically(jar, maestroJarsDir.resolve(jar.name))
       }
     }
@@ -174,23 +182,26 @@ val maestroWebKtor2Jars: FileCollection = maestroWebKtor2.incoming.artifactView 
   componentFilter { it is ModuleComponentIdentifier && it.group == "io.ktor" }
 }.files
 
-// Shade into the (per-build, non-shared) build directory so Gradle's own up-to-date checking
-// applies and concurrent builds never write the same shared jar; publishShadedMaestroWeb then
-// moves it into the shared cache atomically. Read the plain maestro-web.jar from the extraction
-// staging dir rather than the shared cache to avoid reading a jar another build is publishing.
-val maestroShadedStagingDir: File = layout.buildDirectory.dir("maestro/shaded-staging").get().asFile
+// Shade into a unique temp directory under the build directory (as for extraction) so concurrent
+// builds in the same checkout never write the same staging jar; publishShadedMaestroWeb then moves
+// it into the shared cache atomically. Read the plain maestro-web.jar from the extraction staging
+// dir rather than the shared cache to avoid reading a jar another build is publishing.
+val maestroShadedStagingDir: File by lazy {
+  maestroStagingBase.mkdirs()
+  java.nio.file.Files.createTempDirectory(maestroStagingBase.toPath(), "shaded-staging").toFile()
+}
 val shadeMaestroWeb = tasks.register<ShadowJar>("shadeMaestroWeb") {
   description = "Relocate ktor 2.3.13 inside maestro-web to avoid clashing with arbigent's ktor 3.x."
   group = "maestro"
   dependsOn(extractMaestroJars)
-  from(zipTree(maestroJarsStagingDir.resolve("maestro-web.jar")))
+  from({ zipTree(maestroJarsStagingDir.resolve("maestro-web.jar")) })
   from({ maestroWebKtor2Jars.map { zipTree(it) } })
   relocate("io.ktor", "arbigent.shaded.io.ktor")
   mergeServiceFiles() // ktor engines register via META-INF/services; merge + relocate their entries
   exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA", "**/module-info.class")
   duplicatesStrategy = DuplicatesStrategy.EXCLUDE
   archiveFileName.set("maestro-web-shaded.jar")
-  destinationDirectory.set(maestroShadedStagingDir)
+  destinationDirectory.set(layout.dir(provider { maestroShadedStagingDir }))
 }
 
 val shadedMaestroWebJar: File = maestroShadedDir.resolve("maestro-web-shaded.jar")
