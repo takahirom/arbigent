@@ -4,6 +4,7 @@ import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.runCatching
 import device.IOSDevice
 import ios.devicectl.DeviceControlIOSDevice
+import util.IOSLaunchArguments.toIOSLaunchArguments
 import java.io.File
 import java.io.InputStream
 import java.util.zip.ZipInputStream
@@ -34,14 +35,16 @@ public class ArbigentDevicectlIOSDevice(
       "xcrun", "devicectl", "device", "process", "launch",
       "--terminate-existing",
       "--device", coreDeviceIdentifier,
-      id,
     )
     // devicectl parses `-`-prefixed tokens as its own options wherever they appear (Swift
-    // ArgumentParser), so terminate option parsing with `--` before passing app launch arguments.
-    if (launchArguments.isNotEmpty()) {
-      command.add("--")
-      launchArguments.values.forEach { command.add(it.toString()) }
-    }
+    // ArgumentParser), so terminate option parsing with `--`. Per `devicectl device process
+    // launch --help` everything after `--` is positional (<bundle-identifier-or-path> then
+    // <command-line-arguments>...), so a malformed app id can't be read as a devicectl option.
+    // Convert the launch arguments with maestro's own toIOSLaunchArguments so key/value pairs
+    // (e.g. "-cartColor" "Orange") match the semantics used on simulators.
+    command.add("--")
+    command.add(id)
+    command.addAll(launchArguments.toIOSLaunchArguments())
     val result = executor.execute(command)
     check(result.isSuccess) {
       "Failed to launch $id on the connected device: ${result.stderr.ifBlank { result.stdout }}"
@@ -70,19 +73,24 @@ public class ArbigentDevicectlIOSDevice(
   }
 
   override fun clearAppState(id: String) {
-    // devicectl exposes no app-state clear; terminating is the closest safe behavior. Uninstall
-    // would be destructive without a reinstall path, so we log and skip rather than throw, keeping
-    // flows that call clearState from crashing on a real device.
-    arbigentInfoLog("iOS real device: clearAppState($id) is not supported via devicectl; skipping")
+    // devicectl exposes no app-state clear, and uninstall/reinstall would be destructive without a
+    // reliable reinstall path. Silently skipping made clearState() falsely report success and let
+    // scenarios run against stale data, so fail explicitly instead.
+    throw UnsupportedOperationException(
+      "clearAppState($id) is not supported on a physical iOS device via devicectl. Remove clearState " +
+        "from this scenario, or uninstall/reinstall the app between runs manually."
+    )
   }
 
   override fun openLink(link: String): Result<Unit, Throwable> = runCatching {
-    val result = executor.execute(
-      listOf("xcrun", "devicectl", "device", "process", "launch", "--device", coreDeviceIdentifier, "--payload-url", link)
+    // `devicectl device process launch` requires a <bundle-identifier-or-path> positional (see its
+    // --help); there is no devicectl verb that opens an arbitrary URL against the system handler, so
+    // --payload-url alone cannot launch anything. Fail loudly rather than run a command that always
+    // errors while pretending to be supported.
+    throw UnsupportedOperationException(
+      "openLink($link) is not supported on a physical iOS device via devicectl. Trigger the deep link " +
+        "from within the app under test instead."
     )
-    check(result.isSuccess) {
-      "Failed to open link on the connected device: ${result.stderr.ifBlank { result.stdout }}"
-    }
   }
 
   private fun unzip(stream: InputStream, targetDir: File) {

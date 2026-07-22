@@ -1,5 +1,6 @@
 package io.github.takahirom.arbigent
 
+import com.github.michaelbull.result.get
 import device.IOSDevice
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -152,6 +153,113 @@ class IosRealDeviceTest {
     assertEquals(listOf("555"), pids)
   }
 
+  private fun record(iproxyPid: Long, iproxyStart: Long, ownerPid: Long = 900, ownerStart: Long = 111) =
+    IosRealXCTestPortForwarder.IproxyOwnershipRecord(iproxyPid, iproxyStart, ownerPid, ownerStart)
+
+  @Test
+  fun reapDecision_reapsWhenOwnerArbigentIsDead() {
+    val decision = IosRealXCTestPortForwarder.reapDecision(
+      port = 22087,
+      listeningIproxyPids = listOf("111"),
+      record = record(iproxyPid = 111, iproxyStart = 5000),
+      isOwnerAlive = { _, _ -> false },
+      iproxyStartOf = { 5000 },
+    )
+    assertEquals(IosRealXCTestPortForwarder.ReapDecision.Reap(listOf("111")), decision)
+  }
+
+  @Test
+  fun reapDecision_failsWhenOwnerArbigentStillAlive() {
+    val decision = IosRealXCTestPortForwarder.reapDecision(
+      port = 22087,
+      listeningIproxyPids = listOf("111"),
+      record = record(iproxyPid = 111, iproxyStart = 5000, ownerPid = 42),
+      isOwnerAlive = { pid, _ -> pid == 42L },
+      iproxyStartOf = { 5000 },
+    )
+    assertTrue(decision is IosRealXCTestPortForwarder.ReapDecision.Fail)
+    assertTrue(decision.reason.contains("another running arbigent"))
+  }
+
+  @Test
+  fun reapDecision_failsForUnownedIproxy() {
+    val decision = IosRealXCTestPortForwarder.reapDecision(
+      port = 22087,
+      listeningIproxyPids = listOf("111"),
+      record = null,
+      isOwnerAlive = { _, _ -> false },
+      iproxyStartOf = { 5000 },
+    )
+    assertTrue(decision is IosRealXCTestPortForwarder.ReapDecision.Fail)
+    assertTrue(decision.reason.contains("did not start"))
+  }
+
+  @Test
+  fun reapDecision_failsWhenRecordedIproxyStartMismatches() {
+    // PID reuse: the pid matches the record but the process started at a different time.
+    val decision = IosRealXCTestPortForwarder.reapDecision(
+      port = 22087,
+      listeningIproxyPids = listOf("111"),
+      record = record(iproxyPid = 111, iproxyStart = 5000),
+      isOwnerAlive = { _, _ -> false },
+      iproxyStartOf = { 9999 },
+    )
+    assertTrue(decision is IosRealXCTestPortForwarder.ReapDecision.Fail)
+  }
+
+  @Test
+  fun reapDecision_reapsNothingWhenPortFree() {
+    val decision = IosRealXCTestPortForwarder.reapDecision(
+      port = 22087,
+      listeningIproxyPids = emptyList(),
+      record = null,
+      isOwnerAlive = { _, _ -> true },
+      iproxyStartOf = { null },
+    )
+    assertEquals(IosRealXCTestPortForwarder.ReapDecision.Reap(emptyList()), decision)
+  }
+
+  // --- provisioning profile validity ----------------------------------------------------
+
+  private fun profileXml(expiration: String, devices: List<String>?): String {
+    val deviceBlock = devices?.joinToString("\n") { "\t\t<string>$it</string>" }?.let {
+      "\t<key>ProvisionedDevices</key>\n\t<array>\n$it\n\t</array>\n"
+    }.orEmpty()
+    return """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <plist version="1.0">
+      <dict>
+      $deviceBlock	<key>ExpirationDate</key>
+      	<date>$expiration</date>
+      </dict>
+      </plist>
+    """.trimIndent()
+  }
+
+  @Test
+  fun mobileProvision_validAndDeviceCovered_isUsable() {
+    val xml = profileXml("2999-01-01T00:00:00Z", listOf("DEVICE-A", "DEVICE-B"))
+    assertTrue(MobileProvisionInspector.isUsable(xml, "DEVICE-B", java.time.Instant.parse("2026-07-22T00:00:00Z")))
+  }
+
+  @Test
+  fun mobileProvision_expired_isNotUsable() {
+    val xml = profileXml("2020-01-01T00:00:00Z", listOf("DEVICE-A"))
+    assertTrue(!MobileProvisionInspector.isUsable(xml, "DEVICE-A", java.time.Instant.parse("2026-07-22T00:00:00Z")))
+  }
+
+  @Test
+  fun mobileProvision_deviceNotCovered_isNotUsable() {
+    val xml = profileXml("2999-01-01T00:00:00Z", listOf("DEVICE-A"))
+    assertTrue(!MobileProvisionInspector.isUsable(xml, "DEVICE-Z", java.time.Instant.parse("2026-07-22T00:00:00Z")))
+  }
+
+  @Test
+  fun mobileProvision_noDeviceList_isUsableWhenUnexpired() {
+    val xml = profileXml("2999-01-01T00:00:00Z", devices = null)
+    assertTrue(MobileProvisionInspector.isUsable(xml, "ANY-DEVICE", java.time.Instant.parse("2026-07-22T00:00:00Z")))
+  }
+
   // --- devicectl controller --------------------------------------------------------------
 
   @Test
@@ -167,31 +275,52 @@ class IosRealDeviceTest {
     assertEquals(
       listOf(
         "xcrun", "devicectl", "device", "process", "launch",
-        "--terminate-existing", "--device", "CORE-ID-1", "com.apple.Preferences",
+        "--terminate-existing", "--device", "CORE-ID-1", "--", "com.apple.Preferences",
       ),
       cmd,
     )
   }
 
   @Test
-  fun launch_separatesLaunchArgumentsWithDoubleDash() {
+  fun launch_placesDoubleDashBeforeBundleIdAndKeepsArgumentKeys() {
     val executor = FakeExecutor()
     val controller = ArbigentDevicectlIOSDevice(
       coreDeviceIdentifier = "CORE-ID-1",
       executor = executor,
       delegate = NoopIOSDevice(),
     )
-    // A `-`-prefixed arg must not be consumed by devicectl as one of its own options.
+    // `--` before the bundle id keeps a malformed app id from being parsed as a devicectl option,
+    // and launch arguments must keep their keys (maestro's toIOSLaunchArguments prefixes bare keys
+    // with `-`), not collapse to values only.
     controller.launch("com.example", linkedMapOf("-cartColor" to "Orange", "count" to 3))
     val cmd = executor.commands.single()
     assertEquals(
       listOf(
         "xcrun", "devicectl", "device", "process", "launch",
-        "--terminate-existing", "--device", "CORE-ID-1", "com.example",
-        "--", "Orange", "3",
+        "--terminate-existing", "--device", "CORE-ID-1",
+        "--", "com.example", "-cartColor", "Orange", "-count", "3",
       ),
       cmd,
     )
+  }
+
+  @Test
+  fun clearAppState_failsAsUnsupportedRatherThanFakingSuccess() {
+    val executor = FakeExecutor()
+    val controller = ArbigentDevicectlIOSDevice("CORE-ID-1", executor, NoopIOSDevice())
+    assertFailsWith<UnsupportedOperationException> { controller.clearAppState("com.example") }
+    assertTrue(executor.commands.isEmpty(), "clearAppState must not run any devicectl command")
+  }
+
+  @Test
+  fun openLink_failsAsUnsupportedRatherThanRunningABrokenCommand() {
+    val executor = FakeExecutor()
+    val controller = ArbigentDevicectlIOSDevice("CORE-ID-1", executor, NoopIOSDevice())
+    // openLink is unsupported on a real device, so it must report failure (a null success value)
+    // without ever shelling out to a devicectl command that could not work.
+    val result = controller.openLink("https://example.com")
+    assertEquals(null, result.get())
+    assertTrue(executor.commands.isEmpty(), "openLink must not run any devicectl command")
   }
 
   @Test
