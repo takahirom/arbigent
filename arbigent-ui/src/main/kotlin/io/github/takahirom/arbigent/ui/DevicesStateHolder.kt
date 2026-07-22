@@ -46,6 +46,10 @@ class DevicesStateHolder(val arbigentAvailableDeviceListFactory: (ArbigentDevice
 
   fun fetchDevices() {
     synchronized(fetchLock) {
+      // Accepted tradeoff: cancel() only requests cancellation, so a just-cancelled predecessor may
+      // still be unwinding its (read-only) discovery when the replacement starts, briefly running
+      // two discoveries. That is harmless — discovery mutates no device state, and the ensureActive()
+      // guard below means only the latest job ever publishes its result.
       fetchJob?.cancel()
       fetchJob = scope.launch {
         val os = selectedDeviceOs.value
@@ -64,17 +68,12 @@ class DevicesStateHolder(val arbigentAvailableDeviceListFactory: (ArbigentDevice
 
   // Rediscovery produces fresh device objects that are never reference-equal to the previously
   // selected one (these device classes deliberately don't override equals), so re-point the
-  // selection at the matching entry in the new list by a stable identity, or clear it if the
+  // selection at the matching entry in the new list by its stable identity, or clear it if the
   // device is gone. Without this the UI keeps a stale object selected that no list entry matches.
+  // stableKey carries the full device identifier (never displayed), so two real iPhones sharing a
+  // masked UDID prefix are told apart and the selection can never re-point at the wrong device.
   private fun reconcileSelection(newDevices: List<ArbigentAvailableDevice>) {
     val previous = _selectedDevice.value ?: return
-    _selectedDevice.value = newDevices.firstOrNull { deviceIdentity(it) == deviceIdentity(previous) }
-  }
-
-  private fun deviceIdentity(device: ArbigentAvailableDevice): String = when (device) {
-    // Real iPhones share model names, so key on the masked UDID (never the raw one) plus name.
-    is ArbigentAvailableDevice.IosReal -> "iosreal:${device.maskedUdid}:${device.name}"
-    // Android name is the adb serial; simulator/web names are stable per device.
-    else -> "${device.deviceOs.name}:${device.name}"
+    _selectedDevice.value = newDevices.firstOrNull { it.stableKey == previous.stableKey }
   }
 }
