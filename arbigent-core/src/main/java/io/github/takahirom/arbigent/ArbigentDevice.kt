@@ -199,24 +199,37 @@ public data class ArbigentElementList(
 }
 
 public class MaestroDevice(
-  @Volatile private var maestro: Maestro,
+  maestro: Maestro,
   private val screenshotsDir: File = ArbigentFiles.screenshotsDir,
   private val availableDevice: ArbigentAvailableDevice? = null,
   // Extra teardown tied to this connection (e.g. the iproxy port forwarder for a physical
   // iPhone), run after maestro.close() so session-scoped child processes stop with the device.
-  private val onClose: (() -> Unit)? = null,
+  onClose: (() -> Unit)? = null,
 ) : ArbigentDevice, ArbigentTvCompatDevice {
-  init {
-    arbigentInfoLog("MaestroDevice created: screenshotsDir:${screenshotsDir.absolutePath}")
-  }
-
+  // maestro, its Orchestra and the connection-scoped teardown are swapped together as one
+  // Connection, so a reconnect can never pair the new maestro with the old cleanup (which would
+  // leak the replacement device's iproxy) or keep invoking the stale one on close().
+  //
   // Maestro's Orchestra artifact refactor (#3282) removed the screenshotsDir constructor
   // parameter; takeScreenshot commands now write under an artifacts dir instead of
   // screenshotsDir/<path>.png. Arbigent captures screenshots itself in executeActions()
   // (see below) to keep that path contract, so Orchestra needs no screenshots dir here.
-  @Volatile private var orchestra = Orchestra(
-    maestro = maestro,
+  private class Connection(
+    val maestro: Maestro,
+    val orchestra: Orchestra,
+    val onClose: (() -> Unit)?,
   )
+
+  @Volatile private var connection: Connection =
+    Connection(maestro, Orchestra(maestro = maestro), onClose)
+
+  // Volatile read of the live connection so callers keep using `maestro`/`orchestra` unchanged.
+  private val maestro: Maestro get() = connection.maestro
+  private val orchestra: Orchestra get() = connection.orchestra
+
+  init {
+    arbigentInfoLog("MaestroDevice created: screenshotsDir:${screenshotsDir.absolutePath}")
+  }
 
   override fun deviceName(): String {
     return maestro.deviceName
@@ -627,11 +640,6 @@ public class MaestroDevice(
   private var reconnectAttempts = 0
   private val maxReconnectAttempts = 6  // Allows retries with exponential backoff up to ~64 seconds
   private val reconnectLock = Any()
-  
-  private fun updateConnection(newMaestro: Maestro) {
-    this.maestro = newMaestro
-    this.orchestra = Orchestra(maestro = this.maestro)
-  }
 
   private fun reconnectIfDisconnected() {
     synchronized(reconnectLock) {
@@ -661,8 +669,8 @@ public class MaestroDevice(
         }
         
         reconnectAttempts++
-        
-        val oldMaestro = this.maestro
+
+        val oldConnection = this.connection
 
         // Try to reconnect
         val newDevice = try {
@@ -679,15 +687,16 @@ public class MaestroDevice(
           continue // Try again
         }
 
-        // Update to new connection
-        updateConnection(newDevice.maestro)
-
-        // Close old connection after successful reconnection
+        // Adopt the new device's whole Connection (maestro + orchestra + its onClose, which owns the
+        // new iproxy) in one volatile swap, then tear down the old connection exactly once — closing
+        // the old maestro AND running the old onClose so the previous iproxy is not leaked.
+        this.connection = newDevice.connection
         try {
-          oldMaestro.close()
+          oldConnection.maestro.close()
         } catch (_: Exception) {
           // Ignore close errors, device might already be disconnected
         }
+        runCatching { oldConnection.onClose?.invoke() }
 
         // Reset counter on successful reconnection
         reconnectAttempts = 0
@@ -702,8 +711,14 @@ public class MaestroDevice(
 
   override fun close() {
     isClosed = true
-    maestro.close()
-    runCatching { onClose?.invoke() }
+    val current = connection
+    // onClose owns the iproxy forwarder; run it in finally so a failure closing maestro still tears
+    // the forwarder down instead of leaking it.
+    try {
+      current.maestro.close()
+    } finally {
+      runCatching { current.onClose?.invoke() }
+    }
   }
 
   override fun isClosed(): Boolean {
