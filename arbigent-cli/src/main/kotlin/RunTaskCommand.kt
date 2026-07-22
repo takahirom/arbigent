@@ -79,7 +79,7 @@ class ArbigentRunTaskCommand : CliktCommand(name = "task") {
       os = os,
       iosAppleTeamId = iosAppleTeamId,
       iosRealDeviceId = iosRealDeviceId,
-      iosRealDevicePort = iosRealDevicePort?.trim()?.toIntOrNull(),
+      iosRealDevicePort = parseIosRealDevicePort(iosRealDevicePort),
     )
 
     try {

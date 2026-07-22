@@ -43,7 +43,24 @@ public object ArbigentIosRealDeviceSettings {
   public fun resolvedDeviceId(env: (String) -> String? = System::getenv): String? =
     current.deviceId?.takeIf { it.isNotBlank() } ?: env(ENV_DEVICE_ID)?.takeIf { it.isNotBlank() }
 
-  /** Resolved runner port: explicit config, then env, else [DEFAULT_PORT]. */
-  public fun resolvedPort(env: (String) -> String? = System::getenv): Int =
-    current.port ?: env(ENV_PORT)?.trim()?.toIntOrNull() ?: DEFAULT_PORT
+  /**
+   * Resolved runner port: explicit config, then env, else [DEFAULT_PORT]. A configured or env value
+   * outside `1..65535` — or non-numeric env text — fails loudly rather than silently falling back to
+   * the default, which would mask a misconfiguration.
+   */
+  public fun resolvedPort(env: (String) -> String? = System::getenv): Int {
+    current.port?.let { return requireValidPort(it) { "configured iOS real-device port" } }
+    val raw = env(ENV_PORT)?.trim()
+    if (!raw.isNullOrEmpty()) {
+      val parsed = raw.toIntOrNull()
+        ?: throw IllegalArgumentException("$ENV_PORT must be an integer in 1..65535 but was \"$raw\"")
+      return requireValidPort(parsed) { ENV_PORT }
+    }
+    return DEFAULT_PORT
+  }
+
+  private inline fun requireValidPort(port: Int, name: () -> String): Int {
+    require(port in 1..65535) { "${name()} must be in 1..65535 but was $port" }
+    return port
+  }
 }

@@ -165,6 +165,10 @@ public sealed interface ArbigentAvailableDevice {
   ) : ArbigentAvailableDevice {
     override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Ios
 
+    // First 8 chars of the UDID, enough to disambiguate connected iPhones in a message without ever
+    // printing the full hardware UDID.
+    public val maskedUdid: String get() = hardwareUdid.take(8) + "…"
+
     override fun connectToDevice(): ArbigentDevice {
       val config = ArbigentIosRealDeviceSettings.current
       val host = "127.0.0.1"

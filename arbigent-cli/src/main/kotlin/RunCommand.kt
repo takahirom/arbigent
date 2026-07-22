@@ -201,7 +201,7 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
       os = os,
       iosAppleTeamId = iosAppleTeamId,
       iosRealDeviceId = iosRealDeviceId,
-      iosRealDevicePort = iosRealDevicePort?.trim()?.toIntOrNull(),
+      iosRealDevicePort = parseIosRealDevicePort(iosRealDevicePort),
     )
     Runtime.getRuntime().addShutdownHook(object : Thread() {
       override fun run() {
