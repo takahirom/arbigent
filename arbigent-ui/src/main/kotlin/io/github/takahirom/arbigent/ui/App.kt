@@ -12,6 +12,7 @@ import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import io.github.takahirom.arbigent.ArbigentAvailableDevice
 import io.github.takahirom.arbigent.ArbigentDeviceOs
 import io.github.takahirom.arbigent.arbigentDebugLog
 import io.github.takahirom.arbigent.ui.ArbigentAppStateHolder.DeviceConnectionState
@@ -23,6 +24,18 @@ import org.jetbrains.jewel.ui.Orientation
 import org.jetbrains.jewel.ui.component.*
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
+
+// Label for a device in the picker. Names alone can collide (a simulator and a phone, or two phones,
+// with the same model name), so when a name is shared we append the device kind and, for a physical
+// iPhone, its masked UDID to disambiguate. Selection itself is keyed by the device object, not this.
+private fun deviceItemLabel(device: ArbigentAvailableDevice, all: List<ArbigentAvailableDevice>): String {
+  if (all.count { it.name == device.name } <= 1) return device.name
+  val hint = when (device) {
+    is ArbigentAvailableDevice.IosReal -> "iOS device ${device.maskedUdid}"
+    else -> device.deviceOs.name
+  }
+  return "${device.name} ($hint)"
+}
 
 @Composable
 fun App(
@@ -296,8 +309,9 @@ fun ScenarioControls(appStateHolder: ArbigentAppStateHolder) {
             text = item.name,
             isSelected = isSelected,
             onClick = {
+              // The holder's OS collector re-fetches on this change; no explicit fetch needed (which
+              // would only launch a second, redundant discovery).
               devicesStateHolder.selectedDeviceOs.value = item
-              devicesStateHolder.fetchDevices()
               devicesStateHolder.onSelectedDeviceChanged(null)
             },
           )
@@ -306,21 +320,23 @@ fun ScenarioControls(appStateHolder: ArbigentAppStateHolder) {
     }
 
     val selectedDevice by devicesStateHolder.selectedDevice.collectAsState()
-    val items = devicesStateHolder.devices.collectAsState().value.map { it.name }
+    val deviceList = devicesStateHolder.devices.collectAsState().value
     arbigentDebugLog("selectedDevice: $selectedDevice")
     ComboBox(
       modifier = Modifier.width(170.dp).padding(end = 2.dp),
-      labelText = selectedDevice?.name ?: "Select device",
+      labelText = selectedDevice?.let { deviceItemLabel(it, deviceList) } ?: "Select device",
       maxPopupHeight = 150.dp,
     ) {
       Column {
-        items.forEach { itemText ->
-          val isSelected = itemText == selectedDevice?.name
+        // Iterate device objects (not display names) so a simulator and a phone, or two phones, that
+        // share a name each select the exact device the user clicked rather than the first name match.
+        deviceList.forEach { device ->
+          val isSelected = device == selectedDevice
           ComboBoxItem(
-            text = itemText,
+            text = deviceItemLabel(device, deviceList),
             isSelected = isSelected,
             onClick = {
-              devicesStateHolder.onSelectedDeviceChanged(devicesStateHolder.devices.value.firstOrNull { it.name == itemText })
+              devicesStateHolder.onSelectedDeviceChanged(device)
               devicesStateHolder.selectedDevice.value?.let {
                 appStateHolder.onClickConnect(devicesStateHolder)
               }
