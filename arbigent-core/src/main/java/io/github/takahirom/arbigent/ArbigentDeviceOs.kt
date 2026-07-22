@@ -336,6 +336,11 @@ internal fun warmUpIosDevice(maestro: Maestro) {
       runBlocking { maestro.viewHierarchy() }
       responsive = true
       break
+    } catch (e: InterruptedException) {
+      // Cancellation must win: restore the interrupt flag and stop warming up rather than
+      // treating it as just another "not responsive yet" retry.
+      Thread.currentThread().interrupt()
+      throw e
     } catch (e: Exception) {
       arbigentInfoLog("iOS warm-up: device not responsive yet, retrying: ${e.message}")
       Thread.sleep(pollIntervalMs)
