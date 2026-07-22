@@ -27,8 +27,9 @@ class ArbigentAppStateHolder(
     fetchAvailableDevicesByOs(os, includeAllIosDevices = true)
   },
   // Threaded into every holder and scope this owns so tests drive them on a TestDispatcher instead
-  // of mutating a process-wide global.
-  private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
+  // of mutating a process-wide global. internal so editor dialogs that build their own holders
+  // (e.g. the reusable-scenario editor) can keep them on the same dispatcher.
+  internal val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
   private val _fixedScenariosFlow = MutableStateFlow<List<FixedScenario>>(emptyList())
   val fixedScenariosFlow: StateFlow<List<FixedScenario>> = _fixedScenariosFlow.asStateFlow()
@@ -424,7 +425,8 @@ class ArbigentAppStateHolder(
       initialScenarios = allScenarioStateHoldersStateFlow.value.map { scenario ->
         scenario.createScenario(allScenarioStateHoldersStateFlow.value)
       },
-      appSettings = appSettings
+      appSettings = appSettings,
+      dispatcher = dispatcher,
     )
     projectStateFlow.value = arbigentProject
     allScenarioStateHoldersStateFlow.value.forEach { scenarioStateHolder ->
@@ -618,7 +620,8 @@ class ArbigentAppStateHolder(
           arbigentScenarioStateHolders
         )
       },
-      appSettings = appSettings
+      appSettings = appSettings,
+      dispatcher = dispatcher,
     )
     allScenarioStateHoldersStateFlow.value = arbigentScenarioStateHolders
     // Use the loaded content directly to avoid format differences
