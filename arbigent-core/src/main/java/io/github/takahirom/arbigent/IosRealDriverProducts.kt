@@ -34,14 +34,12 @@ public class IosRealDriverProducts(
   public fun resolveBuildProductsDir(): File {
     val cacheDir = cacheDir()
     val productsDir = File(cacheDir, "Build/Products")
-    if (isUpToDate(cacheDir, productsDir)) {
-      arbigentInfoLog("iOS real device: reusing cached runner at ${productsDir.absolutePath}")
-      return productsDir
-    }
-    // The cache dir is shared across arbigent processes (e.g. UI + CLI); serialize the
-    // check-then-build so two runs cannot wipe each other's in-progress build. See [withBuildLock].
+    // Validate the cache and (if needed) build entirely under the build lock. A cache-hit
+    // validation done outside the lock could return a products dir that a concurrent run is
+    // mid-way through deleting and rebuilding, and its runner-source checksum could open the
+    // bundled-source jar FileSystem while another thread closes it. Holding the lock across the
+    // whole check-then-build serializes both against other runs (process) and threads (JVM).
     return withBuildLock(cacheDir) {
-      // Another run may have finished the build while we waited for the lock.
       if (isUpToDate(cacheDir, productsDir)) {
         arbigentInfoLog("iOS real device: reusing cached runner at ${productsDir.absolutePath}")
       } else {
@@ -206,10 +204,18 @@ public class IosRealDriverProducts(
     if (uri.scheme != "jar") return block(Paths.get(uri))
     var createdFs = false
     val fs = try {
+      // The JVM already owns this jar FileSystem (e.g. the app jar); borrow it and leave it open.
       FileSystems.getFileSystem(uri)
     } catch (e: FileSystemNotFoundException) {
-      createdFs = true
-      FileSystems.newFileSystem(uri, emptyMap<String, Any>())
+      try {
+        createdFs = true
+        FileSystems.newFileSystem(uri, emptyMap<String, Any>())
+      } catch (e: java.nio.file.FileSystemAlreadyExistsException) {
+        // Another caller created it between our lookup and creation; borrow it without closing so
+        // we don't yank the FileSystem out from under that caller mid-walk.
+        createdFs = false
+        FileSystems.getFileSystem(uri)
+      }
     }
     return try {
       block(fs.getPath("/$DRIVER_SOURCE_RESOURCE"))
