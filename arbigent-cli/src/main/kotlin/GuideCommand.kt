@@ -276,6 +276,14 @@ Done when: you know the scenario ids and tags you need for the next `run` comman
   Never commit keys; use the `settings.local.yml` file (gitignore it).
 - A connected device matching `--os` (`android` (default) / `ios` / `web`). The first
   available device is used. Not needed for `--dry-run`.
+  - `--os=ios` uses a booted simulator, or a physical iPhone when one is connected.
+    Runner signing and USB port forwarding are handled for you (needs Xcode, the iOS
+    platform matching the device, and `iproxy` on PATH). Keep the iPhone paired,
+    trusted, and unlocked for the whole run. Real-device options: `--ios-xctest-apple-team-id`
+    (signing team; auto-detected when you have exactly one identity),
+    `--ios-real-device-id` (hardware UDID; required when several iPhones are connected),
+    `--ios-real-device-port` (default 22087). All can live in `.arbigent/settings.local.yml`.
+    See the README "iOS real devices" section for details.
 
 ## Selecting scenarios
 
@@ -356,6 +364,8 @@ you suspect the wrong scenarios were selected.
   `.arbigent/settings.local.yml`.
 - "No available device found" — start an emulator/simulator or connect a device
   matching `--os` before running.
+- iOS real-device run times out — the iPhone screen is almost always locked; unlock it and
+  keep it unlocked. For other setup causes see `arbigent guide running-scenarios`.
 - Goal not achieved within steps — raise `maxStep`, split the scenario using
   `dependency`, or make the `goal` more specific with explicit guardrails.
 - Wrong starting state — add `initializationMethods` (`CleanupData`, `LaunchApp`,

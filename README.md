@@ -389,6 +389,9 @@ Options:
   --ai-type=(openai|gemini|azureopenai)  Type of AI to use
   --ai-api-logging                       Enable AI API debug logging
   --os=(android|ios|web)                 Target operating system
+  --ios-xctest-apple-team-id=<text>      Apple team id for signing the XCTest runner on a physical iPhone
+  --ios-real-device-id=<text>            Hardware UDID selecting a specific physical iPhone
+  --ios-real-device-port=<text>          Host/device port for the XCTest runner (default 22087)
   --project-file=<text>                  Path to the project YAML file
   --log-level=(debug|info|warn|error)    Log level
   --log-file=<text>                      Log file path
@@ -401,6 +404,52 @@ Options:
   --shard=<value>                        Shard specification (e.g., 1/5)
   -h, --help                             Show this message and exit
 ```
+
+#### iOS real devices
+
+Arbigent can drive a physical iPhone (not just a simulator) over Apple's CoreDevice/XCTest stack. Discovery, runner signing, and port forwarding are handled for you; a single connected iPhone with `--os=ios` just works.
+
+**Prerequisites**
+
+- **Xcode** installed, plus the iOS platform matching your device's iOS version. If a build fails with `iOS X.Y is not installed`, install it with `xcodebuild -downloadPlatform iOS`.
+- **`iproxy`** from [libimobiledevice](https://libimobiledevice.org) on your `PATH` (`brew install libimobiledevice`). Arbigent starts and manages it to bridge the XCTest runner port from the device to the host.
+- The device must be **paired, trusted, and unlocked**. Keep it unlocked for the whole run — a locked screen is the most common cause of timeouts.
+- **A code-signing identity.** Any Apple Development identity works, including a **free Apple ID** account. Free accounts issue 7-day provisioning profiles, so you must rebuild/re-sign roughly weekly; a paid Apple Developer account avoids this. Arbigent auto-detects the team when you have exactly one identity; pass `--ios-xctest-apple-team-id` when you have several.
+
+**Quickstart**
+
+With one iPhone connected, paired, and unlocked:
+
+```bash
+arbigent run --os=ios
+```
+
+For multiple connected devices, or when auto-detection can't pick a single signing team, pass the relevant options (placeholder values shown — use your own):
+
+```bash
+arbigent run --os=ios \
+  --ios-xctest-apple-team-id=ABCDE12345 \
+  --ios-real-device-id=00008110-XXXXXXXXXXXXXXXX
+```
+
+These options can also live in `.arbigent/settings.local.yml` like any other option (globally or under `run:`), so you don't repeat them:
+
+```yaml
+run:
+  os: ios
+  ios-xctest-apple-team-id: ABCDE12345
+  ios-real-device-id: 00008110-XXXXXXXXXXXXXXXX
+  ios-real-device-port: "22087"
+```
+
+The team id is treated as sensitive and is masked in `--help` output and redacted from persisted logs.
+
+**Troubleshooting**
+
+- **Timeouts / no response:** the device screen is locked. Wake and unlock it, and keep it unlocked during the run.
+- **`Timed out while enabling automation mode`:** transient; retry with the device awake and unlocked.
+- **A macOS keychain prompt on the first build** (codesign wanting to sign): allow it (choose "Always Allow" to avoid repeat prompts) so the runner can be signed.
+- **`iOS X.Y is not installed`:** install the matching platform with `xcodebuild -downloadPlatform iOS`.
 
 #### Other commands
 

@@ -5,29 +5,34 @@ import maestro.utils.TempFileHandler
 import util.LocalSimulatorUtils
 
 @ArbigentInternalApi
-public fun fetchAvailableDevicesByOs(deviceType: ArbigentDeviceOs): List<ArbigentAvailableDevice> {
+public fun fetchAvailableDevicesByOs(
+  deviceType: ArbigentDeviceOs,
+  // The CLI auto-selects the first device, so iOS discovery hides physical iPhones behind an
+  // opt-in (see below). The UI lets the user pick explicitly, so it passes true to list every
+  // connected iOS device (booted simulators and paired iPhones) at once.
+  includeAllIosDevices: Boolean = false,
+): List<ArbigentAvailableDevice> {
   return when (deviceType) {
     ArbigentDeviceOs.Android -> {
       Dadb.list().map { ArbigentAvailableDevice.Android(it) }
     }
 
     ArbigentDeviceOs.Ios -> {
-      // LocalSimulatorUtils is now a class taking a TempFileHandler instead of an object.
-      val simulators = LocalSimulatorUtils(TempFileHandler()).list()
-        .devices
-        .flatMap { runtime ->
-          runtime.value
-            .filter { it.isAvailable && it.state == "Booted" }
-        }
-        .map { ArbigentAvailableDevice.IOS(it) }
-      val optedIn = isRealIosDeviceOptedIn()
-      // Wake the CoreDevice tunnel (read-only) when the user opted in, or when there is no booted
-      // simulator to fall back on so a lone connected iPhone still "just works".
-      val realDevices = fetchConnectedIosRealDevices(wakeTunnels = optedIn || simulators.isEmpty())
-      // Prefer a physical device only when the user has opted in (Apple team id or a specific
-      // real-device id). Otherwise a booted simulator wins, keeping the common `--os=ios` dev flow
-      // unchanged. connectDevice() picks the first entry.
-      if (optedIn) realDevices + simulators else simulators + realDevices
+      val simulators = fetchBootedIosSimulators()
+      if (includeAllIosDevices) {
+        // Interactive selection: surface both kinds. Always wake tunnels so a paired iPhone shows
+        // up even when a simulator is also booted.
+        fetchConnectedIosRealDevices(wakeTunnels = true) + simulators
+      } else {
+        val optedIn = isRealIosDeviceOptedIn()
+        // Wake the CoreDevice tunnel (read-only) when the user opted in, or when there is no booted
+        // simulator to fall back on so a lone connected iPhone still "just works".
+        val realDevices = fetchConnectedIosRealDevices(wakeTunnels = optedIn || simulators.isEmpty())
+        // Prefer a physical device only when the user has opted in (Apple team id or a specific
+        // real-device id). Otherwise a booted simulator wins, keeping the common `--os=ios` dev flow
+        // unchanged. connectDevice() picks the first entry.
+        if (optedIn) realDevices + simulators else simulators + realDevices
+      }
     }
 
     else -> {
@@ -35,6 +40,19 @@ public fun fetchAvailableDevicesByOs(deviceType: ArbigentDeviceOs): List<Arbigen
     }
   }
 }
+
+// LocalSimulatorUtils is now a class taking a TempFileHandler instead of an object. TempFileHandler
+// is Closeable and we own this instance, so scope it with use {} to clean up any temp files.
+private fun fetchBootedIosSimulators(): List<ArbigentAvailableDevice.IOS> =
+  TempFileHandler().use { tempFileHandler ->
+    LocalSimulatorUtils(tempFileHandler).list()
+      .devices
+      .flatMap { runtime ->
+        runtime.value
+          .filter { it.isAvailable && it.state == "Booted" }
+      }
+      .map { ArbigentAvailableDevice.IOS(it) }
+  }
 
 /**
  * Lists physical iPhones reachable over CoreDevice (`xcrun devicectl`), filtered to the ones with a

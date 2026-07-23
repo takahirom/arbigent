@@ -22,7 +22,9 @@ class ArbigentAppStateHolder(
     }
   },
   val availableDeviceListFactory: (ArbigentDeviceOs) -> List<ArbigentAvailableDevice> = { os ->
-    fetchAvailableDevicesByOs(os)
+    // The UI selects a device explicitly, so list every connected iOS device (simulators and
+    // paired iPhones) rather than the CLI's auto-select subset.
+    fetchAvailableDevicesByOs(os, includeAllIosDevices = true)
   }
 ) {
   private val _fixedScenariosFlow = MutableStateFlow<List<FixedScenario>>(emptyList())
@@ -627,6 +629,7 @@ class ArbigentAppStateHolder(
     job?.cancel()
     projectStateFlow.value?.cancel()
     allScenarioStateHoldersStateFlow.value.forEach { it.cancel() }
+    devicesStateHolder.close()
     deviceConnectionState.value = DeviceConnectionState.NotConnected
     ArbigentGlobalStatus.onDisconnect {
       deviceCache.values.forEach { it.close() }

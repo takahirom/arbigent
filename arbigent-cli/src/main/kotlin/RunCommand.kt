@@ -56,16 +56,17 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     .choice("android", "ios", "web")
     .default("android")
 
-  private val iosAppleTeamId by defaultOption(
+  // internal (not private) so tests can assert these resolve from .arbigent settings yaml.
+  internal val iosAppleTeamId by defaultOption(
     "--ios-xctest-apple-team-id",
     help = "Apple developer team id used to sign the XCTest runner for a physical iPhone (--os=ios). " +
       "Falls back to ${ArbigentIosRealDeviceSettings.ENV_APPLE_TEAM_ID}, then single-identity auto-detect."
   )
-  private val iosRealDeviceId by defaultOption(
+  internal val iosRealDeviceId by defaultOption(
     "--ios-real-device-id",
     help = "Hardware UDID selecting a specific physical iPhone (--os=ios)."
   )
-  private val iosRealDevicePort by defaultOption(
+  internal val iosRealDevicePort by defaultOption(
     "--ios-real-device-port",
     help = "Host/device port for the XCTest runner on a physical iPhone (default 22087)."
   )
