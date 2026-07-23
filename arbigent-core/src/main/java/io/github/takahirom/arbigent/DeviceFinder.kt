@@ -1,6 +1,7 @@
 package io.github.takahirom.arbigent
 
 import dadb.Dadb
+import maestro.utils.TempFileHandler
 import util.LocalSimulatorUtils
 
 @ArbigentInternalApi
@@ -11,7 +12,8 @@ public fun fetchAvailableDevicesByOs(deviceType: ArbigentDeviceOs): List<Arbigen
     }
 
     ArbigentDeviceOs.Ios -> {
-      LocalSimulatorUtils.list()
+      // LocalSimulatorUtils is now a class taking a TempFileHandler instead of an object.
+      LocalSimulatorUtils(TempFileHandler()).list()
         .devices
         .flatMap { runtime ->
           runtime.value

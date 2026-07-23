@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import io.github.takahirom.arbigent.ArbigentFiles
 import io.github.takahirom.arbigent.FixedScenario
 import maestro.orchestra.yaml.MaestroFlowParser
 import org.jetbrains.jewel.ui.Orientation
@@ -229,8 +230,13 @@ fun AddFixedScenarioDialog(
                         if (text.isNotBlank()) {
                             yamlError = try {
                                 // Try to parse the YAML to check syntax
+                                // checkSyntax now requires a flow path to resolve relative
+                                // includes; use the same base the runtime uses (ArbigentAgent
+                                // resolves flows against ArbigentFiles.parentDir) so validation
+                                // agrees with runtime include resolution.
                                 MaestroFlowParser.checkSyntax(
-                                    maestroCode = text
+                                    text,
+                                    Path(ArbigentFiles.parentDir)
                                 )
                                 null
                             } catch (e: Exception) {
@@ -358,8 +364,13 @@ fun EditFixedScenarioDialog(
                         if (text.isNotBlank()) {
                             yamlError = try {
                                 // Try to parse the YAML to check syntax
+                                // checkSyntax now requires a flow path to resolve relative
+                                // includes; use the same base the runtime uses (ArbigentAgent
+                                // resolves flows against ArbigentFiles.parentDir) so validation
+                                // agrees with runtime include resolution.
                                 MaestroFlowParser.checkSyntax(
-                                    maestroCode = text
+                                    text,
+                                    Path(ArbigentFiles.parentDir)
                                 )
                                 null
                             } catch (e: Exception) {
