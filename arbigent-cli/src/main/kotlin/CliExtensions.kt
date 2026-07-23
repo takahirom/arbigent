@@ -70,7 +70,8 @@ fun ParameterHolder.defaultOption(
  */
 internal fun isSensitiveOptionKey(optionKey: String): Boolean {
     val lower = optionKey.lowercase()
-    return listOf("key", "token", "secret", "password").any { lower.contains(it) }
+    // "team" covers the Apple developer team id, which is treated as sensitive and never shown.
+    return listOf("key", "token", "secret", "password", "team").any { lower.contains(it) }
 }
 
 /**

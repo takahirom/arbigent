@@ -159,7 +159,12 @@ fun loadArbigentProject(
   }
 }
 
-fun connectDevice(os: String): ArbigentDevice {
+fun connectDevice(
+  os: String,
+  iosAppleTeamId: String? = null,
+  iosRealDeviceId: String? = null,
+  iosRealDevicePort: Int? = null,
+): ArbigentDevice {
   val deviceOs =
     ArbigentDeviceOs.entries.find { it.name.toLowerCasePreservingASCIIRules() == os.toLowerCasePreservingASCIIRules() }
       ?: throw IllegalArgumentException(
@@ -167,6 +172,42 @@ fun connectDevice(os: String): ArbigentDevice {
           ArbigentDeviceOs.entries
             .joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
         }")
-  return fetchAvailableDevicesByOs(deviceOs).firstOrNull()?.connectToDevice()
-    ?: throw IllegalArgumentException("No available device found")
+  // Publish iOS real-device options for discovery/connection to read. Only relevant for --os=ios
+  // with a physical iPhone; simulators and other OSes ignore it.
+  ArbigentIosRealDeviceSettings.current = ArbigentIosRealDeviceConfiguration(
+    appleTeamId = iosAppleTeamId?.takeIf { it.isNotBlank() },
+    deviceId = iosRealDeviceId?.takeIf { it.isNotBlank() },
+    port = iosRealDevicePort,
+  )
+  val candidates = fetchAvailableDevicesByOs(deviceOs)
+  val chosen = candidates.firstOrNull() ?: throw IllegalArgumentException("No available device found")
+  // When the device we would connect is a physical iPhone and the user gave no explicit id, refuse to
+  // guess between several connected iPhones (devicectl ordering is not stable). List the candidates by
+  // a short, masked UDID prefix so the user can pick one with --ios-real-device-id.
+  if (chosen is ArbigentAvailableDevice.IosReal &&
+    ArbigentIosRealDeviceSettings.resolvedDeviceId() == null
+  ) {
+    val realCandidates = candidates.filterIsInstance<ArbigentAvailableDevice.IosReal>()
+    if (realCandidates.size > 1) {
+      throw IllegalArgumentException(
+        "Multiple connected iPhones found. Set --ios-real-device-id (or ${ArbigentIosRealDeviceSettings.ENV_DEVICE_ID}) " +
+          "to choose one. Candidates: " +
+          ArbigentAvailableDevice.IosReal.maskedUdidLabels(realCandidates).joinToString(", ")
+      )
+    }
+  }
+  return chosen.connectToDevice()
+}
+
+// Parses the --ios-real-device-port string option, failing loudly on a non-integer or out-of-range
+// value instead of silently falling back to the default (which would hide a typo'd port).
+internal fun parseIosRealDevicePort(raw: String?): Int? {
+  val trimmed = raw?.trim()
+  if (trimmed.isNullOrEmpty()) return null
+  val port = trimmed.toIntOrNull()
+    ?: throw CliktError("--ios-real-device-port must be an integer in 1..65535 but was \"$trimmed\"")
+  if (port !in 1..65535) {
+    throw CliktError("--ios-real-device-port must be in 1..65535 but was $port")
+  }
+  return port
 }

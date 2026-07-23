@@ -95,14 +95,53 @@ fun publishFileAtomically(source: File, target: File) {
   }
 }
 
+// Re-hashing a multi-hundred-MB download on every build's up-to-date check is wasteful (it made
+// even Android/Web-only builds pay for the iOS source tarball). Instead hash once — in doLast,
+// which only runs when the task isn't up-to-date — and stamp a marker recording the verified
+// file's expected sha, length and mtime. The cheap up-to-date check compares that fingerprint
+// rather than reading the whole file.
+//
+// The fingerprint (sha+length+mtime) is only a fast-path hint: content swapped in place while
+// preserving length and mtime would slip past it. So the actual bytes are re-hashed at
+// consumption (verifyArchiveIntegrity, called from the extract tasks) before they are ever
+// trusted, which costs one hash only when an extract task is out of date — never on the common
+// incremental path where extraction is already up-to-date.
+fun verifiedMarkerFile(target: File): File = File(target.parentFile, "${target.name}.sha256.ok")
+
+fun verifiedFingerprint(target: File, expectedSha: String): String =
+  "$expectedSha:${target.length()}:${target.lastModified()}"
+
+fun stampVerified(target: File, expectedSha: String) {
+  verifiedMarkerFile(target).writeText(verifiedFingerprint(target, expectedSha))
+}
+
+fun isVerifiedUpToDate(target: File, expectedSha: String): Boolean {
+  if (!target.exists()) return false
+  val marker = verifiedMarkerFile(target)
+  return marker.exists() && marker.readText().trim() == verifiedFingerprint(target, expectedSha)
+}
+
+// Re-hash a cached archive before extracting from it, so content swapped in place (same
+// length/mtime, defeating the marker fast-path) is caught rather than silently extracted.
+fun verifyArchiveIntegrity(target: File, expectedSha: String) {
+  val actual = sha256(target)
+  check(actual == expectedSha) {
+    "Maestro cache artifact ${target.name} failed its integrity check: expected $expectedSha but got " +
+      "$actual. Delete $maestroCacheDir and re-run to re-download."
+  }
+}
+
 val downloadMaestroZip = tasks.register("downloadMaestroZip") {
   description = "Download the pinned Maestro release artifact and verify its sha256 checksum."
   group = "maestro"
   outputs.file(maestroZipFile)
-  outputs.upToDateWhen { maestroZipFile.exists() && sha256(maestroZipFile) == maestroZipSha256 }
+  outputs.upToDateWhen { isVerifiedUpToDate(maestroZipFile, maestroZipSha256) }
   doLast {
     withMaestroCacheLock {
-      if (maestroZipFile.exists() && sha256(maestroZipFile) == maestroZipSha256) return@withMaestroCacheLock
+      if (maestroZipFile.exists() && sha256(maestroZipFile) == maestroZipSha256) {
+        stampVerified(maestroZipFile, maestroZipSha256)
+        return@withMaestroCacheLock
+      }
       logger.lifecycle("Downloading Maestro $maestroVersion from $maestroZipUrl")
       val tmp = File.createTempFile("maestro", ".zip", maestroCacheDir)
       try {
@@ -114,6 +153,7 @@ val downloadMaestroZip = tasks.register("downloadMaestroZip") {
           "Maestro zip checksum mismatch for $maestroZipUrl: expected $maestroZipSha256 but got $actual"
         }
         publishFileAtomically(tmp, maestroZipFile)
+        stampVerified(maestroZipFile, maestroZipSha256)
       } finally {
         tmp.delete()
       }
@@ -136,6 +176,7 @@ val extractMaestroJars = tasks.register<Copy>("extractMaestroJars") {
   description = "Extract the maestro-* jars arbigent depends on from the pinned release artifact."
   group = "maestro"
   dependsOn(downloadMaestroZip)
+  doFirst { verifyArchiveIntegrity(maestroZipFile, maestroZipSha256) }
   from(zipTree(maestroZipFile)) {
     include(maestroJarEntries)
     eachFile { path = name } // flatten maestro/lib/<jar> -> <jar>
@@ -231,3 +272,76 @@ val maestroJars: FileCollection = files(
 
 // Consumed by modules via rootProject.extra: dependencies { api(rootMaestroJars()) }.
 extra["maestroJars"] = maestroJars
+
+// Pinned Maestro version, exposed so modules can key caches (e.g. the built iOS real-device
+// runner) on the exact runner source they ship.
+extra["maestroVersion"] = maestroVersion
+
+// --- iOS real-device driver source ------------------------------------------------------
+//
+// Building the XCTest runner for a physical iPhone requires re-signing it with the user's
+// Apple team (maestro's mobile-dev signature is useless off their machines). maestro does this
+// in its `maestro-cli` module (DriverBuilder), which arbigent does not depend on. We therefore
+// build the runner ourselves, from the COMPLETE runner Xcode project in the pinned source
+// archive (`maestro-ios-xctest-runner/`). Note: the `driver/ios` copy bundled inside
+// maestro-cli-<version>.jar is incomplete — it omits the MaestroDriverLib sub-project its own
+// xcodeproj references — so the source archive, not that jar resource, is the source of truth.
+val maestroSourceSha256 = "6ff65eba63ec4910df59ddb1007044f964753c3b4a66464447c6676594809c0b"
+val maestroSourceUrl =
+  "https://github.com/mobile-dev-inc/Maestro/archive/refs/tags/cli-$maestroVersion.tar.gz"
+val maestroSourceTar: File = maestroCacheDir.resolve("maestro-source.tar.gz")
+val maestroDriverSourceDir: File = maestroCacheDir.resolve("ios-driver-source")
+// Path prefix inside the GitHub source tarball (repo name + tag) that wraps every entry.
+val maestroSourceRootPrefix = "Maestro-cli-$maestroVersion"
+
+val downloadMaestroSource = tasks.register("downloadMaestroSource") {
+  description = "Download the pinned Maestro source archive (carrier of the iOS runner Xcode project)."
+  group = "maestro"
+  outputs.file(maestroSourceTar)
+  outputs.upToDateWhen { isVerifiedUpToDate(maestroSourceTar, maestroSourceSha256) }
+  doLast {
+    withMaestroCacheLock {
+      if (maestroSourceTar.exists() && sha256(maestroSourceTar) == maestroSourceSha256) {
+        stampVerified(maestroSourceTar, maestroSourceSha256)
+        return@withMaestroCacheLock
+      }
+      logger.lifecycle("Downloading Maestro source $maestroVersion from $maestroSourceUrl")
+      val tmp = File.createTempFile("maestro-source", ".tar.gz", maestroCacheDir)
+      try {
+        uri(maestroSourceUrl).toURL().openStream().use { input ->
+          tmp.outputStream().use { output -> input.copyTo(output) }
+        }
+        val actual = sha256(tmp)
+        check(actual == maestroSourceSha256) {
+          "Maestro source checksum mismatch for $maestroSourceUrl: expected $maestroSourceSha256 but got $actual"
+        }
+        publishFileAtomically(tmp, maestroSourceTar)
+        stampVerified(maestroSourceTar, maestroSourceSha256)
+      } finally {
+        tmp.delete()
+      }
+    }
+  }
+}
+
+val extractMaestroIosDriverSource = tasks.register<Copy>("extractMaestroIosDriverSource") {
+  description = "Extract the complete iOS XCTest runner Xcode project used to build a signed real-device runner."
+  group = "maestro"
+  dependsOn(downloadMaestroSource)
+  doFirst { verifyArchiveIntegrity(maestroSourceTar, maestroSourceSha256) }
+  from(tarTree(resources.gzip(maestroSourceTar))) {
+    include("$maestroSourceRootPrefix/maestro-ios-xctest-runner/**")
+    // Strip the "<root>/maestro-ios-xctest-runner/" prefix so maestro-driver-ios.xcodeproj sits
+    // at the top of the extracted tree.
+    eachFile { relativePath = RelativePath(true, *relativePath.segments.drop(2).toTypedArray()) }
+  }
+  includeEmptyDirs = false
+  into(maestroDriverSourceDir)
+}
+
+// Packaged into arbigent-core resources under ios-real-driver/runner/**; the runtime runner
+// builder copies it out and runs xcodebuild against maestro-driver-ios.xcodeproj.
+val maestroIosDriverSource: FileCollection = fileTree(maestroDriverSourceDir) {
+  builtBy(extractMaestroIosDriverSource)
+}
+extra["maestroIosDriverSource"] = maestroIosDriverSource
