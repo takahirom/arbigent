@@ -397,7 +397,7 @@ class IosRealDeviceTest {
         zip.closeEntry()
       }
     }.toByteArray()
-    val e = assertFailsWith<IllegalStateException> {
+    val e = assertFailsWith<java.io.IOException> {
       controller.install(java.io.ByteArrayInputStream(malicious))
     }
     assertTrue(e.message!!.contains("escapes target directory"))
