@@ -173,6 +173,9 @@ public sealed interface ArbigentAvailableDevice {
     private val coreDeviceIdentifier: String,
     private val hardwareUdid: String,
     override val name: String,
+    // Resolved real-device knobs, baked in at discovery so connection reads them off this instance
+    // rather than a process-wide global. Defaults keep env/auto-detect fallbacks in effect.
+    private val config: ArbigentIosRealDeviceConfiguration = ArbigentIosRealDeviceConfiguration(),
   ) : ArbigentAvailableDevice {
     override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Ios
 
@@ -186,9 +189,8 @@ public sealed interface ArbigentAvailableDevice {
     public val maskedUdid: String get() = hardwareUdid.take(8) + "…"
 
     override fun connectToDevice(): ArbigentDevice {
-      val config = ArbigentIosRealDeviceSettings.current
       val host = "127.0.0.1"
-      val port = ArbigentIosRealDeviceSettings.resolvedPort()
+      val port = ArbigentIosRealDeviceSettings.resolvedPort(config)
       val teamId = IosCodeSigningTeamResolver.resolve(config)
       val productsDir = IosRealDriverProducts(teamId = teamId, deviceUdid = hardwareUdid)
         .resolveBuildProductsDir()

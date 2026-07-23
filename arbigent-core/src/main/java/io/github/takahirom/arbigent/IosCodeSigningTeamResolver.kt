@@ -28,7 +28,7 @@ public object IosCodeSigningTeamResolver {
     Regex("""-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----""", RegexOption.DOT_MATCHES_ALL)
 
   public fun resolve(
-    config: ArbigentIosRealDeviceConfiguration = ArbigentIosRealDeviceSettings.current,
+    config: ArbigentIosRealDeviceConfiguration,
     env: (String) -> String? = System::getenv,
     executor: ArbigentCommandExecutor = DefaultArbigentCommandExecutor(),
   ): String {

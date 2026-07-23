@@ -11,6 +11,10 @@ public fun fetchAvailableDevicesByOs(
   // opt-in (see below). The UI lets the user pick explicitly, so it passes true to list every
   // connected iOS device (booted simulators and paired iPhones) at once.
   includeAllIosDevices: Boolean = false,
+  // iOS real-device knobs (Apple team id / device id / port), threaded explicitly from the caller
+  // and baked into each discovered IosReal so connection reads them off the instance rather than a
+  // global. The default keeps env-variable fallbacks in effect for callers with no explicit config.
+  iosConfig: ArbigentIosRealDeviceConfiguration = ArbigentIosRealDeviceConfiguration(),
 ): List<ArbigentAvailableDevice> {
   return when (deviceType) {
     ArbigentDeviceOs.Android -> {
@@ -22,12 +26,12 @@ public fun fetchAvailableDevicesByOs(
       if (includeAllIosDevices) {
         // Interactive selection: surface both kinds. Always wake tunnels so a paired iPhone shows
         // up even when a simulator is also booted.
-        fetchConnectedIosRealDevices(wakeTunnels = true) + simulators
+        fetchConnectedIosRealDevices(wakeTunnels = true, config = iosConfig) + simulators
       } else {
-        val optedIn = isRealIosDeviceOptedIn()
+        val optedIn = isRealIosDeviceOptedIn(iosConfig)
         // Wake the CoreDevice tunnel (read-only) when the user opted in, or when there is no booted
         // simulator to fall back on so a lone connected iPhone still "just works".
-        val realDevices = fetchConnectedIosRealDevices(wakeTunnels = optedIn || simulators.isEmpty())
+        val realDevices = fetchConnectedIosRealDevices(wakeTunnels = optedIn || simulators.isEmpty(), config = iosConfig)
         // Prefer a physical device only when the user has opted in (Apple team id or a specific
         // real-device id). Otherwise a booted simulator wins, keeping the common `--os=ios` dev flow
         // unchanged. connectDevice() picks the first entry.
@@ -69,8 +73,9 @@ private fun fetchBootedIosSimulators(): List<ArbigentAvailableDevice.IOS> =
 public fun fetchConnectedIosRealDevices(
   wakeTunnels: Boolean = true,
   executor: ArbigentCommandExecutor = DefaultArbigentCommandExecutor(),
+  config: ArbigentIosRealDeviceConfiguration = ArbigentIosRealDeviceConfiguration(),
 ): List<ArbigentAvailableDevice.IosReal> {
-  val deviceIdFilter = ArbigentIosRealDeviceSettings.resolvedDeviceId()
+  val deviceIdFilter = ArbigentIosRealDeviceSettings.resolvedDeviceId(config)
   return try {
     val localDevice = util.LocalIOSDevice()
     var devices = localDevice.listDeviceViaDeviceCtl()
@@ -103,6 +108,7 @@ public fun fetchConnectedIosRealDevices(
           coreDeviceIdentifier = identifier,
           hardwareUdid = udid,
           name = device.deviceProperties?.name ?: udid,
+          config = config,
         )
       }
   } catch (e: Exception) {
@@ -124,10 +130,7 @@ private fun wakeIosRealDeviceTunnels(identifiers: List<String>, executor: Arbige
   }
 }
 
-private fun isRealIosDeviceOptedIn(env: (String) -> String? = System::getenv): Boolean {
-  val config = ArbigentIosRealDeviceSettings.current
-  if (!config.appleTeamId.isNullOrBlank()) return true
-  if (!config.deviceId.isNullOrBlank()) return true
-  if (!env(ArbigentIosRealDeviceSettings.ENV_APPLE_TEAM_ID).isNullOrBlank()) return true
-  return !env(ArbigentIosRealDeviceSettings.ENV_DEVICE_ID).isNullOrBlank()
-}
+private fun isRealIosDeviceOptedIn(
+  config: ArbigentIosRealDeviceConfiguration,
+  env: (String) -> String? = System::getenv,
+): Boolean = ArbigentIosRealDeviceSettings.isOptedIn(config, env)

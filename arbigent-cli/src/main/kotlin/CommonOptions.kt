@@ -172,20 +172,21 @@ fun connectDevice(
           ArbigentDeviceOs.entries
             .joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
         }")
-  // Publish iOS real-device options for discovery/connection to read. Only relevant for --os=ios
-  // with a physical iPhone; simulators and other OSes ignore it.
-  ArbigentIosRealDeviceSettings.current = ArbigentIosRealDeviceConfiguration(
+  // iOS real-device options, threaded into discovery so each discovered IosReal carries them to
+  // connection time. Only relevant for --os=ios with a physical iPhone; simulators and other OSes
+  // ignore it.
+  val iosConfig = ArbigentIosRealDeviceConfiguration(
     appleTeamId = iosAppleTeamId?.takeIf { it.isNotBlank() },
     deviceId = iosRealDeviceId?.takeIf { it.isNotBlank() },
     port = iosRealDevicePort,
   )
-  val candidates = fetchAvailableDevicesByOs(deviceOs)
+  val candidates = fetchAvailableDevicesByOs(deviceOs, iosConfig = iosConfig)
   val chosen = candidates.firstOrNull() ?: throw IllegalArgumentException("No available device found")
   // When the device we would connect is a physical iPhone and the user gave no explicit id, refuse to
   // guess between several connected iPhones (devicectl ordering is not stable). List the candidates by
   // a short, masked UDID prefix so the user can pick one with --ios-real-device-id.
   if (chosen is ArbigentAvailableDevice.IosReal &&
-    ArbigentIosRealDeviceSettings.resolvedDeviceId() == null
+    ArbigentIosRealDeviceSettings.resolvedDeviceId(iosConfig) == null
   ) {
     val realCandidates = candidates.filterIsInstance<ArbigentAvailableDevice.IosReal>()
     if (realCandidates.size > 1) {
