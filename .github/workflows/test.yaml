@@ -6,6 +6,10 @@ on:
       - main
   pull_request:
 
+# Least-privilege token: this workflow only checks out code and uploads build artifacts.
+permissions:
+  contents: read
+
 env:
   GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx6g -Dorg.gradle.daemon=false -Dkotlin.incremental=false"
 

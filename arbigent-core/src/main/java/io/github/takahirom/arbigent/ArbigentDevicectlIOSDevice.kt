@@ -6,6 +6,7 @@ import device.IOSDevice
 import ios.devicectl.DeviceControlIOSDevice
 import util.IOSLaunchArguments.toIOSLaunchArguments
 import java.io.File
+import java.io.IOException
 import java.io.InputStream
 import java.util.zip.ZipInputStream
 
@@ -94,15 +95,19 @@ public class ArbigentDevicectlIOSDevice(
   }
 
   private fun unzip(stream: InputStream, targetDir: File) {
+    val targetRoot = targetDir.canonicalFile
     ZipInputStream(stream).use { zip ->
       var entry = zip.nextEntry
       while (entry != null) {
-        val outFile = File(targetDir, entry.name)
-        // Guard against zip-slip.
-        check(outFile.canonicalPath.startsWith(targetDir.canonicalPath + File.separator)) {
-          "Zip entry escapes target directory: ${entry!!.name}"
+        val currentEntry = entry!!
+        // Canonicalize the destination before any filesystem use, then confirm it stays within the
+        // target directory (zip-slip guard). Path.startsWith compares whole path components, so a
+        // traversing entry (../…) or a sibling like "<target>-evil" cannot escape.
+        val outFile = File(targetRoot, currentEntry.name).canonicalFile
+        if (!outFile.toPath().startsWith(targetRoot.toPath())) {
+          throw IOException("Zip entry escapes target directory: ${currentEntry.name}")
         }
-        if (entry.isDirectory) {
+        if (currentEntry.isDirectory) {
           outFile.mkdirs()
         } else {
           outFile.parentFile?.mkdirs()
