@@ -29,6 +29,7 @@ import com.jakewharton.mosaic.ui.Column
 import com.jakewharton.mosaic.ui.Row
 import com.jakewharton.mosaic.ui.Text
 import io.github.takahirom.arbigent.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -160,11 +161,14 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
       path = path,
       variables = variables
     )
+    // Composition root for the `run` command: the one place the production dispatcher is created and
+    // threaded down (no per-signature defaults, no process-wide global).
     val arbigentProject = loadArbigentProject(
       projectFile = projectFilePath,
       aiFactory = { ai },
       deviceFactory = { device ?: throw UnsupportedOperationException("Device not available in dry-run mode") },
-      appSettings = appSettings
+      appSettings = appSettings,
+      dispatcher = Dispatchers.Default,
     )
     if (scenarioIds.isNotEmpty() && tags.isNotEmpty()) {
       throw IllegalArgumentException("Cannot specify both scenario IDs and tags. Please create an issue if you need this feature.")

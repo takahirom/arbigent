@@ -65,10 +65,8 @@ public sealed interface ArbigentScenarioExecutorState {
 }
 
 public class ArbigentScenarioExecutor internal constructor(
-  // Injected (via Builder, which defaults it to Dispatchers.Default) so tests drive execution on a
-  // TestDispatcher rather than mutating a process-wide global. Threaded into every ArbigentAgent
-  // this executor creates. No default here so the no-arg `ArbigentScenarioExecutor()` factory
-  // function stays unambiguous against this constructor.
+  // Required: threaded into every ArbigentAgent this executor creates, originating at the
+  // application composition root. No default so the compiler rejects any path that forgets it.
   private val dispatcher: CoroutineDispatcher,
 ) {
   private val _taskAssignmentsStateFlow =
@@ -290,17 +288,21 @@ public class ArbigentScenarioExecutor internal constructor(
     }"
   }
 
-  public class Builder {
-    // Defaults to Dispatchers.Default; tests set a TestDispatcher so execution is deterministic.
-    public var dispatcher: CoroutineDispatcher = Dispatchers.Default
+  public class Builder(
+    // Required — supplied by the ArbigentScenarioExecutor(dispatcher) factory.
+    public val dispatcher: CoroutineDispatcher,
+  ) {
     public fun build(): ArbigentScenarioExecutor {
       return ArbigentScenarioExecutor(dispatcher)
     }
   }
 }
 
-public fun ArbigentScenarioExecutor(block: ArbigentScenarioExecutor.Builder.() -> Unit = {}): ArbigentScenarioExecutor {
-  val builder = ArbigentScenarioExecutor.Builder()
+public fun ArbigentScenarioExecutor(
+  dispatcher: CoroutineDispatcher,
+  block: ArbigentScenarioExecutor.Builder.() -> Unit = {},
+): ArbigentScenarioExecutor {
+  val builder = ArbigentScenarioExecutor.Builder(dispatcher)
   builder.block()
   return builder.build()
 }

@@ -6,7 +6,6 @@ import io.github.takahirom.arbigent.ArbigentDeviceOs
 import io.github.takahirom.arbigent.arbigentDebugLog
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.SupervisorJob
@@ -22,8 +21,9 @@ import kotlinx.coroutines.withContext
 
 class DevicesStateHolder(
   val arbigentAvailableDeviceListFactory: (ArbigentDeviceOs) -> List<ArbigentAvailableDevice>,
-  // Injected so tests run discovery on a TestDispatcher instead of a process-wide global.
-  private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
+  // Required: discovery dispatcher, supplied by the owner (ArbigentAppStateHolder) so it shares the
+  // composition root's dispatcher rather than silently defaulting.
+  private val dispatcher: CoroutineDispatcher,
 ) {
   val selectedDeviceOs: MutableStateFlow<ArbigentDeviceOs> = MutableStateFlow(ArbigentDeviceOs.Android)
   val devices: MutableStateFlow<List<ArbigentAvailableDevice>> = MutableStateFlow(listOf())

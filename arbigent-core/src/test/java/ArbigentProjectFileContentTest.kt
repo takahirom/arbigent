@@ -53,7 +53,7 @@ class ArbigentProjectFileContentTest {
         deviceFactory = { FakeDevice() },
         aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
       )
-      val executor = ArbigentScenarioExecutor { dispatcher = testDispatcher }
+      val executor = ArbigentScenarioExecutor(testDispatcher)
       executor.execute(executorScenario, MCPClient())
       assertTrue {
         executor.isGoalAchieved()

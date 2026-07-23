@@ -6,7 +6,6 @@ import io.github.takahirom.arbigent.coroutines.buildSingleSourceStateFlow
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -23,8 +22,9 @@ class ArbigentScenarioStateHolder
 constructor(
   id: String = Uuid.random().toString(),
   private val tagManager: ArbigentTagManager,
-  // Injected so tests run this holder's flows on a TestDispatcher instead of a process-wide global.
-  dispatcher: CoroutineDispatcher = Dispatchers.Default,
+  // Required: the flow scope's dispatcher, supplied by whoever creates this holder (ultimately the
+  // UI composition root) so no construction path silently falls back to a default.
+  dispatcher: CoroutineDispatcher,
 ) {
   private val _id = MutableStateFlow(id)
   val idStateFlow: StateFlow<String> = _id

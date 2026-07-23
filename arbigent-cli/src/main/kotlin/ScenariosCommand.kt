@@ -2,6 +2,8 @@
 
 package io.github.takahirom.arbigent.cli
 
+import kotlinx.coroutines.Dispatchers
+
 import com.github.ajalt.clikt.core.CliktCommand
 import io.github.takahirom.arbigent.*
 
@@ -32,9 +34,12 @@ class ArbigentScenariosCommand : CliktCommand(name = "scenarios") {
       appSettings = CliAppSettings(
         workingDirectory = workingDirectory,
         path = null,
-      )
+      ),
+      // Read-only command: the project builds executors on construction, so a dispatcher is required
+      // even though no scenario is run here.
+      dispatcher = Dispatchers.Default,
     )
-    
+
     arbigentInfoLog("Scenarios in $projectFile:")
     arbigentProject.scenarios.forEach { scenario ->
       arbigentInfoLog("- ${scenario.id}: ${scenario.agentTasks.lastOrNull()?.goal?.take(80)}...")

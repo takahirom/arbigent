@@ -16,6 +16,7 @@ import com.jakewharton.mosaic.ui.Color.Companion.White
 import com.jakewharton.mosaic.ui.Column
 import com.jakewharton.mosaic.ui.Text
 import io.github.takahirom.arbigent.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import java.io.File
@@ -97,7 +98,9 @@ class ArbigentRunTaskCommand : CliktCommand(name = "task") {
         )
       )
       val appSettings = CliAppSettings(workingDirectory = workingDirectory, path = null)
-      val arbigentProject = ArbigentProject(projectFileContent, aiFactory = { ai }, deviceFactory = { device }, appSettings = appSettings)
+      // Composition root for the `run task` command: the one place the production dispatcher is
+      // created and threaded down (no per-signature defaults, no process-wide global).
+      val arbigentProject = ArbigentProject(projectFileContent, aiFactory = { ai }, deviceFactory = { device }, appSettings = appSettings, dispatcher = Dispatchers.Default)
       val scenarios = arbigentProject.scenarios
 
       Runtime.getRuntime().addShutdownHook(object : Thread() {

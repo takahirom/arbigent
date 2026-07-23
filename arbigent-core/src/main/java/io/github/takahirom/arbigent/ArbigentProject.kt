@@ -3,7 +3,6 @@ package io.github.takahirom.arbigent
 import io.github.takahirom.arbigent.result.ArbigentProjectExecutionResult
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -17,10 +16,9 @@ public class ArbigentProject(
   public val settings: ArbigentProjectSettings,
   initialScenarios: List<ArbigentScenario>,
   public val appSettings: ArbigentAppSettings,
-  // Dispatcher for the per-scenario executors this project creates. Defaults to Dispatchers.Default
-  // (unchanged production behavior); tests inject a TestDispatcher so scenario execution runs on the
-  // same virtual clock the test drives, instead of the former process-wide dispatcher global.
-  dispatcher: CoroutineDispatcher = Dispatchers.Default,
+  // Required: dispatcher for the per-scenario executors this project creates, originating at the
+  // application composition root. No default so the compiler rejects any path that forgets it.
+  dispatcher: CoroutineDispatcher,
 ) {
   private val _scenarioAssignmentsFlow =
     MutableStateFlow<List<ArbigentScenarioAssignment>>(listOf())
@@ -35,7 +33,7 @@ public class ArbigentProject(
   init {
     val projectDispatcher = dispatcher
     _scenarioAssignmentsFlow.value = initialScenarios.map { scenario ->
-      ArbigentScenarioAssignment(scenario, ArbigentScenarioExecutor { this.dispatcher = projectDispatcher })
+      ArbigentScenarioAssignment(scenario, ArbigentScenarioExecutor(projectDispatcher))
     }
   }
 
@@ -137,7 +135,7 @@ public fun ArbigentProject(
   aiFactory: () -> ArbigentAi,
   deviceFactory: () -> ArbigentDevice,
   appSettings: ArbigentAppSettings,
-  dispatcher: CoroutineDispatcher = Dispatchers.Default,
+  dispatcher: CoroutineDispatcher,
 ): ArbigentProject {
   return ArbigentProject(
     settings = projectFileContent.settings,
@@ -163,7 +161,7 @@ public fun ArbigentProject(
   aiFactory: () -> ArbigentAi,
   deviceFactory: () -> ArbigentDevice,
   appSettings: ArbigentAppSettings,
-  dispatcher: CoroutineDispatcher = Dispatchers.Default,
+  dispatcher: CoroutineDispatcher,
 ): ArbigentProject {
   val projectContentFileContent = ArbigentProjectSerializer().load(file)
   return ArbigentProject(projectContentFileContent, aiFactory, deviceFactory, appSettings, dispatcher)

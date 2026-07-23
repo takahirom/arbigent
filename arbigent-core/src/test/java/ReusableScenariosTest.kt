@@ -229,7 +229,7 @@ class ReusableScenariosTest {
       fixedScenarios = project.fixedScenarios,
       reusableScenarios = project.reusableScenarios
     )
-    val executor = ArbigentScenarioExecutor { this.dispatcher = dispatcher }
+    val executor = ArbigentScenarioExecutor(dispatcher)
     executor.execute(scenario, MCPClient())
     assertTrue(executor.isGoalAchieved())
     val openLink = executedCommands.mapNotNull { it.openLinkCommand }.firstOrNull()

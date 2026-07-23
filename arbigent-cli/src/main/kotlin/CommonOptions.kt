@@ -6,6 +6,7 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.CliktError
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.types.choice
+import kotlinx.coroutines.CoroutineDispatcher
 import io.github.takahirom.arbigent.*
 import io.ktor.client.request.*
 import io.ktor.util.*
@@ -140,6 +141,7 @@ fun loadArbigentProject(
   aiFactory: () -> ArbigentAi,
   deviceFactory: () -> ArbigentDevice,
   appSettings: ArbigentAppSettings,
+  dispatcher: CoroutineDispatcher,
 ): ArbigentProject {
   return if (isJourneyProjectSource(projectFile)) {
     val projectFileContent = ArbigentJourneyXmlImporter.loadProjectContent(File(projectFile))
@@ -148,6 +150,7 @@ fun loadArbigentProject(
       aiFactory = aiFactory,
       deviceFactory = deviceFactory,
       appSettings = appSettings,
+      dispatcher = dispatcher,
     )
   } else {
     ArbigentProject(
@@ -155,6 +158,7 @@ fun loadArbigentProject(
       aiFactory = aiFactory,
       deviceFactory = deviceFactory,
       appSettings = appSettings,
+      dispatcher = dispatcher,
     )
   }
 }

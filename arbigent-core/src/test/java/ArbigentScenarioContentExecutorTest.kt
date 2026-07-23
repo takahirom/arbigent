@@ -17,9 +17,7 @@ class ArbigentScenarioContentExecutorTest {
       deviceFactory { FakeDevice() }
       aiFactory { fakeAi }
     }
-    val arbigentScenarioExecutor = ArbigentScenarioExecutor {
-      dispatcher = testDispatcher
-    }
+    val arbigentScenarioExecutor = ArbigentScenarioExecutor(testDispatcher)
     val arbigentScenario = ArbigentScenario(
       id = "id2",
       agentTasks = listOf(
@@ -71,9 +69,7 @@ class ArbigentScenarioContentExecutorTest {
         }
       )
     }
-    val arbigentScenarioExecutor = ArbigentScenarioExecutor {
-      dispatcher = testDispatcher
-    }
+    val arbigentScenarioExecutor = ArbigentScenarioExecutor(testDispatcher)
     val arbigentScenario = ArbigentScenario(
       id = "id2",
       listOf(
@@ -143,9 +139,7 @@ class ArbigentScenarioContentExecutorTest {
         }
       )
     }
-    val arbigentScenarioExecutor = ArbigentScenarioExecutor {
-      dispatcher = testDispatcher
-    }
+    val arbigentScenarioExecutor = ArbigentScenarioExecutor(testDispatcher)
     val arbigentScenario = ArbigentScenario(
       id = "id2",
       listOf(

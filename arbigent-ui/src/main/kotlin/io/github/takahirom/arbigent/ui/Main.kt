@@ -34,6 +34,7 @@ import org.jetbrains.jewel.window.DecoratedWindow
 import org.jetbrains.jewel.window.TitleBar
 import org.jetbrains.jewel.window.styling.TitleBarStyle
 import java.awt.Window
+import kotlinx.coroutines.Dispatchers
 
 
 @OptIn(ArbigentInternalApi::class)
@@ -82,6 +83,9 @@ fun main() {
             throw IllegalArgumentException("Unsupported aiProviderSetting: $aiProviderSetting")
           }
         },
+        // Composition root for the desktop app: the one place the production dispatcher is created
+        // and threaded into the holder (and, through it, every scope/holder it owns).
+        dispatcher = Dispatchers.Default,
       )
     }
     AppWindow(

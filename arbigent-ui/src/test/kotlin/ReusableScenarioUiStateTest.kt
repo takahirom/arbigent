@@ -1,6 +1,7 @@
 package io.github.takahirom.arbigent.ui
 
 import io.github.takahirom.arbigent.*
+import kotlinx.coroutines.Dispatchers
 import org.junit.Before
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -14,7 +15,7 @@ class ReusableScenarioUiStateTest {
   }
 
   private fun holderOf(content: ArbigentScenarioContent) =
-    ArbigentScenarioStateHolder(id = content.id, tagManager = ArbigentTagManager()).apply {
+    ArbigentScenarioStateHolder(id = content.id, tagManager = ArbigentTagManager(), dispatcher = Dispatchers.Unconfined).apply {
       load(content)
     }
 
@@ -69,8 +70,8 @@ class ReusableScenarioUiStateTest {
 
   @Test
   fun `make this reusable moves content and converts scenario to call node`() {
-    val appStateHolder = ArbigentAppStateHolder(aiFactory = { FakeAi() })
-    val holder = ArbigentScenarioStateHolder(id = "login-test", tagManager = ArbigentTagManager()).apply {
+    val appStateHolder = ArbigentAppStateHolder(aiFactory = { FakeAi() }, dispatcher = Dispatchers.Unconfined)
+    val holder = ArbigentScenarioStateHolder(id = "login-test", tagManager = ArbigentTagManager(), dispatcher = Dispatchers.Unconfined).apply {
       load(
         ArbigentScenarioContent(
           id = "login-test",
@@ -104,12 +105,12 @@ class ReusableScenarioUiStateTest {
 
   @Test
   fun `renaming a reusable scenario rewrites references from scenarios and composites`() {
-    val appStateHolder = ArbigentAppStateHolder(aiFactory = { FakeAi() })
+    val appStateHolder = ArbigentAppStateHolder(aiFactory = { FakeAi() }, dispatcher = Dispatchers.Unconfined)
     appStateHolder.addReusableScenario(ArbigentScenarioContent(id = "part", goal = "goal"))
     appStateHolder.addReusableScenario(
       ArbigentScenarioContent(id = "composite", steps = listOf(ArbigentScenarioContent.ReusableStep(uses = "part")))
     )
-    val callerHolder = ArbigentScenarioStateHolder(id = "caller", tagManager = ArbigentTagManager()).apply {
+    val callerHolder = ArbigentScenarioStateHolder(id = "caller", tagManager = ArbigentTagManager(), dispatcher = Dispatchers.Unconfined).apply {
       load(ArbigentScenarioContent(id = "caller", uses = "part"))
     }
     // Register the caller so the rename can reach it (mirrors loadProjectContents wiring).
@@ -129,7 +130,7 @@ class ReusableScenarioUiStateTest {
 
   @Test
   fun `reusable scenario references are detected for delete protection`() {
-    val appStateHolder = ArbigentAppStateHolder(aiFactory = { FakeAi() })
+    val appStateHolder = ArbigentAppStateHolder(aiFactory = { FakeAi() }, dispatcher = Dispatchers.Unconfined)
     appStateHolder.addReusableScenario(ArbigentScenarioContent(id = "part", goal = "goal"))
     appStateHolder.addReusableScenario(
       ArbigentScenarioContent(id = "composite", steps = listOf(ArbigentScenarioContent.ReusableStep(uses = "part")))

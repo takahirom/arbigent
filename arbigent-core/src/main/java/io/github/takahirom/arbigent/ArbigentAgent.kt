@@ -29,9 +29,10 @@ import kotlin.time.Duration.Companion.hours
 
 public class ArbigentAgent(
   agentConfig: AgentConfig,
-  // Injected so tests can drive execution on a TestDispatcher instead of mutating a process-wide
-  // global. The scenario executor threads its own dispatcher in here.
-  dispatcher: CoroutineDispatcher = Dispatchers.Default,
+  // Required (no default): the scenario executor threads its own dispatcher in, which ultimately
+  // originates at the application composition root. Keeping it mandatory means the compiler rejects
+  // any construction path that forgets to propagate it, so there is no silent fallback.
+  dispatcher: CoroutineDispatcher,
 ) {
   private val ai by lazy { agentConfig.aiFactory() }
   public val device: ArbigentDevice by lazy { agentConfig.deviceFactory() }

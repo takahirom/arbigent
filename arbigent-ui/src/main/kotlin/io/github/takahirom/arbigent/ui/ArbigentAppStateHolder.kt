@@ -26,10 +26,10 @@ class ArbigentAppStateHolder(
     // paired iPhones) rather than the CLI's auto-select subset.
     fetchAvailableDevicesByOs(os, includeAllIosDevices = true)
   },
-  // Threaded into every holder and scope this owns so tests drive them on a TestDispatcher instead
-  // of mutating a process-wide global. internal so editor dialogs that build their own holders
+  // Required: threaded into every holder and scope this owns so they share one dispatcher supplied
+  // by the UI composition root (Main). internal so editor dialogs that build their own holders
   // (e.g. the reusable-scenario editor) can keep them on the same dispatcher.
-  internal val dispatcher: CoroutineDispatcher = Dispatchers.Default,
+  internal val dispatcher: CoroutineDispatcher,
 ) {
   private val _fixedScenariosFlow = MutableStateFlow<List<FixedScenario>>(emptyList())
   val fixedScenariosFlow: StateFlow<List<FixedScenario>> = _fixedScenariosFlow.asStateFlow()

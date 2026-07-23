@@ -2,6 +2,8 @@
 
 package io.github.takahirom.arbigent.cli
 
+import kotlinx.coroutines.Dispatchers
+
 import com.github.ajalt.clikt.core.CliktCommand
 import io.github.takahirom.arbigent.*
 
@@ -24,9 +26,12 @@ class ArbigentTagsCommand : CliktCommand(name = "tags") {
       appSettings = CliAppSettings(
         workingDirectory = workingDirectory,
         path = null,
-      )
+      ),
+      // Read-only command: the project builds executors on construction, so a dispatcher is required
+      // even though no scenario is run here.
+      dispatcher = Dispatchers.Default,
     )
-    
+
     val allTags = arbigentProject.scenarios
       .flatMap { it.tags }
       .map { it.name }
