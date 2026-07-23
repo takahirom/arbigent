@@ -28,7 +28,11 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 
 public class ArbigentAgent(
-  agentConfig: AgentConfig
+  agentConfig: AgentConfig,
+  // Required (no default): the scenario executor threads its own dispatcher in, which ultimately
+  // originates at the application composition root. Keeping it mandatory means the compiler rejects
+  // any construction path that forgets to propagate it, so there is no silent fallback.
+  dispatcher: CoroutineDispatcher,
 ) {
   private val ai by lazy { agentConfig.aiFactory() }
   public val device: ArbigentDevice by lazy { agentConfig.deviceFactory() }
@@ -132,7 +136,7 @@ public class ArbigentAgent(
   }
   
   private val coroutineScope =
-    CoroutineScope(ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob())
+    CoroutineScope(dispatcher + SupervisorJob())
   private var job: Job? = null
   private val arbigentContextHistoryStateFlow: MutableStateFlow<List<ArbigentContextHolder>> =
     MutableStateFlow(listOf())

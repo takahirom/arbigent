@@ -11,14 +11,13 @@ class ArbigentScenarioContentExecutorTest {
   @OptIn(ExperimentalStdlibApi::class)
   @Test
   fun tests() = runTest {
-    ArbigentCoroutinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
+    val testDispatcher = coroutineContext[CoroutineDispatcher]!!
     val fakeAi = FakeAi()
     val agentConfig = AgentConfig {
       deviceFactory { FakeDevice() }
       aiFactory { fakeAi }
     }
-    val arbigentScenarioExecutor = ArbigentScenarioExecutor {
-    }
+    val arbigentScenarioExecutor = ArbigentScenarioExecutor(testDispatcher)
     val arbigentScenario = ArbigentScenario(
       id = "id2",
       agentTasks = listOf(
@@ -39,7 +38,7 @@ class ArbigentScenarioContentExecutorTest {
   @OptIn(ExperimentalStdlibApi::class)
   @Test
   fun lastInitializerInterceptorCalledFirst() = runTest {
-    ArbigentCoroutinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
+    val testDispatcher = coroutineContext[CoroutineDispatcher]!!
     val order = mutableListOf<String>()
     val fakeAi = FakeAi()
     val agentConfig = AgentConfig {
@@ -70,8 +69,7 @@ class ArbigentScenarioContentExecutorTest {
         }
       )
     }
-    val arbigentScenarioExecutor = ArbigentScenarioExecutor {
-    }
+    val arbigentScenarioExecutor = ArbigentScenarioExecutor(testDispatcher)
     val arbigentScenario = ArbigentScenario(
       id = "id2",
       listOf(
@@ -108,7 +106,7 @@ class ArbigentScenarioContentExecutorTest {
   @OptIn(ExperimentalStdlibApi::class)
   @Test
   fun lastStepInterceptorCalledFirst() = runTest {
-    ArbigentCoroutinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
+    val testDispatcher = coroutineContext[CoroutineDispatcher]!!
     val order = mutableListOf<String>()
     val fakeAi = FakeAi()
     val agentConfig = AgentConfig {
@@ -141,8 +139,7 @@ class ArbigentScenarioContentExecutorTest {
         }
       )
     }
-    val arbigentScenarioExecutor = ArbigentScenarioExecutor {
-    }
+    val arbigentScenarioExecutor = ArbigentScenarioExecutor(testDispatcher)
     val arbigentScenario = ArbigentScenario(
       id = "id2",
       listOf(

@@ -2,6 +2,7 @@ package io.github.takahirom.arbigent
 
 import io.github.takahirom.arbigent.result.ArbigentProjectExecutionResult
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -14,7 +15,10 @@ public class FailedToArchiveException(message: String) : RuntimeException(messag
 public class ArbigentProject(
   public val settings: ArbigentProjectSettings,
   initialScenarios: List<ArbigentScenario>,
-  public val appSettings: ArbigentAppSettings
+  public val appSettings: ArbigentAppSettings,
+  // Required: dispatcher for the per-scenario executors this project creates, originating at the
+  // application composition root. No default so the compiler rejects any path that forgets it.
+  dispatcher: CoroutineDispatcher,
 ) {
   private val _scenarioAssignmentsFlow =
     MutableStateFlow<List<ArbigentScenarioAssignment>>(listOf())
@@ -27,8 +31,9 @@ public class ArbigentProject(
   public val scenarios: List<ArbigentScenario> get() = scenarioAssignments().map { it.scenario }
 
   init {
+    val projectDispatcher = dispatcher
     _scenarioAssignmentsFlow.value = initialScenarios.map { scenario ->
-      ArbigentScenarioAssignment(scenario, ArbigentScenarioExecutor())
+      ArbigentScenarioAssignment(scenario, ArbigentScenarioExecutor(projectDispatcher))
     }
   }
 
@@ -129,7 +134,8 @@ public fun ArbigentProject(
   projectFileContent: ArbigentProjectFileContent,
   aiFactory: () -> ArbigentAi,
   deviceFactory: () -> ArbigentDevice,
-  appSettings: ArbigentAppSettings
+  appSettings: ArbigentAppSettings,
+  dispatcher: CoroutineDispatcher,
 ): ArbigentProject {
   return ArbigentProject(
     settings = projectFileContent.settings,
@@ -145,7 +151,8 @@ public fun ArbigentProject(
         reusableScenarios = projectFileContent.reusableScenarios
       )
     },
-    appSettings = appSettings
+    appSettings = appSettings,
+    dispatcher = dispatcher,
   )
 }
 
@@ -153,10 +160,11 @@ public fun ArbigentProject(
   file: File,
   aiFactory: () -> ArbigentAi,
   deviceFactory: () -> ArbigentDevice,
-  appSettings: ArbigentAppSettings
+  appSettings: ArbigentAppSettings,
+  dispatcher: CoroutineDispatcher,
 ): ArbigentProject {
   val projectContentFileContent = ArbigentProjectSerializer().load(file)
-  return ArbigentProject(projectContentFileContent, aiFactory, deviceFactory, appSettings)
+  return ArbigentProject(projectContentFileContent, aiFactory, deviceFactory, appSettings, dispatcher)
 }
 
 public data class ArbigentScenario(

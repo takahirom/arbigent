@@ -42,7 +42,7 @@ class ArbigentProjectFileContentTest {
   @OptIn(ExperimentalStdlibApi::class)
   @Test
   fun tests() = runTest {
-    ArbigentCoroutinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
+    val testDispatcher = coroutineContext[CoroutineDispatcher]!!
 
     val projectFileContent: ArbigentProjectFileContent = basicProject
     projectFileContent.scenarioContents.forEach { scenarioContent ->
@@ -53,7 +53,7 @@ class ArbigentProjectFileContentTest {
         deviceFactory = { FakeDevice() },
         aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
       )
-      val executor = ArbigentScenarioExecutor()
+      val executor = ArbigentScenarioExecutor(testDispatcher)
       executor.execute(executorScenario, MCPClient())
       assertTrue {
         executor.isGoalAchieved()

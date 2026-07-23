@@ -180,16 +180,10 @@ class ReusableScenariosTest {
 
   @Test
   fun maestroYamlInputsAreSubstitutedAndExecuted() = runTest {
-    val previousDispatcher = ArbigentCoroutinesDispatcher.dispatcher
-    ArbigentCoroutinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
-    try {
-      maestroYamlInputsAreSubstitutedAndExecutedBody()
-    } finally {
-      ArbigentCoroutinesDispatcher.dispatcher = previousDispatcher
-    }
+    maestroYamlInputsAreSubstitutedAndExecutedBody(coroutineContext[CoroutineDispatcher]!!)
   }
 
-  private suspend fun maestroYamlInputsAreSubstitutedAndExecutedBody() {
+  private suspend fun maestroYamlInputsAreSubstitutedAndExecutedBody(dispatcher: CoroutineDispatcher) {
     val executedCommands = mutableListOf<MaestroCommand>()
     val fakeDevice = FakeDevice()
     val recordingDevice = object : ArbigentDevice by fakeDevice {
@@ -235,7 +229,7 @@ class ReusableScenariosTest {
       fixedScenarios = project.fixedScenarios,
       reusableScenarios = project.reusableScenarios
     )
-    val executor = ArbigentScenarioExecutor()
+    val executor = ArbigentScenarioExecutor(dispatcher)
     executor.execute(scenario, MCPClient())
     assertTrue(executor.isGoalAchieved())
     val openLink = executedCommands.mapNotNull { it.openLinkCommand }.firstOrNull()

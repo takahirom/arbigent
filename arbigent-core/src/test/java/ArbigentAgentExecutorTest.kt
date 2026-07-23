@@ -10,7 +10,7 @@ class ArbigentAgentExecutorTest {
   @OptIn(ExperimentalStdlibApi::class)
   @Test
   fun testCacheKeyFormat() = runTest {
-    ArbigentCoroutinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
+    val testDispatcher = coroutineContext[CoroutineDispatcher]!!
 
     val testDevice = FakeDevice()
     val cacheKeyCapture = FakeAi.Status.CacheKeyCapture()
@@ -24,7 +24,7 @@ class ArbigentAgentExecutorTest {
     }
 
     val task = ArbigentAgentTask("id1", "Test goal", agentConfig)
-    ArbigentAgent(agentConfig).execute(task, MCPClient())
+    ArbigentAgent(agentConfig, testDispatcher).execute(task, MCPClient())
     advanceUntilIdle()
 
     // Verify cache key format
@@ -42,14 +42,14 @@ class ArbigentAgentExecutorTest {
   @OptIn(ExperimentalStdlibApi::class)
   @Test
   fun tests() = runTest {
-    ArbigentCoroutinesDispatcher.dispatcher = coroutineContext[CoroutineDispatcher]!!
+    val testDispatcher = coroutineContext[CoroutineDispatcher]!!
     val agentConfig = AgentConfig {
       deviceFactory { FakeDevice() }
       aiFactory { FakeAi() }
     }
 
     val task = ArbigentAgentTask("id1", "goal1", agentConfig)
-    ArbigentAgent(agentConfig)
+    ArbigentAgent(agentConfig, testDispatcher)
       .execute(task, MCPClient())
 
     advanceUntilIdle()

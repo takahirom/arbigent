@@ -1,10 +1,10 @@
 package io.github.takahirom.arbigent.ui
 
 
-import io.github.takahirom.arbigent.ArbigentCoroutinesDispatcher
 import io.github.takahirom.arbigent.ArbigentAvailableDevice
 import io.github.takahirom.arbigent.ArbigentDeviceOs
 import io.github.takahirom.arbigent.arbigentDebugLog
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
@@ -19,7 +19,12 @@ import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 
 
-class DevicesStateHolder(val arbigentAvailableDeviceListFactory: (ArbigentDeviceOs) -> List<ArbigentAvailableDevice>) {
+class DevicesStateHolder(
+  val arbigentAvailableDeviceListFactory: (ArbigentDeviceOs) -> List<ArbigentAvailableDevice>,
+  // Required: discovery dispatcher, supplied by the owner (ArbigentAppStateHolder) so it shares the
+  // composition root's dispatcher rather than silently defaulting.
+  private val dispatcher: CoroutineDispatcher,
+) {
   val selectedDeviceOs: MutableStateFlow<ArbigentDeviceOs> = MutableStateFlow(ArbigentDeviceOs.Android)
   val devices: MutableStateFlow<List<ArbigentAvailableDevice>> = MutableStateFlow(listOf())
   private val _selectedDevice: MutableStateFlow<ArbigentAvailableDevice?> = MutableStateFlow(null)
@@ -28,7 +33,7 @@ class DevicesStateHolder(val arbigentAvailableDeviceListFactory: (ArbigentDevice
   // One scope owned by the holder. A single collector re-fetches when the OS changes; each fetch is a
   // cancellable one-shot whose predecessor is cancelled first, so refreshes never accumulate
   // collectors or let a slow discovery overwrite a newer result out of order.
-  private val scope = CoroutineScope(ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob())
+  private val scope = CoroutineScope(dispatcher + SupervisorJob())
   private var fetchJob: Job? = null
   // Monotonic id of the latest fetch. A job publishes only if it still matches this when it finishes,
   // which makes the "am I still the newest?" check and the state writes atomic under fetchLock.
@@ -62,7 +67,7 @@ class DevicesStateHolder(val arbigentAvailableDeviceListFactory: (ArbigentDevice
         val os = selectedDeviceOs.value
         // Device discovery (e.g. devicectl) blocks, so run it off the caller under runInterruptible
         // so cancelling the job actually interrupts the blocking call.
-        val result = withContext(ArbigentCoroutinesDispatcher.dispatcher) {
+        val result = withContext(dispatcher) {
           runInterruptible { arbigentAvailableDeviceListFactory(os) }
         }
         synchronized(fetchLock) {

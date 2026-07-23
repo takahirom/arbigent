@@ -180,7 +180,8 @@ private fun ReusableScenarioEditorDialog(
   val stateHolder = remember(existingScenario) {
     ArbigentScenarioStateHolder(
       id = existingScenario?.id ?: "new-reusable-scenario",
-      tagManager = ArbigentTagManager()
+      tagManager = ArbigentTagManager(),
+      dispatcher = appStateHolder.dispatcher,
     ).apply {
       existingScenario?.let { load(it) }
     }

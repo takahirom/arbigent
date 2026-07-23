@@ -1,6 +1,7 @@
 package io.github.takahirom.arbigent.ui
 
 import io.github.takahirom.arbigent.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Before
@@ -23,7 +24,8 @@ class AdditionalActionsTest {
     @Test
     fun `ArbigentAppStateHolder onAdditionalActionsChanged should update flow`() = runBlocking {
         val appStateHolder = ArbigentAppStateHolder(
-            aiFactory = { FakeAi() }
+            aiFactory = { FakeAi() },
+            dispatcher = Dispatchers.Unconfined,
         )
         val testActions = listOf("ClickWithText", "ClickWithId")
 
@@ -35,7 +37,8 @@ class AdditionalActionsTest {
     @Test
     fun `ArbigentAppStateHolder onAdditionalActionsChanged should handle null`() = runBlocking {
         val appStateHolder = ArbigentAppStateHolder(
-            aiFactory = { FakeAi() }
+            aiFactory = { FakeAi() },
+            dispatcher = Dispatchers.Unconfined,
         )
 
         // First set some actions
@@ -50,7 +53,8 @@ class AdditionalActionsTest {
     @Test
     fun `ArbigentAppStateHolder onAdditionalActionsChanged should handle empty list`() = runBlocking {
         val appStateHolder = ArbigentAppStateHolder(
-            aiFactory = { FakeAi() }
+            aiFactory = { FakeAi() },
+            dispatcher = Dispatchers.Unconfined,
         )
 
         // Set empty list should be treated as null in UI (checkbox deselection logic)
@@ -61,7 +65,7 @@ class AdditionalActionsTest {
     @Test
     fun `ArbigentScenarioStateHolder onAdditionalActionsChanged should update flow`() {
         val tagManager = ArbigentTagManager()
-        val scenarioStateHolder = ArbigentScenarioStateHolder(tagManager = tagManager)
+        val scenarioStateHolder = ArbigentScenarioStateHolder(tagManager = tagManager, dispatcher = Dispatchers.Unconfined)
         val testActions = listOf("ClickWithText", "DpadTryAutoFocusById")
 
         scenarioStateHolder.onAdditionalActionsChanged(testActions)
@@ -72,7 +76,7 @@ class AdditionalActionsTest {
     @Test
     fun `ArbigentScenarioStateHolder onAdditionalActionsChanged should handle null`() {
         val tagManager = ArbigentTagManager()
-        val scenarioStateHolder = ArbigentScenarioStateHolder(tagManager = tagManager)
+        val scenarioStateHolder = ArbigentScenarioStateHolder(tagManager = tagManager, dispatcher = Dispatchers.Unconfined)
 
         // First set some actions
         scenarioStateHolder.onAdditionalActionsChanged(listOf("ClickWithId"))
@@ -86,7 +90,7 @@ class AdditionalActionsTest {
     @Test
     fun `ArbigentScenarioStateHolder createArbigentScenarioContent should include additionalActions`() {
         val tagManager = ArbigentTagManager()
-        val scenarioStateHolder = ArbigentScenarioStateHolder(tagManager = tagManager)
+        val scenarioStateHolder = ArbigentScenarioStateHolder(tagManager = tagManager, dispatcher = Dispatchers.Unconfined)
         val testActions = listOf("ClickWithText", "ClickWithId")
 
         scenarioStateHolder.onAdditionalActionsChanged(testActions)
@@ -100,7 +104,7 @@ class AdditionalActionsTest {
     @Test
     fun `ArbigentScenarioStateHolder load should restore additionalActions`() {
         val tagManager = ArbigentTagManager()
-        val scenarioStateHolder = ArbigentScenarioStateHolder(tagManager = tagManager)
+        val scenarioStateHolder = ArbigentScenarioStateHolder(tagManager = tagManager, dispatcher = Dispatchers.Unconfined)
         val testActions = listOf("DpadTryAutoFocusByText")
 
         val scenarioContent = ArbigentScenarioContent(

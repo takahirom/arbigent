@@ -4,6 +4,7 @@ import androidx.compose.foundation.text.input.TextFieldState
 import io.github.takahirom.arbigent.*
 import io.github.takahirom.arbigent.coroutines.buildSingleSourceStateFlow
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,7 +21,10 @@ class ArbigentScenarioStateHolder
 @OptIn(ExperimentalUuidApi::class)
 constructor(
   id: String = Uuid.random().toString(),
-  private val tagManager: ArbigentTagManager
+  private val tagManager: ArbigentTagManager,
+  // Required: the flow scope's dispatcher, supplied by whoever creates this holder (ultimately the
+  // UI composition root) so no construction path silently falls back to a default.
+  dispatcher: CoroutineDispatcher,
 ) {
   private val _id = MutableStateFlow(id)
   val idStateFlow: StateFlow<String> = _id
@@ -76,7 +80,7 @@ constructor(
   val isNewlyGenerated = MutableStateFlow(false)
 
   private val coroutineScope = CoroutineScope(
-    ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob()
+    dispatcher + SupervisorJob()
   )
   @OptIn(ArbigentInternalApi::class)
   val tags = coroutineScope.buildSingleSourceStateFlow(tagManager.scenarioToTagsStateFlow) {

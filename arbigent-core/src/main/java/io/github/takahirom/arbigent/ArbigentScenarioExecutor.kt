@@ -64,7 +64,11 @@ public sealed interface ArbigentScenarioExecutorState {
   }
 }
 
-public class ArbigentScenarioExecutor {
+public class ArbigentScenarioExecutor internal constructor(
+  // Required: threaded into every ArbigentAgent this executor creates, originating at the
+  // application composition root. No default so the compiler rejects any path that forgets it.
+  private val dispatcher: CoroutineDispatcher,
+) {
   private val _taskAssignmentsStateFlow =
     MutableStateFlow<List<ArbigentTaskAssignment>>(listOf())
   private val _taskAssignmentsHistoryStateFlow =
@@ -81,7 +85,7 @@ public class ArbigentScenarioExecutor {
   public fun taskAssignments(): List<ArbigentTaskAssignment> = _taskAssignmentsStateFlow.value
   private var executeJob: Job? = null
   private val coroutineScope =
-    CoroutineScope(ArbigentCoroutinesDispatcher.dispatcher + SupervisorJob())
+    CoroutineScope(dispatcher + SupervisorJob())
   private val _arbigentScenarioRunningInfoStateFlow: MutableStateFlow<ArbigentScenarioRunningInfo?> =
     MutableStateFlow(null)
   public val runningInfoFlow: StateFlow<ArbigentScenarioRunningInfo?> =
@@ -192,7 +196,7 @@ public class ArbigentScenarioExecutor {
           it.agent.cancel()
         }
         _taskAssignmentsStateFlow.value = scenario.agentTasks.map { task ->
-          ArbigentTaskAssignment(task, ArbigentAgent(task.agentConfig))
+          ArbigentTaskAssignment(task, ArbigentAgent(task.agentConfig, dispatcher))
         }
         _taskAssignmentsHistoryStateFlow.value += listOf(taskAssignments())
         for ((index, taskAgent) in taskAssignments().withIndex()) {
@@ -284,15 +288,21 @@ public class ArbigentScenarioExecutor {
     }"
   }
 
-  public class Builder {
+  public class Builder(
+    // Required — supplied by the ArbigentScenarioExecutor(dispatcher) factory.
+    public val dispatcher: CoroutineDispatcher,
+  ) {
     public fun build(): ArbigentScenarioExecutor {
-      return ArbigentScenarioExecutor()
+      return ArbigentScenarioExecutor(dispatcher)
     }
   }
 }
 
-public fun ArbigentScenarioExecutor(block: ArbigentScenarioExecutor.Builder.() -> Unit = {}): ArbigentScenarioExecutor {
-  val builder = ArbigentScenarioExecutor.Builder()
+public fun ArbigentScenarioExecutor(
+  dispatcher: CoroutineDispatcher,
+  block: ArbigentScenarioExecutor.Builder.() -> Unit = {},
+): ArbigentScenarioExecutor {
+  val builder = ArbigentScenarioExecutor.Builder(dispatcher)
   builder.block()
   return builder.build()
 }
