@@ -2,6 +2,7 @@ package io.github.takahirom.arbigent.sample.test
 
 import io.github.takahirom.arbigent.*
 import dadb.Dadb
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.test.runTest
 import java.io.File
 import kotlin.test.Ignore
@@ -30,7 +31,8 @@ class RealArbigentTest {
           dadb = Dadb.discover()!!
         ).connectToDevice()
       },
-      appSettings = DefaultArbigentAppSettings
+      appSettings = DefaultArbigentAppSettings,
+      dispatcher = coroutineContext[CoroutineDispatcher]!!,
     )
     arbigentProject.execute()
   }
