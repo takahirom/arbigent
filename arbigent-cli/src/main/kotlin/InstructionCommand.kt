@@ -124,83 +124,46 @@ class ArbigentInstructionCommand : CliktCommand(name = "instruction") {
   }
 
   /**
-   * Walks [target]'s dependency chain (dependency-first) and expands reusable `uses`/`steps` calls
-   * into the concrete leaves that actually execute, resolving `{{inputs.*}}` bindings along the way.
-   * Mirrors the runtime expansion in `createArbigentScenario`, but keeps each leaf's own
-   * initialization methods and image assertions so they can be rendered.
+   * Resolves [target] into the concrete leaves that actually execute (dependency chain first,
+   * reusable calls expanded, `{{inputs.*}}` bound) and renders each one. `instruction` refuses to
+   * print a partial chain, so every diagnostic the resolver reports becomes a [CliktError].
    */
   private fun resolveChain(
     scenariosById: Map<String, ArbigentScenarioContent>,
     reusableById: Map<String, ArbigentScenarioContent>,
     target: ArbigentScenarioContent,
   ): List<ResolvedStep> {
-    val steps = mutableListOf<ResolvedStep>()
-    val visited = mutableSetOf<String>()
-
-    fun leaf(content: ArbigentScenarioContent, bindings: Map<String, String>) {
+    val resolution = ArbigentScenarioResolver.resolveChain(
+      target = target,
+      reusableScenarios = reusableById.values.toList(),
+      scenarioLookup = scenariosById::get,
+    )
+    resolution.diagnostics.firstOrNull()?.let { diagnostic ->
+      throw CliktError(
+        when (diagnostic) {
+          // The call site is obvious from the printed chain, so keep the short wording.
+          is ArbigentScenarioDiagnostic.UnresolvedReusable ->
+            "Reusable scenario '${diagnostic.uses}' is not defined in reusableScenarios"
+          else -> diagnostic.message
+        }
+      )
+    }
+    return resolution.leaves.map { leaf ->
+      val content = requireNotNull(leaf.content)
+      val bindings = leaf.bindings.orEmpty()
       @Suppress("DEPRECATION")
       val rawInitializationMethods =
         content.initializationMethods.ifEmpty { listOf(content.initializeMethods) }
-      steps.add(
-        ResolvedStep(
-          id = content.id,
-          goal = ReusableInputsResolver.resolve(content.goal, bindings),
-          initializationMethods = rawInitializationMethods.map { resolveInitializationMethod(it, bindings) },
-          note = ReusableInputsResolver.resolve(content.noteForHumans, bindings),
-          imageAssertions = content.imageAssertions.map {
-            it.copy(assertionPrompt = ReusableInputsResolver.resolve(it.assertionPrompt, bindings))
-          },
-        )
+      ResolvedStep(
+        id = content.id,
+        goal = ReusableInputsResolver.resolve(content.goal, bindings),
+        initializationMethods = rawInitializationMethods.map { resolveInitializationMethod(it, bindings) },
+        note = ReusableInputsResolver.resolve(content.noteForHumans, bindings),
+        imageAssertions = content.imageAssertions.map {
+          it.copy(assertionPrompt = ReusableInputsResolver.resolve(it.assertionPrompt, bindings))
+        },
       )
     }
-
-    fun expandStep(
-      step: ArbigentScenarioContent.ReusableStep,
-      parentBindings: Map<String, String>,
-      expansionStack: List<String>,
-    ) {
-      if (expansionStack.contains(step.uses)) {
-        throw CliktError(
-          "Cyclic reusable scenario reference detected: ${(expansionStack + step.uses).joinToString(" -> ")}"
-        )
-      }
-      val reusable = reusableById[step.uses] ?: throw CliktError(
-        "Reusable scenario '${step.uses}' is not defined in reusableScenarios"
-      )
-      val resolvedWith = step.withValues.mapValues { (_, value) ->
-        ReusableInputsResolver.resolve(value, parentBindings)
-      }
-      val defaults = reusable.inputs.mapNotNull { (name, input) -> input.default?.let { name to it } }.toMap()
-      val bindings = defaults + resolvedWith
-      if (reusable.isCallForm()) {
-        reusable.callSteps().forEach { expandStep(it, bindings, expansionStack + step.uses) }
-      } else {
-        leaf(reusable, bindings)
-      }
-    }
-
-    fun dfs(scenario: ArbigentScenarioContent, dependencyStack: List<String>) {
-      if (dependencyStack.contains(scenario.id)) {
-        throw CliktError(
-          "Cyclic scenario dependency detected: ${(dependencyStack + scenario.id).joinToString(" -> ")}"
-        )
-      }
-      if (!visited.add(scenario.id)) return
-      scenario.dependencyId?.let { dependencyId ->
-        val dependency = scenariosById[dependencyId] ?: throw CliktError(
-          "Scenario '${scenario.id}' depends on unknown scenario '$dependencyId'."
-        )
-        dfs(dependency, dependencyStack + scenario.id)
-      }
-      if (scenario.isCallForm()) {
-        scenario.callSteps().forEach { expandStep(it, emptyMap(), emptyList()) }
-      } else {
-        leaf(scenario, emptyMap())
-      }
-    }
-
-    dfs(target, emptyList())
-    return steps
   }
 
   private fun resolveInitializationMethod(

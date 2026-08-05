@@ -338,15 +338,12 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
   fixedScenarios: List<FixedScenario> = emptyList(),
   reusableScenarios: List<ArbigentScenarioContent> = emptyList()
 ): ArbigentScenario {
-  val visited = mutableSetOf<ArbigentScenarioContent>()
-  val result = mutableListOf<ArbigentAgentTask>()
-
-  fun addLeafTask(
+  fun agentTask(
     taskScenarioId: String,
     nodeScenario: ArbigentScenarioContent,
     inputBindings: Map<String, String>?,
     callBreadcrumb: String?
-  ) {
+  ): ArbigentAgentTask {
     // Determine which device form factor to use
     val effectiveDeviceFormFactor = if (nodeScenario.deviceFormFactor is ArbigentScenarioDeviceFormFactor.Unspecified) {
       if (projectSettings.deviceFormFactor is ArbigentScenarioDeviceFormFactor.Unspecified) {
@@ -378,93 +375,67 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
       fixedScenarios = fixedScenarios
     )
 
-    result.add(
-      ArbigentAgentTask(
-        scenarioId = taskScenarioId,
-        goal = goal,
-        maxStep = nodeScenario.maxStep,
+    return ArbigentAgentTask(
+      scenarioId = taskScenarioId,
+      goal = goal,
+      maxStep = nodeScenario.maxStep,
+      deviceFormFactor = effectiveDeviceFormFactor,
+      additionalActions = mergedAdditionalActions,
+      mcpOptions = nodeScenario.mcpOptions,
+      callBreadcrumb = callBreadcrumb,
+      agentConfig = AgentConfigBuilder(
+        prompt = projectSettings.prompt,
+        scenarioType = nodeScenario.type,
         deviceFormFactor = effectiveDeviceFormFactor,
-        additionalActions = mergedAdditionalActions,
-        mcpOptions = nodeScenario.mcpOptions,
-        callBreadcrumb = callBreadcrumb,
-        agentConfig = AgentConfigBuilder(
-          prompt = projectSettings.prompt,
-          scenarioType = nodeScenario.type,
-          deviceFormFactor = effectiveDeviceFormFactor,
-          initializationMethods = initializationMethods,
-          imageAssertions = ArbigentImageAssertions(
-            nodeScenario.imageAssertions,
-            nodeScenario.imageAssertionHistoryCount
-          ),
-          aiDecisionCache = aiDecisionCache,
-          cacheOptions = nodeScenario.cacheOptions ?: ArbigentScenarioCacheOptions(),
-          mcpClient = if (projectSettings.mcpJson.isNotBlank() && projectSettings.mcpJson != DefaultMcpJson) {
-            MCPClient(projectSettings.mcpJson, appSettings)
-          } else {
-            null
-          },
-          fixedScenarios = fixedScenarios,
-          appSettings = appSettings
-        ).apply {
-          aiOptions(projectSettings.aiOptions?.mergeWith(nodeScenario.aiOptions) ?: nodeScenario.aiOptions)
-          aiFactory(aiFactory)
-          deviceFactory(deviceFactory)
-        }.build(),
-      )
+        initializationMethods = initializationMethods,
+        imageAssertions = ArbigentImageAssertions(
+          nodeScenario.imageAssertions,
+          nodeScenario.imageAssertionHistoryCount
+        ),
+        aiDecisionCache = aiDecisionCache,
+        cacheOptions = nodeScenario.cacheOptions ?: ArbigentScenarioCacheOptions(),
+        mcpClient = if (projectSettings.mcpJson.isNotBlank() && projectSettings.mcpJson != DefaultMcpJson) {
+          MCPClient(projectSettings.mcpJson, appSettings)
+        } else {
+          null
+        },
+        fixedScenarios = fixedScenarios,
+        appSettings = appSettings
+      ).apply {
+        aiOptions(projectSettings.aiOptions?.mergeWith(nodeScenario.aiOptions) ?: nodeScenario.aiOptions)
+        aiFactory(aiFactory)
+        deviceFactory(deviceFactory)
+      }.build(),
     )
   }
 
-  fun expandStep(
-    taskScenarioId: String,
-    step: ArbigentScenarioContent.ReusableStep,
-    parentBindings: Map<String, String>,
-    breadcrumb: List<String>,
-    expansionStack: List<String>
-  ) {
-    if (expansionStack.contains(step.uses)) {
-      throw ArbigentProjectValidationException(
-        "Cyclic reusable scenario reference detected: ${(expansionStack + step.uses).joinToString(" -> ")}"
-      )
-    }
-    val reusable = reusableScenarios.firstOrNull { it.id == step.uses }
-      ?: throw ArbigentProjectValidationException(
-        "Reusable scenario '${step.uses}' referenced from '${breadcrumb.lastOrNull() ?: taskScenarioId}' is not defined in reusableScenarios"
-      )
-    // Explicit propagation: with-values may reference the caller's own inputs via {{inputs.*}}.
-    val resolvedWith = step.withValues.mapValues { (_, value) ->
-      ReusableInputsResolver.resolve(value, parentBindings)
-    }
-    val defaults = reusable.inputs.mapNotNull { (name, input) -> input.default?.let { name to it } }.toMap()
-    val bindings = defaults + resolvedWith
-    // Label with the effective bindings (including defaults) so reports show the full snapshot.
-    val crumb = breadcrumb + ReusableInputsResolver.breadcrumbLabel(reusable.id, bindings)
-    if (reusable.isCallForm()) {
-      reusable.callSteps().forEach {
-        expandStep(taskScenarioId, it, bindings, crumb, expansionStack + step.uses)
-      }
-    } else {
-      addLeafTask(taskScenarioId, reusable, bindings, crumb.joinToString(" › "))
+  val resolution = ArbigentScenarioResolver.resolveChain(
+    target = scenario,
+    reusableScenarios = reusableScenarios,
+    // Duplicate ids resolve to the first declaration, as `first { it.id == ... }` always did.
+    scenarioLookup = { id -> firstOrNull { it.id == id } },
+  )
+  // The runtime has never validated `dependency`: a cycle is silently cut short by the resolver's
+  // visited set, and only a dangling reference is fatal.
+  resolution.diagnostics.forEach { diagnostic ->
+    when (diagnostic) {
+      is ArbigentScenarioDiagnostic.DanglingDependency ->
+        throw NoSuchElementException("Collection contains no element matching the predicate.")
+      is ArbigentScenarioDiagnostic.UnresolvedReusable,
+      is ArbigentScenarioDiagnostic.CyclicReusable ->
+        throw ArbigentProjectValidationException(diagnostic.message)
+      is ArbigentScenarioDiagnostic.CyclicDependency,
+      is ArbigentScenarioDiagnostic.DuplicateScenarioId -> Unit
     }
   }
-
-  fun dfs(nodeScenario: ArbigentScenarioContent) {
-    if (visited.contains(nodeScenario)) {
-      return
-    }
-    visited.add(nodeScenario)
-    nodeScenario.dependencyId?.let { dependency ->
-      val dependencyScenario = first { it.id == dependency }
-      dfs(dependencyScenario)
-    }
-    if (nodeScenario.isCallForm()) {
-      nodeScenario.callSteps().forEach { step ->
-        expandStep(nodeScenario.id, step, emptyMap(), listOf(nodeScenario.id), emptyList())
-      }
-    } else {
-      addLeafTask(nodeScenario.id, nodeScenario, null, null)
-    }
+  val result = resolution.leaves.map { leaf ->
+    agentTask(
+      taskScenarioId = leaf.rootScenarioId,
+      nodeScenario = requireNotNull(leaf.content),
+      inputBindings = leaf.bindings,
+      callBreadcrumb = leaf.callPath.takeIf { it.isNotEmpty() }?.joinToString(" › "),
+    )
   }
-  dfs(scenario)
   arbigentDebugLog("Built scenario ${scenario.id} with ${result.size} tasks: ${result.map { it.scenarioId }}")
   // Determine which device form factor to use for the scenario
   val effectiveScenarioDeviceFormFactor = if (scenario.deviceFormFactor is ArbigentScenarioDeviceFormFactor.Unspecified) {
