@@ -718,6 +718,39 @@ class ArbigentAppStateHolder(
     return allScenarioStateHoldersStateFlow.value.count { it.id == newScenarioId }
   }
 
+  /**
+   * Scenarios that can be chosen as [scenarioStateHolder]'s dependency: every scenario except
+   * itself and the ones that already depend on it, directly or through a chain.
+   *
+   * Picking one of those would mean the two have to run after each other, which no ordering can
+   * satisfy — the project would then fail to load and refuse to save. The choice is left out of
+   * the menu instead of being rejected afterwards, so the editor cannot reach that state at all.
+   *
+   * Returned in tree order, the same order the scenario list is displayed in.
+   */
+  fun selectableDependencies(
+    scenarioStateHolder: ArbigentScenarioStateHolder,
+  ): List<ArbigentScenarioStateHolder> =
+    sortedScenariosAndDepths().map { it.first }.filter { candidate ->
+      candidate !== scenarioStateHolder && !dependsOn(candidate, scenarioStateHolder)
+    }
+
+  /** Whether [from] reaches [target] by following dependencies. */
+  private fun dependsOn(
+    from: ArbigentScenarioStateHolder,
+    target: ArbigentScenarioStateHolder,
+  ): Boolean {
+    // The stepped-through set only matters for content that already contains a cycle; the menu
+    // this backs is what stops one from being created in the first place.
+    val steppedThrough = mutableSetOf<ArbigentScenarioStateHolder>()
+    var current = from.dependencyScenarioStateHolderStateFlow.value
+    while (current != null && steppedThrough.add(current)) {
+      if (current === target) return true
+      current = current.dependencyScenarioStateHolderStateFlow.value
+    }
+    return false
+  }
+
   fun onStepFeedback(feedback: StepFeedbackEvent) {
     when (feedback) {
       is StepFeedback -> {
