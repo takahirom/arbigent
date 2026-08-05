@@ -189,6 +189,47 @@ public object ArbigentScenarioResolver {
   }
 
   /**
+   * Whole-project `dependency` diagnostics, in a stable order: duplicate ids, then dangling
+   * references in declaration order, then each cycle once. Used by load-time validation so a
+   * broken project is rejected with every violation at once instead of one per run.
+   */
+  public fun diagnoseDependencies(
+    scenarios: List<ArbigentScenarioContent>,
+  ): List<ArbigentScenarioDiagnostic> {
+    val diagnostics = mutableListOf<ArbigentScenarioDiagnostic>()
+    scenarios.groupBy { it.id }.filterValues { it.size > 1 }.keys.forEach {
+      diagnostics += ArbigentScenarioDiagnostic.DuplicateScenarioId(it)
+    }
+    val byId = scenarios.associateBy { it.id }
+    scenarios.forEach { scenario ->
+      scenario.dependencyId?.let { dependencyId ->
+        if (!byId.containsKey(dependencyId)) {
+          diagnostics += ArbigentScenarioDiagnostic.DanglingDependency(scenario.id, dependencyId)
+        }
+      }
+    }
+
+    // Three-color walk so a cycle shared by several scenarios is reported once.
+    val visiting = mutableSetOf<String>()
+    val done = mutableSetOf<String>()
+    fun visit(id: String, path: List<String>) {
+      if (id in visiting) {
+        diagnostics += ArbigentScenarioDiagnostic.CyclicDependency(
+          path.dropWhile { it != id } + id
+        )
+        return
+      }
+      if (id in done) return
+      visiting += id
+      byId[id]?.dependencyId?.takeIf { byId.containsKey(it) }?.let { visit(it, path + id) }
+      visiting -= id
+      done += id
+    }
+    scenarios.forEach { visit(it.id, emptyList()) }
+    return diagnostics
+  }
+
+  /**
    * Orders [items] as a dependency forest and pairs each with its depth: roots first, each
    * followed by its dependents. An item whose dependency is not in [items] (or is itself) is a
    * root. Items are matched with `==` and used as map keys, so the UI can order live scenario

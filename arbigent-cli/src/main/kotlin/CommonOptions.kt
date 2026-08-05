@@ -133,6 +133,26 @@ fun isJourneyProjectSource(projectFile: String): Boolean {
 }
 
 /**
+ * Loads [projectFile] as project content, choosing the Journeys XML importer or the YAML loader.
+ * A project file that fails validation is reported as a plain [CliktError] message rather than an
+ * uncaught exception, since the user's fix is in the YAML, not in the command line.
+ */
+fun loadArbigentProjectFileContent(projectFile: String): ArbigentProjectFileContent =
+  asCliktError {
+    if (isJourneyProjectSource(projectFile)) {
+      ArbigentJourneyXmlImporter.loadProjectContent(File(projectFile))
+    } else {
+      ArbigentProjectSerializer().load(File(projectFile))
+    }
+  }
+
+private fun <T> asCliktError(block: () -> T): T = try {
+  block()
+} catch (e: ArbigentProjectValidationException) {
+  throw CliktError(e.message)
+}
+
+/**
  * Builds an [ArbigentProject] from [projectFile], loading Journeys XML when the path is a
  * journey source and falling back to the normal YAML loader otherwise.
  */
@@ -142,8 +162,8 @@ fun loadArbigentProject(
   deviceFactory: () -> ArbigentDevice,
   appSettings: ArbigentAppSettings,
   dispatcher: CoroutineDispatcher,
-): ArbigentProject {
-  return if (isJourneyProjectSource(projectFile)) {
+): ArbigentProject = asCliktError {
+  if (isJourneyProjectSource(projectFile)) {
     val projectFileContent = ArbigentJourneyXmlImporter.loadProjectContent(File(projectFile))
     ArbigentProject(
       projectFileContent = projectFileContent,

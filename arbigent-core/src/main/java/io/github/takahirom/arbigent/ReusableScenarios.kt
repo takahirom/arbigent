@@ -35,10 +35,21 @@ public object ReusableInputsResolver {
 }
 
 /**
- * Load-time validation of reusable scenarios. Throws [ArbigentProjectValidationException]
- * with all violations joined, so the user can fix everything in one pass.
+ * Load-time validation of a project file. Throws [ArbigentProjectValidationException] with all
+ * violations joined, so the user can fix everything in one pass. Covers the reusable-scenario
+ * rules and the `dependency` graph (duplicate scenario ids, dangling and cyclic references).
  */
-public fun ArbigentProjectFileContent.validateReusableScenarios() {
+public fun ArbigentProjectFileContent.validateProject() {
+  val errors = ArbigentScenarioResolver.diagnoseDependencies(scenarioContents).map { it.message } +
+    reusableScenarioErrors()
+  if (errors.isNotEmpty()) {
+    throw ArbigentProjectValidationException(
+      "Invalid project configuration:\n" + errors.joinToString("\n") { "- $it" }
+    )
+  }
+}
+
+private fun ArbigentProjectFileContent.reusableScenarioErrors(): List<String> {
   val errors = mutableListOf<String>()
   val reusableById = reusableScenarios.associateBy { it.id }
 
@@ -174,11 +185,7 @@ public fun ArbigentProjectFileContent.validateReusableScenarios() {
   }
   reusableScenarios.forEach { visit(it.id, emptyList()) }
 
-  if (errors.isNotEmpty()) {
-    throw ArbigentProjectValidationException(
-      "Invalid reusable scenario configuration:\n" + errors.joinToString("\n") { "- $it" }
-    )
-  }
+  return errors
 }
 
 private val RESERVED_ID_CHARS = listOf("/", "#", "@")

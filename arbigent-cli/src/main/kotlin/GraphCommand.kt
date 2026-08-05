@@ -4,7 +4,6 @@ package io.github.takahirom.arbigent.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
 import io.github.takahirom.arbigent.*
-import java.io.File
 
 /**
  * Prints the scenario dependency graph (dependency edges and reusable `uses` edges)
@@ -16,12 +15,7 @@ class ArbigentGraphCommand : CliktCommand(name = "graph") {
 
   override fun run() {
     applyLogLevel(logLevel)
-    val projectFilePath = requireProjectFile(projectFile)
-    val projectFileContent = if (isJourneyProjectSource(projectFilePath)) {
-      ArbigentJourneyXmlImporter.loadProjectContent(File(projectFilePath))
-    } else {
-      ArbigentProjectSerializer().load(File(projectFilePath))
-    }
+    val projectFileContent = loadArbigentProjectFileContent(requireProjectFile(projectFile))
     echo(ArbigentScenarioGraph.from(projectFileContent).toMermaid())
   }
 }

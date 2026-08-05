@@ -416,18 +416,10 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
     scenarioLookup = { id -> firstOrNull { it.id == id } },
     reusableLookup = { id -> reusableScenarios.firstOrNull { it.id == id } },
   )
-  // The runtime has never validated `dependency`: a cycle is silently cut short by the resolver's
-  // visited set, and only a dangling reference is fatal.
-  resolution.diagnostics.forEach { diagnostic ->
-    when (diagnostic) {
-      is ArbigentScenarioDiagnostic.DanglingDependency ->
-        throw NoSuchElementException("Collection contains no element matching the predicate.")
-      is ArbigentScenarioDiagnostic.UnresolvedReusable,
-      is ArbigentScenarioDiagnostic.CyclicReusable ->
-        throw ArbigentProjectValidationException(diagnostic.message)
-      is ArbigentScenarioDiagnostic.CyclicDependency,
-      is ArbigentScenarioDiagnostic.DuplicateScenarioId -> Unit
-    }
+  // Loading a project file already rejects every one of these, so reaching this point means the
+  // content was built in memory. Fail the same way rather than running a half-resolved chain.
+  resolution.diagnostics.firstOrNull()?.let {
+    throw ArbigentProjectValidationException(it.message)
   }
   val result = resolution.leaves.map { leaf ->
     agentTask(
@@ -648,14 +640,14 @@ public class ArbigentProjectSerializer(
 
   internal fun load(yamlString: String): ArbigentProjectFileContent {
     return yaml.decodeFromString(ArbigentProjectFileContent.serializer(), yamlString)
-      .also { it.validateReusableScenarios() }
+      .also { it.validateProject() }
   }
 
   private fun load(inputStream: InputStream): ArbigentProjectFileContent {
     val jsonString = fileSystem.readText(inputStream)
     val projectFileContent =
       yaml.decodeFromString(ArbigentProjectFileContent.serializer(), jsonString)
-    projectFileContent.validateReusableScenarios()
+    projectFileContent.validateProject()
     return projectFileContent
   }
 

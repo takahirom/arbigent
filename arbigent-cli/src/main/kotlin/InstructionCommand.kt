@@ -11,7 +11,6 @@ import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.options.split
 import io.github.takahirom.arbigent.*
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
-import java.io.File
 
 /**
  * Prints AI-oriented reproduction instructions for one or more scenarios: the ordered chain of
@@ -41,12 +40,7 @@ class ArbigentInstructionCommand : CliktCommand(name = "instruction") {
 
   override fun run() {
     applyLogLevel(logLevel)
-    val projectFilePath = requireProjectFile(projectFile)
-    val projectFileContent = if (isJourneyProjectSource(projectFilePath)) {
-      ArbigentJourneyXmlImporter.loadProjectContent(File(projectFilePath))
-    } else {
-      ArbigentProjectSerializer().load(File(projectFilePath))
-    }
+    val projectFileContent = loadArbigentProjectFileContent(requireProjectFile(projectFile))
 
     val scenariosById = projectFileContent.scenarioContents.associateBy { it.id }
     val reusableById = projectFileContent.reusableScenarios.associateBy { it.id }

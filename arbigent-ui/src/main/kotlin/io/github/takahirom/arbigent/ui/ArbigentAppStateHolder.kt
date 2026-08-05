@@ -178,7 +178,7 @@ class ArbigentAppStateHolder(
         scenarioContents = allScenarioStateHoldersStateFlow.value.map { it.createArbigentScenarioContent() },
         reusableScenarios = prospectiveReusables,
         fixedScenarios = _fixedScenariosFlow.value,
-      ).validateReusableScenarios()
+      ).validateProject()
     }.exceptionOrNull()?.message
   }
 
@@ -542,7 +542,7 @@ class ArbigentAppStateHolder(
     }
     val content = getCurrentProjectFileContent()
     // Never write a project file that would fail to load; surface the problem instead.
-    runCatching { content.validateReusableScenarios() }.exceptionOrNull()?.let { e ->
+    runCatching { content.validateProject() }.exceptionOrNull()?.let { e ->
       showErrorDialog(e)
       return
     }
