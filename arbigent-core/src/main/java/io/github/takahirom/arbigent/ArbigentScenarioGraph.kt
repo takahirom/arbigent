@@ -79,6 +79,9 @@ public data class ArbigentScenarioGraph(
       // Call-node keys carry a monotonic counter so they can never collide with a
       // scenario key (scenario ids are unrestricted and could imitate any path scheme).
       var callNodeCounter = 0
+      // `associateBy` resolves a duplicate reusable id to the last declaration, which is what
+      // the graph has always drawn; the runtime resolves it to the first.
+      val reusableById = projectFileContent.reusableScenarios.associateBy { it.id }
 
       fun scenarioKey(id: String) = "scenario:$id"
 
@@ -99,7 +102,7 @@ public data class ArbigentScenarioGraph(
       projectFileContent.scenarioContents.forEach { scenario ->
         var lastKey = scenarioKey(scenario.id)
         val leaves = ArbigentScenarioResolver
-          .expandCalls(scenario, projectFileContent.reusableScenarios)
+          .expandCalls(scenario, reusableById::get)
           .leaves
         leaves.forEach { leaf ->
           // `uses` is always set for a leaf from expandCalls; orEmpty keeps the key readable

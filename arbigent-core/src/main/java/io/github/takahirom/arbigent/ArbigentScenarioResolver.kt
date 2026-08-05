@@ -55,33 +55,45 @@ public object ArbigentScenarioResolver {
    * Walks [target]'s `dependency` chain root-first and expands each scenario's calls, returning
    * the leaves in execution order.
    *
-   * [scenarioLookup] resolves a dependency id; callers pass their existing index so duplicate ids
-   * keep resolving the way they always did.
+   * [scenarioLookup] and [reusableLookup] resolve a dependency id and a `uses` id. Callers pass
+   * their existing index, because they disagree on which declaration wins for a duplicate id and
+   * that difference is observable for content that never went through load-time validation.
    */
   public fun resolveChain(
     target: ArbigentScenarioContent,
-    reusableScenarios: List<ArbigentScenarioContent>,
     scenarioLookup: (String) -> ArbigentScenarioContent?,
+    reusableLookup: (String) -> ArbigentScenarioContent?,
   ): Resolution {
     val leaves = mutableListOf<ResolvedLeaf>()
     val diagnostics = mutableListOf<ArbigentScenarioDiagnostic>()
-    val visited = mutableSetOf<String>()
+    // Keyed by instance, not by id: `ArbigentScenarioContent` does not override `equals`, and the
+    // runtime's `visited` set has always been identity-based. Two declarations sharing an id are
+    // therefore both expanded, which only in-memory content can produce — load-time validation
+    // rejects duplicate scenario ids.
+    val visited = mutableSetOf<ArbigentScenarioContent>()
 
-    fun dfs(scenario: ArbigentScenarioContent, dependencyStack: List<String>) {
-      if (dependencyStack.contains(scenario.id)) {
-        diagnostics += ArbigentScenarioDiagnostic.CyclicDependency(dependencyStack + scenario.id)
+    // Both the path guard and [visited] are keyed by instance, not by id, because
+    // `ArbigentScenarioContent` does not override `equals` and the runtime's cut-off has always
+    // been identity-based. Two declarations sharing an id are therefore both expanded instead of
+    // the second looking like a cycle. Only in-memory content can produce that — load-time
+    // validation rejects duplicate scenario ids.
+    fun dfs(scenario: ArbigentScenarioContent, dependencyStack: List<ArbigentScenarioContent>) {
+      if (dependencyStack.any { it === scenario }) {
+        diagnostics += ArbigentScenarioDiagnostic.CyclicDependency(
+          (dependencyStack + scenario).map { it.id }
+        )
         return
       }
-      if (!visited.add(scenario.id)) return
+      if (!visited.add(scenario)) return
       scenario.dependencyId?.let { dependencyId ->
         val dependency = scenarioLookup(dependencyId)
         if (dependency == null) {
           diagnostics += ArbigentScenarioDiagnostic.DanglingDependency(scenario.id, dependencyId)
         } else {
-          dfs(dependency, dependencyStack + scenario.id)
+          dfs(dependency, dependencyStack + scenario)
         }
       }
-      val expansion = expandCalls(scenario, reusableScenarios)
+      val expansion = expandCalls(scenario, reusableLookup)
       leaves += expansion.leaves
       diagnostics += expansion.diagnostics
       if (!scenario.isCallForm()) {
@@ -102,13 +114,16 @@ public object ArbigentScenarioResolver {
   /**
    * Expands only [scenario]'s own `uses`/`steps` (no dependency walk), flattening composites into
    * the leaves that actually execute. Empty for a scenario that has no calls.
+   *
+   * [reusableLookup] is supplied by the caller for the same reason as in [resolveChain]: the
+   * runtime resolves a duplicate `uses` id to the first declaration while the graph and the CLI
+   * resolve it to the last.
    */
   public fun expandCalls(
     scenario: ArbigentScenarioContent,
-    reusableScenarios: List<ArbigentScenarioContent>,
+    reusableLookup: (String) -> ArbigentScenarioContent?,
   ): Resolution {
     if (!scenario.isCallForm()) return Resolution(emptyList(), emptyList())
-    val reusableById = reusableScenarios.associateBy { it.id }
     val leaves = mutableListOf<ResolvedLeaf>()
     val diagnostics = mutableListOf<ArbigentScenarioDiagnostic>()
 
@@ -118,7 +133,7 @@ public object ArbigentScenarioResolver {
       breadcrumb: List<String>,
       expansionStack: List<String>,
     ) {
-      val target = reusableById[step.uses]
+      val target = reusableLookup(step.uses)
       // Explicit propagation: with-values may reference the caller's own inputs via {{inputs.*}}.
       val resolvedWith = step.withValues.mapValues { (_, value) ->
         ReusableInputsResolver.resolve(value, parentBindings)

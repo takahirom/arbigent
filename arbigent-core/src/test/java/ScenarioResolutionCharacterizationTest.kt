@@ -103,6 +103,73 @@ class ScenarioResolutionCharacterizationTest {
     assertEquals(listOf("first", "A"), goals)
   }
 
+  /**
+   * The runtime and the graph disagree on which declaration wins for a duplicate reusable id:
+   * `createArbigentScenario` looked it up with `firstOrNull { it.id == step.uses }` while
+   * `ArbigentScenarioGraph` and `instruction` used `associateBy`. Loading YAML rejects duplicate
+   * reusable ids, so only in-memory content — what the UI holds while editing — can reach this.
+   */
+  @Test
+  fun duplicateReusableIdResolvesToTheFirstAtRuntimeAndTheLastInTheGraph() {
+    // Each duplicate is a composite reaching a differently-named leaf, so the winner is visible
+    // in both the executed goals and the rendered node titles.
+    val scenarios = listOf(ArbigentScenarioContent(id = "caller", uses = "part"))
+    val reusableScenarios = listOf(
+      ArbigentScenarioContent(
+        id = "part",
+        steps = listOf(ArbigentScenarioContent.ReusableStep(uses = "leaf-of-first")),
+      ),
+      ArbigentScenarioContent(
+        id = "part",
+        steps = listOf(ArbigentScenarioContent.ReusableStep(uses = "leaf-of-last")),
+      ),
+      ArbigentScenarioContent(id = "leaf-of-first", goal = "reached the first declaration"),
+      ArbigentScenarioContent(id = "leaf-of-last", goal = "reached the last declaration"),
+    )
+
+    val goals = scenarios.createArbigentScenario(
+      projectSettings = ArbigentProjectSettings(),
+      scenario = scenarios.single(),
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.Disabled.toCache(),
+      reusableScenarios = reusableScenarios,
+    ).agentTasks.map { it.goal }
+    assertEquals(listOf("reached the first declaration"), goals)
+
+    val graph = ArbigentScenarioGraph.from(
+      ArbigentProjectFileContent(
+        scenarioContents = scenarios,
+        reusableScenarios = reusableScenarios,
+      )
+    )
+    assertEquals(listOf("caller", "leaf-of-last"), graph.nodes.map { it.title })
+  }
+
+  /**
+   * The runtime's `visited` set is keyed by instance, not by id, because
+   * `ArbigentScenarioContent` does not override `equals`. Two declarations sharing an id are both
+   * expanded rather than the second being swallowed. Only in-memory content reaches this — load
+   * rejects duplicate scenario ids.
+   */
+  @Test
+  fun duplicateScenarioIdInMemoryExpandsBothDeclarations() {
+    val first = ArbigentScenarioContent(id = "dup", goal = "dup-first")
+    val middle = ArbigentScenarioContent(id = "x", goal = "x", dependencyId = "dup")
+    val second = ArbigentScenarioContent(id = "dup", goal = "dup-second", dependencyId = "x")
+    val scenarios = listOf(first, middle, second)
+
+    val goals = scenarios.createArbigentScenario(
+      projectSettings = ArbigentProjectSettings(),
+      scenario = second,
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.Disabled.toCache(),
+    ).agentTasks.map { it.goal }
+
+    assertEquals(listOf("dup-first", "x", "dup-second"), goals)
+  }
+
   @Test
   fun graphSilentlyDropsDanglingDependencyEdge() {
     val graph = ArbigentScenarioGraph.from(load(danglingDependency))

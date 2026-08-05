@@ -411,9 +411,10 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
 
   val resolution = ArbigentScenarioResolver.resolveChain(
     target = scenario,
-    reusableScenarios = reusableScenarios,
-    // Duplicate ids resolve to the first declaration, as `first { it.id == ... }` always did.
+    // Both lookups resolve a duplicate id to the first declaration, as the runtime's
+    // `first { it.id == ... }` / `firstOrNull { it.id == step.uses }` always did.
     scenarioLookup = { id -> firstOrNull { it.id == id } },
+    reusableLookup = { id -> reusableScenarios.firstOrNull { it.id == id } },
   )
   // The runtime has never validated `dependency`: a cycle is silently cut short by the resolver's
   // visited set, and only a dangling reference is fatal.

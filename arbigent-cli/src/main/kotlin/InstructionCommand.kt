@@ -135,8 +135,11 @@ class ArbigentInstructionCommand : CliktCommand(name = "instruction") {
   ): List<ResolvedStep> {
     val resolution = ArbigentScenarioResolver.resolveChain(
       target = target,
-      reusableScenarios = reusableById.values.toList(),
+      // Both indexes are `associateBy`, so a duplicate id resolves to the last declaration
+      // here while the runtime resolves it to the first. Preserved rather than unified,
+      // because load-time validation rejects duplicates before either can be reached.
       scenarioLookup = scenariosById::get,
+      reusableLookup = reusableById::get,
     )
     resolution.diagnostics.firstOrNull()?.let { diagnostic ->
       throw CliktError(
