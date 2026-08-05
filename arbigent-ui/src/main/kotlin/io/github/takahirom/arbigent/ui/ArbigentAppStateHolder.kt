@@ -30,6 +30,9 @@ class ArbigentAppStateHolder(
   // by the UI composition root (Main). internal so editor dialogs that build their own holders
   // (e.g. the reusable-scenario editor) can keep them on the same dispatcher.
   internal val dispatcher: CoroutineDispatcher,
+  // How a recoverable failure reaches the user. Defaults to the Swing error dialog; tests replace
+  // it so asserting on a rejected save does not open a modal window.
+  private val onRecoverableError: (Throwable) -> Unit = { showErrorDialog(it) },
 ) {
   private val _fixedScenariosFlow = MutableStateFlow<List<FixedScenario>>(emptyList())
   val fixedScenariosFlow: StateFlow<List<FixedScenario>> = _fixedScenariosFlow.asStateFlow()
@@ -508,7 +511,17 @@ class ArbigentAppStateHolder(
   private var lastSavedYaml: String? = getCurrentContentAsYaml()
 
   private fun getCurrentProjectFileContent(): ArbigentProjectFileContent {
-    val sortedScenarios = sortedScenariosAndDepthsStateFlow.value.map { it.first }
+    // Ordering is recomputed here rather than read from `sortedScenariosAndDepthsStateFlow`:
+    // that flow is `WhileSubscribed`, so its value is the empty initial value until the UI first
+    // collects it and goes stale whenever collection stops — saving from either state would
+    // write a project with scenarios missing.
+    //
+    // The ordering decides the order scenarios are written in, but it must never decide *which*
+    // scenarios are written. Anything it does not place is appended in declaration order, so
+    // saving stays lossless even if the ordering regresses.
+    val ordered = sortedScenariosAndDepths().map { it.first }
+    val placed = ordered.toSet()
+    val sortedScenarios = ordered + allScenarioStateHoldersStateFlow.value.filterNot { it in placed }
     return ArbigentProjectFileContent(
       settings = ArbigentProjectSettings(
         prompt = promptFlow.value,
@@ -543,7 +556,7 @@ class ArbigentAppStateHolder(
     val content = getCurrentProjectFileContent()
     // Never write a project file that would fail to load; surface the problem instead.
     runCatching { content.validateProject() }.exceptionOrNull()?.let { e ->
-      showErrorDialog(e)
+      onRecoverableError(e)
       return
     }
     arbigentProjectSerializer.save(

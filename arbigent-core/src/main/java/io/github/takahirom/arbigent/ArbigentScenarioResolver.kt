@@ -240,9 +240,10 @@ public object ArbigentScenarioResolver {
    * state holders (which have no stable id) by identity — `ArbigentScenarioStateHolder` does not
    * override `equals`.
    *
-   * Items that only reach each other form no root, so a dependency cycle is omitted from the
-   * result entirely. That is what the UI has always done; see
-   * `mutualDependencyCycleIsOmittedFromTheForest`.
+   * Every item appears exactly once. Items that only reach each other form no root, so the first
+   * member of such a cycle is surfaced as a root and the rest follow as its dependents — the
+   * cycle itself is reported separately by [diagnoseDependencies], and dropping the items here
+   * would delete them from a project the UI saves.
    */
   public fun <T> dependencyForestWithDepth(
     items: List<T>,
@@ -261,11 +262,32 @@ public object ArbigentScenarioResolver {
     }
 
     val result = mutableListOf<Pair<T, Int>>()
+    val placed = mutableSetOf<T>()
     fun walk(item: T, depth: Int) {
+      // A cycle would otherwise recurse forever once traversal enters it. Outside a cycle each
+      // item has a single dependency, so it can be reached only once and this never fires.
+      if (!placed.add(item)) return
       result.add(item to depth)
       dependents[item]?.forEach { walk(it, depth + 1) }
     }
     roots.forEach { walk(it, 0) }
+    // Items that only reach each other form no root. Enter each such group at the cycle itself
+    // rather than at whichever member happens to be declared first: seeding from an ordinary
+    // dependent of the cycle would strand it at depth 0, contradicting "roots first, then their
+    // dependents". Walking up the dependency chain always lands on a cycle member, because the
+    // only way the walk can stop is by revisiting something it already stepped through.
+    val itemSet = items.toSet()
+    items.forEach { item ->
+      if (item in placed) return@forEach
+      var seed = item
+      val steppedThrough = mutableSetOf<T>()
+      while (steppedThrough.add(seed)) {
+        val parent = dependencyOf(seed) ?: break
+        if (parent !in itemSet || parent in placed) break
+        seed = parent
+      }
+      walk(seed, 0)
+    }
     return result
   }
 }

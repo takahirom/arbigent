@@ -361,19 +361,13 @@ class ScenarioResolutionCharacterizationTest {
   }
 
   /**
-   * A mutual cycle gives every item a dependency inside the list, so no root exists and the
-   * whole cycle drops out of the ordering. The UI has always behaved this way: the pre-refactor
-   * `sortedScenarioAndDepth` built the same roots/dependents split, and its
-   * `if (v.isEmpty()) roots.add(k)` branch was unreachable because `getOrPut` always inserted a
-   * non-empty list.
-   *
-   * This matters beyond ordering, because `getCurrentProjectFileContent()` serializes
-   * `sortedScenariosAndDepthsStateFlow`, so scenarios in a cycle are dropped when the project is
-   * saved. That is a pre-existing bug rather than something this refactoring introduces, and it
-   * is pinned here so a fix has to change this test deliberately.
+   * A mutual cycle gives every item a dependency inside the list, so it has no root. The first
+   * member is surfaced as a root instead of dropping the group, because
+   * `getCurrentProjectFileContent()` serializes this ordering and a dropped scenario is a
+   * scenario deleted from the saved project.
    */
   @Test
-  fun mutualDependencyCycleIsOmittedFromTheForest() {
+  fun mutualDependencyCycleKeepsEveryItemWithTheFirstAsRoot() {
     class Item(val name: String, var dependency: Item? = null)
 
     val a = Item("a")
@@ -385,7 +379,53 @@ class ScenarioResolutionCharacterizationTest {
       it.dependency
     }
 
-    assertEquals(listOf("unrelated" to 0), ordered.map { (item, depth) -> item.name to depth })
+    // Genuine roots keep their order and come first; the cycle is appended rather than dropped.
+    assertEquals(
+      listOf("unrelated" to 0, "a" to 0, "b" to 1),
+      ordered.map { (item, depth) -> item.name to depth }
+    )
+  }
+
+  /**
+   * A dependent of a cycle stays a dependent even when it is declared before the cycle. Entering
+   * the group at the first unplaced item would emit `trailing` as a root and then be unable to
+   * attach it under `a`, so the fallback walks up to a cycle member first.
+   */
+  @Test
+  fun aDependentDeclaredBeforeTheCycleItPointsIntoIsNotShownAsARoot() {
+    class Item(val name: String, var dependency: Item? = null)
+
+    val a = Item("a")
+    val b = Item("b", a)
+    a.dependency = b
+    val trailing = Item("trailing", a)
+
+    val ordered = ArbigentScenarioResolver.dependencyForestWithDepth(listOf(trailing, a, b)) {
+      it.dependency
+    }
+
+    assertEquals(0, ordered.single { it.first.name == "a" }.second)
+    assertEquals(1, ordered.single { it.first.name == "trailing" }.second)
+    assertEquals(1, ordered.single { it.first.name == "b" }.second)
+    assertEquals(3, ordered.size)
+  }
+
+  /** A scenario hanging off a cycle must survive too, and must not be visited twice. */
+  @Test
+  fun aDependentOfACycleIsListedOnce() {
+    class Item(val name: String, var dependency: Item? = null)
+
+    val a = Item("a")
+    val b = Item("b", a)
+    a.dependency = b
+    val trailing = Item("trailing", a)
+
+    val ordered = ArbigentScenarioResolver.dependencyForestWithDepth(listOf(a, b, trailing)) {
+      it.dependency
+    }
+
+    assertEquals(listOf("a", "b", "trailing"), ordered.map { it.first.name }.sorted())
+    assertEquals(3, ordered.size)
   }
 
   /**
