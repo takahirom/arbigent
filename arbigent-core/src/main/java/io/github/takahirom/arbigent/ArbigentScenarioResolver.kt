@@ -197,8 +197,8 @@ public object ArbigentScenarioResolver {
     scenarios: List<ArbigentScenarioContent>,
   ): List<ArbigentScenarioDiagnostic> {
     val diagnostics = mutableListOf<ArbigentScenarioDiagnostic>()
-    scenarios.groupBy { it.id }.filterValues { it.size > 1 }.keys.forEach {
-      diagnostics += ArbigentScenarioDiagnostic.DuplicateScenarioId(it)
+    scenarios.groupBy { it.id }.filterValues { it.size > 1 }.forEach { (id, declarations) ->
+      diagnostics += ArbigentScenarioDiagnostic.DuplicateScenarioId(id, declarations.size)
     }
     val byId = scenarios.associateBy { it.id }
     scenarios.forEach { scenario ->
@@ -266,39 +266,52 @@ public object ArbigentScenarioResolver {
   }
 }
 
-/** A broken reference found while resolving scenarios. Callers decide whether it is fatal. */
+/**
+ * A broken reference found while resolving scenarios. Callers decide whether it is fatal.
+ *
+ * [message] follows the same shape as every other validation message —
+ * `<section> '<id>': <what is wrong>`, no trailing period — so a report that mixes dependency
+ * and reusable violations reads as one list.
+ */
 public sealed interface ArbigentScenarioDiagnostic {
-  public val message: String
+  /** Section and id the violation is attributed to, e.g. `scenarios 'checkout'`. */
+  public val where: String
+  public val detail: String
+  public val message: String get() = "$where: $detail"
 
   public data class DanglingDependency(
     public val scenarioId: String,
     public val dependencyId: String,
   ) : ArbigentScenarioDiagnostic {
-    override val message: String
-      get() = "Scenario '$scenarioId' depends on unknown scenario '$dependencyId'."
+    override val where: String get() = "scenarios '$scenarioId'"
+    override val detail: String get() = "dependency '$dependencyId' is not defined in scenarios"
   }
 
   /** [path] repeats the scenario that closes the cycle, e.g. `a -> b -> a`. */
   public data class CyclicDependency(public val path: List<String>) : ArbigentScenarioDiagnostic {
-    override val message: String
-      get() = "Cyclic scenario dependency detected: ${path.joinToString(" -> ")}"
+    // Attributed to where the cycle starts, so the line points at a scenario the user can edit.
+    override val where: String get() = "scenarios '${path.first()}'"
+    override val detail: String get() = "cyclic dependency: ${path.joinToString(" -> ")}"
   }
 
-  public data class DuplicateScenarioId(public val id: String) : ArbigentScenarioDiagnostic {
-    override val message: String
-      get() = "scenarios: duplicate id '$id'"
+  public data class DuplicateScenarioId(
+    public val id: String,
+    public val declarationCount: Int,
+  ) : ArbigentScenarioDiagnostic {
+    override val where: String get() = "scenarios '$id'"
+    override val detail: String get() = "duplicate id (declared $declarationCount times)"
   }
 
   public data class UnresolvedReusable(
     public val referencedFrom: String,
     public val uses: String,
   ) : ArbigentScenarioDiagnostic {
-    override val message: String
-      get() = "Reusable scenario '$uses' referenced from '$referencedFrom' is not defined in reusableScenarios"
+    override val where: String get() = "scenarios '$referencedFrom'"
+    override val detail: String get() = "uses '$uses' is not defined in reusableScenarios"
   }
 
   public data class CyclicReusable(public val path: List<String>) : ArbigentScenarioDiagnostic {
-    override val message: String
-      get() = "Cyclic reusable scenario reference detected: ${path.joinToString(" -> ")}"
+    override val where: String get() = "reusableScenarios '${path.first()}'"
+    override val detail: String get() = "cyclic reusable reference: ${path.joinToString(" -> ")}"
   }
 }

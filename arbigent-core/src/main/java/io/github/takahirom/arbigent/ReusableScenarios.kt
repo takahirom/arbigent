@@ -1,10 +1,25 @@
 package io.github.takahirom.arbigent
 
 /**
- * Thrown when a project file violates the reusable-scenario rules.
+ * Thrown when a project file violates the scenario or reusable-scenario rules.
  * All violations are detected at load time so that a part is never silently skipped at runtime.
+ *
+ * [violations] keeps the individual lines so a caller that knows more about the source than the
+ * core does — the CLI knows which file was loaded — can re-render the report with that context
+ * via [arbigentValidationReport].
  */
-public class ArbigentProjectValidationException(message: String) : RuntimeException(message)
+public class ArbigentProjectValidationException(
+  message: String,
+  public val violations: List<String> = emptyList(),
+) : RuntimeException(message)
+
+/**
+ * Renders validation [violations] as one report. [source] names where the content came from
+ * (a file path) and is left out when the caller has nothing to name — the core never knows it.
+ */
+public fun arbigentValidationReport(violations: List<String>, source: String? = null): String =
+  "Invalid project configuration" + (source?.let { " in $it" } ?: "") + ":\n" +
+    violations.joinToString("\n") { "- $it" }
 
 /**
  * Resolves `{{inputs.name}}` placeholders with values bound at the call site (`with:` + declared defaults).
@@ -43,9 +58,7 @@ public fun ArbigentProjectFileContent.validateProject() {
   val errors = ArbigentScenarioResolver.diagnoseDependencies(scenarioContents).map { it.message } +
     reusableScenarioErrors()
   if (errors.isNotEmpty()) {
-    throw ArbigentProjectValidationException(
-      "Invalid project configuration:\n" + errors.joinToString("\n") { "- $it" }
-    )
+    throw ArbigentProjectValidationException(arbigentValidationReport(errors), errors)
   }
 }
 
@@ -159,8 +172,9 @@ private fun ArbigentProjectFileContent.reusableScenarioErrors(): List<String> {
     }
   }
 
-  val duplicateReusableIds = reusableScenarios.groupBy { it.id }.filterValues { it.size > 1 }.keys
-  duplicateReusableIds.forEach { errors += "reusableScenarios: duplicate id '$it'" }
+  reusableScenarios.groupBy { it.id }.filterValues { it.size > 1 }.forEach { (id, declarations) ->
+    errors += "reusableScenarios '$id': duplicate id (declared ${declarations.size} times)"
+  }
 
   scenarioContents.forEach { validateNode(it, isReusable = false) }
   reusableScenarios.forEach { validateNode(it, isReusable = true) }
@@ -170,7 +184,10 @@ private fun ArbigentProjectFileContent.reusableScenarioErrors(): List<String> {
   fun visit(id: String, path: List<String>) {
     when (visitState[id]) {
       0 -> {
-        errors += "reusableScenarios: cyclic reference detected: ${(path + id).joinToString(" -> ")}"
+        // Same shape as ArbigentScenarioDiagnostic.CyclicReusable: attributed to the cycle's start.
+        val cycle = (path + id).dropWhile { it != id }
+        errors += "reusableScenarios '$id': cyclic reusable reference: " +
+          cycle.joinToString(" -> ")
         return
       }
       1 -> return

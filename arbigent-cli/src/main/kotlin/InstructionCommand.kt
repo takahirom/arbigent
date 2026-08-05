@@ -135,16 +135,7 @@ class ArbigentInstructionCommand : CliktCommand(name = "instruction") {
       scenarioLookup = scenariosById::get,
       reusableLookup = reusableById::get,
     )
-    resolution.diagnostics.firstOrNull()?.let { diagnostic ->
-      throw CliktError(
-        when (diagnostic) {
-          // The call site is obvious from the printed chain, so keep the short wording.
-          is ArbigentScenarioDiagnostic.UnresolvedReusable ->
-            "Reusable scenario '${diagnostic.uses}' is not defined in reusableScenarios"
-          else -> diagnostic.message
-        }
-      )
-    }
+    resolution.diagnostics.firstOrNull()?.let { throw CliktError(it.message) }
     return resolution.leaves.map { leaf ->
       val content = requireNotNull(leaf.content)
       val bindings = leaf.bindings.orEmpty()

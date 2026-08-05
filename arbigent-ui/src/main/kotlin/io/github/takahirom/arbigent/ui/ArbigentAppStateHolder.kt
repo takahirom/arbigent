@@ -557,7 +557,16 @@ class ArbigentAppStateHolder(
     if (file == null) {
       return
     }
-    val projectFile = ArbigentProjectSerializer().load(file)
+    // The core reports the violations but not which file they came from; name it here.
+    val projectFile = try {
+      ArbigentProjectSerializer().load(file)
+    } catch (e: ArbigentProjectValidationException) {
+      if (e.violations.isEmpty()) throw e
+      throw ArbigentProjectValidationException(
+        arbigentValidationReport(e.violations, source = file.absolutePath),
+        e.violations,
+      )
+    }
     val scenarios = projectFile.scenarioContents
     val arbigentScenarioStateHolders = scenarios.map { scenarioContent ->
       ArbigentScenarioStateHolder(

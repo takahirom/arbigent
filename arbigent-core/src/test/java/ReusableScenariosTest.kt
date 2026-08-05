@@ -573,7 +573,7 @@ class ReusableScenariosTest {
   @Test
   fun duplicateReusableIdsFailAtLoad() {
     assertValidationError(
-      "duplicate id 'part'",
+      "reusableScenarios 'part': duplicate id (declared 2 times)",
       """
       scenarios:
       - id: "caller"

@@ -138,7 +138,7 @@ fun isJourneyProjectSource(projectFile: String): Boolean {
  * uncaught exception, since the user's fix is in the YAML, not in the command line.
  */
 fun loadArbigentProjectFileContent(projectFile: String): ArbigentProjectFileContent =
-  asCliktError {
+  asCliktError(projectFile) {
     if (isJourneyProjectSource(projectFile)) {
       ArbigentJourneyXmlImporter.loadProjectContent(File(projectFile))
     } else {
@@ -146,10 +146,17 @@ fun loadArbigentProjectFileContent(projectFile: String): ArbigentProjectFileCont
     }
   }
 
-private fun <T> asCliktError(block: () -> T): T = try {
+/**
+ * Turns a validation failure into a [CliktError], naming the file it came from — the core reports
+ * the violations but has no idea which path was loaded.
+ */
+private fun <T> asCliktError(projectFile: String, block: () -> T): T = try {
   block()
 } catch (e: ArbigentProjectValidationException) {
-  throw CliktError(e.message)
+  throw CliktError(
+    if (e.violations.isEmpty()) e.message
+    else arbigentValidationReport(e.violations, source = projectFile)
+  )
 }
 
 /**
@@ -162,7 +169,7 @@ fun loadArbigentProject(
   deviceFactory: () -> ArbigentDevice,
   appSettings: ArbigentAppSettings,
   dispatcher: CoroutineDispatcher,
-): ArbigentProject = asCliktError {
+): ArbigentProject = asCliktError(projectFile) {
   if (isJourneyProjectSource(projectFile)) {
     val projectFileContent = ArbigentJourneyXmlImporter.loadProjectContent(File(projectFile))
     ArbigentProject(

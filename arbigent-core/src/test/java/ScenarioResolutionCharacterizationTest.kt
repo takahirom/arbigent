@@ -39,7 +39,7 @@ class ScenarioResolutionCharacterizationTest {
   @Test
   fun danglingDependencyFailsAtLoad() {
     assertValidationError(
-      "Scenario 'a' depends on unknown scenario 'missing'.",
+      "scenarios 'a': dependency 'missing' is not defined in scenarios",
       """
       scenarios:
       - id: "a"
@@ -119,7 +119,7 @@ class ScenarioResolutionCharacterizationTest {
   @Test
   fun cyclicDependencyFailsAtLoadWithThePath() {
     assertValidationError(
-      "Cyclic scenario dependency detected: a -> c -> b -> a",
+      "scenarios 'a': cyclic dependency: a -> c -> b -> a",
       """
       scenarios:
       - id: "a"
@@ -138,7 +138,7 @@ class ScenarioResolutionCharacterizationTest {
   @Test
   fun selfDependencyFailsAtLoad() {
     assertValidationError(
-      "Cyclic scenario dependency detected: selfie -> selfie",
+      "scenarios 'selfie': cyclic dependency: selfie -> selfie",
       """
       scenarios:
       - id: "selfie"
@@ -151,7 +151,7 @@ class ScenarioResolutionCharacterizationTest {
   @Test
   fun duplicateScenarioIdFailsAtLoad() {
     assertValidationError(
-      "scenarios: duplicate id 'a'",
+      "scenarios 'a': duplicate id (declared 2 times)",
       """
       scenarios:
       - id: "a"
@@ -187,9 +187,9 @@ class ScenarioResolutionCharacterizationTest {
       )
     }
     val message = exception.message!!
-    assertTrue(message.contains("scenarios: duplicate id 'dup'"), message)
-    assertTrue(message.contains("Scenario 'orphan' depends on unknown scenario 'missing'."), message)
-    assertTrue(message.contains("Cyclic scenario dependency detected: loop-a -> loop-b -> loop-a"), message)
+    assertTrue(message.contains("scenarios 'dup': duplicate id (declared 2 times)"), message)
+    assertTrue(message.contains("scenarios 'orphan': dependency 'missing' is not defined in scenarios"), message)
+    assertTrue(message.contains("scenarios 'loop-a': cyclic dependency: loop-a -> loop-b -> loop-a"), message)
     // Reusable violations are reported in the same pass, not one run later.
     assertTrue(message.contains("uses 'nowhere' is not defined in reusableScenarios"), message)
   }
@@ -214,7 +214,7 @@ class ScenarioResolutionCharacterizationTest {
     }
     assertEquals(
       1,
-      exception.message!!.lines().count { it.contains("Cyclic scenario dependency detected") },
+      exception.message!!.lines().count { it.contains("cyclic dependency:") },
       exception.message
     )
   }
@@ -237,7 +237,7 @@ class ScenarioResolutionCharacterizationTest {
         aiDecisionCache = AiDecisionCacheStrategy.Disabled.toCache(),
       )
     }
-    assertEquals("Scenario 'a' depends on unknown scenario 'missing'.", failure.message)
+    assertEquals("scenarios 'a': dependency 'missing' is not defined in scenarios", failure.message)
   }
 
   /**
@@ -336,7 +336,7 @@ class ScenarioResolutionCharacterizationTest {
       buildTasks(listOf(ArbigentScenarioContent(id = "a", uses = "nowhere")))
     }
     assertEquals(
-      "Reusable scenario 'nowhere' referenced from 'a' is not defined in reusableScenarios",
+      "scenarios 'a': uses 'nowhere' is not defined in reusableScenarios",
       failure.message
     )
   }
@@ -353,7 +353,7 @@ class ScenarioResolutionCharacterizationTest {
       )
     }
     assertEquals(
-      "Cyclic reusable scenario reference detected: first -> second -> first",
+      "reusableScenarios 'first': cyclic reusable reference: first -> second -> first",
       failure.message
     )
   }
