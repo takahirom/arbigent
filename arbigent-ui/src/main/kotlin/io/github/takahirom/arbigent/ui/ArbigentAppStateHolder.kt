@@ -466,43 +466,12 @@ class ArbigentAppStateHolder(
         reusableScenarios = this@ArbigentAppStateHolder._reusableScenariosFlow.value
       )
 
-  private fun sortedScenarioAndDepth(allScenarios: List<ArbigentScenarioStateHolder>): List<Pair<ArbigentScenarioStateHolder, Int>> {
-    // Build dependency map using goals as keys
-    val dependentMap =
-      mutableMapOf<ArbigentScenarioStateHolder, MutableList<ArbigentScenarioStateHolder>>()
-    val rootScenarios = mutableListOf<ArbigentScenarioStateHolder>()
-
-    allScenarios.forEach { scenario ->
-      allScenarios.firstOrNull { it == scenario.dependencyScenarioStateHolderStateFlow.value }
-        ?.let {
-          if (it == scenario) {
-            rootScenarios.add(scenario)
-            return@forEach
-          }
-          dependentMap.getOrPut(it) { mutableListOf() }.add(scenario)
-        } ?: run {
-        rootScenarios.add(scenario)
-      }
+  // A scenario whose dependency is gone (or is itself) is shown as a root, matching how the
+  // dependency forest is walked everywhere else.
+  private fun sortedScenarioAndDepth(allScenarios: List<ArbigentScenarioStateHolder>): List<Pair<ArbigentScenarioStateHolder, Int>> =
+    ArbigentScenarioResolver.dependencyForestWithDepth(allScenarios) {
+      it.dependencyScenarioStateHolderStateFlow.value
     }
-    dependentMap.forEach { (k, v) ->
-      if (v.isEmpty()) {
-        rootScenarios.add(k)
-      }
-    }
-
-    // Assign depths using BFS
-    val result = mutableListOf<Pair<ArbigentScenarioStateHolder, Int>>()
-    fun dfs(scenario: ArbigentScenarioStateHolder, depth: Int) {
-      result.add(scenario to depth)
-      dependentMap[scenario]?.forEach {
-        dfs(it, depth + 1)
-      }
-    }
-    rootScenarios.forEach {
-      dfs(it, 0)
-    }
-    return result
-  }
 
   fun runAllFailed() {
     job?.cancel()

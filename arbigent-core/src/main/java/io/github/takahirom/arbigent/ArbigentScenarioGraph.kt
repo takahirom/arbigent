@@ -74,60 +74,14 @@ public data class ArbigentScenarioGraph(
     private const val MAX_GOAL_LENGTH = 60
 
     public fun from(projectFileContent: ArbigentProjectFileContent): ArbigentScenarioGraph {
-      val reusableById = projectFileContent.reusableScenarios.associateBy { it.id }
       val nodes = mutableListOf<Node>()
       val edges = mutableListOf<Edge>()
       // Call-node keys carry a monotonic counter so they can never collide with a
       // scenario key (scenario ids are unrestricted and could imitate any path scheme).
       var callNodeCounter = 0
-
-      /**
-       * Expands one call step. Leaves become nodes chained after [previousKey]; composites are
-       * flattened by recursing into their steps, accumulating the path into [viaPath]. Returns
-       * the key of the last emitted node so the next sibling step can chain from it. Bindings
-       * are resolved like the runtime expansion (`defaults + with` resolved against the caller's
-       * bindings). [expansionStack] guards against cyclic references on content that has not
-       * gone through load-time validation.
-       */
-      fun expandStep(
-        step: ArbigentScenarioContent.ReusableStep,
-        parentBindings: Map<String, String>,
-        viaPath: List<String>,
-        previousKey: String,
-        expansionStack: List<String>,
-      ): String {
-        val key = "call#${callNodeCounter++}:${step.uses}"
-        val target = reusableById[step.uses]
-        val resolvedWith = step.withValues.mapValues { (_, value) ->
-          ReusableInputsResolver.resolve(value, parentBindings)
-        }
-        val defaults = target?.inputs.orEmpty()
-          .mapNotNull { (name, input) -> input.default?.let { name to it } }.toMap()
-        val bindings = defaults + resolvedWith
-        val label = ReusableInputsResolver.breadcrumbLabel(step.uses, bindings)
-        // Unresolved references (target == null) are reported by validation; keep a leaf node.
-        if (target == null || !target.isCallForm() || step.uses in expansionStack) {
-          nodes += Node(
-            key = key,
-            title = label,
-            subtitle = if (viaPath.isEmpty()) "" else "via ${viaPath.joinToString(" › ")}",
-            kind = NodeKind.ReusableCall,
-          )
-          edges += Edge(fromKey = previousKey, toKey = key, kind = EdgeKind.Call)
-          return key
-        }
-        var lastKey = previousKey
-        target.callSteps().forEach { nestedStep ->
-          lastKey = expandStep(
-            step = nestedStep,
-            parentBindings = bindings,
-            viaPath = viaPath + label,
-            previousKey = lastKey,
-            expansionStack = expansionStack + step.uses,
-          )
-        }
-        return lastKey
-      }
+      // `associateBy` resolves a duplicate reusable id to the last declaration, which is what
+      // the graph has always drawn; the runtime resolves it to the first.
+      val reusableById = projectFileContent.reusableScenarios.associateBy { it.id }
 
       fun scenarioKey(id: String) = "scenario:$id"
 
@@ -140,23 +94,34 @@ public data class ArbigentScenarioGraph(
         )
       }
       // First expand every scenario's call chain and remember where it ends, because a
-      // dependency edge starts from the dependency scenario's last executed node.
+      // dependency edge starts from the dependency scenario's last executed node. The
+      // expansion emits leaves in execution order, so each leaf simply chains after the
+      // previous one; broken references still emit a leaf, since the graph renders an
+      // invalid project instead of rejecting it (diagnostics are reported by validation).
       val lastKeyByScenarioId = mutableMapOf<String, String>()
       projectFileContent.scenarioContents.forEach { scenario ->
         var lastKey = scenarioKey(scenario.id)
-        scenario.callSteps().forEach { step ->
-          lastKey = expandStep(
-            step = step,
-            parentBindings = emptyMap(),
-            viaPath = emptyList(),
-            previousKey = lastKey,
-            expansionStack = emptyList(),
+        val leaves = ArbigentScenarioResolver
+          .expandCalls(scenario, reusableById::get)
+          .leaves
+        leaves.forEach { leaf ->
+          // `uses` is always set for a leaf from expandCalls; orEmpty keeps the key readable
+          // rather than encoding "null" if that ever stops holding. The counter makes it unique.
+          val key = "call#${callNodeCounter++}:${leaf.uses.orEmpty()}"
+          nodes += Node(
+            key = key,
+            title = leaf.callLabel,
+            subtitle = leaf.viaPath.let { if (it.isEmpty()) "" else "via ${it.joinToString(" › ")}" },
+            kind = NodeKind.ReusableCall,
           )
+          edges += Edge(fromKey = lastKey, toKey = key, kind = EdgeKind.Call)
+          lastKey = key
         }
         lastKeyByScenarioId[scenario.id] = lastKey
       }
       projectFileContent.scenarioContents.forEach { scenario ->
         scenario.dependencyId?.let { dependencyId ->
+          // A dangling dependency silently loses its edge; the rest of the graph still renders.
           lastKeyByScenarioId[dependencyId]?.let { fromKey ->
             edges += Edge(
               fromKey = fromKey,

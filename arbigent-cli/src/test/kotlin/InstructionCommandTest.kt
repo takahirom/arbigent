@@ -125,8 +125,10 @@ scenarios:
     )
     val result = run("--scenario-ids=child")
     assertNotEquals(0, result.statusCode, result.output)
-    assertContains(result.output, "child")
-    assertContains(result.output, "missing-parent")
+    assertContains(
+      result.output,
+      "Scenario 'child' depends on unknown scenario 'missing-parent'."
+    )
   }
 
   @Test
