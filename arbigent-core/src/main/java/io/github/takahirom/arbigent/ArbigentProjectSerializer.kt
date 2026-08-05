@@ -431,7 +431,11 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
   val result = resolution.leaves.map { leaf ->
     agentTask(
       taskScenarioId = leaf.rootScenarioId,
-      nodeScenario = requireNotNull(leaf.content),
+      // Non-null because the loop above throws for the only two diagnostics that produce a
+      // content-less leaf (UnresolvedReusable / CyclicReusable).
+      nodeScenario = requireNotNull(leaf.content) {
+        "Unresolved leaf '${leaf.uses}' reached task creation without a diagnostic"
+      },
       inputBindings = leaf.bindings,
       callBreadcrumb = leaf.callPath.takeIf { it.isNotEmpty() }?.joinToString(" › "),
     )

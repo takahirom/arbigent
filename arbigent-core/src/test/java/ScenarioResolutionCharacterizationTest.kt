@@ -148,6 +148,82 @@ class ScenarioResolutionCharacterizationTest {
     )
   }
 
+  /**
+   * A mutual cycle gives every item a dependency inside the list, so no root exists and the
+   * whole cycle drops out of the ordering. The UI has always behaved this way: the pre-refactor
+   * `sortedScenarioAndDepth` built the same roots/dependents split, and its
+   * `if (v.isEmpty()) roots.add(k)` branch was unreachable because `getOrPut` always inserted a
+   * non-empty list.
+   *
+   * This matters beyond ordering, because `getCurrentProjectFileContent()` serializes
+   * `sortedScenariosAndDepthsStateFlow`, so scenarios in a cycle are dropped when the project is
+   * saved. That is a pre-existing bug rather than something this refactoring introduces, and it
+   * is pinned here so a fix has to change this test deliberately.
+   */
+  @Test
+  fun mutualDependencyCycleIsOmittedFromTheForest() {
+    class Item(val name: String, var dependency: Item? = null)
+
+    val a = Item("a")
+    val b = Item("b", a)
+    a.dependency = b
+    val unrelated = Item("unrelated")
+
+    val ordered = ArbigentScenarioResolver.dependencyForestWithDepth(listOf(a, b, unrelated)) {
+      it.dependency
+    }
+
+    assertEquals(listOf("unrelated" to 0), ordered.map { (item, depth) -> item.name to depth })
+  }
+
+  /**
+   * `createArbigentScenario` turns an unresolvable or cyclic `uses` into an exception. Without
+   * that throw the null-content leaf the resolver emits for those diagnostics would reach
+   * `requireNotNull(leaf.content)`, so the branch is pinned here.
+   *
+   * Loading YAML cannot reach it — reusable references are validated at load time — so these
+   * cases build the content in memory, the way the UI does while a project is being edited.
+   */
+  private fun buildTasks(
+    scenarios: List<ArbigentScenarioContent>,
+    reusableScenarios: List<ArbigentScenarioContent> = emptyList(),
+  ) = scenarios.createArbigentScenario(
+    projectSettings = ArbigentProjectSettings(),
+    scenario = scenarios.first(),
+    aiFactory = { FakeAi() },
+    deviceFactory = { FakeDevice() },
+    aiDecisionCache = AiDecisionCacheStrategy.Disabled.toCache(),
+    reusableScenarios = reusableScenarios,
+  )
+
+  @Test
+  fun runtimeRejectsUnresolvedReusableReference() {
+    val failure = assertFailsWith<ArbigentProjectValidationException> {
+      buildTasks(listOf(ArbigentScenarioContent(id = "a", uses = "nowhere")))
+    }
+    assertEquals(
+      "Reusable scenario 'nowhere' referenced from 'a' is not defined in reusableScenarios",
+      failure.message
+    )
+  }
+
+  @Test
+  fun runtimeRejectsCyclicReusableReference() {
+    val failure = assertFailsWith<ArbigentProjectValidationException> {
+      buildTasks(
+        scenarios = listOf(ArbigentScenarioContent(id = "a", uses = "first")),
+        reusableScenarios = listOf(
+          ArbigentScenarioContent(id = "first", uses = "second"),
+          ArbigentScenarioContent(id = "second", uses = "first"),
+        ),
+      )
+    }
+    assertEquals(
+      "Cyclic reusable scenario reference detected: first -> second -> first",
+      failure.message
+    )
+  }
+
   @Test
   fun reusableExpansionKeepsBreadcrumbsAndOrder() {
     val project = load(

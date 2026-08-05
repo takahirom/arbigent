@@ -102,7 +102,9 @@ public data class ArbigentScenarioGraph(
           .expandCalls(scenario, projectFileContent.reusableScenarios)
           .leaves
         leaves.forEach { leaf ->
-          val key = "call#${callNodeCounter++}:${leaf.uses}"
+          // `uses` is always set for a leaf from expandCalls; orEmpty keeps the key readable
+          // rather than encoding "null" if that ever stops holding. The counter makes it unique.
+          val key = "call#${callNodeCounter++}:${leaf.uses.orEmpty()}"
           nodes += Node(
             key = key,
             title = leaf.callLabel,

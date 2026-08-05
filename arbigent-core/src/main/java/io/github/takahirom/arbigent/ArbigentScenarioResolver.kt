@@ -34,7 +34,12 @@ public object ArbigentScenarioResolver {
      */
     public val callPath: List<String>,
   ) {
-    /** Label of this leaf's own call site, e.g. `login (user=paid)`. */
+    /**
+     * Label of this leaf's own call site, e.g. `login (user=paid)`.
+     * Only defined for a leaf reached through a call ([uses] is non-null); [expandCalls] emits
+     * only such leaves, while [resolveChain] can also emit the scenario itself with an empty
+     * [callPath], for which there is no call site to label.
+     */
     public val callLabel: String get() = callPath.last()
 
     /** Enclosing composite labels between the scenario and this leaf. */
@@ -171,7 +176,13 @@ public object ArbigentScenarioResolver {
   /**
    * Orders [items] as a dependency forest and pairs each with its depth: roots first, each
    * followed by its dependents. An item whose dependency is not in [items] (or is itself) is a
-   * root. Reference-based so the UI can order live scenario state holders, which have no stable id.
+   * root. Items are matched with `==` and used as map keys, so the UI can order live scenario
+   * state holders (which have no stable id) by identity — `ArbigentScenarioStateHolder` does not
+   * override `equals`.
+   *
+   * Items that only reach each other form no root, so a dependency cycle is omitted from the
+   * result entirely. That is what the UI has always done; see
+   * `mutualDependencyCycleIsOmittedFromTheForest`.
    */
   public fun <T> dependencyForestWithDepth(
     items: List<T>,
