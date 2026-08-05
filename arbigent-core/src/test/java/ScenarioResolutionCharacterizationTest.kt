@@ -116,6 +116,84 @@ class ScenarioResolutionCharacterizationTest {
     assertEquals(listOf("dup-first", "x", "dup-second"), goals)
   }
 
+  /**
+   * A violation must name a declaration the user can open. The resolver walks from the target, so
+   * it can enter a cycle from outside it and reach a nested call through composites; neither the
+   * lead-in nor a breadcrumb label is addressable, so both are trimmed away before attributing.
+   */
+  @Test
+  fun runtimeAttributesACycleEnteredFromOutsideToTheCycleItself() {
+    val a = ArbigentScenarioContent(id = "a", goal = "A", dependencyId = "b")
+    val b = ArbigentScenarioContent(id = "b", goal = "B", dependencyId = "a")
+    val tail = ArbigentScenarioContent(id = "tail", goal = "T", dependencyId = "a")
+    val scenarios = listOf(a, b, tail)
+
+    val failure = assertFailsWith<ArbigentProjectValidationException> {
+      scenarios.createArbigentScenario(
+        projectSettings = ArbigentProjectSettings(),
+        scenario = tail,
+        aiFactory = { FakeAi() },
+        deviceFactory = { FakeDevice() },
+        aiDecisionCache = AiDecisionCacheStrategy.Disabled.toCache(),
+      )
+    }
+    // Same attribution load-time validation produces for this project, not `scenarios 'tail'`.
+    assertEquals("scenarios 'a': cyclic dependency: a -> b -> a", failure.message)
+  }
+
+  @Test
+  fun runtimeAttributesAnUndefinedNestedCallToTheReusableThatMakesIt() {
+    val scenarios = listOf(ArbigentScenarioContent(id = "caller", uses = "outer"))
+    val reusableScenarios = listOf(
+      ArbigentScenarioContent(
+        id = "outer",
+        steps = listOf(ArbigentScenarioContent.ReusableStep(uses = "nowhere")),
+        inputs = mapOf("user" to ArbigentScenarioContent.ReusableInput(default = "paid")),
+      )
+    )
+
+    val failure = assertFailsWith<ArbigentProjectValidationException> {
+      scenarios.createArbigentScenario(
+        projectSettings = ArbigentProjectSettings(),
+        scenario = scenarios.single(),
+        aiFactory = { FakeAi() },
+        deviceFactory = { FakeDevice() },
+        aiDecisionCache = AiDecisionCacheStrategy.Disabled.toCache(),
+        reusableScenarios = reusableScenarios,
+      )
+    }
+    // Not `scenarios 'outer (user=paid)'` — that breadcrumb label is not a declaration.
+    assertEquals(
+      "reusableScenarios 'outer': uses 'nowhere' is not defined in reusableScenarios",
+      failure.message
+    )
+  }
+
+  @Test
+  fun runtimeAttributesAReusableCycleEnteredFromOutsideToTheCycleItself() {
+    val scenarios = listOf(ArbigentScenarioContent(id = "caller", uses = "entry"))
+    val reusableScenarios = listOf(
+      ArbigentScenarioContent(id = "entry", steps = listOf(ArbigentScenarioContent.ReusableStep(uses = "y"))),
+      ArbigentScenarioContent(id = "y", steps = listOf(ArbigentScenarioContent.ReusableStep(uses = "z"))),
+      ArbigentScenarioContent(id = "z", steps = listOf(ArbigentScenarioContent.ReusableStep(uses = "y"))),
+    )
+
+    val failure = assertFailsWith<ArbigentProjectValidationException> {
+      scenarios.createArbigentScenario(
+        projectSettings = ArbigentProjectSettings(),
+        scenario = scenarios.single(),
+        aiFactory = { FakeAi() },
+        deviceFactory = { FakeDevice() },
+        aiDecisionCache = AiDecisionCacheStrategy.Disabled.toCache(),
+        reusableScenarios = reusableScenarios,
+      )
+    }
+    assertEquals(
+      "reusableScenarios 'y': cyclic reusable reference: y -> z -> y",
+      failure.message
+    )
+  }
+
   @Test
   fun cyclicDependencyFailsAtLoadWithThePath() {
     assertValidationError(

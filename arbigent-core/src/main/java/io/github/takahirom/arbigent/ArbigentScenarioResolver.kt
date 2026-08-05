@@ -160,8 +160,12 @@ public object ArbigentScenarioResolver {
         return
       }
       if (target == null) {
+        // The owner is the innermost composite the call sits in, or the scenario itself for a
+        // direct call. `expansionStack` holds raw ids; `breadcrumb` holds display labels.
         diagnostics += ArbigentScenarioDiagnostic.UnresolvedReusable(
-          referencedFrom = breadcrumb.lastOrNull() ?: scenario.id,
+          referencedFromSection = if (expansionStack.isEmpty()) DeclarationSection.Scenarios
+          else DeclarationSection.ReusableScenarios,
+          referencedFrom = expansionStack.lastOrNull() ?: scenario.id,
           uses = step.uses,
         )
         unresolvedLeaf()
@@ -266,6 +270,12 @@ public object ArbigentScenarioResolver {
   }
 }
 
+/** Which project-file section a declaration lives in, used to point a violation at it. */
+public enum class DeclarationSection(public val sectionName: String) {
+  Scenarios("scenarios"),
+  ReusableScenarios("reusableScenarios"),
+}
+
 /**
  * A broken reference found while resolving scenarios. Callers decide whether it is fatal.
  *
@@ -287,11 +297,15 @@ public sealed interface ArbigentScenarioDiagnostic {
     override val detail: String get() = "dependency '$dependencyId' is not defined in scenarios"
   }
 
-  /** [path] repeats the scenario that closes the cycle, e.g. `a -> b -> a`. */
+  /** [path] ends with the scenario that closes the cycle, e.g. `a -> b -> a`. */
   public data class CyclicDependency(public val path: List<String>) : ArbigentScenarioDiagnostic {
-    // Attributed to where the cycle starts, so the line points at a scenario the user can edit.
-    override val where: String get() = "scenarios '${path.first()}'"
-    override val detail: String get() = "cyclic dependency: ${path.joinToString(" -> ")}"
+    init { require(path.isNotEmpty()) { "A cycle path needs at least the repeated scenario" } }
+
+    // A walk can enter a cycle from outside it (`tail -> a -> b -> a`), so the lead-in is trimmed
+    // before attributing: load-time and runtime detection must name the same scenario.
+    private val cycle: List<String> get() = path.dropWhile { it != path.last() }
+    override val where: String get() = "scenarios '${cycle.first()}'"
+    override val detail: String get() = "cyclic dependency: ${cycle.joinToString(" -> ")}"
   }
 
   public data class DuplicateScenarioId(
@@ -303,15 +317,25 @@ public sealed interface ArbigentScenarioDiagnostic {
   }
 
   public data class UnresolvedReusable(
+    /** Where the declaration holding the call lives. */
+    public val referencedFromSection: DeclarationSection,
+    /**
+     * Raw id of that declaration. Never a breadcrumb label like `outer (user=paid)`, which names
+     * a call site rather than something the user can open and edit.
+     */
     public val referencedFrom: String,
     public val uses: String,
   ) : ArbigentScenarioDiagnostic {
-    override val where: String get() = "scenarios '$referencedFrom'"
+    override val where: String get() = "${referencedFromSection.sectionName} '$referencedFrom'"
     override val detail: String get() = "uses '$uses' is not defined in reusableScenarios"
   }
 
+  /** [path] ends with the reusable scenario that closes the cycle, e.g. `y -> z -> y`. */
   public data class CyclicReusable(public val path: List<String>) : ArbigentScenarioDiagnostic {
-    override val where: String get() = "reusableScenarios '${path.first()}'"
-    override val detail: String get() = "cyclic reusable reference: ${path.joinToString(" -> ")}"
+    init { require(path.isNotEmpty()) { "A cycle path needs at least the repeated reusable" } }
+
+    private val cycle: List<String> get() = path.dropWhile { it != path.last() }
+    override val where: String get() = "reusableScenarios '${cycle.first()}'"
+    override val detail: String get() = "cyclic reusable reference: ${cycle.joinToString(" -> ")}"
   }
 }
