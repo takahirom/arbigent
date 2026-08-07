@@ -189,8 +189,9 @@ private fun MainScreen(
                 Text("No dependency")
               }
             )
-            appStateHolder.sortedScenariosAndDepthsStateFlow.value.map { it.first }
-              .filter { senario -> senario != scenarioStateHolderAndDepth.first }
+            // Scenarios that already depend on this one are left out: choosing one would create
+            // a dependency cycle, which the project can neither load nor save.
+            appStateHolder.selectableDependencies(scenarioStateHolderAndDepth.first)
               .forEach { scenarioStateHolder: ArbigentScenarioStateHolder ->
                 selectableItem(
                   selected = scenarioStateHolderAndDepth.first.dependencyScenarioStateHolderStateFlow.value == scenarioStateHolder,

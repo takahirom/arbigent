@@ -30,6 +30,9 @@ class ArbigentAppStateHolder(
   // by the UI composition root (Main). internal so editor dialogs that build their own holders
   // (e.g. the reusable-scenario editor) can keep them on the same dispatcher.
   internal val dispatcher: CoroutineDispatcher,
+  // How a recoverable failure reaches the user. Defaults to the Swing error dialog; tests replace
+  // it so asserting on a rejected save does not open a modal window.
+  private val onRecoverableError: (Throwable) -> Unit = { showErrorDialog(it) },
 ) {
   private val _fixedScenariosFlow = MutableStateFlow<List<FixedScenario>>(emptyList())
   val fixedScenariosFlow: StateFlow<List<FixedScenario>> = _fixedScenariosFlow.asStateFlow()
@@ -178,7 +181,7 @@ class ArbigentAppStateHolder(
         scenarioContents = allScenarioStateHoldersStateFlow.value.map { it.createArbigentScenarioContent() },
         reusableScenarios = prospectiveReusables,
         fixedScenarios = _fixedScenariosFlow.value,
-      ).validateReusableScenarios()
+      ).validateProject()
     }.exceptionOrNull()?.message
   }
 
@@ -508,7 +511,17 @@ class ArbigentAppStateHolder(
   private var lastSavedYaml: String? = getCurrentContentAsYaml()
 
   private fun getCurrentProjectFileContent(): ArbigentProjectFileContent {
-    val sortedScenarios = sortedScenariosAndDepthsStateFlow.value.map { it.first }
+    // Ordering is recomputed here rather than read from `sortedScenariosAndDepthsStateFlow`:
+    // that flow is `WhileSubscribed`, so its value is the empty initial value until the UI first
+    // collects it and goes stale whenever collection stops — saving from either state would
+    // write a project with scenarios missing.
+    //
+    // The ordering decides the order scenarios are written in, but it must never decide *which*
+    // scenarios are written. Anything it does not place is appended in declaration order, so
+    // saving stays lossless even if the ordering regresses.
+    val ordered = sortedScenariosAndDepths().map { it.first }
+    val placed = ordered.toSet()
+    val sortedScenarios = ordered + allScenarioStateHoldersStateFlow.value.filterNot { it in placed }
     return ArbigentProjectFileContent(
       settings = ArbigentProjectSettings(
         prompt = promptFlow.value,
@@ -542,8 +555,8 @@ class ArbigentAppStateHolder(
     }
     val content = getCurrentProjectFileContent()
     // Never write a project file that would fail to load; surface the problem instead.
-    runCatching { content.validateReusableScenarios() }.exceptionOrNull()?.let { e ->
-      showErrorDialog(e)
+    runCatching { content.validateProject() }.exceptionOrNull()?.let { e ->
+      onRecoverableError(e)
       return
     }
     arbigentProjectSerializer.save(
@@ -557,7 +570,16 @@ class ArbigentAppStateHolder(
     if (file == null) {
       return
     }
-    val projectFile = ArbigentProjectSerializer().load(file)
+    // The core reports the violations but not which file they came from; name it here.
+    val projectFile = try {
+      ArbigentProjectSerializer().load(file)
+    } catch (e: ArbigentProjectValidationException) {
+      if (e.violations.isEmpty()) throw e
+      throw ArbigentProjectValidationException(
+        arbigentValidationReport(e.violations, source = file.absolutePath),
+        e.violations,
+      )
+    }
     val scenarios = projectFile.scenarioContents
     val arbigentScenarioStateHolders = scenarios.map { scenarioContent ->
       ArbigentScenarioStateHolder(
@@ -694,6 +716,39 @@ class ArbigentAppStateHolder(
 
   fun scenarioCountById(newScenarioId: String): Int {
     return allScenarioStateHoldersStateFlow.value.count { it.id == newScenarioId }
+  }
+
+  /**
+   * Scenarios that can be chosen as [scenarioStateHolder]'s dependency: every scenario except
+   * itself and the ones that already depend on it, directly or through a chain.
+   *
+   * Picking one of those would mean the two have to run after each other, which no ordering can
+   * satisfy — the project would then fail to load and refuse to save. The choice is left out of
+   * the menu instead of being rejected afterwards, so the editor cannot reach that state at all.
+   *
+   * Returned in tree order, the same order the scenario list is displayed in.
+   */
+  fun selectableDependencies(
+    scenarioStateHolder: ArbigentScenarioStateHolder,
+  ): List<ArbigentScenarioStateHolder> =
+    sortedScenariosAndDepths().map { it.first }.filter { candidate ->
+      candidate !== scenarioStateHolder && !dependsOn(candidate, scenarioStateHolder)
+    }
+
+  /** Whether [from] reaches [target] by following dependencies. */
+  private fun dependsOn(
+    from: ArbigentScenarioStateHolder,
+    target: ArbigentScenarioStateHolder,
+  ): Boolean {
+    // The stepped-through set only matters for content that already contains a cycle; the menu
+    // this backs is what stops one from being created in the first place.
+    val steppedThrough = mutableSetOf<ArbigentScenarioStateHolder>()
+    var current = from.dependencyScenarioStateHolderStateFlow.value
+    while (current != null && steppedThrough.add(current)) {
+      if (current === target) return true
+      current = current.dependencyScenarioStateHolderStateFlow.value
+    }
+    return false
   }
 
   fun onStepFeedback(feedback: StepFeedbackEvent) {

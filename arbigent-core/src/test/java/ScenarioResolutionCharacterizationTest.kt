@@ -4,11 +4,12 @@ import io.github.takahirom.arbigent.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 /**
- * Records how each caller of the scenario-resolution logic reacts to broken `dependency` graphs
- * today. The four callers deliberately disagree, so this test pins the current behavior down
- * before the resolution logic is unified; it must keep passing across the refactoring.
+ * Pins down how scenario resolution reacts to broken `dependency` graphs. A broken graph is now
+ * rejected at load time with every violation listed at once; the tests that used to record each
+ * caller's own divergent reaction were rewritten accordingly.
  */
 class ScenarioResolutionCharacterizationTest {
   private fun load(yaml: String): ArbigentProjectFileContent = ArbigentProjectSerializer().load(yaml)
@@ -16,7 +17,7 @@ class ScenarioResolutionCharacterizationTest {
   private fun ArbigentProjectFileContent.scenario(id: String) =
     scenarioContents.first { it.id == id }
 
-  private fun ArbigentProjectFileContent.taskIdsOf(id: String): List<String> =
+  private fun ArbigentProjectFileContent.tasksOf(id: String) =
     scenarioContents.createArbigentScenario(
       projectSettings = settings,
       scenario = scenario(id),
@@ -25,82 +26,27 @@ class ScenarioResolutionCharacterizationTest {
       aiDecisionCache = AiDecisionCacheStrategy.Disabled.toCache(),
       fixedScenarios = fixedScenarios,
       reusableScenarios = reusableScenarios,
-    ).agentTasks.map { it.scenarioId }
+    ).agentTasks
 
-  private val danglingDependency = """
-    scenarios:
-    - id: "a"
-      goal: "A"
-      dependency: "missing"
-    """
-
-  private val cyclicDependency = """
-    scenarios:
-    - id: "a"
-      goal: "A"
-      dependency: "c"
-    - id: "b"
-      goal: "B"
-      dependency: "a"
-    - id: "c"
-      goal: "C"
-      dependency: "b"
-    """
-
-  private val duplicateScenarioIds = """
-    scenarios:
-    - id: "a"
-      goal: "first"
-    - id: "a"
-      goal: "second"
-    """
-
-  @Test
-  fun brokenDependenciesLoadWithoutValidationError() {
-    // `dependency` is not validated at load time; only reusable scenarios are.
-    load(danglingDependency)
-    load(cyclicDependency)
-    load(duplicateScenarioIds)
+  private fun assertValidationError(expectedMessagePart: String, yaml: String) {
+    val exception = assertFailsWith<ArbigentProjectValidationException> { load(yaml) }
+    assertTrue(
+      exception.message!!.contains(expectedMessagePart),
+      "Expected message to contain '$expectedMessagePart' but was: ${exception.message}"
+    )
   }
 
   @Test
-  fun runtimeThrowsNoSuchElementOnDanglingDependency() {
-    val project = load(danglingDependency)
-    val failure = assertFailsWith<NoSuchElementException> { project.taskIdsOf("a") }
-    assertEquals("Collection contains no element matching the predicate.", failure.message)
-  }
-
-  @Test
-  fun runtimeSilentlyTruncatesCyclicDependency() {
-    // No error: the `visited` set cuts the cycle and the remaining tasks are emitted.
-    val project = load(cyclicDependency)
-    assertEquals(listOf("b", "c", "a"), project.taskIdsOf("a"))
-    assertEquals(listOf("c", "a", "b"), project.taskIdsOf("b"))
-    assertEquals(listOf("a", "b", "c"), project.taskIdsOf("c"))
-  }
-
-  @Test
-  fun runtimeResolvesDuplicateScenarioIdToTheFirstDeclaration() {
-    val project = load(
+  fun danglingDependencyFailsAtLoad() {
+    assertValidationError(
+      "scenarios 'a': dependency 'missing' is not defined in scenarios",
       """
       scenarios:
-      - id: "dep"
-        goal: "first"
-      - id: "dep"
-        goal: "second"
       - id: "a"
         goal: "A"
-        dependency: "dep"
+        dependency: "missing"
       """
     )
-    val goals = project.scenarioContents.createArbigentScenario(
-      projectSettings = project.settings,
-      scenario = project.scenario("a"),
-      aiFactory = { FakeAi() },
-      deviceFactory = { FakeDevice() },
-      aiDecisionCache = AiDecisionCacheStrategy.Disabled.toCache(),
-    ).agentTasks.map { it.goal }
-    assertEquals(listOf("first", "A"), goals)
   }
 
   /**
@@ -170,29 +116,228 @@ class ScenarioResolutionCharacterizationTest {
     assertEquals(listOf("dup-first", "x", "dup-second"), goals)
   }
 
+  /**
+   * A violation must name a declaration the user can open. The resolver walks from the target, so
+   * it can enter a cycle from outside it and reach a nested call through composites; neither the
+   * lead-in nor a breadcrumb label is addressable, so both are trimmed away before attributing.
+   */
   @Test
-  fun graphSilentlyDropsDanglingDependencyEdge() {
-    val graph = ArbigentScenarioGraph.from(load(danglingDependency))
-    assertEquals(listOf("a"), graph.nodes.map { it.title })
-    assertEquals(emptyList(), graph.edges)
+  fun runtimeAttributesACycleEnteredFromOutsideToTheCycleItself() {
+    val a = ArbigentScenarioContent(id = "a", goal = "A", dependencyId = "b")
+    val b = ArbigentScenarioContent(id = "b", goal = "B", dependencyId = "a")
+    val tail = ArbigentScenarioContent(id = "tail", goal = "T", dependencyId = "a")
+    val scenarios = listOf(a, b, tail)
+
+    val failure = assertFailsWith<ArbigentProjectValidationException> {
+      scenarios.createArbigentScenario(
+        projectSettings = ArbigentProjectSettings(),
+        scenario = tail,
+        aiFactory = { FakeAi() },
+        deviceFactory = { FakeDevice() },
+        aiDecisionCache = AiDecisionCacheStrategy.Disabled.toCache(),
+      )
+    }
+    // Same attribution load-time validation produces for this project, not `scenarios 'tail'`.
+    assertEquals("scenarios 'a': cyclic dependency: a -> b -> a", failure.message)
   }
 
   @Test
-  fun graphKeepsCyclicDependencyEdges() {
-    val graph = ArbigentScenarioGraph.from(load(cyclicDependency))
+  fun runtimeAttributesAnUndefinedNestedCallToTheReusableThatMakesIt() {
+    val scenarios = listOf(ArbigentScenarioContent(id = "caller", uses = "outer"))
+    val reusableScenarios = listOf(
+      ArbigentScenarioContent(
+        id = "outer",
+        steps = listOf(ArbigentScenarioContent.ReusableStep(uses = "nowhere")),
+        inputs = mapOf("user" to ArbigentScenarioContent.ReusableInput(default = "paid")),
+      )
+    )
+
+    val failure = assertFailsWith<ArbigentProjectValidationException> {
+      scenarios.createArbigentScenario(
+        projectSettings = ArbigentProjectSettings(),
+        scenario = scenarios.single(),
+        aiFactory = { FakeAi() },
+        deviceFactory = { FakeDevice() },
+        aiDecisionCache = AiDecisionCacheStrategy.Disabled.toCache(),
+        reusableScenarios = reusableScenarios,
+      )
+    }
+    // Not `scenarios 'outer (user=paid)'` — that breadcrumb label is not a declaration.
     assertEquals(
-      listOf(
-        "scenario:c" to "scenario:a",
-        "scenario:a" to "scenario:b",
-        "scenario:b" to "scenario:c",
-      ),
-      graph.edges.map { it.fromKey to it.toKey }
+      "reusableScenarios 'outer': uses 'nowhere' is not defined in reusableScenarios",
+      failure.message
+    )
+  }
+
+  @Test
+  fun runtimeAttributesAReusableCycleEnteredFromOutsideToTheCycleItself() {
+    val scenarios = listOf(ArbigentScenarioContent(id = "caller", uses = "entry"))
+    val reusableScenarios = listOf(
+      ArbigentScenarioContent(id = "entry", steps = listOf(ArbigentScenarioContent.ReusableStep(uses = "y"))),
+      ArbigentScenarioContent(id = "y", steps = listOf(ArbigentScenarioContent.ReusableStep(uses = "z"))),
+      ArbigentScenarioContent(id = "z", steps = listOf(ArbigentScenarioContent.ReusableStep(uses = "y"))),
+    )
+
+    val failure = assertFailsWith<ArbigentProjectValidationException> {
+      scenarios.createArbigentScenario(
+        projectSettings = ArbigentProjectSettings(),
+        scenario = scenarios.single(),
+        aiFactory = { FakeAi() },
+        deviceFactory = { FakeDevice() },
+        aiDecisionCache = AiDecisionCacheStrategy.Disabled.toCache(),
+        reusableScenarios = reusableScenarios,
+      )
+    }
+    assertEquals(
+      "reusableScenarios 'y': cyclic reusable reference: y -> z -> y",
+      failure.message
+    )
+  }
+
+  @Test
+  fun cyclicDependencyFailsAtLoadWithThePath() {
+    assertValidationError(
+      "scenarios 'a': cyclic dependency: a -> c -> b -> a",
+      """
+      scenarios:
+      - id: "a"
+        goal: "A"
+        dependency: "c"
+      - id: "b"
+        goal: "B"
+        dependency: "a"
+      - id: "c"
+        goal: "C"
+        dependency: "b"
+      """
+    )
+  }
+
+  @Test
+  fun selfDependencyFailsAtLoad() {
+    assertValidationError(
+      "scenarios 'selfie': cyclic dependency: selfie -> selfie",
+      """
+      scenarios:
+      - id: "selfie"
+        goal: "Loop"
+        dependency: "selfie"
+      """
+    )
+  }
+
+  @Test
+  fun duplicateScenarioIdFailsAtLoad() {
+    assertValidationError(
+      "scenarios 'a': duplicate id (declared 2 times)",
+      """
+      scenarios:
+      - id: "a"
+        goal: "first"
+      - id: "a"
+        goal: "second"
+      """
+    )
+  }
+
+  @Test
+  fun allViolationsAreReportedInOnePass() {
+    val exception = assertFailsWith<ArbigentProjectValidationException> {
+      load(
+        """
+        scenarios:
+        - id: "dup"
+          goal: "first"
+        - id: "dup"
+          goal: "second"
+        - id: "orphan"
+          goal: "O"
+          dependency: "missing"
+        - id: "loop-a"
+          goal: "A"
+          dependency: "loop-b"
+        - id: "loop-b"
+          goal: "B"
+          dependency: "loop-a"
+        - id: "bad-call"
+          uses: "nowhere"
+        """
+      )
+    }
+    val message = exception.message!!
+    assertTrue(message.contains("scenarios 'dup': duplicate id (declared 2 times)"), message)
+    assertTrue(message.contains("scenarios 'orphan': dependency 'missing' is not defined in scenarios"), message)
+    assertTrue(message.contains("scenarios 'loop-a': cyclic dependency: loop-a -> loop-b -> loop-a"), message)
+    // Reusable violations are reported in the same pass, not one run later.
+    assertTrue(message.contains("uses 'nowhere' is not defined in reusableScenarios"), message)
+  }
+
+  @Test
+  fun aCycleSharedBySeveralScenariosIsReportedOnce() {
+    val exception = assertFailsWith<ArbigentProjectValidationException> {
+      load(
+        """
+        scenarios:
+        - id: "a"
+          goal: "A"
+          dependency: "b"
+        - id: "b"
+          goal: "B"
+          dependency: "a"
+        - id: "c"
+          goal: "C"
+          dependency: "a"
+        """
+      )
+    }
+    assertEquals(
+      1,
+      exception.message!!.lines().count { it.contains("cyclic dependency:") },
+      exception.message
     )
   }
 
   /**
+   * Content built in memory never went through load-time validation, so the runtime repeats the
+   * check instead of running a half-resolved chain.
+   */
+  @Test
+  fun runtimeRejectsInMemoryContentWithADanglingDependency() {
+    val scenarios = listOf(
+      ArbigentScenarioContent(id = "a", goal = "A", dependencyId = "missing"),
+    )
+    val failure = assertFailsWith<ArbigentProjectValidationException> {
+      scenarios.createArbigentScenario(
+        projectSettings = ArbigentProjectSettings(),
+        scenario = scenarios.single(),
+        aiFactory = { FakeAi() },
+        deviceFactory = { FakeDevice() },
+        aiDecisionCache = AiDecisionCacheStrategy.Disabled.toCache(),
+      )
+    }
+    assertEquals("scenarios 'a': dependency 'missing' is not defined in scenarios", failure.message)
+  }
+
+  /**
+   * The graph renders whatever content it is handed — the UI draws it while the project is still
+   * being edited — so a dangling reference only loses its edge.
+   */
+  @Test
+  fun graphStillRendersInMemoryContentWithADanglingDependency() {
+    val graph = ArbigentScenarioGraph.from(
+      ArbigentProjectFileContent(
+        scenarioContents = listOf(
+          ArbigentScenarioContent(id = "a", goal = "A", dependencyId = "missing"),
+        )
+      )
+    )
+    assertEquals(listOf("a"), graph.nodes.map { it.title })
+    assertEquals(emptyList(), graph.edges)
+  }
+
+  /**
    * The UI tree ordering: roots first, dependents indented under them. A scenario pointing at
-   * something outside the list (the UI's shape of a dangling dependency) is shown as a root.
+   * something outside the list is shown as a root.
    */
   @Test
   fun dependencyForestTreatsMissingAndSelfDependenciesAsRoots() {
@@ -216,19 +361,13 @@ class ScenarioResolutionCharacterizationTest {
   }
 
   /**
-   * A mutual cycle gives every item a dependency inside the list, so no root exists and the
-   * whole cycle drops out of the ordering. The UI has always behaved this way: the pre-refactor
-   * `sortedScenarioAndDepth` built the same roots/dependents split, and its
-   * `if (v.isEmpty()) roots.add(k)` branch was unreachable because `getOrPut` always inserted a
-   * non-empty list.
-   *
-   * This matters beyond ordering, because `getCurrentProjectFileContent()` serializes
-   * `sortedScenariosAndDepthsStateFlow`, so scenarios in a cycle are dropped when the project is
-   * saved. That is a pre-existing bug rather than something this refactoring introduces, and it
-   * is pinned here so a fix has to change this test deliberately.
+   * A mutual cycle gives every item a dependency inside the list, so it has no root. The first
+   * member is surfaced as a root instead of dropping the group, because
+   * `getCurrentProjectFileContent()` serializes this ordering and a dropped scenario is a
+   * scenario deleted from the saved project.
    */
   @Test
-  fun mutualDependencyCycleIsOmittedFromTheForest() {
+  fun mutualDependencyCycleKeepsEveryItemWithTheFirstAsRoot() {
     class Item(val name: String, var dependency: Item? = null)
 
     val a = Item("a")
@@ -240,7 +379,53 @@ class ScenarioResolutionCharacterizationTest {
       it.dependency
     }
 
-    assertEquals(listOf("unrelated" to 0), ordered.map { (item, depth) -> item.name to depth })
+    // Genuine roots keep their order and come first; the cycle is appended rather than dropped.
+    assertEquals(
+      listOf("unrelated" to 0, "a" to 0, "b" to 1),
+      ordered.map { (item, depth) -> item.name to depth }
+    )
+  }
+
+  /**
+   * A dependent of a cycle stays a dependent even when it is declared before the cycle. Entering
+   * the group at the first unplaced item would emit `trailing` as a root and then be unable to
+   * attach it under `a`, so the fallback walks up to a cycle member first.
+   */
+  @Test
+  fun aDependentDeclaredBeforeTheCycleItPointsIntoIsNotShownAsARoot() {
+    class Item(val name: String, var dependency: Item? = null)
+
+    val a = Item("a")
+    val b = Item("b", a)
+    a.dependency = b
+    val trailing = Item("trailing", a)
+
+    val ordered = ArbigentScenarioResolver.dependencyForestWithDepth(listOf(trailing, a, b)) {
+      it.dependency
+    }
+
+    assertEquals(0, ordered.single { it.first.name == "a" }.second)
+    assertEquals(1, ordered.single { it.first.name == "trailing" }.second)
+    assertEquals(1, ordered.single { it.first.name == "b" }.second)
+    assertEquals(3, ordered.size)
+  }
+
+  /** A scenario hanging off a cycle must survive too, and must not be visited twice. */
+  @Test
+  fun aDependentOfACycleIsListedOnce() {
+    class Item(val name: String, var dependency: Item? = null)
+
+    val a = Item("a")
+    val b = Item("b", a)
+    a.dependency = b
+    val trailing = Item("trailing", a)
+
+    val ordered = ArbigentScenarioResolver.dependencyForestWithDepth(listOf(a, b, trailing)) {
+      it.dependency
+    }
+
+    assertEquals(listOf("a", "b", "trailing"), ordered.map { it.first.name }.sorted())
+    assertEquals(3, ordered.size)
   }
 
   /**
@@ -269,7 +454,7 @@ class ScenarioResolutionCharacterizationTest {
       buildTasks(listOf(ArbigentScenarioContent(id = "a", uses = "nowhere")))
     }
     assertEquals(
-      "Reusable scenario 'nowhere' referenced from 'a' is not defined in reusableScenarios",
+      "scenarios 'a': uses 'nowhere' is not defined in reusableScenarios",
       failure.message
     )
   }
@@ -286,7 +471,7 @@ class ScenarioResolutionCharacterizationTest {
       )
     }
     assertEquals(
-      "Cyclic reusable scenario reference detected: first -> second -> first",
+      "reusableScenarios 'first': cyclic reusable reference: first -> second -> first",
       failure.message
     )
   }
@@ -323,14 +508,7 @@ class ScenarioResolutionCharacterizationTest {
         goal: "Checkout"
       """
     )
-    val tasks = project.scenarioContents.createArbigentScenario(
-      projectSettings = project.settings,
-      scenario = project.scenario("buy"),
-      aiFactory = { FakeAi() },
-      deviceFactory = { FakeDevice() },
-      aiDecisionCache = AiDecisionCacheStrategy.Disabled.toCache(),
-      reusableScenarios = project.reusableScenarios,
-    ).agentTasks
+    val tasks = project.tasksOf("buy")
     assertEquals(listOf("setup", "buy", "buy"), tasks.map { it.scenarioId })
     assertEquals(listOf("Setup", "Log in as paid", "Checkout"), tasks.map { it.goal })
     assertEquals(

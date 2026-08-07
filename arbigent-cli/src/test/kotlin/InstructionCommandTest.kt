@@ -127,8 +127,11 @@ scenarios:
     assertNotEquals(0, result.statusCode, result.output)
     assertContains(
       result.output,
-      "Scenario 'child' depends on unknown scenario 'missing-parent'."
+      "scenarios 'child': dependency 'missing-parent' is not defined in scenarios"
     )
+    // The report names the file the violations came from.
+    assertContains(result.output, "Invalid project configuration in ")
+    assertContains(result.output, yaml.absolutePath)
   }
 
   @Test
@@ -146,7 +149,7 @@ scenarios:
     )
     val result = run("--scenario-ids=a")
     assertNotEquals(0, result.statusCode, result.output)
-    assertContains(result.output, "Cyclic scenario dependency detected")
+    assertContains(result.output, "cyclic dependency:")
     assertContains(result.output, "a -> b -> a")
   }
 
@@ -162,7 +165,7 @@ scenarios:
     )
     val result = run("--scenario-ids=selfie")
     assertNotEquals(0, result.statusCode, result.output)
-    assertContains(result.output, "Cyclic scenario dependency detected")
+    assertContains(result.output, "cyclic dependency:")
   }
 
   @Test
