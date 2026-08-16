@@ -99,6 +99,7 @@ dependencies {
   implementation("com.charleskorn.kaml:kaml:0.83.0")
   implementation(project(":arbigent-core"))
   implementation(project(":arbigent-ai-openai"))
+  implementation(project(":arbigent-ai-anthropic"))
   testImplementation(kotlin("test"))
 
   // coroutine test

@@ -93,6 +93,31 @@ sealed interface AiProviderSetting {
     }
   }
 
+  // https://docs.anthropic.com/en/api/messages
+  @Serializable
+  @SerialName("Anthropic")
+  data class Anthropic(
+    override val id: String,
+    override val apiKey: String,
+    override val modelName: String,
+    val baseUrl: String = "https://api.anthropic.com/v1/",
+  ) : AiProviderSetting, NormalAiProviderSetting {
+    override val name: String
+      get() = "Anthropic"
+
+    override fun updatedApiKey(apiKey: String): NormalAiProviderSetting {
+      return copy(apiKey = apiKey)
+    }
+
+    override fun updatedModelName(modelName: String): NormalAiProviderSetting {
+      return copy(modelName = modelName)
+    }
+
+    fun updatedBaseUrl(baseUrl: String): Anthropic {
+      return copy(baseUrl = baseUrl)
+    }
+  }
+
   // https://learn.microsoft.com/en-us/azure/ai-services/openai/reference#chat-completions
   @Serializable
   @SerialName("AzureOpenAi")

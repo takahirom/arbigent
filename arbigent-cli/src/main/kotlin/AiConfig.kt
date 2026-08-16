@@ -4,6 +4,7 @@ package io.github.takahirom.arbigent.cli
 
 import com.github.ajalt.clikt.parameters.groups.OptionGroup
 import com.github.ajalt.clikt.parameters.options.default
+import io.github.takahirom.arbigent.AnthropicAi
 import io.github.takahirom.arbigent.ArbigentInternalApi
 import io.github.takahirom.arbigent.OpenAIAi
 
@@ -34,4 +35,13 @@ class AzureOpenAiConfig : AiConfig("Options for Azure OpenAI") {
   val azureOpenAIModelName by defaultOption("--azure-openai-model-name", help = "Deployment name (default: ${OpenAIAi.DEFAULT_OPENAI_MODEL})")
     .default(OpenAIAi.DEFAULT_OPENAI_MODEL, OpenAIAi.DEFAULT_OPENAI_MODEL)
   val azureOpenAIKey by defaultOption("--azure-openai-api-key", "--azure-openai-key", envvar = "AZURE_OPENAI_API_KEY", help = "API key")
+}
+
+class AnthropicAiConfig : AiConfig("Options for Anthropic API AI") {
+  private val defaultEndpoint = AnthropicAi.DEFAULT_ANTHROPIC_BASE_URL
+  val anthropicEndpoint by defaultOption("--anthropic-endpoint", help = "Endpoint URL (default: $defaultEndpoint)")
+    .default(defaultEndpoint, defaultForHelp = defaultEndpoint)
+  val anthropicModelName by defaultOption("--anthropic-model-name", help = "Model name (default: ${AnthropicAi.DEFAULT_ANTHROPIC_MODEL})")
+    .default(AnthropicAi.DEFAULT_ANTHROPIC_MODEL, AnthropicAi.DEFAULT_ANTHROPIC_MODEL)
+  val anthropicApiKey by defaultOption("--anthropic-api-key", "--anthropic-key", envvar = "ANTHROPIC_API_KEY", help = "API key")
 }

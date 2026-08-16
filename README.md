@@ -385,8 +385,13 @@ Options for Azure OpenAI:
   --azure-openai-model-name=<text>       Deployment name (default: gpt-4.1)  
   --azure-openai-api-key, --azure-openai-key=<text> API key
 
+Options for Anthropic API AI:
+  --anthropic-endpoint=<text>    Endpoint URL (default: https://api.anthropic.com/v1/)
+  --anthropic-model-name=<text> Model name (default: claude-sonnet-4-5)
+  --anthropic-api-key, --anthropic-key=<text> API key
+
 Options:
-  --ai-type=(openai|gemini|azureopenai)  Type of AI to use
+  --ai-type=(openai|gemini|azureopenai|anthropic)  Type of AI to use
   --ai-api-logging                       Enable AI API debug logging
   --os=(android|ios|web)                 Target operating system
   --ios-xctest-apple-team-id=<text>      Apple team id for signing the XCTest runner on a physical iPhone
@@ -569,9 +574,12 @@ https://github.com/takahirom/arbigent-sample
 |-------------|-----------|
 | OpenAI      | Yes       |
 | Gemini      | Yes       |
+| Anthropic (Claude) | Yes |
 | OpenAI based APIs like Ollama | Yes |
 
 You can add AI providers by implementing the `ArbigentAi` interface.
+
+Anthropic is called directly through its own Messages API (not emulated through the OpenAI format), via the `AnthropicAi` class in the `arbigent-ai-anthropic` module. It supports a custom base URL for Anthropic-compatible proxies/gateways, but note that `assertImage`/`generateScenarios` structured output on Anthropic is implemented natively (forced tool-use) rather than via Roborazzi's OpenAI-based assertion model, since Roborazzi does not currently ship an Anthropic assertion model.
 
 ## Supported OSes / Form Factors
 
