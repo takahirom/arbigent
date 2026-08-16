@@ -281,7 +281,7 @@ fun AiOptionsComponent(
                 contentDescription = "Extra Request Params Info",
                 hint = Size(16)
             ) {
-                Text("Add custom JSON fields to the API request body. For example: {\"reasoning_effort\": \"high\"} for OpenAI o3/5.1 models.")
+                Text("Add custom JSON fields to the API request body. For example: {\"reasoning_effort\": \"high\"} for OpenAI o3/5.1 models, or {\"thinking\": {\"type\": \"enabled\", \"budget_tokens\": 10000}} for Anthropic extended thinking (increase max_tokens above the budget too).")
             }
         }
         var jsonParseError by remember { mutableStateOf<String?>(null) }
