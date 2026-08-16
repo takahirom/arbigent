@@ -8,6 +8,7 @@ import io.github.takahirom.arbigent.AnthropicMessage
 import io.github.takahirom.arbigent.AnthropicMessagesRequest
 import io.github.takahirom.arbigent.AnthropicMessagesResponse
 import io.github.takahirom.arbigent.ArbigentAi
+import io.github.takahirom.arbigent.ArbigentAiOptions
 import io.github.takahirom.arbigent.ArbigentPrompt
 import io.github.takahirom.arbigent.ClickWithIndex
 import io.github.takahirom.arbigent.GoalAchievedAgentAction
@@ -139,6 +140,42 @@ class AnthropicRequestConversionTest {
     val ai = AnthropicAi(apiKey = "k", baseUrl = "https://my-proxy.example.com/v1/", loggingEnabled = false)
 
     assertEquals("https://my-proxy.example.com/v1/", ai.normalizedBaseUrl)
+  }
+
+  @Test
+  fun `decision tool choice defaults to any`() {
+    assertEquals("any", anthropicAi.decisionToolChoice(null).type)
+  }
+
+  @Test
+  fun `manual extended thinking uses auto tool choice`() {
+    val extraBody = buildJsonObject {
+      putJsonObject("thinking") {
+        put("type", "enabled")
+        put("budget_tokens", 10_000)
+      }
+    }
+    val options = ArbigentAiOptions(extraBody = extraBody)
+    val request = minimalRequest().copy(toolChoice = anthropicAi.decisionToolChoice(options))
+
+    val body = anthropicAi.buildRequestBody(request, extraBody).jsonObject
+
+    assertEquals("auto", body["tool_choice"]?.jsonObject?.get("type")?.jsonPrimitive?.content)
+    assertEquals("enabled", body["thinking"]?.jsonObject?.get("type")?.jsonPrimitive?.content)
+    assertEquals(10_000, body["thinking"]?.jsonObject?.get("budget_tokens")?.jsonPrimitive?.int)
+  }
+
+  @Test
+  fun `adaptive thinking keeps forced tool choice`() {
+    val options = ArbigentAiOptions(
+      extraBody = buildJsonObject {
+        putJsonObject("thinking") {
+          put("type", "adaptive")
+        }
+      }
+    )
+
+    assertEquals("any", anthropicAi.decisionToolChoice(options).type)
   }
 
   // --- System prompt handling ---

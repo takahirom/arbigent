@@ -244,7 +244,7 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
       system = systemContents,
       messages = messages,
       tools = toolDefinitions,
-      toolChoice = AnthropicToolChoice.Any,
+      toolChoice = decisionToolChoice(decisionInput.aiOptions),
     )
     val responseText = try {
       retryOnAnthropicRateLimit {
@@ -326,6 +326,16 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
       AnthropicContent(type = "text", text = it)
     } + prompt.additionalSystemPrompts.map {
       AnthropicContent(type = "text", text = it)
+    }
+  }
+
+  internal fun decisionToolChoice(aiOptions: ArbigentAiOptions?): AnthropicToolChoice {
+    val thinking = aiOptions?.extraBody?.get("thinking") as? JsonObject
+    val thinkingType = (thinking?.get("type") as? JsonPrimitive)?.contentOrNull
+    return if (thinkingType == "enabled") {
+      AnthropicToolChoice.Auto
+    } else {
+      AnthropicToolChoice.Any
     }
   }
 
