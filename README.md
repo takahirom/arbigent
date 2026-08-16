@@ -575,7 +575,7 @@ https://github.com/takahirom/arbigent-sample
 | OpenAI      | Yes       |
 | Gemini      | Yes       |
 | Anthropic (Claude) | Yes |
-| OpenAI based APIs like Ollama | Yes |
+| OpenAI-based APIs like Ollama | Yes |
 
 You can add AI providers by implementing the `ArbigentAi` interface.
 

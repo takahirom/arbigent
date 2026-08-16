@@ -813,7 +813,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
       val jsonString = """
 {
   "type": "object",
-  "required": [${ArbigentAiAnswerItems.entries.joinToString(",") { it.key }}${
+  "required": [${ArbigentAiAnswerItems.entries.joinToString(",") { "\"${it.key}\"" }}${
         if (actionType.arguments().isNotEmpty()) ", \"text\"" else ""
       }],
 "additionalProperties": false,

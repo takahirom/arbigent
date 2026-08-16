@@ -370,7 +370,7 @@ you suspect the wrong scenarios were selected.
 ## Common causes and fixes
 
 - "Missing option '--project-file'" — pass it explicitly or configure `.arbigent/settings.yml`.
-- "Missing OpenAI API key" (or Gemini/Azure) — set the environment variable or
+- "Missing OpenAI API key" (or Gemini/Azure/Anthropic) — set the environment variable or
   `.arbigent/settings.local.yml`.
 - "No available device found" — start an emulator/simulator or connect a device
   matching `--os` before running.

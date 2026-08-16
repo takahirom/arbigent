@@ -1,5 +1,6 @@
 import io.github.takahirom.arbigent.AgentActionType
 import io.github.takahirom.arbigent.AnthropicAi
+import io.github.takahirom.arbigent.AnthropicAiRateLimitExceededException
 import io.github.takahirom.arbigent.AnthropicContent
 import io.github.takahirom.arbigent.AnthropicErrorResponse
 import io.github.takahirom.arbigent.AnthropicImageSource
@@ -12,6 +13,7 @@ import io.github.takahirom.arbigent.ClickWithIndex
 import io.github.takahirom.arbigent.GoalAchievedAgentAction
 import io.github.takahirom.arbigent.InputTextAgentAction
 import io.github.takahirom.arbigent.WaitAgentAction
+import io.github.takahirom.arbigent.retryOnAnthropicRateLimit
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import kotlinx.serialization.json.*
 import org.junit.Assert.*
@@ -322,10 +324,60 @@ class AnthropicRequestConversionTest {
   // --- Error handling ---
 
   @Test
-  fun `rate limit retries are bounded, not infinite`() {
-    // A persistently rate-limited (or overloaded) API must not recurse forever: each retry
-    // doubles the wait, so this cap already bounds a single call to tens of minutes worst-case.
-    assertTrue(AnthropicAi.MAX_RATE_LIMIT_RETRIES in 1..10)
+  fun `rate limit retries stop after the configured limit`() {
+    var attempts = 0
+    val delays = mutableListOf<Long>()
+
+    try {
+      retryOnAnthropicRateLimit<Unit>(waitForRetry = delays::add) {
+        attempts++
+        throw AnthropicAiRateLimitExceededException()
+      }
+      fail("Expected the final rate-limit exception")
+    } catch (_: AnthropicAiRateLimitExceededException) {
+      // Expected after the configured retries are exhausted.
+    }
+
+    assertEquals(AnthropicAi.MAX_RATE_LIMIT_RETRIES + 1, attempts)
+    assertEquals(
+      (0 until AnthropicAi.MAX_RATE_LIMIT_RETRIES).map { 10_000L * (1L shl it) },
+      delays,
+    )
+  }
+
+  @Test
+  fun `rate limit retries return a later successful result`() {
+    var attempts = 0
+    val delays = mutableListOf<Long>()
+
+    val result = retryOnAnthropicRateLimit(waitForRetry = delays::add) {
+      attempts++
+      if (attempts < 3) throw AnthropicAiRateLimitExceededException()
+      "success"
+    }
+
+    assertEquals("success", result)
+    assertEquals(3, attempts)
+    assertEquals(listOf(10_000L, 20_000L), delays)
+  }
+
+  @Test
+  fun `non-rate-limit failures are not retried`() {
+    var attempts = 0
+    val delays = mutableListOf<Long>()
+
+    try {
+      retryOnAnthropicRateLimit<Unit>(waitForRetry = delays::add) {
+        attempts++
+        throw IllegalStateException("invalid response")
+      }
+      fail("Expected the non-rate-limit exception")
+    } catch (e: IllegalStateException) {
+      assertEquals("invalid response", e.message)
+    }
+
+    assertEquals(1, attempts)
+    assertTrue(delays.isEmpty())
   }
 
   @Test

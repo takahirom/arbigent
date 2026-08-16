@@ -36,6 +36,34 @@ import java.util.concurrent.ConcurrentLinkedDeque
 
 public class AnthropicAiRateLimitExceededException : Exception("Rate limit exceeded")
 
+private const val ANTHROPIC_RATE_LIMIT_INITIAL_DELAY_MS: Long = 10_000L
+
+internal fun <T> retryOnAnthropicRateLimit(
+  maxRetries: Int = AnthropicAi.MAX_RATE_LIMIT_RETRIES,
+  waitForRetry: (Long) -> Unit = { waitMs ->
+    ArbigentGlobalStatus.onAiRateLimitWait(waitSec = waitMs / 1000) {
+      Thread.sleep(waitMs)
+    }
+  },
+  operation: () -> T,
+): T {
+  require(maxRetries >= 0) { "maxRetries must not be negative" }
+  var retryCount = 0
+  while (true) {
+    try {
+      return operation()
+    } catch (e: AnthropicAiRateLimitExceededException) {
+      if (retryCount >= maxRetries) {
+        throw e
+      }
+      val waitMs = ANTHROPIC_RATE_LIMIT_INITIAL_DELAY_MS * (1L shl retryCount)
+      arbigentInfoLog("Rate limit exceeded. Waiting for ${waitMs / 1000} seconds.")
+      waitForRetry(waitMs)
+      retryCount++
+    }
+  }
+}
+
 private enum class ArbigentAiAnswerItems(
   val key: String,
   val type: String,
@@ -178,8 +206,6 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
     ConfidentialInfo.addStringToBeRemoved(apiKey, "{{API_KEY}}")
   }
 
-  private var retried = 0
-
   @OptIn(ExperimentalSerializationApi::class, ArbigentInternalApi::class)
   override fun decideAgentActions(decisionInput: ArbigentAi.DecisionInput): ArbigentAi.DecisionOutput {
     val contextHolder = decisionInput.contextHolder
@@ -202,12 +228,9 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
     val prompt =
       buildPrompt(
         contextHolder = contextHolder,
-        dumpHierarchy = uiTreeStrings.optimizedTreeString,
         focusedTree = focusedTree,
-        agentActionTypes = agentActionTypes,
         elements = elements,
         aiOptions = decisionInput.aiOptions ?: ArbigentAiOptions(),
-        tools = decisionInput.mcpTools,
         aiHints = uiTreeStrings.aiHints,
       )
     val systemContents = buildSystemContents(decisionInput.prompt, formFactor)
@@ -224,23 +247,15 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
       toolChoice = AnthropicToolChoice.Any,
     )
     val responseText = try {
-      createMessage(
-        requestUuid = requestUuid,
-        request = messagesRequest,
-        aiOptions = decisionInput.aiOptions
-      )
+      retryOnAnthropicRateLimit {
+        createMessage(
+          requestUuid = requestUuid,
+          request = messagesRequest,
+          aiOptions = decisionInput.aiOptions
+        )
+      }
     } catch (e: AnthropicAiRateLimitExceededException) {
-      if (retried >= MAX_RATE_LIMIT_RETRIES) {
-        retried = 0
-        throw e
-      }
-      val waitMs = 10000L * (1 shl retried)
-      arbigentInfoLog("Rate limit exceeded. Waiting for ${waitMs / 1000} seconds.")
-      ArbigentGlobalStatus.onAiRateLimitWait(waitSec = waitMs / 1000) {
-        Thread.sleep(waitMs)
-      }
-      retried++
-      return decideAgentActions(decisionInput)
+      throw e
     } catch (e: Exception) {
       contextHolder.addStep(
         ArbigentContextHolder.Step(
@@ -255,7 +270,6 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
     }
     val curlString = anthropicCurls.lastOrNull { it.requestUuid == requestUuid }?.command
       ?: "No curl command available for requestUuid: $requestUuid"
-    retried = 0
     val json = Json { ignoreUnknownKeys = true }
     var responseObj: AnthropicMessagesResponse?
     try {
@@ -343,12 +357,9 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
 
   private fun buildPrompt(
     contextHolder: ArbigentContextHolder,
-    dumpHierarchy: String,
     focusedTree: String?,
-    agentActionTypes: List<AgentActionType>,
     elements: ArbigentElementList,
     aiOptions: ArbigentAiOptions,
-    tools: List<MCPTool>? = null,
     aiHints: List<String> = emptyList(),
   ): String {
     val focusedTreeText = focusedTree.orEmpty().ifBlank { "No focused tree" }
@@ -713,25 +724,9 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
   }
 
   override fun assertImage(imageAssertionInput: ArbigentAi.ImageAssertionInput): ArbigentAi.ImageAssertionOutput {
-    // Only rate limiting is retried here: unlike a 429, a bad API key or a malformed response
-    // will never succeed on retry, so retrying them would just wait ~10 minutes before failing anyway.
-    fun assert(retry: Int = 0): ArbigentAi.ImageAssertionOutput {
-      try {
-        return performAssertImage(imageAssertionInput)
-      } catch (e: AnthropicAiRateLimitExceededException) {
-        if (retry < MAX_RATE_LIMIT_RETRIES) {
-          val waitMs = 10000L * (1 shl retry)
-          ArbigentGlobalStatus.onAiRateLimitWait(waitSec = waitMs / 1000) {
-            Thread.sleep(waitMs)
-          }
-          arbigentDebugLog("Retrying assertion after rate limit: retryCount: $retry. Wait for ${waitMs / 1000}")
-          return assert(retry + 1)
-        } else {
-          throw e
-        }
-      }
+    return retryOnAnthropicRateLimit {
+      performAssertImage(imageAssertionInput)
     }
-    return assert()
   }
 
   private fun performAssertImage(imageAssertionInput: ArbigentAi.ImageAssertionInput): ArbigentAi.ImageAssertionOutput {
@@ -802,11 +797,12 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
 
   override fun generateScenarios(
     scenarioGenerationInput: ArbigentAi.ScenarioGenerationInput,
-  ): GeneratedScenariosContent = generateScenarios(scenarioGenerationInput, retryCount = 0)
+  ): GeneratedScenariosContent = retryOnAnthropicRateLimit {
+    generateScenariosOnce(scenarioGenerationInput)
+  }
 
-  private fun generateScenarios(
+  private fun generateScenariosOnce(
     scenarioGenerationInput: ArbigentAi.ScenarioGenerationInput,
-    retryCount: Int,
   ): GeneratedScenariosContent {
     val scenariosToGenerate = scenarioGenerationInput.scenariosToGenerate
     val appUiStructure = scenarioGenerationInput.appUiStructure
@@ -904,15 +900,7 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
         throw ArbigentAi.FailedToParseResponseException("Failed to parse response: ${e.message}", e)
       }
     } catch (e: AnthropicAiRateLimitExceededException) {
-      if (retryCount >= MAX_RATE_LIMIT_RETRIES) {
-        throw e
-      }
-      val waitMs = 10000L * (1 shl retryCount)
-      arbigentInfoLog("Rate limit exceeded. Waiting for ${waitMs / 1000} seconds.")
-      ArbigentGlobalStatus.onAiRateLimitWait(waitSec = waitMs / 1000) {
-        Thread.sleep(waitMs)
-      }
-      return generateScenarios(scenarioGenerationInput, retryCount + 1)
+      throw e
     } catch (e: Exception) {
       arbigentDebugLog("Error calling Anthropic API: ${e.message}")
       throw ArbigentAi.FailedToParseResponseException("Error calling Anthropic API: ${e.message}", e)
