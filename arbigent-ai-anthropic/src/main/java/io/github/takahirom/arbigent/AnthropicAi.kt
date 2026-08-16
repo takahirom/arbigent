@@ -170,6 +170,10 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
     }
   },
 ) : ArbigentAi {
+  // Callers (CLI options, UI dialogs) don't all normalize a trailing slash, so do it once here
+  // rather than relying on every caller to get baseUrl + "messages" right.
+  internal val normalizedBaseUrl: String = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
+
   init {
     ConfidentialInfo.addStringToBeRemoved(apiKey, "{{API_KEY}}")
   }
@@ -226,6 +230,10 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
         aiOptions = decisionInput.aiOptions
       )
     } catch (e: AnthropicAiRateLimitExceededException) {
+      if (retried >= MAX_RATE_LIMIT_RETRIES) {
+        retried = 0
+        throw e
+      }
       val waitMs = 10000L * (1 shl retried)
       arbigentInfoLog("Rate limit exceeded. Waiting for ${waitMs / 1000} seconds.")
       ArbigentGlobalStatus.onAiRateLimitWait(waitSec = waitMs / 1000) {
@@ -584,7 +592,7 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
         request.copy(temperature = temp)
       } ?: request
       val response: HttpResponse =
-        httpClient.post(baseUrl + "messages") {
+        httpClient.post(normalizedBaseUrl + "messages") {
           url {
             parameters.append("requestUuid", requestUuid)
           }
@@ -600,6 +608,7 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
           Json { ignoreUnknownKeys = true }
             .decodeFromString<AnthropicErrorResponse>(responseBody).error?.message
         } catch (e: Exception) {
+          arbigentDebugLog { "Anthropic error response was not the expected shape: ${e.message}" }
           null
         }
         throw IllegalStateException(
@@ -644,7 +653,7 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
       val jsonString = """
 {
   "type": "object",
-  "required": [${ArbigentAiAnswerItems.entries.joinToString(",") { it.key }}${
+  "required": [${ArbigentAiAnswerItems.entries.joinToString(",") { "\"${it.key}\"" }}${
         if (actionType.arguments().isNotEmpty()) ", \"text\"" else ""
       }],
 "additionalProperties": false,
@@ -704,16 +713,18 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
   }
 
   override fun assertImage(imageAssertionInput: ArbigentAi.ImageAssertionInput): ArbigentAi.ImageAssertionOutput {
+    // Only rate limiting is retried here: unlike a 429, a bad API key or a malformed response
+    // will never succeed on retry, so retrying them would just wait ~10 minutes before failing anyway.
     fun assert(retry: Int = 0): ArbigentAi.ImageAssertionOutput {
       try {
         return performAssertImage(imageAssertionInput)
-      } catch (e: Exception) {
-        if (retry < 6) {
+      } catch (e: AnthropicAiRateLimitExceededException) {
+        if (retry < MAX_RATE_LIMIT_RETRIES) {
           val waitMs = 10000L * (1 shl retry)
           ArbigentGlobalStatus.onAiRateLimitWait(waitSec = waitMs / 1000) {
             Thread.sleep(waitMs)
           }
-          arbigentDebugLog("Retrying assertion: retryCount: $retry. Wait for ${waitMs / 1000}")
+          arbigentDebugLog("Retrying assertion after rate limit: retryCount: $retry. Wait for ${waitMs / 1000}")
           return assert(retry + 1)
         } else {
           throw e
@@ -791,6 +802,11 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
 
   override fun generateScenarios(
     scenarioGenerationInput: ArbigentAi.ScenarioGenerationInput,
+  ): GeneratedScenariosContent = generateScenarios(scenarioGenerationInput, retryCount = 0)
+
+  private fun generateScenarios(
+    scenarioGenerationInput: ArbigentAi.ScenarioGenerationInput,
+    retryCount: Int,
   ): GeneratedScenariosContent {
     val scenariosToGenerate = scenarioGenerationInput.scenariosToGenerate
     val appUiStructure = scenarioGenerationInput.appUiStructure
@@ -888,12 +904,15 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
         throw ArbigentAi.FailedToParseResponseException("Failed to parse response: ${e.message}", e)
       }
     } catch (e: AnthropicAiRateLimitExceededException) {
-      val waitMs = 10000L
+      if (retryCount >= MAX_RATE_LIMIT_RETRIES) {
+        throw e
+      }
+      val waitMs = 10000L * (1 shl retryCount)
       arbigentInfoLog("Rate limit exceeded. Waiting for ${waitMs / 1000} seconds.")
       ArbigentGlobalStatus.onAiRateLimitWait(waitSec = waitMs / 1000) {
         Thread.sleep(waitMs)
       }
-      return generateScenarios(scenarioGenerationInput)
+      return generateScenarios(scenarioGenerationInput, retryCount + 1)
     } catch (e: Exception) {
       arbigentDebugLog("Error calling Anthropic API: ${e.message}")
       throw ArbigentAi.FailedToParseResponseException("Error calling Anthropic API: ${e.message}", e)
@@ -927,6 +946,12 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
      * These are critical API fields that could break functionality or cause security issues.
      */
     internal val protectedFields: Set<String> = setOf("model", "messages", "system", "tools", "tool_choice")
+
+    /**
+     * Caps rate-limit backoff retries so a persistently rate-limited or overloaded API can't
+     * recurse forever (each retry doubles the wait, so this is already tens of minutes total).
+     */
+    internal const val MAX_RATE_LIMIT_RETRIES: Int = 6
   }
 }
 

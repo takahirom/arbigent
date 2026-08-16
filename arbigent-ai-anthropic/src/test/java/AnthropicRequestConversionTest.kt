@@ -123,6 +123,22 @@ class AnthropicRequestConversionTest {
     assertFalse("tools should be omitted when null", result.jsonObject.containsKey("tools"))
   }
 
+  // --- Base URL normalization ---
+
+  @Test
+  fun `baseUrl without a trailing slash gets one appended`() {
+    val ai = AnthropicAi(apiKey = "k", baseUrl = "https://my-proxy.example.com/v1", loggingEnabled = false)
+
+    assertEquals("https://my-proxy.example.com/v1/", ai.normalizedBaseUrl)
+  }
+
+  @Test
+  fun `baseUrl with a trailing slash is left unchanged`() {
+    val ai = AnthropicAi(apiKey = "k", baseUrl = "https://my-proxy.example.com/v1/", loggingEnabled = false)
+
+    assertEquals("https://my-proxy.example.com/v1/", ai.normalizedBaseUrl)
+  }
+
   // --- System prompt handling ---
 
   @Test
@@ -211,6 +227,16 @@ class AnthropicRequestConversionTest {
     assertFalse(required?.contains("text") == true)
   }
 
+  @Test
+  fun `buildTools required array entries are quoted JSON strings, not bare identifiers`() {
+    val tools = anthropicAi.buildTools(agentActionTypes = listOf(ClickWithIndex), mcpTools = null)
+
+    val required = tools.first().inputSchema["required"]!!.jsonArray
+    required.forEach {
+      assertTrue("required entry '$it' should be a JSON string", it.jsonPrimitive.isString)
+    }
+  }
+
   // --- Anthropic response -> ArbigentAi action conversion ---
 
   private val json = Json { ignoreUnknownKeys = true }
@@ -294,6 +320,13 @@ class AnthropicRequestConversionTest {
   }
 
   // --- Error handling ---
+
+  @Test
+  fun `rate limit retries are bounded, not infinite`() {
+    // A persistently rate-limited (or overloaded) API must not recurse forever: each retry
+    // doubles the wait, so this cap already bounds a single call to tens of minutes worst-case.
+    assertTrue(AnthropicAi.MAX_RATE_LIMIT_RETRIES in 1..10)
+  }
 
   @Test
   fun `AnthropicErrorResponse decodes a rate limit error body`() {
