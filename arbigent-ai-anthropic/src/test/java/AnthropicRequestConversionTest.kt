@@ -205,6 +205,25 @@ class AnthropicRequestConversionTest {
     assertNull(request.temperature)
   }
 
+  @Test
+  fun `existing request temperature is omitted when manual extended thinking is enabled`() {
+    val options = ArbigentAiOptions(
+      extraBody = buildJsonObject {
+        putJsonObject("thinking") {
+          put("type", "enabled")
+          put("budget_tokens", 10_000)
+        }
+      }
+    )
+
+    val request = anthropicAi.applyTemperature(
+      minimalRequest().copy(temperature = 0.9),
+      options,
+    )
+
+    assertNull(request.temperature)
+  }
+
   // --- System prompt handling ---
 
   @Test
