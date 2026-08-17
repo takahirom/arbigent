@@ -330,13 +330,31 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
   }
 
   internal fun decisionToolChoice(aiOptions: ArbigentAiOptions?): AnthropicToolChoice {
-    val thinking = aiOptions?.extraBody?.get("thinking") as? JsonObject
-    val thinkingType = (thinking?.get("type") as? JsonPrimitive)?.contentOrNull
-    return if (thinkingType == "enabled") {
+    return if (isManualThinkingEnabled(aiOptions)) {
       AnthropicToolChoice.Auto
     } else {
       AnthropicToolChoice.Any
     }
+  }
+
+  private fun isManualThinkingEnabled(aiOptions: ArbigentAiOptions?): Boolean {
+    val thinking = aiOptions?.extraBody?.get("thinking") as? JsonObject
+    val thinkingType = (thinking?.get("type") as? JsonPrimitive)?.contentOrNull
+    return thinkingType == "enabled"
+  }
+
+  internal fun applyTemperature(
+    request: AnthropicMessagesRequest,
+    aiOptions: ArbigentAiOptions?,
+  ): AnthropicMessagesRequest {
+    if (isManualThinkingEnabled(aiOptions)) {
+      if (aiOptions?.temperature != null || request.temperature != null) {
+        arbigentDebugLog { "Ignoring temperature because Anthropic extended thinking is enabled." }
+      }
+      return request.copy(temperature = null)
+    }
+    val temperature = aiOptions?.temperature ?: return request
+    return request.copy(temperature = temperature)
   }
 
   /**
@@ -609,9 +627,7 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
     aiOptions: ArbigentAiOptions? = null
   ): String {
     return runBlocking {
-      val requestWithTemp = aiOptions?.temperature?.let { temp ->
-        request.copy(temperature = temp)
-      } ?: request
+      val requestWithTemp = applyTemperature(request, aiOptions)
       val response: HttpResponse =
         httpClient.post(normalizedBaseUrl + "messages") {
           url {
