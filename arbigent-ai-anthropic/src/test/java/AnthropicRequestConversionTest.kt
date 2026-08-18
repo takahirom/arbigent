@@ -102,18 +102,16 @@ class AnthropicRequestConversionTest {
 
   @Test
   fun `buildRequestBody blocks all protected fields defined in constant`() {
+    val baseline = anthropicAi.buildRequestBody(minimalRequest(), null).jsonObject
     AnthropicAi.protectedFields.forEach { protectedField ->
       val extraParams = buildJsonObject { put(protectedField, "malicious-value") }
-      val result = anthropicAi.buildRequestBody(minimalRequest(), extraParams)
+      val merged = anthropicAi.buildRequestBody(minimalRequest(), extraParams).jsonObject
 
-      val fieldValue = result.jsonObject[protectedField]
-      if (fieldValue is JsonPrimitive) {
-        assertNotEquals(
-          "Protected field '$protectedField' should not be overridable",
-          "malicious-value",
-          fieldValue.content
-        )
-      }
+      assertEquals(
+        "Protected field '$protectedField' should be unchanged by extraParams",
+        baseline[protectedField],
+        merged[protectedField]
+      )
     }
   }
 
@@ -222,6 +220,60 @@ class AnthropicRequestConversionTest {
     )
 
     assertNull(request.temperature)
+  }
+
+  // --- Extended thinking request constraints ---
+
+  private fun manualThinkingExtraBody(budgetTokens: Int, extra: JsonObjectBuilder.() -> Unit = {}): JsonObject {
+    return buildJsonObject {
+      putJsonObject("thinking") {
+        put("type", "enabled")
+        put("budget_tokens", budgetTokens)
+      }
+      extra()
+    }
+  }
+
+  @Test
+  fun `max_tokens is raised above the thinking budget when it would be too small`() {
+    val body = anthropicAi.buildRequestBody(minimalRequest(), manualThinkingExtraBody(10_000)).jsonObject
+
+    assertEquals(10_000 + AnthropicAi.DEFAULT_MAX_TOKENS, body["max_tokens"]?.jsonPrimitive?.int)
+  }
+
+  @Test
+  fun `max_tokens above the thinking budget is left unchanged`() {
+    val extraParams = manualThinkingExtraBody(10_000) {
+      put("max_tokens", 20_000)
+    }
+
+    val body = anthropicAi.buildRequestBody(minimalRequest(), extraParams).jsonObject
+
+    assertEquals(20_000, body["max_tokens"]?.jsonPrimitive?.int)
+  }
+
+  @Test
+  fun `temperature from extraBody is dropped when manual extended thinking is enabled`() {
+    val extraParams = manualThinkingExtraBody(10_000) {
+      put("temperature", 0.7)
+    }
+
+    val body = anthropicAi.buildRequestBody(minimalRequest(), extraParams).jsonObject
+
+    assertFalse(body.containsKey("temperature"))
+  }
+
+  @Test
+  fun `adaptive thinking leaves max_tokens and temperature untouched`() {
+    val extraParams = buildJsonObject {
+      putJsonObject("thinking") { put("type", "adaptive") }
+      put("temperature", 0.7)
+    }
+
+    val body = anthropicAi.buildRequestBody(minimalRequest(), extraParams).jsonObject
+
+    assertEquals(1024, body["max_tokens"]?.jsonPrimitive?.int)
+    assertEquals(0.7, body["temperature"]?.jsonPrimitive?.double ?: 0.0, 0.0)
   }
 
   // --- System prompt handling ---
@@ -372,6 +424,48 @@ class AnthropicRequestConversionTest {
     )
 
     anthropicAi.extractActionAndArguments(json, response, listOf(ClickWithIndex))
+  }
+
+  @Test(expected = IllegalArgumentException::class)
+  fun `arbigentAgentAction rejects a negative index`() {
+    anthropicAi.arbigentAgentAction(
+      agentActionList = listOf(ClickWithIndex),
+      action = "ClickWithIndex",
+      argumentsJsonData = buildJsonObject { put("text", "-1") },
+      elements = fakeElementList(size = 5),
+      mcpTools = null,
+    )
+  }
+
+  @Test
+  fun `buildTools deduplicates MCP required entries and keeps them as JSON strings`() {
+    val mcpTool = io.github.takahirom.arbigent.MCPTool(
+      tool = io.github.takahirom.arbigent.Tool(
+        name = "search",
+        description = "Search things",
+        inputSchema = io.github.takahirom.arbigent.ToolSchema(
+          properties = buildJsonObject {
+            putJsonObject("query") { put("type", "string") }
+          },
+          // Overlaps with the always-added arbigent keys to exercise deduplication
+          required = listOf("query", "arbigent-memo"),
+        ),
+      ),
+      serverName = "test-server",
+    )
+
+    val tools = anthropicAi.buildTools(agentActionTypes = emptyList(), mcpTools = listOf(mcpTool))
+
+    val required = tools.single().inputSchema["required"]!!.jsonArray.map { it.jsonPrimitive.content }
+    assertEquals(required.distinct(), required)
+    assertTrue(required.containsAll(listOf("query", "arbigent-memo", "arbigent-image-description")))
+  }
+
+  @Test
+  fun `mediaTypeForImageFile derives the media type from the file extension`() {
+    assertEquals("image/png", anthropicAi.mediaTypeForImageFile("/tmp/screenshot.png"))
+    assertEquals("image/webp", anthropicAi.mediaTypeForImageFile("/tmp/screenshot.webp"))
+    assertEquals("image/png", anthropicAi.mediaTypeForImageFile("/tmp/screenshot.unknown"))
   }
 
   @Test

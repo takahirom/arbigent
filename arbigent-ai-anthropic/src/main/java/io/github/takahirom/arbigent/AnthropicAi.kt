@@ -565,7 +565,7 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
         val text = argumentsJsonData["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
         val index = text.toIntOrNull()
           ?: throw IllegalArgumentException("text should be a number for ${DpadAutoFocusWithIndexAgentAction.actionName}")
-        if (elements.elements.size <= index) {
+        if (index < 0 || elements.elements.size <= index) {
           throw IllegalArgumentException("Index out of bounds: $index")
         }
         DpadAutoFocusWithIndexAgentAction(index)
@@ -580,7 +580,7 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
         val text = argumentsJsonData["text"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Text not found")
         val index = text.toIntOrNull()
           ?: throw IllegalArgumentException("text should be a number for ${ClickWithIndex.actionName}")
-        if (elements.elements.size <= index) {
+        if (index < 0 || elements.elements.size <= index) {
           throw IllegalArgumentException("Index out of bounds: $index")
         }
         ClickWithIndex(
@@ -648,8 +648,10 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
           arbigentDebugLog { "Anthropic error response was not the expected shape: ${e.message}" }
           null
         }
+        // The raw body reaches step feedback/reports, so redact and cap it first.
+        val errorDetail = (apiErrorMessage ?: responseBody).removeConfidentialInfo().take(1_000)
         throw IllegalStateException(
-          "Failed to call API: ${response.status} ${apiErrorMessage ?: responseBody}"
+          "Failed to call API: ${response.status} $errorDetail"
         )
       }
       return@runBlocking responseBody
@@ -682,7 +684,30 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
         requestJson[key] = value
       }
     }
-    return JsonObject(requestJson)
+    return normalizeExtendedThinking(JsonObject(requestJson))
+  }
+
+  /**
+   * With extended thinking, `temperature` must stay unset and `max_tokens` must exceed
+   * `thinking.budget_tokens`; runs after the extraParams merge so overrides can't break this.
+   */
+  internal fun normalizeExtendedThinking(body: JsonObject): JsonObject {
+    val thinking = body["thinking"] as? JsonObject ?: return body
+    if ((thinking["type"] as? JsonPrimitive)?.contentOrNull != "enabled") return body
+    val fields = body.toMutableMap()
+    if (fields.remove("temperature") != null) {
+      arbigentDebugLog { "Ignoring temperature because Anthropic extended thinking is enabled." }
+    }
+    val budgetTokens = (thinking["budget_tokens"] as? JsonPrimitive)?.intOrNull
+    val requestMaxTokens = (fields["max_tokens"] as? JsonPrimitive)?.intOrNull
+    if (budgetTokens != null && (requestMaxTokens == null || requestMaxTokens <= budgetTokens)) {
+      val raisedMaxTokens = budgetTokens + DEFAULT_MAX_TOKENS
+      arbigentInfoLog(
+        "max_tokens ($requestMaxTokens) must exceed thinking.budget_tokens ($budgetTokens); raising max_tokens to $raisedMaxTokens."
+      )
+      fields["max_tokens"] = JsonPrimitive(raisedMaxTokens)
+    }
+    return JsonObject(fields)
   }
 
   internal fun buildTools(agentActionTypes: List<AgentActionType>, mcpTools: List<MCPTool>?): List<AnthropicToolDefinition> {
@@ -735,11 +760,10 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
         )
       }
 
-      // Add the "required" field with the required properties
-      val requiredList = (tool.inputSchema?.required ?: emptyList()) + ArbigentAiAnswerItems.entries.map { it.key }
-      val requiredJsonArray =
-        Json.parseToJsonElement(requiredList.joinToString(prefix = "[", postfix = "]") { "\"$it\"" })
-      parametersMap["required"] = requiredJsonArray
+      // Add the "required" field; MCP-provided names may need escaping and must be unique.
+      val requiredList =
+        ((tool.inputSchema?.required ?: emptyList()) + ArbigentAiAnswerItems.entries.map { it.key }).distinct()
+      parametersMap["required"] = JsonArray(requiredList.map { JsonPrimitive(it) })
 
       AnthropicToolDefinition(
         name = "mcp_" + tool.name,
@@ -761,7 +785,8 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
       AnthropicContent(
         type = "image",
         source = AnthropicImageSource(
-          mediaType = ImageFormat.PNG.mimeType,
+          // Screenshots may be WebP depending on ArbigentAiOptions.imageFormat, not always PNG.
+          mediaType = mediaTypeForImageFile(filePath),
           data = File(filePath).readImageBase64()
         )
       )
@@ -808,6 +833,12 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
     } catch (e: Exception) {
       throw ArbigentAi.FailedToParseResponseException("Failed to parse assertion response: ${e.message}", e)
     }
+    if (evaluation.results.size != assertions.size) {
+      throw ArbigentAi.FailedToParseResponseException(
+        "Expected ${assertions.size} assertion results but got ${evaluation.results.size}",
+        IllegalStateException("Assertion result count mismatch")
+      )
+    }
     return ArbigentAi.ImageAssertionOutput(
       results = evaluation.results.mapIndexed { index, result ->
         val requiredPercent = assertions.getOrNull(index)?.requiredFulfillmentPercent ?: 80
@@ -819,6 +850,12 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
         )
       }
     )
+  }
+
+  internal fun mediaTypeForImageFile(filePath: String): String {
+    val extension = File(filePath).extension.lowercase()
+    return ImageFormat.entries.firstOrNull { it.fileExtension == extension }?.mimeType
+      ?: ImageFormat.PNG.mimeType
   }
 
   override fun generateScenarios(
