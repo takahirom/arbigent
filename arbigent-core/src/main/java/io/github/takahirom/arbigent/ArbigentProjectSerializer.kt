@@ -342,7 +342,8 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
     taskScenarioId: String,
     nodeScenario: ArbigentScenarioContent,
     inputBindings: Map<String, String>?,
-    callBreadcrumb: String?
+    callBreadcrumb: String?,
+    callSiteAssertions: List<ArbigentImageAssertion> = emptyList()
   ): ArbigentAgentTask {
     // Determine which device form factor to use
     val effectiveDeviceFormFactor = if (nodeScenario.deviceFormFactor is ArbigentScenarioDeviceFormFactor.Unspecified) {
@@ -388,8 +389,19 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
         scenarioType = nodeScenario.type,
         deviceFormFactor = effectiveDeviceFormFactor,
         initializationMethods = initializationMethods,
+        // Call-site assertions run after the leaf's own: the leaf verifies what it promised,
+        // then the call site verifies what this particular call was for. Only the leaf's own
+        // prompts are {{inputs.*}}-resolved — the call site declares no inputs.
         imageAssertions = ArbigentImageAssertions(
-          nodeScenario.imageAssertions,
+          nodeScenario.imageAssertions.map { assertion ->
+            if (inputBindings != null) {
+              assertion.copy(
+                assertionPrompt = ReusableInputsResolver.resolve(assertion.assertionPrompt, inputBindings)
+              )
+            } else {
+              assertion
+            }
+          } + callSiteAssertions,
           nodeScenario.imageAssertionHistoryCount
         ),
         aiDecisionCache = aiDecisionCache,
@@ -431,6 +443,7 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
       },
       inputBindings = leaf.bindings,
       callBreadcrumb = leaf.callPath.takeIf { it.isNotEmpty() }?.joinToString(" › "),
+      callSiteAssertions = leaf.callSiteAssertions,
     )
   }
   arbigentDebugLog("Built scenario ${scenario.id} with ${result.size} tasks: ${result.map { it.scenarioId }}")

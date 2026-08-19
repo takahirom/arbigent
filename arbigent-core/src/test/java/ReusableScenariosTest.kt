@@ -176,6 +176,111 @@ class ReusableScenariosTest {
     assertEquals(25, project.tasksOf("caller")[0].maxStep)
   }
 
+  // ----- Call-site assertions -----
+
+  /**
+   * A call-form scenario may declare its own imageAssertions: the call shares the *how*, the
+   * assertions are this call site's own *what*. They run once the whole call has finished, so
+   * the resolver carries them on the last leaf of the expansion.
+   */
+  @Test
+  fun callSiteAssertionsAreCarriedByTheLastLeafOfTheExpansion() {
+    val project = load(
+      """
+      scenarios:
+      - id: "open-search"
+        dependency: "launch"
+        uses: "open-screen"
+        with:
+          screen: "Search"
+        imageAssertions:
+        - assertionPrompt: "The search input field is shown"
+      - id: "launch"
+        goal: "Launch the app"
+      reusableScenarios:
+      - id: "open-screen"
+        inputs:
+          screen:
+            required: true
+        steps:
+        - uses: "focus-nav"
+        - uses: "select-item"
+          with:
+            screen: "{{inputs.screen}}"
+      - id: "focus-nav"
+        goal: "Focus the left navigation"
+      - id: "select-item"
+        inputs:
+          screen:
+            required: true
+        goal: "Select {{inputs.screen}}"
+      """
+    )
+    val resolution = ArbigentScenarioResolver.resolveChain(
+      target = project.scenarioContents.first { it.id == "open-search" },
+      scenarioLookup = { id -> project.scenarioContents.firstOrNull { it.id == id } },
+      reusableLookup = { id -> project.reusableScenarios.firstOrNull { it.id == id } },
+    )
+    assertEquals(emptyList(), resolution.diagnostics)
+    // launch, focus-nav, select-item — only the expansion's last leaf carries the assertions.
+    assertEquals(
+      listOf(emptyList(), emptyList(), listOf("The search input field is shown")),
+      resolution.leaves.map { leaf -> leaf.callSiteAssertions.map { it.assertionPrompt } }
+    )
+  }
+
+  @Test
+  fun leafAssertionsResolveInputsAndRunBeforeCallSiteAssertions() = runTest {
+    leafAssertionsResolveInputsAndRunBeforeCallSiteAssertionsBody(coroutineContext[CoroutineDispatcher]!!)
+  }
+
+  private suspend fun leafAssertionsResolveInputsAndRunBeforeCallSiteAssertionsBody(
+    dispatcher: CoroutineDispatcher
+  ) {
+    val assertedPrompts = mutableListOf<String>()
+    val fakeAi = FakeAi()
+    val recordingAi = object : ArbigentAi by fakeAi {
+      override fun assertImage(imageAssertionInput: ArbigentAi.ImageAssertionInput): ArbigentAi.ImageAssertionOutput {
+        assertedPrompts += imageAssertionInput.assertions.assertions.map { it.assertionPrompt }
+        return fakeAi.assertImage(imageAssertionInput)
+      }
+    }
+    val project = load(
+      """
+      scenarios:
+      - id: "caller"
+        uses: "part"
+        with:
+          user: "paid"
+        imageAssertions:
+        - assertionPrompt: "Call-site verification"
+      reusableScenarios:
+      - id: "part"
+        goal: "Log in as {{inputs.user}}"
+        inputs:
+          user:
+            required: true
+        imageAssertions:
+        - assertionPrompt: "Logged in as {{inputs.user}}"
+      """
+    )
+    val scenario = project.scenarioContents.createArbigentScenario(
+      projectSettings = project.settings,
+      scenario = project.scenarioContents.first { it.id == "caller" },
+      aiFactory = { recordingAi },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = ArbigentAiDecisionCache.Disabled,
+      fixedScenarios = project.fixedScenarios,
+      reusableScenarios = project.reusableScenarios
+    )
+    val executor = ArbigentScenarioExecutor(dispatcher)
+    executor.execute(scenario, MCPClient())
+    assertTrue(executor.isGoalAchieved())
+    // The leaf's prompt is {{inputs.*}}-resolved (matching what `instruction` renders) and runs
+    // before the call site's own verification.
+    assertEquals(listOf("Logged in as paid", "Call-site verification"), assertedPrompts)
+  }
+
   // ----- Maestro yamlText substitution -----
 
   @Test
@@ -348,6 +453,75 @@ class ReusableScenariosTest {
         initializeMethods:
           type: "Back"
       reusableScenarios:
+      - id: "part"
+        goal: "part goal"
+      """
+    )
+  }
+
+  /** Assertion prompts follow the same `{{inputs.*}}` rules as goals. */
+  @Test
+  fun inputsPlaceholderInCallSiteAssertionFailsAtLoad() {
+    assertValidationError(
+      "scenarios 'caller': '{{inputs.*}}' can only be used inside reusable scenario definitions",
+      """
+      scenarios:
+      - id: "caller"
+        uses: "part"
+        with:
+          user: "paid"
+        imageAssertions:
+        - assertionPrompt: "Logged in as {{inputs.user}}"
+      reusableScenarios:
+      - id: "part"
+        inputs:
+          user:
+            required: true
+        goal: "Log in as {{inputs.user}}"
+      """
+    )
+  }
+
+  @Test
+  fun undeclaredInputsPlaceholderInReusableAssertionFailsAtLoad() {
+    assertValidationError(
+      "reusableScenarios 'part': '{{inputs.typo}}' is not declared in inputs",
+      """
+      scenarios:
+      - id: "caller"
+        uses: "part"
+        with:
+          user: "paid"
+      reusableScenarios:
+      - id: "part"
+        inputs:
+          user:
+            required: true
+        goal: "Log in as {{inputs.user}}"
+        imageAssertions:
+        - assertionPrompt: "Logged in as {{inputs.typo}}"
+      """
+    )
+  }
+
+  /**
+   * Reusable composites stay pure delegation: verification belongs either to the call site or
+   * to the leaf, not to the wiring in between.
+   */
+  @Test
+  fun imageAssertionsOnReusableCallFormFailAtLoad() {
+    assertValidationError(
+      "reusableScenarios 'composite': imageAssertions are not allowed on a reusable call-form scenario",
+      """
+      scenarios:
+      - id: "caller"
+        uses: "composite"
+      reusableScenarios:
+      - id: "composite"
+        steps:
+        - uses: "part"
+        imageAssertions:
+        - assertionPrompt: "Not allowed here"
       - id: "part"
         goal: "part goal"
       """

@@ -33,6 +33,12 @@ public object ArbigentScenarioResolver {
      * that is not reached through a call.
      */
     public val callPath: List<String>,
+    /**
+     * Assertions declared on the call-form scenario itself, carried by the last leaf of its
+     * expansion: a call site's own verification runs once the whole call has finished, and the
+     * last leaf is what executes at that moment.
+     */
+    public val callSiteAssertions: List<ArbigentImageAssertion> = emptyList(),
   ) {
     /**
      * Label of this leaf's own call site, e.g. `login (user=paid)`.
@@ -188,6 +194,16 @@ public object ArbigentScenarioResolver {
 
     scenario.callSteps().forEach { step ->
       expandStep(step, emptyMap(), listOf(scenario.id), emptyList())
+    }
+    // A call-form scenario may carry its own assertions (verification specific to this call
+    // site); they run after the whole call, i.e. with the expansion's last leaf. A call-form
+    // scenario always has at least one step and every step emits a leaf, so `leaves` is never
+    // empty here.
+    if (scenario.imageAssertions.isNotEmpty() && leaves.isNotEmpty()) {
+      val last = leaves.last()
+      leaves[leaves.lastIndex] = last.copy(
+        callSiteAssertions = last.callSiteAssertions + scenario.imageAssertions
+      )
     }
     return Resolution(leaves, diagnostics)
   }
