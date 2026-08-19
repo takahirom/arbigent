@@ -44,7 +44,8 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     .groupChoice(
       "openai" to OpenAIAiConfig(),
       "gemini" to GeminiAiConfig(),
-      "azureopenai" to AzureOpenAiConfig()
+      "azureopenai" to AzureOpenAiConfig(),
+      "anthropic" to AnthropicAiConfig()
     )
     .defaultByName("openai")
 
@@ -147,6 +148,7 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
       is OpenAIAiConfig -> "openai"
       is GeminiAiConfig -> "gemini"
       is AzureOpenAiConfig -> "azureopenai"
+      is AnthropicAiConfig -> "anthropic"
       else -> "unknown"
     }}")
     arbigentDebugLog("  log-level: $logLevel")

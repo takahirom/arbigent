@@ -46,6 +46,7 @@ dependencies {
   testImplementation("io.github.takahirom.roborazzi:roborazzi-compose-desktop:1.68.0")
   implementation(project(":arbigent-core"))
   implementation(project(":arbigent-ai-openai"))
+  implementation(project(":arbigent-ai-anthropic"))
   implementation("io.github.takahirom.rin:rin:0.3.0")
 }
 

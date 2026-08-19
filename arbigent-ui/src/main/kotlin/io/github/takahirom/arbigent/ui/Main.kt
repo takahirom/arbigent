@@ -19,6 +19,7 @@ import androidx.compose.ui.window.MenuBar
 import androidx.compose.ui.window.WindowExceptionHandler
 import androidx.compose.ui.window.WindowExceptionHandlerFactory
 import androidx.compose.ui.window.application
+import io.github.takahirom.arbigent.AnthropicAi
 import io.github.takahirom.arbigent.ArbigentAi
 import io.github.takahirom.arbigent.ArbigentGlobalStatus
 import io.github.takahirom.arbigent.ArbigentInternalApi
@@ -78,6 +79,13 @@ fun main() {
               modelName = aiProviderSetting.modelName,
               loggingEnabled = aiSetting.loggingEnabled,
               baseUrl = aiProviderSetting.baseUrl,
+            )
+          } else if (aiProviderSetting is AiProviderSetting.Anthropic) {
+            AnthropicAi(
+              apiKey = aiProviderSetting.apiKey,
+              modelName = aiProviderSetting.modelName,
+              baseUrl = aiProviderSetting.baseUrl,
+              loggingEnabled = aiSetting.loggingEnabled,
             )
           } else {
             throw IllegalArgumentException("Unsupported aiProviderSetting: $aiProviderSetting")

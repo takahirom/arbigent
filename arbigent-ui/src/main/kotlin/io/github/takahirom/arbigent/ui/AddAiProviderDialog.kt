@@ -44,6 +44,7 @@ fun AddAiProviderDialog(
                 is AiProviderSetting.Gemini -> "Gemini"
                 is AiProviderSetting.CustomOpenAiApiBasedAi -> "CustomOpenAiApiBasedAi"
                 is AiProviderSetting.AzureOpenAi -> "AzureOpenAi"
+                is AiProviderSetting.Anthropic -> "Anthropic"
                 else -> "OpenAi"
               }
             )
@@ -100,6 +101,18 @@ fun AddAiProviderDialog(
                 enabled = !isEditMode
               )
             }
+            Row(
+              verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+              RadioButtonRow(
+                text = "Anthropic",
+                selected = selectedType == "Anthropic",
+                onClick = {
+                  if (!isEditMode) selectedType = "Anthropic"
+                },
+                enabled = !isEditMode
+              )
+            }
           }
 
           GroupHeader("Provider ID")
@@ -149,14 +162,20 @@ fun AddAiProviderDialog(
                 is AiProviderSetting.Gemini -> editingProvider.modelName
                 is AiProviderSetting.CustomOpenAiApiBasedAi -> editingProvider.modelName
                 is AiProviderSetting.AzureOpenAi -> editingProvider.modelName
+                is AiProviderSetting.Anthropic -> editingProvider.modelName
                 else -> ""
               }
             )
           }
+          val modelNamePlaceholder = when (selectedType) {
+            "Gemini" -> "Enter model name (e.g., gemini-1.5-flash)"
+            "Anthropic" -> "Enter model name (e.g., claude-sonnet-4-5)"
+            else -> "Enter model name (e.g., gpt-4.1)"
+          }
           TextField(
             state = modelNameState,
             modifier = Modifier.padding(8.dp).fillMaxWidth(),
-            placeholder = { Text("Enter model name (e.g., gpt-4.1)") }
+            placeholder = { Text(modelNamePlaceholder) }
           )
 
           GroupHeader("API Key")
@@ -167,6 +186,7 @@ fun AddAiProviderDialog(
                 is AiProviderSetting.Gemini -> editingProvider.apiKey
                 is AiProviderSetting.CustomOpenAiApiBasedAi -> editingProvider.apiKey
                 is AiProviderSetting.AzureOpenAi -> editingProvider.apiKey
+                is AiProviderSetting.Anthropic -> editingProvider.apiKey
                 else -> ""
               }
             )
@@ -312,6 +332,62 @@ fun AddAiProviderDialog(
                 },
                 enabled = isIdValid && modelNameState.text.isNotEmpty() &&
                   endpointState.text.isNotEmpty() && apiVersionState.text.isNotEmpty(),
+                modifier = Modifier.padding(8.dp)
+              ) {
+                Text(if (isEditMode) "Update Provider" else "Add Provider")
+              }
+            }
+
+            "Anthropic" -> {
+              GroupHeader("Base URL")
+              val baseUrlState = remember {
+                TextFieldState(
+                  (editingProvider as? AiProviderSetting.Anthropic)?.baseUrl ?: "https://api.anthropic.com/v1/"
+                )
+              }
+              val baseUrlText = baseUrlState.text.toString()
+              val isBaseUrlEndsWithSlash = baseUrlText.isEmpty() || baseUrlText.endsWith("/")
+
+              TextField(
+                state = baseUrlState,
+                modifier = Modifier.padding(8.dp).fillMaxWidth(),
+                placeholder = { Text("Enter base URL (e.g., https://api.anthropic.com/v1/)") }
+              )
+
+              if (!isBaseUrlEndsWithSlash) {
+                Text(
+                  text = "Warning: URL should end with a slash (/)",
+                  color = Color(0xFFF57C00), // Orange warning color
+                  modifier = Modifier.padding(horizontal = 8.dp)
+                )
+              }
+
+              // Add/Update button
+              OutlinedButton(
+                onClick = {
+                  if (isIdValid && modelNameState.text.isNotEmpty() && baseUrlState.text.isNotEmpty()) {
+                    // Ensure URL ends with a slash
+                    var baseUrl = baseUrlState.text.toString()
+                    if (!baseUrl.endsWith("/")) {
+                      baseUrl += "/"
+                    }
+
+                    val provider = AiProviderSetting.Anthropic(
+                      id = idState.text.toString(),
+                      apiKey = apiKeyState.text.toString(),
+                      modelName = modelNameState.text.toString(),
+                      baseUrl = baseUrl
+                    )
+
+                    if (isEditMode) {
+                      aiSettingStateHolder.updateAiProvider(provider)
+                    } else {
+                      aiSettingStateHolder.addAiProvider(provider)
+                    }
+                    onCloseRequest()
+                  }
+                },
+                enabled = isIdValid && modelNameState.text.isNotEmpty() && baseUrlState.text.isNotEmpty(),
                 modifier = Modifier.padding(8.dp)
               ) {
                 Text(if (isEditMode) "Update Provider" else "Add Provider")

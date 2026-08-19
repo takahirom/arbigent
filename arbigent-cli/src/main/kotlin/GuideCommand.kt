@@ -86,7 +86,7 @@ also override any shared setting on one machine (e.g. a different model name).
 Never put API keys in `settings.yml` or in committed scripts.
 
 In CI, prefer environment variables over files: OPENAI_API_KEY, GEMINI_API_KEY,
-or AZURE_OPENAI_API_KEY (mapped to the same options).
+AZURE_OPENAI_API_KEY, or ANTHROPIC_API_KEY (mapped to the same options).
 
 ## AI provider settings
 
@@ -97,6 +97,9 @@ or AZURE_OPENAI_API_KEY (mapped to the same options).
 - `ai-type: "azureopenai"` — `azure-openai-endpoint`, `azure-openai-api-version`,
   `azure-openai-model-name` (the deployment name), `azure-openai-api-key`
   (or AZURE_OPENAI_API_KEY).
+- `ai-type: "anthropic"` — `anthropic-api-key` (or ANTHROPIC_API_KEY); optional
+  `anthropic-model-name`, `anthropic-endpoint`. Uses Anthropic's Messages API
+  directly (not an OpenAI-compatible endpoint).
 
 ## Verify
 
@@ -277,8 +280,8 @@ Done when: you know the scenario ids and tags you need for the next `run` comman
 
 ## Prerequisites
 
-- An AI API key: pass `--ai-type` (`openai` (default) / `gemini` / `azureopenai`) and the
-  matching key via the OPENAI_API_KEY / GEMINI_API_KEY / AZURE_OPENAI_API_KEY
+- An AI API key: pass `--ai-type` (`openai` (default) / `gemini` / `azureopenai` / `anthropic`) and the
+  matching key via the OPENAI_API_KEY / GEMINI_API_KEY / AZURE_OPENAI_API_KEY / ANTHROPIC_API_KEY
   environment variable, `--openai-api-key`-style options, or `.arbigent/settings.local.yml`.
   Never commit keys; use the `settings.local.yml` file (gitignore it).
 - A connected device matching `--os` (`android` (default) / `ios` / `web`). The first
@@ -367,7 +370,7 @@ you suspect the wrong scenarios were selected.
 ## Common causes and fixes
 
 - "Missing option '--project-file'" — pass it explicitly or configure `.arbigent/settings.yml`.
-- "Missing OpenAI API key" (or Gemini/Azure) — set the environment variable or
+- "Missing OpenAI API key" (or Gemini/Azure/Anthropic) — set the environment variable or
   `.arbigent/settings.local.yml`.
 - "No available device found" — start an emulator/simulator or connect a device
   matching `--os` before running.

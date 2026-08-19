@@ -54,6 +54,11 @@ fun validateAiConfig(aiType: AiConfig) {
         throw CliktError("Missing Azure OpenAI API key. Please provide via --azure-openai-api-key, AZURE_OPENAI_API_KEY environment variable, or in .arbigent/settings.local.yml")
       }
     }
+    is AnthropicAiConfig -> {
+      if (aiType.anthropicApiKey.isNullOrBlank()) {
+        throw CliktError("Missing Anthropic API key. Please provide via --anthropic-api-key, ANTHROPIC_API_KEY environment variable, or in .arbigent/settings.local.yml")
+      }
+    }
   }
 }
 
@@ -108,6 +113,13 @@ fun createAi(aiType: AiConfig, aiApiLoggingEnabled: Boolean): ArbigentAi {
         parameter("api-version", aiType.azureOpenAIApiVersion)
         header("api-key", aiType.azureOpenAIKey!!)
       }
+    )
+
+    is AnthropicAiConfig -> AnthropicAi(
+      apiKey = aiType.anthropicApiKey!!,
+      baseUrl = aiType.anthropicEndpoint,
+      modelName = aiType.anthropicModelName,
+      loggingEnabled = aiApiLoggingEnabled,
     )
   }
 }

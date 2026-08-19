@@ -238,6 +238,39 @@ class CliE2ETest {
     }
     
     @Test
+    fun `CLI uses anthropic ai-type from command line`() {
+        // Create settings with a different default ai-type
+        settingsFile.writeText("""
+            # Global settings
+            project-file: ${projectFile.name}
+            ai-type: openai
+            openai-api-key: global-openai-key
+            log-level: info
+            os: android
+            dry-run: true
+        """.trimIndent())
+
+        // Run with --ai-type=anthropic from the command line, overriding the global openai default
+        val result = runCli(
+            "run",
+            "--scenario-ids=test-scenario-001",
+            "--ai-type=anthropic",
+            "--log-level=debug",
+            "--anthropic-api-key=cli-anthropic-key"
+        )
+        val output = result.output
+
+        assertTrue(output.contains("ai-type: anthropic"),
+            "Should use anthropic from command line argument, not openai from global config")
+
+        // Verify --help lists the Anthropic-specific options
+        val helpResult = runCli("run", "--help", "--ai-type=anthropic")
+        val helpOutput = helpResult.output
+        assertTrue(helpOutput.contains("--anthropic-api-key"), "Should show anthropic-api-key option in help")
+        assertTrue(helpOutput.contains("--anthropic-model-name"), "Should show anthropic-model-name option in help")
+    }
+
+    @Test
     fun `CLI handles partial command line overrides correctly`() {
         // Create settings with specific configurations
         settingsFile.writeText("""
