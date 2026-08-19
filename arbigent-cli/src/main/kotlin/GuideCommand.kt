@@ -171,7 +171,8 @@ field name does not fail the load — it just does nothing. After editing, verif
 Define once under `reusableScenarios` (may declare `inputs` with `required`/`default`),
 then call from ordinary scenarios with `uses` + `with`, or a `steps` list for multiple
 calls. A calling scenario must NOT set `goal`, `maxStep`, `initializationMethods`,
-`imageAssertions`, or `userPromptTemplate` — those belong to the reusable definition.
+or `userPromptTemplate` — those belong to the reusable definition. A calling scenario
+MAY set its own `imageAssertions`; they are verified after the whole call finishes.
 Reusable definitions must NOT have `dependency` or `tags`.
 
 ## Complete example

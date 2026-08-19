@@ -147,9 +147,11 @@ class ArbigentInstructionCommand : CliktCommand(name = "instruction") {
         goal = ReusableInputsResolver.resolve(content.goal, bindings),
         initializationMethods = rawInitializationMethods.map { resolveInitializationMethod(it, bindings) },
         note = ReusableInputsResolver.resolve(content.noteForHumans, bindings),
+        // Call-site assertions come from the calling scenario, which declares no inputs, so
+        // they are appended as written rather than resolved against this leaf's bindings.
         imageAssertions = content.imageAssertions.map {
           it.copy(assertionPrompt = ReusableInputsResolver.resolve(it.assertionPrompt, bindings))
-        },
+        } + leaf.callSiteAssertions,
       )
     }
   }

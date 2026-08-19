@@ -41,6 +41,8 @@ scenarios:
   uses: "search"
   with:
     term: "wifi"
+  imageAssertions:
+  - assertionPrompt: "The wifi settings entry is listed"
 reusableScenarios:
 - id: "search"
   inputs:
@@ -88,6 +90,12 @@ reusableScenarios:
 
     // Image assertion resolved and rendered as verification.
     assertContains(output, "Verification: Results for wifi are shown")
+
+    // The call site's own assertion follows the leaf's: the leaf verifies what it promised,
+    // then the call site verifies what this particular call was for.
+    val leafVerification = output.indexOf("Verification: Results for wifi are shown")
+    val callSiteVerification = output.indexOf("Verification: The wifi settings entry is listed")
+    assertTrue(callSiteVerification > leafVerification, output)
 
     // Bare project variable stays unresolved and is listed.
     assertContains(output, "{{username}}")
