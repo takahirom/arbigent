@@ -390,9 +390,18 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
         deviceFormFactor = effectiveDeviceFormFactor,
         initializationMethods = initializationMethods,
         // Call-site assertions run after the leaf's own: the leaf verifies what it promised,
-        // then the call site verifies what this particular call was for.
+        // then the call site verifies what this particular call was for. Only the leaf's own
+        // prompts are {{inputs.*}}-resolved — the call site declares no inputs.
         imageAssertions = ArbigentImageAssertions(
-          nodeScenario.imageAssertions + callSiteAssertions,
+          nodeScenario.imageAssertions.map { assertion ->
+            if (inputBindings != null) {
+              assertion.copy(
+                assertionPrompt = ReusableInputsResolver.resolve(assertion.assertionPrompt, inputBindings)
+              )
+            } else {
+              assertion
+            }
+          } + callSiteAssertions,
           nodeScenario.imageAssertionHistoryCount
         ),
         aiDecisionCache = aiDecisionCache,

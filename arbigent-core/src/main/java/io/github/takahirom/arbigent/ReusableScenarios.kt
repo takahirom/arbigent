@@ -82,8 +82,8 @@ private fun ArbigentProjectFileContent.reusableScenarioErrors(): List<String> {
       }
       // A call-form scenario may carry imageAssertions: they are this call site's own
       // verification and run after the whole call. Reusable composites stay pure delegation —
-      // assertion prompts are not {{inputs.*}}-resolved, so parameterized assertions on a
-      // composite would silently reach the AI unresolved.
+      // verification belongs either to the scenario that owns the journey (the call site) or to
+      // the leaf that promises a state, not to the wiring in between.
       if (content.imageAssertions.isNotEmpty() && isReusable) {
         errors += "$where: imageAssertions are not allowed on a reusable call-form scenario; put them on the calling scenario or the reusable leaf"
       }
@@ -137,6 +137,7 @@ private fun ArbigentProjectFileContent.reusableScenarioErrors(): List<String> {
 
     // {{inputs.*}} may only appear in reusable definitions and only for declared inputs.
     val referencedInputs = ReusableInputsResolver.referencedInputNames(content.goal) +
+      content.imageAssertions.flatMap { ReusableInputsResolver.referencedInputNames(it.assertionPrompt) } +
       content.initializationMethods.filterIsInstance<ArbigentScenarioContent.InitializationMethod.MaestroYaml>()
         .mapNotNull { method -> fixedScenarios.firstOrNull { it.id == method.scenarioId }?.yamlText }
         .flatMap { ReusableInputsResolver.referencedInputNames(it) }

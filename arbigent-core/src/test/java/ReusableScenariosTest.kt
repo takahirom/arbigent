@@ -230,24 +230,55 @@ class ReusableScenariosTest {
   }
 
   @Test
-  fun callSiteAssertionsAppendToTheLeafsOwnAssertionsInTheTask() {
+  fun leafAssertionsResolveInputsAndRunBeforeCallSiteAssertions() = runTest {
+    leafAssertionsResolveInputsAndRunBeforeCallSiteAssertionsBody(coroutineContext[CoroutineDispatcher]!!)
+  }
+
+  private suspend fun leafAssertionsResolveInputsAndRunBeforeCallSiteAssertionsBody(
+    dispatcher: CoroutineDispatcher
+  ) {
+    val assertedPrompts = mutableListOf<String>()
+    val fakeAi = FakeAi()
+    val recordingAi = object : ArbigentAi by fakeAi {
+      override fun assertImage(imageAssertionInput: ArbigentAi.ImageAssertionInput): ArbigentAi.ImageAssertionOutput {
+        assertedPrompts += imageAssertionInput.assertions.assertions.map { it.assertionPrompt }
+        return fakeAi.assertImage(imageAssertionInput)
+      }
+    }
     val project = load(
       """
       scenarios:
       - id: "caller"
         uses: "part"
+        with:
+          user: "paid"
         imageAssertions:
         - assertionPrompt: "Call-site verification"
       reusableScenarios:
       - id: "part"
-        goal: "Do something"
+        goal: "Log in as {{inputs.user}}"
+        inputs:
+          user:
+            required: true
         imageAssertions:
-        - assertionPrompt: "Leaf verification"
+        - assertionPrompt: "Logged in as {{inputs.user}}"
       """
     )
-    // The merged order (leaf first, call site last) is asserted end-to-end by
-    // InstructionCommandTest; here the task must simply build without a validation error.
-    assertEquals(1, project.tasksOf("caller").size)
+    val scenario = project.scenarioContents.createArbigentScenario(
+      projectSettings = project.settings,
+      scenario = project.scenarioContents.first { it.id == "caller" },
+      aiFactory = { recordingAi },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = ArbigentAiDecisionCache.Disabled,
+      fixedScenarios = project.fixedScenarios,
+      reusableScenarios = project.reusableScenarios
+    )
+    val executor = ArbigentScenarioExecutor(dispatcher)
+    executor.execute(scenario, MCPClient())
+    assertTrue(executor.isGoalAchieved())
+    // The leaf's prompt is {{inputs.*}}-resolved (matching what `instruction` renders) and runs
+    // before the call site's own verification.
+    assertEquals(listOf("Logged in as paid", "Call-site verification"), assertedPrompts)
   }
 
   // ----- Maestro yamlText substitution -----
@@ -428,9 +459,54 @@ class ReusableScenariosTest {
     )
   }
 
+  /** Assertion prompts follow the same `{{inputs.*}}` rules as goals. */
+  @Test
+  fun inputsPlaceholderInCallSiteAssertionFailsAtLoad() {
+    assertValidationError(
+      "scenarios 'caller': '{{inputs.*}}' can only be used inside reusable scenario definitions",
+      """
+      scenarios:
+      - id: "caller"
+        uses: "part"
+        with:
+          user: "paid"
+        imageAssertions:
+        - assertionPrompt: "Logged in as {{inputs.user}}"
+      reusableScenarios:
+      - id: "part"
+        inputs:
+          user:
+            required: true
+        goal: "Log in as {{inputs.user}}"
+      """
+    )
+  }
+
+  @Test
+  fun undeclaredInputsPlaceholderInReusableAssertionFailsAtLoad() {
+    assertValidationError(
+      "reusableScenarios 'part': '{{inputs.typo}}' is not declared in inputs",
+      """
+      scenarios:
+      - id: "caller"
+        uses: "part"
+        with:
+          user: "paid"
+      reusableScenarios:
+      - id: "part"
+        inputs:
+          user:
+            required: true
+        goal: "Log in as {{inputs.user}}"
+        imageAssertions:
+        - assertionPrompt: "Logged in as {{inputs.typo}}"
+      """
+    )
+  }
+
   /**
-   * Reusable composites stay pure delegation: assertion prompts are not `{{inputs.*}}`-resolved,
-   * so a parameterized assertion on a composite would reach the AI with the placeholder intact.
+   * Reusable composites stay pure delegation: verification belongs either to the call site or
+   * to the leaf, not to the wiring in between.
    */
   @Test
   fun imageAssertionsOnReusableCallFormFailAtLoad() {
