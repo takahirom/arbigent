@@ -599,8 +599,10 @@ public data class KeyPressAgentAction(val keyName: String) : ArbigentAgentAction
   }
 
   override fun runDeviceAction(runInput: ArbigentAgentAction.RunInput) {
-    val code = KeyCode.getByName(keyName)
-      ?: throw MaestroException.InvalidCommand(message = "Unknown key: $keyName")
+    val code = resolveKeyCode(keyName)
+      ?: throw MaestroException.InvalidCommand(
+        message = "Unknown key: $keyName. Supported keys: ${supportedKeyNames().joinToString(", ")}"
+      )
     runInput.device.executeActions(
       actions = listOf(
         MaestroCommand(
@@ -615,6 +617,29 @@ public data class KeyPressAgentAction(val keyName: String) : ArbigentAgentAction
   public companion object : AgentActionType {
     override val actionName: String = "KeyPress"
 
+    // AI models often emit Android KeyEvent style names that Maestro doesn't know.
+    private val keyAliases: Map<String, KeyCode> = mapOf(
+      "DEL" to KeyCode.BACKSPACE,
+      "DELETE" to KeyCode.BACKSPACE,
+      "FORWARD_DEL" to KeyCode.BACKSPACE,
+      "ESC" to KeyCode.ESCAPE,
+      "DPAD_UP" to KeyCode.REMOTE_UP,
+      "DPAD_DOWN" to KeyCode.REMOTE_DOWN,
+      "DPAD_LEFT" to KeyCode.REMOTE_LEFT,
+      "DPAD_RIGHT" to KeyCode.REMOTE_RIGHT,
+      "DPAD_CENTER" to KeyCode.REMOTE_CENTER,
+      "MENU" to KeyCode.REMOTE_MENU,
+    )
+
+    public fun resolveKeyCode(keyName: String): KeyCode? {
+      val normalized = keyName.trim().removePrefix("KEYCODE_")
+      return KeyCode.getByName(normalized)
+        ?: KeyCode.entries.firstOrNull { it.name.equals(normalized.replace(' ', '_'), ignoreCase = true) }
+        ?: keyAliases[normalized.replace(' ', '_').uppercase()]
+    }
+
+    public fun supportedKeyNames(): List<String> = KeyCode.entries.map { it.name }
+
     override fun actionDescription(): String = "Press a specific key on the device"
 
     override fun arguments(): List<AgentActionType.Argument> =
@@ -622,7 +647,7 @@ public data class KeyPressAgentAction(val keyName: String) : ArbigentAgentAction
         AgentActionType.Argument(
           name = "text",
           type = "string",
-          description = "The name of the key to press (e.g., ENTER, TAB, etc.)"
+          description = "The name of the key to press. Must be one of: ${supportedKeyNames().joinToString(", ")}"
         )
       )
   }
