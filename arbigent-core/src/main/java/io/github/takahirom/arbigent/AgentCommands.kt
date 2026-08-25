@@ -647,7 +647,7 @@ public data class KeyPressAgentAction(val keyName: String) : ArbigentAgentAction
         AgentActionType.Argument(
           name = "text",
           type = "string",
-          description = "The name of the key to press. Must be one of: ${supportedKeyNames().joinToString(", ")}"
+          description = "The name of the key to press (e.g., ENTER, TAB, BACKSPACE, ESCAPE, BACK, HOME)"
         )
       )
   }
