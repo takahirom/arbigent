@@ -30,6 +30,18 @@ class KeyPressAgentActionTest {
   }
 
   @Test
+  fun `strips keycode prefix case insensitively`() {
+    assertEquals(KeyCode.BACKSPACE, KeyPressAgentAction.resolveKeyCode("keycode_del"))
+    assertEquals(KeyCode.REMOTE_UP, KeyPressAgentAction.resolveKeyCode("KeyCode_Dpad_Up"))
+  }
+
+  @Test
+  fun `rejects forward delete because maestro has no forward-delete key`() {
+    assertNull(KeyPressAgentAction.resolveKeyCode("FORWARD_DEL"))
+    assertNull(KeyPressAgentAction.resolveKeyCode("KEYCODE_FORWARD_DEL"))
+  }
+
+  @Test
   fun `trims whitespace`() {
     assertEquals(KeyCode.TAB, KeyPressAgentAction.resolveKeyCode(" TAB "))
   }
