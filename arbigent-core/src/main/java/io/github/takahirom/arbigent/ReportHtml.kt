@@ -73,14 +73,20 @@ public class ArbigentHtmlReport {
                     step.copy(
                       screenshotFilePath = newScreenshotFile.absolutePath
                     ).let {
-                      step.apiCallJsonPath?.let { apiCallJsonPath ->
-                        val jsonlFile = File(apiCallJsonPath)
+                      // A recorded path can outlive the file it names: an AI-decision cache entry
+                      // survives the result directory it was written in. Exporting must neither
+                      // fail over the missing artifact nor keep pointing at it, since the export
+                      // would then carry a dead link and a local path it never packaged.
+                      val jsonlFile = step.apiCallJsonPath?.let { path -> File(path) }
+                      if (jsonlFile != null && jsonlFile.isFile) {
                         val newJsonlFile = File(jsonlsDir, jsonlFile.name)
                         jsonlFile.copyTo(newJsonlFile, overwrite = true)
                         it.copy(
                           apiCallJsonPath = newJsonlFile.absolutePath
                         )
-                      } ?: it
+                      } else {
+                        it.copy(apiCallJsonPath = null)
+                      }
                     }
                   }
                 )

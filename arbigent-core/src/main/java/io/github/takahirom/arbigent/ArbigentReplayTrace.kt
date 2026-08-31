@@ -89,6 +89,17 @@ internal class ArbigentReplayDecisionInterceptor(
     // re-locate it so the action survives a reordered list, and its absence is real divergence.
     // Elements with no identifying attributes at all (common for TV cards driven by D-pad index)
     // are replayed as recorded — the image assertions and the fallback are what keep replay honest.
+    // A recorded index means nothing on a shorter element list, and the actions that carry one
+    // index into it directly. Catching it here turns a stray IndexOutOfBoundsException thrown
+    // mid-action into ordinary divergence, before anything has been tapped.
+    recordedAction.recordedElementIndex()?.let { index ->
+      if (index !in decisionInput.elements.elements.indices) {
+        throw ReplayDivergenceException(
+          "step ${replayIndex + 1} targets element $index but the current screen has " +
+            "${decisionInput.elements.elements.size}",
+        )
+      }
+    }
     val identity = recorded.decisionOutput.step.targetElement
     val reboundAction = if (identity != null) {
       val currentElement = identity.findMatch(decisionInput.elements)
@@ -109,7 +120,9 @@ internal class ArbigentReplayDecisionInterceptor(
         cacheKey = decisionInput.cacheKey,
         timestamp = TimeProvider.get().currentTimeMillis(),
         screenshotFilePath = decisionInput.screenshotFilePath,
-        apiCallJsonLFilePath = decisionInput.apiCallJsonLFilePath,
+        // No AI call was made, so nothing wrote a JSONL for this step. Carrying the path anyway
+        // would name an artifact that does not exist, and the report copies every path it is given.
+        apiCallJsonLFilePath = null,
         stepSource = ArbigentStepSource.Replay,
       ),
     )
@@ -210,6 +223,12 @@ private fun ArbigentAgentAction.targetElement(elements: ArbigentElementList): Ar
   // Coordinate actions explicitly target content outside the UI hierarchy and therefore cannot
   // be replayed safely in replay mode.
   is ClickAtCoordinates -> null
+  else -> null
+}
+
+private fun ArbigentAgentAction.recordedElementIndex(): Int? = when (this) {
+  is ClickWithIndex -> index
+  is DpadAutoFocusWithIndexAgentAction -> index
   else -> null
 }
 
