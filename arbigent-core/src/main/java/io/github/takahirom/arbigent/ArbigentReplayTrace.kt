@@ -35,12 +35,12 @@ internal class ArbigentReplayDecisionInterceptor(
       ?: throw ReplayDivergenceException(
         "trace step ${replayIndex + 1} does not contain exactly one action",
       )
-    val targetIdentity = recorded.decisionOutput.step.targetElement
-    val reboundAction = if (recordedAction.requiresElementIdentity()) {
-      val identity = targetIdentity
-        ?: throw ReplayDivergenceException(
-          "trace step ${replayIndex + 1} ${recordedAction.actionName} has no target identity",
-        )
+    // An identity is an optimization, not a requirement: when the recorded element carried one we
+    // re-locate it so the action survives a reordered list, and its absence is real divergence.
+    // Elements with no identifying attributes at all (common for TV cards driven by D-pad index)
+    // are replayed as recorded — the image assertions and the fallback are what keep replay honest.
+    val identity = recorded.decisionOutput.step.targetElement
+    val reboundAction = if (identity != null) {
       val currentElement = identity.findMatch(decisionInput.elements)
         ?: throw ReplayDivergenceException(
           "step ${replayIndex + 1} target ${identity.description()} is absent from the current UI",
@@ -149,17 +149,6 @@ internal fun ArbigentAgentAction.withTargetIdentity(
   return ArbigentElementIdentity.from(target, elements.elements)
 }
 
-internal fun ArbigentAgentAction.requiresElementIdentity(): Boolean = when (this) {
-  is ClickWithIndex,
-  is ClickWithTextAgentAction,
-  is ClickWithIdAgentAction,
-  is ClickAtCoordinates,
-  is DpadAutoFocusWithIndexAgentAction,
-  is DpadAutoFocusWithTextAgentAction,
-  is DpadAutoFocusWithIdAgentAction -> true
-  else -> false
-}
-
 private fun ArbigentAgentAction.targetElement(elements: ArbigentElementList): ArbigentElement? = when (this) {
   is ClickWithIndex -> elements.elements.getOrNull(index)
   is DpadAutoFocusWithIndexAgentAction -> elements.elements.getOrNull(index)
@@ -245,12 +234,8 @@ internal data class ArbigentReplayTrace(
     if (goalHash != key.goalHash) return "the goal changed since it was recorded"
     if (steps.isEmpty()) return "it has no steps"
     steps.forEachIndexed { index, traceStep ->
-      val action = traceStep.decisionOutput.agentActions.singleOrNull()
+      traceStep.decisionOutput.agentActions.singleOrNull()
         ?: return "step ${index + 1} does not contain exactly one action"
-      if (action.requiresElementIdentity() && traceStep.decisionOutput.step.targetElement == null) {
-        return "step ${index + 1} (${action.stepLogText()}) targets an element with no text, " +
-          "resource id or accessibility id to find it by on the next run"
-      }
     }
     if (steps.last().decisionOutput.agentActions.none { it is GoalAchievedAgentAction }) {
       return "it does not end by reaching the goal"

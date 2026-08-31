@@ -52,7 +52,7 @@ Used both in `scenarios` and `reusableScenarios`.
 | `initializeMethods` | [InitializationMethod](#initializationmethod) | `Noop` | **Deprecated**; use `initializationMethods`. |
 | `noteForHumans` | String (multiline) | `""` | Free-form note; not sent to the AI. |
 | `maxRetry` | Int | `3` | Retries on failure. |
-| `replayWithFallback` | Boolean | `false` | Replay the actions recorded on the last successful run instead of asking the AI for each step. Image assertions still run. If a target element is gone, or an assertion fails, the whole scenario restarts in normal AI-driven mode. |
+| `replayWithFallback` | Boolean | `false` | Replay the actions recorded on the last successful run instead of asking the AI for each step. Image assertions still run and are what verifies the replay, so a scenario with no `imageAssertions` replays unverified. If a recorded target element is gone, or an assertion fails, the whole scenario restarts in normal AI-driven mode. |
 | `maxStep` | Int | `10` | Max AI steps per attempt. |
 | `tags` | Set of [Tag](#tag) | `[]` | Tags for `run --tags` (serialized as a sequence). |
 | `deviceFormFactor` | [DeviceFormFactor](#deviceformfactor) | `Unspecified` | Target form factor. |
