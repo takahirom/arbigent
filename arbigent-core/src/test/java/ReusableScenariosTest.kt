@@ -188,127 +188,147 @@ class ReusableScenariosTest {
   }
 
   /**
-   * replayWithFallback is a scenario-run level knob like maxRetry, not a per-task execution
-   * option, so a call-form scenario must be able to carry it. Most real scenarios are call-form,
-   * and the executor reads this flag from the scenario it was asked to run.
+   * Replay is a project-wide switch: it is decided once for a whole run, so there is no
+   * per-scenario key that could promise a granularity the executor does not have.
    */
   @Test
-  fun replayWithFallbackIsAllowedOnCallFormScenario() {
-    val project = load(
-      """
-      scenarios:
-      - id: "caller"
-        uses: "part"
-        replayWithFallback: true
-        imageAssertions:
-        - assertionPrompt: "The home screen is shown"
-      reusableScenarios:
-      - id: "part"
-        goal: "Do something"
-      """
-    )
-    assertEquals(true, project.scenarioContents.single { it.id == "caller" }.replayWithFallback)
-  }
-
-  /**
-   * Replay is verified by the image assertions and by nothing else, so enabling it on a scenario
-   * that has none would produce a run that cannot fail.
-   */
-  @Test
-  fun replayWithFallbackWithoutImageAssertionsFailsWhenTheScenarioIsBuilt() {
-    val project = load(
-      """
-      scenarios:
-      - id: "unverified"
-        goal: "Do something"
-        replayWithFallback: true
-      """
-    )
-    val exception = assertFailsWith<ArbigentProjectValidationException> {
-      project.tasksOf("unverified")
-    }
-    assertTrue(
-      exception.message.orEmpty().contains("replayWithFallback requires imageAssertions"),
-      "Expected the leaf to be rejected, got: ${exception.message}",
-    )
-  }
-
-  /**
-   * The project-wide default has to survive a save/load round trip, otherwise turning it on in the
-   * project settings dialog would silently be lost on the next open.
-   */
-  @Test
-  fun projectWideReplayWithFallbackSurvivesSerialization() {
+  fun replayWithFallbackAppliesToAScenarioThatCanBeVerified() {
     val project = load(
       """
       settings:
-        replayWithFallback: true
+        cacheStrategy:
+          replayWithFallback: true
       scenarios:
-      - id: "verified"
-        goal: "Do something"
-        imageAssertions:
-        - assertionPrompt: "The screen is shown"
-      """
-    )
-    assertEquals(true, project.settings.replayWithFallback)
-
-    val file = java.io.File.createTempFile("arbigent-settings-round-trip", ".yaml")
-    file.deleteOnExit()
-    ArbigentProjectSerializer().save(project, file)
-    val reloaded = ArbigentProjectSerializer().load(file.readText())
-    assertEquals(true, reloaded.settings.replayWithFallback)
-  }
-
-  /**
-   * The project-wide default applies to every scenario, so it must not reject the ones that are
-   * never run: only the scenario actually being built has to be verifiable.
-   */
-  @Test
-  fun projectWideReplayWithFallbackOnlyRejectsTheScenarioBeingRun() {
-    val project = load(
-      """
-      settings:
-        replayWithFallback: true
-      scenarios:
-      - id: "unverified"
-        goal: "Do something"
-      - id: "verified"
-        goal: "Do something else"
-        imageAssertions:
-        - assertionPrompt: "The screen is shown"
-      """
-    )
-    assertEquals(true, project.scenarioOf("verified").replayWithFallback)
-    assertFailsWith<ArbigentProjectValidationException> { project.tasksOf("unverified") }
-  }
-
-  /**
-   * Only the scenario that is actually run carries the flag, so the dependencies it drags in are
-   * not required to assert anything. Requiring assertions all the way down the chain would make
-   * the flag unusable on any realistic graph.
-   */
-  @Test
-  fun dependenciesOfAReplayedScenarioNeedNoImageAssertions() {
-    val project = load(
-      """
-      scenarios:
-      - id: "launch"
-        goal: "Launch the app"
-      - id: "setup"
-        dependency: "launch"
-        goal: "Finish the initial setup"
       - id: "watch"
-        dependency: "setup"
         goal: "Watch something"
-        replayWithFallback: true
         imageAssertions:
         - assertionPrompt: "Something is playing"
       """
     )
-    assertEquals(
-      listOf("Launch the app", "Finish the initial setup", "Watch something"),
-      project.tasksOf("watch").map { it.goal },
+    assertEquals(true, project.scenarioOf("watch").replayWithFallback)
+  }
+
+  /**
+   * A scenario with nothing to verify a replayed run against is run normally rather than rejected:
+   * a project-wide default that does not apply to a scenario is ordinary, not a mistake.
+   */
+  @Test
+  fun aScenarioWithoutImageAssertionsIsNotReplayed() {
+    val project = load(
+      """
+      settings:
+        cacheStrategy:
+          replayWithFallback: true
+      scenarios:
+      - id: "unverified"
+        goal: "Do something"
+      """
     )
+    assertEquals(false, project.scenarioOf("unverified").replayWithFallback)
+  }
+
+  /**
+   * The dependencies a replayed scenario drags in do not have to assert anything; only the
+   * scenario being run is checked.
+   */
+  @Test
+  fun dependenciesNeedNoImageAssertionsForTheLeafToReplay() {
+    val project = load(
+      """
+      settings:
+        cacheStrategy:
+          replayWithFallback: true
+      scenarios:
+      - id: "launch"
+        goal: "Launch the app"
+      - id: "watch"
+        dependency: "launch"
+        goal: "Watch something"
+        imageAssertions:
+        - assertionPrompt: "Something is playing"
+      """
+    )
+    assertEquals(true, project.scenarioOf("watch").replayWithFallback)
+    assertEquals(listOf("Launch the app", "Watch something"), project.tasksOf("watch").map { it.goal })
+  }
+
+  /**
+   * A call-form scenario carries no goal and often no assertions of its own; what verifies it lives
+   * on the leaf it calls. Judging by the scenario's own imageAssertions would refuse to replay a
+   * run that is in fact verified.
+   */
+  @Test
+  fun aCallFormScenarioIsReplayedWhenItsLeafAsserts() {
+    val project = load(
+      """
+      settings:
+        cacheStrategy:
+          replayWithFallback: true
+      scenarios:
+      - id: "open-timetable"
+        uses: "open-screen"
+        with:
+          screen: "Timetable"
+      reusableScenarios:
+      - id: "open-screen"
+        inputs:
+          screen:
+            required: true
+        goal: "Open {{inputs.screen}}"
+        imageAssertions:
+        - assertionPrompt: "The {{inputs.screen}} screen is shown"
+      """
+    )
+    assertEquals(true, project.scenarioOf("open-timetable").replayWithFallback)
+  }
+
+  /**
+   * The same call form, verified at the call site instead of on the leaf.
+   */
+  @Test
+  fun aCallFormScenarioIsReplayedWhenTheCallSiteAsserts() {
+    val project = load(
+      """
+      settings:
+        cacheStrategy:
+          replayWithFallback: true
+      scenarios:
+      - id: "open-timetable"
+        uses: "open-screen"
+        with:
+          screen: "Timetable"
+        imageAssertions:
+        - assertionPrompt: "The timetable is shown"
+      reusableScenarios:
+      - id: "open-screen"
+        inputs:
+          screen:
+            required: true
+        goal: "Open {{inputs.screen}}"
+      """
+    )
+    assertEquals(true, project.scenarioOf("open-timetable").replayWithFallback)
+  }
+
+  @Test
+  fun replayWithFallbackSurvivesSerialization() {
+    val project = load(
+      """
+      settings:
+        cacheStrategy:
+          replayWithFallback: true
+      scenarios:
+      - id: "watch"
+        goal: "Watch something"
+        imageAssertions:
+        - assertionPrompt: "Something is playing"
+      """
+    )
+    val file = java.io.File.createTempFile("arbigent-settings-round-trip", ".yaml")
+    file.deleteOnExit()
+    ArbigentProjectSerializer().save(project, file)
+    val reloaded = ArbigentProjectSerializer().load(file.readText())
+    assertEquals(true, reloaded.settings.cacheStrategy.replayWithFallback)
   }
 
   /**

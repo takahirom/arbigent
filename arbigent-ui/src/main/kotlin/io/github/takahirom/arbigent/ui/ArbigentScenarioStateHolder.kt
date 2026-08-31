@@ -33,8 +33,6 @@ constructor(
   private val _aiOptions = MutableStateFlow<ArbigentAiOptions?>(null)
   val aiOptionsFlow: StateFlow<ArbigentAiOptions?> = _aiOptions
 
-  private val _replayWithFallback = MutableStateFlow<Boolean?>(null)
-  val replayWithFallbackFlow: StateFlow<Boolean?> = _replayWithFallback
   private val _cacheOptions = MutableStateFlow<ArbigentScenarioCacheOptions?>(null)
   val cacheOptionsFlow: StateFlow<ArbigentScenarioCacheOptions?> = _cacheOptions
 
@@ -182,10 +180,6 @@ constructor(
     }
   }
 
-  fun onReplayWithFallbackChanged(enabled: Boolean) {
-    // Unchecked means "inherit the project setting", not "force off".
-    _replayWithFallback.value = if (enabled) true else null
-  }
 
   fun onAdditionalActionsChanged(actions: List<String>?) {
     _additionalActions.value = actions
@@ -245,7 +239,6 @@ constructor(
     scenarioTypeStateFlow.value = ArbigentScenarioType.Scenario
     _aiOptions.value = null
     _cacheOptions.value = null
-    _replayWithFallback.value = null
     _additionalActions.value = null
     _mcpOptions.value = null
   }
@@ -262,7 +255,6 @@ constructor(
         steps = if (steps.size == 1) emptyList() else steps,
         noteForHumans = noteForHumans.text.toString(),
         maxRetry = maxRetryState.text.toString().toIntOrNull() ?: 3,
-        replayWithFallback = _replayWithFallback.value,
         tags = tagManager.tagsForScenario(this),
         deviceFormFactor = deviceFormFactorStateFlow.value,
         inputs = reusableInputsStateFlow.value.filter { it.first.isNotBlank() }.toMap(),
@@ -277,7 +269,6 @@ constructor(
         .filter { it !is ArbigentScenarioContent.InitializationMethod.Noop },
       noteForHumans = noteForHumans.text.toString(),
       maxRetry = maxRetryState.text.toString().toIntOrNull() ?: 3,
-      replayWithFallback = _replayWithFallback.value,
       maxStep = maxStepState.text.toString().toIntOrNull() ?: 10,
       tags = tagManager.tagsForScenario(this),
       deviceFormFactor = deviceFormFactorStateFlow.value,
@@ -326,7 +317,6 @@ constructor(
     _aiOptions.value = scenarioContent.aiOptions
     val cacheOptions = scenarioContent.cacheOptions
     _cacheOptions.value = cacheOptions
-    _replayWithFallback.value = scenarioContent.replayWithFallback
     _additionalActions.value = scenarioContent.additionalActions
     _mcpOptions.value = scenarioContent.mcpOptions
   }

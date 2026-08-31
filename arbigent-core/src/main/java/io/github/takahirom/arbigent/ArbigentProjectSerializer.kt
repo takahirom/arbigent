@@ -256,8 +256,6 @@ public data class ArbigentAiOptions(
 public data class ArbigentProjectSettings(
   public val prompt: ArbigentPrompt = ArbigentPrompt(),
   public val cacheStrategy: CacheStrategy = CacheStrategy(),
-  // Project-wide default for the scenario-level flag of the same name.
-  public val replayWithFallback: Boolean = false,
   public val aiOptions: ArbigentAiOptions? = null,
   @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
   public val mcpJson: String = DefaultMcpJson,
@@ -285,7 +283,14 @@ public data class ArbigentPrompt(
 
 @Serializable
 public data class CacheStrategy(
-  public val aiDecisionCacheStrategy: AiDecisionCacheStrategy = AiDecisionCacheStrategy.Disabled
+  public val aiDecisionCacheStrategy: AiDecisionCacheStrategy = AiDecisionCacheStrategy.Disabled,
+  /**
+   * Replay the actions a scenario recorded on its last successful run instead of asking the AI at
+   * each step. Project-wide only: replay is decided once for a whole run, so a per-scenario key
+   * would promise a granularity that does not exist. A scenario with no image assertions is run
+   * normally, since they are what verifies a replayed run.
+   */
+  public val replayWithFallback: Boolean = false,
 )
 
 @Serializable
@@ -466,15 +471,23 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
     scenario.deviceFormFactor
   }
 
-  // Checked here rather than at load time because the project-wide default applies to every
-  // scenario, and only the one being run has to be verifiable. Its image assertions are the sole
-  // thing that can tell a replayed run from a wrong one, so a leaf without them must not replay.
-  val replayWithFallback = scenario.replayWithFallback ?: projectSettings.replayWithFallback
-  if (replayWithFallback && scenario.imageAssertions.isEmpty()) {
-    val error = "scenarios '${scenario.id}': replayWithFallback requires imageAssertions on the " +
-      "scenario being run; they are what verifies a replayed run, and without them it would " +
-      "pass whatever is on screen"
-    throw ArbigentProjectValidationException(arbigentValidationReport(listOf(error)), listOf(error))
+  // Replay is verified by the image assertions and by nothing else. Looking at the scenario's own
+  // imageAssertions is not enough: a call-form scenario carries none of its own, and what verifies
+  // it lives on the last leaf of the expansion — that leaf's assertions plus any declared at the
+  // call site. A project-wide default that does not apply to a scenario is ordinary, so this
+  // reports rather than rejects.
+  val verifyingAssertions = resolution.leaves.lastOrNull()
+    ?.let { leaf -> leaf.content?.imageAssertions.orEmpty() + leaf.callSiteAssertions }
+    .orEmpty()
+  val replayWithFallback = if (!projectSettings.cacheStrategy.replayWithFallback) {
+    false
+  } else if (verifyingAssertions.isEmpty()) {
+    arbigentInfoLog(
+      "Not replaying scenario '${scenario.id}': it has no imageAssertions to verify a replayed run",
+    )
+    false
+  } else {
+    true
   }
 
   return ArbigentScenario(
@@ -526,10 +539,6 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
   @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
   public val noteForHumans: String = "",
   public val maxRetry: Int = 3,
-  // Scenario-run level, like maxRetry: the executor reads it for the whole run, so it is allowed
-  // on call-form scenarios unlike the per-task execution options below. Null inherits
-  // settings.replayWithFallback.
-  public val replayWithFallback: Boolean? = null,
   public val maxStep: Int = 10,
   public val tags: ArbigentContentTags = setOf(),
   public val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Unspecified,
