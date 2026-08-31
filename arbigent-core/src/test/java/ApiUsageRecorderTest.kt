@@ -1,20 +1,22 @@
+package io.github.takahirom.arbigent.sample.test
+
 import io.github.takahirom.arbigent.ApiUsageRecord
 import io.github.takahirom.arbigent.ArbigentFiles
 import io.github.takahirom.arbigent.ConfidentialInfo
 import io.github.takahirom.arbigent.parseApiUsageRecord
 import io.github.takahirom.arbigent.writeApiUsageRecord
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
-import org.junit.Rule
-import org.junit.Test
-import org.junit.rules.TemporaryFolder
+import kotlin.io.path.createTempDirectory
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ApiUsageRecorderTest {
 
-  @get:Rule
-  public val temporaryFolder: TemporaryFolder = TemporaryFolder()
+  private fun usagesDir() = createTempDirectory("usages").toFile().also {
+    ArbigentFiles.usagesDir = it
+  }
 
   @Test
   fun parsesChatCompletionsUsage() {
@@ -71,6 +73,32 @@ class ApiUsageRecorderTest {
   }
 
   @Test
+  fun parsesAnthropicUsage() {
+    // Anthropic reports input_tokens / output_tokens like the Responses API, but has no nested
+    // details object. Its cache counters are not a subset of input_tokens, so they are left out
+    // rather than reported as cached_input_tokens, which would mean something else.
+    val record = parseApiUsageRecord(
+      requestUuid = null,
+      responseBody = """
+        {
+          "type": "message",
+          "model": "test-model",
+          "usage": {
+            "input_tokens": 700,
+            "output_tokens": 25,
+            "cache_read_input_tokens": 400
+          }
+        }
+      """.trimIndent()
+    )
+    requireNotNull(record)
+    assertEquals("test-model", record.model)
+    assertEquals(700, record.inputTokens)
+    assertEquals(25, record.outputTokens)
+    assertNull(record.cachedInputTokens)
+  }
+
+  @Test
   fun keepsUsageWithoutCachedTokenDetails() {
     val record = parseApiUsageRecord(
       requestUuid = null,
@@ -108,8 +136,7 @@ class ApiUsageRecorderTest {
 
   @Test
   fun writesOneFilePerRecord() {
-    val dir = temporaryFolder.newFolder("usages")
-    ArbigentFiles.usagesDir = dir
+    val dir = usagesDir()
 
     writeApiUsageRecord(ApiUsageRecord(requestUuid = "uuid-1", model = "test-model", inputTokens = 5))
     writeApiUsageRecord(ApiUsageRecord(requestUuid = "uuid-2", model = "test-model", inputTokens = 7))
@@ -121,8 +148,7 @@ class ApiUsageRecorderTest {
 
   @Test
   fun doesNotWriteConfidentialInfoToTheRecord() {
-    val dir = temporaryFolder.newFolder("usages")
-    ArbigentFiles.usagesDir = dir
+    val dir = usagesDir()
     val apiKey = "sk-test-should-never-be-written"
     ConfidentialInfo.addStringToBeRemoved(apiKey, "{{API_KEY}}")
 

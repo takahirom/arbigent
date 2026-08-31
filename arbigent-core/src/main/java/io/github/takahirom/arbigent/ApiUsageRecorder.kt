@@ -14,12 +14,12 @@ import java.util.UUID
 /**
  * Token usage of a single API response.
  *
- * This is recorded for every response that goes through the shared HTTP client, so it covers
+ * This is recorded for every response that goes through a provider's HTTP client, so it covers
  * calls that are not written to the jsonls directory - image assertions in particular, which are
- * delegated to Roborazzi and therefore have no [ApiCall] file of their own.
+ * delegated to Roborazzi and therefore have no API call file of their own.
  *
- * The field names are provider neutral because the two OpenAI APIs disagree: Chat Completions
- * reports `prompt_tokens` / `completion_tokens`, the Responses API reports
+ * The field names are provider neutral because the APIs disagree: Chat Completions reports
+ * `prompt_tokens` / `completion_tokens`, while the Responses API and Anthropic report
  * `input_tokens` / `output_tokens`.
  */
 @Serializable
@@ -31,6 +31,11 @@ public class ApiUsageRecord(
   @SerialName("request_uuid") public val requestUuid: String? = null,
   public val model: String? = null,
   @SerialName("input_tokens") public val inputTokens: Int? = null,
+  /**
+   * Cached part of [inputTokens], read from the OpenAI style nested `cached_tokens`. Left null for
+   * providers that count cache reads separately from input tokens instead of as a subset of them,
+   * because reporting those here would mean something different.
+   */
   @SerialName("cached_input_tokens") public val cachedInputTokens: Int? = null,
   @SerialName("output_tokens") public val outputTokens: Int? = null,
   @SerialName("total_tokens") public val totalTokens: Int? = null,
@@ -50,7 +55,8 @@ private val apiUsageJson = Json {
  * usage and are not billed, so skipping them keeps "one file per recorded call" equal to "one
  * billed call".
  */
-internal fun parseApiUsageRecord(requestUuid: String?, responseBody: String): ApiUsageRecord? {
+@ArbigentInternalApi
+public fun parseApiUsageRecord(requestUuid: String?, responseBody: String): ApiUsageRecord? {
   val root = runCatching { apiUsageJson.parseToJsonElement(responseBody).jsonObject }
     .getOrNull() ?: return null
   val usage = runCatching { root["usage"]?.jsonObject }.getOrNull() ?: return null
@@ -73,7 +79,8 @@ internal fun parseApiUsageRecord(requestUuid: String?, responseBody: String): Ap
 }
 
 /** Response bytes to inspect. Usage sits at the end of the body, so this has to fit the whole body. */
-internal const val API_USAGE_PEEK_BYTE_LIMIT: Long = 8L * 1024 * 1024
+@ArbigentInternalApi
+public const val API_USAGE_PEEK_BYTE_LIMIT: Long = 8L * 1024 * 1024
 
 /**
  * Writes one file per recorded call. Recording is observational, so every failure is dropped
@@ -83,7 +90,8 @@ internal const val API_USAGE_PEEK_BYTE_LIMIT: Long = 8L * 1024 * 1024
  * the API key. It still goes through [removeConfidentialInfo] because every other file this class
  * writes does, and a file that leaks a key is far worse than one redundant string replacement.
  */
-internal fun writeApiUsageRecord(record: ApiUsageRecord) {
+@ArbigentInternalApi
+public fun writeApiUsageRecord(record: ApiUsageRecord) {
   runCatching {
     val dir = ArbigentFiles.usagesDir
     dir.mkdirs()

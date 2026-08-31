@@ -157,12 +157,22 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
                 arbigentDebugLog(log)
               }
 
-              return chain.proceed(
+              val response = chain.proceed(
                 request
                   .newBuilder()
                   .url(request.url.newBuilder().removeAllQueryParameters("requestUuid").build())
                   .build()
               )
+              // Recording here rather than where the API call log is written means every call
+              // through this client is counted, whatever code path made it.
+              // peekBody keeps the body readable for the caller; string() would consume it.
+              runCatching {
+                parseApiUsageRecord(
+                  requestUuid = logRequest.url.queryParameter("requestUuid"),
+                  responseBody = response.peekBody(API_USAGE_PEEK_BYTE_LIMIT).string()
+                )?.let(::writeApiUsageRecord)
+              }
+              return response
             }
           }
         )
