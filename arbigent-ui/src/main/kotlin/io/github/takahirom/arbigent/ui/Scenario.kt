@@ -572,6 +572,12 @@ internal fun ScenarioOptions(
             updatedScenarioStateHolder.onOverrideCacheForceDisabledChanged(disabled)
           }
         )
+        CheckboxRow(
+          modifier = Modifier.padding(start = 16.dp),
+          text = "Optimistic trace replay",
+          checked = cacheOptions?.optimisticTraceReplay == true,
+          onCheckedChange = updatedScenarioStateHolder::onOptimisticTraceReplayChanged,
+        )
       }
     }
     if (mcpServerNames.isNotEmpty()) {

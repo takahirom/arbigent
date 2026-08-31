@@ -36,6 +36,7 @@ public class ArbigentContextHolder(
     public val screenshotFilePath: String,
     public val apiCallJsonLFilePath: String? = null,
     public val cacheHit: Boolean = false,
+    public val targetElement: ArbigentElementIdentity? = null,
   ) {
     public fun isFailed(): Boolean {
       return feedback?.contains("Failed") == true

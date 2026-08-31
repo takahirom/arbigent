@@ -189,6 +189,7 @@ Previous steps:
       goal: "Test cache enabled"
       cacheOptions:
         forceCacheDisabled: true
+        optimisticTraceReplay: true
     - id: "cache-disabled"
       goal: "Test cache disabled"
       cacheOptions:
@@ -210,6 +211,7 @@ Previous steps:
       aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
     )
     assertEquals(true, scenarioWithCacheEnabled.cacheOptions?.forceCacheDisabled, "Cache override should be disabled")
+    assertEquals(true, scenarioWithCacheEnabled.cacheOptions?.optimisticTraceReplay)
 
     // Test scenario with cache override disabled
     val scenarioWithCacheDisabled = projectWithCacheOptions.scenarioContents.createArbigentScenario(
@@ -220,6 +222,7 @@ Previous steps:
       aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
     )
     assertEquals(false, scenarioWithCacheDisabled.cacheOptions?.forceCacheDisabled, "Cache override should be enabled")
+    assertEquals(false, scenarioWithCacheDisabled.cacheOptions?.optimisticTraceReplay)
 
     // Test scenario with default cache settings
     val scenarioWithDefaultCache = projectWithCacheOptions.scenarioContents.createArbigentScenario(

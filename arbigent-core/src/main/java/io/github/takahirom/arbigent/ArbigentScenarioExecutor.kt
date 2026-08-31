@@ -69,6 +69,7 @@ public class ArbigentScenarioExecutor internal constructor(
   // application composition root. No default so the compiler rejects any path that forgets it.
   private val dispatcher: CoroutineDispatcher,
 ) {
+  private val replayTraceStore = ArbigentReplayTraceStore()
   private val _taskAssignmentsStateFlow =
     MutableStateFlow<List<ArbigentTaskAssignment>>(listOf())
   private val _taskAssignmentsHistoryStateFlow =
@@ -187,16 +188,43 @@ public class ArbigentScenarioExecutor internal constructor(
     arbigentDebugLog("Arbigent.execute start")
     _taskAssignmentsHistoryStateFlow.value = listOf()
 
+    val replayTraceKeys = scenario.replayTraceKeys()
+    val replayTraces = if (scenario.cacheOptions?.optimisticTraceReplay == true) {
+      replayTraceKeys.map(replayTraceStore::read)
+        .takeIf { traces -> traces.isNotEmpty() && traces.all { it != null } }
+        ?.map { trace -> requireNotNull(trace) }
+    } else {
+      null
+    }
+    var attemptMode = if (replayTraces != null) {
+      ArbigentAttemptMode.OptimisticReplay
+    } else {
+      ArbigentAttemptMode.Normal
+    }
+    if (attemptMode == ArbigentAttemptMode.OptimisticReplay) {
+      arbigentInfoLog("Starting optimistic replay for scenario ${scenario.id}")
+    }
+
     var finishedSuccessfully = false
     var retryRemain = scenario.maxRetry
+    var normalRetriesExhausted = false
     try {
       do {
         yield()
         _taskAssignmentsStateFlow.value.forEach {
           it.agent.cancel()
         }
-        _taskAssignmentsStateFlow.value = scenario.agentTasks.map { task ->
-          ArbigentTaskAssignment(task, ArbigentAgent(task.agentConfig, dispatcher))
+        _taskAssignmentsStateFlow.value = scenario.agentTasks.mapIndexed { index, task ->
+          ArbigentTaskAssignment(
+            task,
+            ArbigentAgent(
+              agentConfig = task.agentConfig,
+              dispatcher = dispatcher,
+              attemptMode = attemptMode,
+              replayTrace = replayTraces?.get(index)
+                .takeIf { attemptMode == ArbigentAttemptMode.OptimisticReplay },
+            ),
+          )
         }
         _taskAssignmentsHistoryStateFlow.value += listOf(taskAssignments())
         for ((index, taskAgent) in taskAssignments().withIndex()) {
@@ -237,7 +265,21 @@ public class ArbigentScenarioExecutor internal constructor(
           }
           yield()
         }
-      } while (!finishedSuccessfully && retryRemain-- > 0)
+        if (!finishedSuccessfully) {
+          if (attemptMode == ArbigentAttemptMode.OptimisticReplay) {
+            val reason = optimisticReplayFailureReason()
+            arbigentInfoLog(
+              "Optimistic replay fallback for scenario ${scenario.id}: $reason. " +
+                "Restarting all tasks and initializers in normal mode.",
+            )
+            attemptMode = ArbigentAttemptMode.Normal
+          } else if (retryRemain > 0) {
+            retryRemain--
+          } else {
+            normalRetriesExhausted = true
+          }
+        }
+      } while (!finishedSuccessfully && !normalRetriesExhausted)
     } catch (e: CancellationException) {
       arbigentDebugLog("Arbigent.execute canceled")
     } catch (e: Exception) {
@@ -250,15 +292,45 @@ public class ArbigentScenarioExecutor internal constructor(
       }
     }
     if (!isGoalAchieved()) {
+      if (normalRetriesExhausted && scenario.cacheOptions?.optimisticTraceReplay == true) {
+        replayTraceKeys.forEach(replayTraceStore::delete)
+      }
       _isFailedToArchiveFlow.value = true
       arbigentErrorLog("🔴 ${scenario.id} scenario failed")
       throw FailedToArchiveException(
         "Failed to archive scenario:" + statusText() + " retryRemain:$retryRemain"
       )
     } else {
+      if (scenario.cacheOptions?.optimisticTraceReplay == true) {
+        taskAssignments().forEachIndexed { index, assignment ->
+          val key = replayTraceKeys[index]
+          val trace = assignment.agent.latestArbigentContext()
+            ?.let { contextHolder -> ArbigentReplayTrace.fromContext(key, contextHolder) }
+          if (trace != null) {
+            replayTraceStore.write(key, trace)
+          } else {
+            replayTraceStore.delete(key)
+            arbigentInfoLog(
+              "Skipped unsafe optimistic replay trace for scenario ${scenario.id}, task ${index + 1}",
+            )
+          }
+        }
+      }
       arbigentInfoLog("🟢 ${scenario.id} scenario completed successfully")
     }
     arbigentDebugLog("Arbigent.execute end")
+  }
+
+  private fun optimisticReplayFailureReason(): String {
+    return taskAssignments().asSequence()
+      .mapNotNull { assignment -> assignment.agent.latestArbigentContext() }
+      .flatMap { contextHolder -> contextHolder.steps().asReversed().asSequence() }
+      .mapNotNull { step -> step.feedback }
+      .firstOrNull { feedback ->
+        feedback.startsWith("Optimistic replay diverged") ||
+          feedback.startsWith("Failed optimistic replay image assertion")
+      }
+      ?: "optimistic task execution failed"
   }
 
   public fun cancel() {
@@ -297,6 +369,23 @@ public class ArbigentScenarioExecutor internal constructor(
     }
   }
 }
+
+private fun ArbigentScenario.replayTraceKeys(): List<ArbigentReplayTraceKey> =
+  agentTasks.mapIndexed { index, task ->
+    ArbigentReplayTraceKey(
+      version = BuildConfig.VERSION_NAME,
+      scenarioId = id,
+      taskIndex = index,
+      taskIdentity = buildString {
+        append(task.scenarioId)
+        task.callBreadcrumb?.let { breadcrumb ->
+          append(":")
+          append(breadcrumb)
+        }
+      },
+      goal = task.agentConfig.resolveGoal(task.goal),
+    )
+  }
 
 public fun ArbigentScenarioExecutor(
   dispatcher: CoroutineDispatcher,

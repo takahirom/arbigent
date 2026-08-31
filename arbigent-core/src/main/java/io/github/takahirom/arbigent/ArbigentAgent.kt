@@ -27,13 +27,25 @@ import kotlin.io.path.Path
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 
-public class ArbigentAgent(
+public class ArbigentAgent internal constructor(
   agentConfig: AgentConfig,
   // Required (no default): the scenario executor threads its own dispatcher in, which ultimately
   // originates at the application composition root. Keeping it mandatory means the compiler rejects
   // any construction path that forgets to propagate it, so there is no silent fallback.
   dispatcher: CoroutineDispatcher,
+  private val attemptMode: ArbigentAttemptMode = ArbigentAttemptMode.Normal,
+  private val replayTrace: ArbigentReplayTrace? = null,
 ) {
+  public constructor(
+    agentConfig: AgentConfig,
+    dispatcher: CoroutineDispatcher,
+  ) : this(
+    agentConfig = agentConfig,
+    dispatcher = dispatcher,
+    attemptMode = ArbigentAttemptMode.Normal,
+    replayTrace = null,
+  )
+
   private val ai by lazy { agentConfig.aiFactory() }
   public val device: ArbigentDevice by lazy { agentConfig.deviceFactory() }
   private val interceptors: List<ArbigentInterceptor> = agentConfig.interceptors
@@ -82,8 +94,12 @@ public class ArbigentAgent(
     chain(input)
   }
 
-  private val decisionInterceptors: List<ArbigentDecisionInterceptor> = interceptors
-    .filterIsInstance<ArbigentDecisionInterceptor>()
+  private val decisionInterceptors: List<ArbigentDecisionInterceptor> = buildList {
+    if (attemptMode == ArbigentAttemptMode.OptimisticReplay && replayTrace != null) {
+      add(ArbigentTraceReplayDecisionInterceptor(replayTrace))
+    }
+    addAll(interceptors.filterIsInstance<ArbigentDecisionInterceptor>())
+  }
   private val decisionChain: suspend (ArbigentAi.DecisionInput) -> ArbigentAi.DecisionOutput = { input ->
     var chain: suspend (ArbigentAi.DecisionInput) -> ArbigentAi.DecisionOutput = { decisionInput ->
       ArbigentGlobalStatus.onAi {
@@ -218,6 +234,7 @@ public class ArbigentAgent(
       device = device,
       ai = ai,
       aiOptions = aiOptions,
+      attemptMode = attemptMode,
       createContextHolder = { g, m ->
         ArbigentContextHolder(
           g,
@@ -257,6 +274,7 @@ public class ArbigentAgent(
     val device: ArbigentDevice,
     val ai: ArbigentAi,
     val aiOptions: ArbigentAiOptions?,
+    val attemptMode: ArbigentAttemptMode = ArbigentAttemptMode.Normal,
     val cacheOptions: ArbigentScenarioCacheOptions = ArbigentScenarioCacheOptions(),
     val createContextHolder: (String, Int) -> ArbigentContextHolder,
     val addContextHolder: (ArbigentContextHolder) -> Unit,
@@ -289,6 +307,7 @@ public class ArbigentAgent(
     val prompt: ArbigentPrompt,
     val aiOptions: ArbigentAiOptions?,
     val cacheOptions: ArbigentScenarioCacheOptions = ArbigentScenarioCacheOptions(),
+    val attemptMode: ArbigentAttemptMode = ArbigentAttemptMode.Normal,
     val mcpClient: MCPClient? = null,
     val mcpOptions: ArbigentMcpOptions? = null,
   )
@@ -345,6 +364,12 @@ public class AgentConfig(
   internal val aiOptions: ArbigentAiOptions?,
   internal val appSettings: ArbigentAppSettings?,
 ) {
+  internal fun resolveGoal(goal: String): String {
+    return appSettings?.variables?.let { variables ->
+      GoalVariableResolver.resolve(goal, variables)
+    } ?: goal
+  }
+
   public class Builder {
     private val interceptors = mutableListOf<ArbigentInterceptor>()
     private var deviceFactory: (() -> ArbigentDevice)? = null
@@ -549,6 +574,60 @@ public sealed interface ArbigentAiDecisionCache {
   public object Disabled : ArbigentAiDecisionCache
 }
 
+internal class ArbigentDecisionCacheInterceptor(
+  private val aiDecisionCache: ArbigentAiDecisionCache.Enabled,
+  private val cacheOptions: ArbigentScenarioCacheOptions,
+) : ArbigentDecisionInterceptor, ArbigentExecutionInterceptor {
+  override suspend fun intercept(
+    decisionInput: ArbigentAi.DecisionInput,
+    chain: ArbigentDecisionInterceptor.Chain,
+  ): ArbigentAi.DecisionOutput {
+    if (!cacheOptions.forceCacheDisabled) {
+      val cached = aiDecisionCache.get(decisionInput.cacheKey)
+      if (cached != null) {
+        arbigentInfoLog("AI-decision cache hit with view tree and prompt")
+        return cached.copy(
+          step = cached.step.copy(
+            timestamp = TimeProvider.get().currentTimeMillis(),
+            screenshotFilePath = decisionInput.screenshotFilePath,
+          )
+        )
+      }
+      arbigentDebugLog("AI-decision cache miss with view tree and prompt")
+      val output = chain.proceed(decisionInput)
+      aiDecisionCache.set(
+        decisionInput.cacheKey,
+        output.copy(
+          step = output.step.copy(cacheHit = true)
+        ),
+      )
+      return output
+    }
+    return chain.proceed(decisionInput)
+  }
+
+  override suspend fun intercept(
+    executeInput: ExecuteInput,
+    chain: ArbigentExecutionInterceptor.Chain,
+  ): ExecutionResult {
+    val output = chain.proceed(executeInput)
+    if (executeInput.attemptMode == ArbigentAttemptMode.Normal) {
+      when (output) {
+        is ExecutionResult.Failed -> purge(output.contextHolder)
+        is ExecutionResult.Cancelled -> purge(output.contextHolder)
+        ExecutionResult.Success -> Unit
+      }
+    }
+    return output
+  }
+
+  private suspend fun purge(contextHolder: ArbigentContextHolder?) {
+    contextHolder?.steps()?.forEach { step ->
+      aiDecisionCache.remove(step.cacheKey)
+    }
+  }
+}
+
 public fun AgentConfigBuilder(
   prompt: ArbigentPrompt,
   scenarioType: ArbigentScenarioType,
@@ -711,65 +790,7 @@ public fun AgentConfigBuilder(
   }
   // Add cache control interceptor
   if (aiDecisionCache is ArbigentAiDecisionCache.Enabled) {
-    addInterceptor(object : ArbigentDecisionInterceptor, ArbigentExecutionInterceptor {
-      override suspend fun intercept(
-        decisionInput: ArbigentAi.DecisionInput,
-        chain: ArbigentDecisionInterceptor.Chain
-      ): ArbigentAi.DecisionOutput {
-        // Only use cache if enabled in scenario options
-        if (!cacheOptions.forceCacheDisabled) {
-          val cached = aiDecisionCache.get(decisionInput.cacheKey)
-          if (cached != null) {
-            arbigentInfoLog("AI-decision cache hit with view tree and prompt")
-            return cached.copy(
-              step = cached.step.copy(
-                timestamp = TimeProvider.get().currentTimeMillis(),
-                screenshotFilePath = decisionInput.screenshotFilePath
-              )
-            )
-          }
-          arbigentDebugLog("AI-decision cache miss with view tree and prompt")
-          val output = chain.proceed(decisionInput)
-          aiDecisionCache.set(
-            decisionInput.cacheKey, output.copy(
-              step = output.step.copy(
-                cacheHit = true,
-              )
-            )
-          )
-          return output
-        }
-        return chain.proceed(decisionInput)
-      }
-
-      override suspend fun intercept(
-        executeInput: ExecuteInput,
-        chain: ArbigentExecutionInterceptor.Chain
-      ): ExecutionResult {
-        val output: ExecutionResult = chain.proceed(executeInput)
-        when (output) {
-          is ExecutionResult.Failed -> {
-            output.contextHolder?.let { contextHolder ->
-              contextHolder.steps().forEach { step ->
-                aiDecisionCache.remove(step.cacheKey)
-              }
-            }
-          }
-
-          is ExecutionResult.Cancelled -> {
-            output.contextHolder?.let { contextHolder ->
-              contextHolder.steps().forEach { step ->
-                aiDecisionCache.remove(step.cacheKey)
-              }
-            }
-          }
-
-          ExecutionResult.Success -> {
-          }
-        }
-        return output
-      }
-    })
+    addInterceptor(ArbigentDecisionCacheInterceptor(aiDecisionCache, cacheOptions))
   }
   if (imageAssertions.assertions.isNotEmpty()) {
     addInterceptor(object : ArbigentImageAssertionInterceptor {
@@ -1094,6 +1115,7 @@ private suspend fun executeDefault(input: ExecuteInput): ExecutionResult {
         prompt = input.prompt,
         aiOptions = input.aiOptions,
         cacheOptions = input.cacheOptions,
+        attemptMode = input.attemptMode,
         mcpClient = input.mcpClient,
         mcpOptions = input.mcpOptions
       )
@@ -1261,7 +1283,27 @@ private suspend fun step(
     aiOptions = stepInput.aiOptions,
     mcpTools = tools
   )
-  val decisionOutput = decisionChain(decisionInput)
+  val decisionOutput = try {
+    val output = decisionChain(decisionInput)
+    val action = output.step.agentAction ?: output.agentActions.singleOrNull()
+    output.copy(
+      step = output.step.copy(
+        targetElement = action?.withTargetIdentity(elements),
+      ),
+    )
+  } catch (exception: OptimisticReplayDivergenceException) {
+    val reason = "Optimistic replay diverged: ${exception.message}"
+    arbigentInfoLog(reason)
+    contextHolder.addStep(
+      ArbigentContextHolder.Step(
+        stepId = stepId,
+        feedback = reason,
+        cacheKey = cacheKey,
+        screenshotFilePath = screenshotFilePath,
+      )
+    )
+    return StepResult.Failed
+  }
   if (decisionOutput.agentActions.any { it is GoalAchievedAgentAction }) {
     val imageAssertionOutput = imageAssertionChain(
       ArbigentAi.ImageAssertionInput(
@@ -1291,16 +1333,27 @@ private suspend fun step(
       contextHolder.addStep(decisionOutput.step)
     } else {
       imageAssertionOutput.results.filter { it.isPassed.not() }.forEach {
+        val failureReason = "Failed optimistic replay image assertion '${it.assertionPrompt}': ${it.explanation}"
+        if (stepInput.attemptMode == ArbigentAttemptMode.OptimisticReplay) {
+          arbigentInfoLog(failureReason)
+        }
         contextHolder.addStep(
           ArbigentContextHolder.Step(
             stepId = stepId,
-            feedback = "Failed to reach the goal by image assertion. Image assertion prompt:${it.assertionPrompt}. explanation:${it.explanation}",
+            feedback = if (stepInput.attemptMode == ArbigentAttemptMode.OptimisticReplay) {
+              failureReason
+            } else {
+              "Failed to reach the goal by image assertion. Image assertion prompt:${it.assertionPrompt}. explanation:${it.explanation}"
+            },
             screenshotFilePath = screenshotFilePath,
             aiRequest = decisionOutput.step.aiRequest,
             cacheKey = cacheKey,
             aiResponse = decisionOutput.step.aiResponse
           )
         )
+      }
+      if (stepInput.attemptMode == ArbigentAttemptMode.OptimisticReplay) {
+        return StepResult.Failed
       }
     }
   } else {

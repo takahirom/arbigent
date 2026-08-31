@@ -173,7 +173,16 @@ constructor(
   }
 
   fun onOverrideCacheForceDisabledChanged(disabled: Boolean?) {
-    _cacheOptions.value = if (disabled == null) null else ArbigentScenarioCacheOptions(disabled)
+    _cacheOptions.value = if (disabled == null) {
+      null
+    } else {
+      (_cacheOptions.value ?: ArbigentScenarioCacheOptions()).copy(forceCacheDisabled = disabled)
+    }
+  }
+
+  fun onOptimisticTraceReplayChanged(enabled: Boolean) {
+    _cacheOptions.value = (_cacheOptions.value ?: ArbigentScenarioCacheOptions())
+      .copy(optimisticTraceReplay = enabled)
   }
 
   fun onAdditionalActionsChanged(actions: List<String>?) {
