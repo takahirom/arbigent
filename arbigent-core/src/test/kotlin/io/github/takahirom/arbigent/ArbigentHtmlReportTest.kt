@@ -1,5 +1,7 @@
 package io.github.takahirom.arbigent
 
+import io.github.takahirom.arbigent.result.ArbigentStepSource
+
 import io.github.takahirom.arbigent.result.ArbigentAgentResult
 import io.github.takahirom.arbigent.result.ArbigentAgentResults
 import io.github.takahirom.arbigent.result.ArbigentAgentTaskStepResult
@@ -139,7 +141,7 @@ class ArbigentHtmlReportRobot(private val tempFolder: TemporaryFolder) {
         val jsonlFile = tempFolder.newFile("test.jsonl")
         jsonlFile.writeText("""{"request": "test request", "response": "test response"}""")
         
-        val step = createTestStep().copy(apiCallJsonPath = jsonlFile.absolutePath, cacheHit = false)
+        val step = createTestStep().copy(apiCallJsonPath = jsonlFile.absolutePath, stepSource = ArbigentStepSource.Ai)
         result = createTestProjectExecutionResult(step)
         outputDir = tempFolder.newFolder("output-jsonl")
         ArbigentHtmlReport().saveReportHtml(outputDir.absolutePath, result)
@@ -151,7 +153,7 @@ class ArbigentHtmlReportRobot(private val tempFolder: TemporaryFolder) {
         val jsonlFile = tempFolder.newFile("cache.jsonl")
         jsonlFile.writeText("""{"request": "cache request", "response": "cache response"}""")
         
-        val step = createTestStep().copy(apiCallJsonPath = jsonlFile.absolutePath, cacheHit = true)
+        val step = createTestStep().copy(apiCallJsonPath = jsonlFile.absolutePath, stepSource = ArbigentStepSource.Cache)
         result = createTestProjectExecutionResult(step)
         outputDir = tempFolder.newFolder("output-cache")
         ArbigentHtmlReport().saveReportHtml(outputDir.absolutePath, result)
@@ -162,8 +164,8 @@ class ArbigentHtmlReportRobot(private val tempFolder: TemporaryFolder) {
         val reportContent = File(outputDir, "report.html").readText()
         assertTrue(
             reportContent.contains("apiCallJsonPath: \"jsonls/test.jsonl\"") && 
-            reportContent.contains("cacheHit: false"),
-            "Report should contain JSONL path in YAML and cacheHit false"
+            reportContent.contains("stepSource: \"Ai\""),
+            "Report should contain JSONL path in YAML and stepSource Ai"
         )
         // Also verify the JSONL file was copied to the output directory
         assertTrue(
@@ -177,8 +179,8 @@ class ArbigentHtmlReportRobot(private val tempFolder: TemporaryFolder) {
         val reportContent = File(outputDir, "report.html").readText()
         assertTrue(
             reportContent.contains("apiCallJsonPath: \"jsonls/cache.jsonl\"") && 
-            reportContent.contains("cacheHit: true"),
-            "Report should contain JSONL path in YAML and cacheHit true"
+            reportContent.contains("stepSource: \"Cache\""),
+            "Report should contain JSONL path in YAML and stepSource Cache"
         )
         // Also verify the JSONL file was copied to the output directory
         assertTrue(
@@ -196,7 +198,7 @@ class ArbigentHtmlReportRobot(private val tempFolder: TemporaryFolder) {
         apiCallJsonPath = null,
         agentAction = null,
         timestamp = System.currentTimeMillis(),
-        cacheHit = false
+        stepSource = ArbigentStepSource.Ai
     )
 
     private fun createTestProjectExecutionResult(step: ArbigentAgentTaskStepResult) = ArbigentProjectExecutionResult(

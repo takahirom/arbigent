@@ -98,8 +98,21 @@ public data class ArbigentAgentTaskStepResult(
   // UiTree is too big to store in the yaml file.
 //  public val uiTreeStrings: ArbigentUiTreeStrings?,
   public val timestamp: Long,
-  public val cacheHit: Boolean
+  // No default, like the cacheHit it replaces: the report must always state which rung ran.
+  public val stepSource: ArbigentStepSource
 )
+
+/**
+ * Which rung of the ladder produced this step: the AI itself, the AI-decision cache keyed on the
+ * UI tree, or a replay of the actions recorded on the last successful run. They differ in how much
+ * was actually verified this run, so the report keeps them apart.
+ */
+@Serializable
+public enum class ArbigentStepSource {
+  Ai,
+  Cache,
+  Replay,
+}
 
 @Serializable
 public data class ArbigentUiTreeStrings(

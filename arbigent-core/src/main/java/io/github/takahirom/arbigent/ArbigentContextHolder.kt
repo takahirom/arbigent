@@ -1,5 +1,7 @@
 package io.github.takahirom.arbigent
 
+import io.github.takahirom.arbigent.result.ArbigentStepSource
+
 import io.github.takahirom.arbigent.result.ArbigentAgentTaskStepResult
 import io.github.takahirom.arbigent.result.ArbigentUiTreeStrings
 import kotlinx.coroutines.flow.Flow
@@ -35,7 +37,7 @@ public class ArbigentContextHolder(
     public val timestamp: Long = TimeProvider.get().currentTimeMillis(),
     public val screenshotFilePath: String,
     public val apiCallJsonLFilePath: String? = null,
-    public val cacheHit: Boolean = false,
+    public val stepSource: ArbigentStepSource = ArbigentStepSource.Ai,
     public val targetElement: ArbigentElementIdentity? = null,
   ) {
     public fun isFailed(): Boolean {
@@ -62,7 +64,7 @@ public class ArbigentContextHolder(
         apiCallJsonPath = apiCallJsonLFilePath,
         agentAction = agentAction?.stepLogText(),
 //        uiTreeStrings = uiTreeStrings,
-        cacheHit = cacheHit
+        stepSource = stepSource
       )
     }
   }

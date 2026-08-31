@@ -1,5 +1,6 @@
 package io.github.takahirom.arbigent.ui
 
+import io.github.takahirom.arbigent.result.ArbigentStepSource
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -1218,9 +1219,9 @@ private fun ContentPanel(
                 Text(
                   text = "Step ${stepIndex + 1} (${formatTimestamp(step.timestamp)})",
                 )
-                if (step.cacheHit) {
+                if (step.stepSource != ArbigentStepSource.Ai) {
                   Text(
-                    "Cache hit",
+                    if (step.stepSource == ArbigentStepSource.Replay) "Replayed" else "Cache hit",
                     modifier = Modifier.padding(4.dp)
                       .background(JewelTheme.colorPalette.purple(8))
                   )

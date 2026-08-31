@@ -1,5 +1,7 @@
 package io.github.takahirom.arbigent
 
+import io.github.takahirom.arbigent.result.ArbigentStepSource
+
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -60,7 +62,7 @@ internal class ArbigentReplayDecisionInterceptor(
         timestamp = TimeProvider.get().currentTimeMillis(),
         screenshotFilePath = decisionInput.screenshotFilePath,
         apiCallJsonLFilePath = decisionInput.apiCallJsonLFilePath,
-        cacheHit = true,
+        stepSource = ArbigentStepSource.Replay,
       ),
     )
   }

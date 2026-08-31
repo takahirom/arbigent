@@ -1,5 +1,7 @@
 package io.github.takahirom.arbigent
 
+import io.github.takahirom.arbigent.result.ArbigentStepSource
+
 import com.mayakapps.kache.JavaFileKache
 import com.mayakapps.kache.KacheStrategy
 import io.github.takahirom.arbigent.ArbigentAgent.*
@@ -596,7 +598,7 @@ internal class ArbigentDecisionCacheInterceptor(
       aiDecisionCache.set(
         decisionInput.cacheKey,
         output.copy(
-          step = output.step.copy(cacheHit = true)
+          step = output.step.copy(stepSource = ArbigentStepSource.Cache)
         ),
       )
       return output
