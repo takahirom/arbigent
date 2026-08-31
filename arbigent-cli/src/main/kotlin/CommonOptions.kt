@@ -80,6 +80,7 @@ fun setupArbigentFiles(workingDirectory: String?, logFile: String): ArbigentResu
   ArbigentFiles.parentDir = resultDir.absolutePath
   ArbigentFiles.screenshotsDir = File(resultDir, "screenshots")
   ArbigentFiles.jsonlsDir = File(resultDir, "jsonls")
+  ArbigentFiles.usagesDir = File(resultDir, "usages")
   ArbigentFiles.logFile = resolveFile(workingDirectory, logFile)
   ArbigentFiles.cacheDir = resolveFile(workingDirectory, defaultCachePath + File.separator + BuildConfig.VERSION_NAME)
   ArbigentFiles.cacheDir.mkdirs()
