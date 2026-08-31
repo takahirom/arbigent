@@ -9,8 +9,10 @@ import java.io.File
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ArbigentReplayTraceTest {
   @Test
@@ -181,6 +183,66 @@ class ArbigentReplayTraceTest {
       "A failed normal attempt must purge the layout cache as before",
     )
   }
+
+  /**
+   * The actions that carry a recorded index read the element list directly, so an index that no
+   * longer exists would surface as an IndexOutOfBoundsException from inside the action, after the
+   * screen had already been touched. Replay must see it as divergence first.
+   */
+  @Test
+  fun `an index beyond the current screen is divergence, not an exception from the action`() = runTest {
+    val action = ClickWithIndex(16)
+    val trace = ArbigentReplayTrace(
+      version = "1.2.3",
+      scenarioId = "scenario",
+      taskIndex = 0,
+      taskIdentity = "scenario",
+      goalHash = "hash",
+      steps = listOf(
+        ArbigentReplayTraceStep(
+          decisionOutput = ArbigentAi.DecisionOutput(
+            agentActions = listOf(action),
+            step = ArbigentContextHolder.Step(
+              stepId = "step-1",
+              agentAction = action,
+              cacheKey = "cache-key",
+              screenshotFilePath = "screenshot.png",
+            ),
+          ),
+        ),
+      ),
+    )
+    val interceptor = ArbigentReplayDecisionInterceptor(trace)
+    val onlyOneElement = ArbigentElementList(
+      listOf(element(text = "Only", resourceId = "only", accessibilityId = "Only")),
+      screenWidth = 100,
+    )
+
+    val exception = assertFailsWith<ReplayDivergenceException> {
+      interceptor.intercept(decisionInput(onlyOneElement)) { error("Should not reach the AI") }
+    }
+    assertTrue(
+      exception.message.contains("targets element 16"),
+      "Expected the reason to name the missing index, got: ${exception.message}",
+    )
+  }
+
+  private fun decisionInput(elements: ArbigentElementList): ArbigentAi.DecisionInput =
+    ArbigentAi.DecisionInput(
+      stepId = "step",
+      contextHolder = ArbigentContextHolder("goal", 1),
+      formFactor = ArbigentScenarioDeviceFormFactor.Mobile,
+      uiTreeStrings = io.github.takahirom.arbigent.result.ArbigentUiTreeStrings("", ""),
+      focusedTreeString = null,
+      agentActionTypes = defaultAgentActionTypesForVisualMode(),
+      screenshotFilePath = "screenshot.png",
+      requestUuid = "uuid",
+      apiCallJsonLFilePath = "call.jsonl",
+      elements = elements,
+      prompt = ArbigentPrompt(),
+      cacheKey = "cache-key",
+      aiOptions = null,
+    )
 
   private fun executeInput(attemptMode: ArbigentAttemptMode): ArbigentAgent.ExecuteInput {
     val device = FakeDevice()
