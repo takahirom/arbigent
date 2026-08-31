@@ -8,8 +8,10 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.util.UUID
+import java.util.zip.GZIPInputStream
 
 /**
  * Token usage of a single API response.
@@ -75,7 +77,32 @@ public fun parseApiUsageRecord(requestUuid: String?, responseBody: String): ApiU
     cachedInputTokens = cachedInt(),
     outputTokens = int("completion_tokens") ?: int("output_tokens"),
     totalTokens = int("total_tokens"),
-  )
+    // A usage object with no field this code knows about carries no number worth recording, and a
+    // file of nulls would be counted as a call by a consumer.
+  ).takeIf { it.inputTokens != null || it.outputTokens != null || it.totalTokens != null }
+}
+
+/**
+ * Same as [parseApiUsageRecord], but takes the raw response bytes and the `Content-Encoding` header.
+ *
+ * An OkHttp network interceptor sits below the bridge that performs transparent gzip, so the bytes
+ * it sees are still compressed whenever the server compressed them. Parsing those directly finds no
+ * usage and silently records nothing, so decode first.
+ */
+@ArbigentInternalApi
+public fun parseApiUsageRecord(
+  requestUuid: String?,
+  responseBytes: ByteArray,
+  contentEncoding: String?,
+): ApiUsageRecord? {
+  val decoded = if (contentEncoding?.contains("gzip", ignoreCase = true) == true) {
+    runCatching {
+      GZIPInputStream(ByteArrayInputStream(responseBytes)).use { it.readBytes() }
+    }.getOrNull() ?: return null
+  } else {
+    responseBytes
+  }
+  return parseApiUsageRecord(requestUuid, decoded.toString(Charsets.UTF_8))
 }
 
 /** Response bytes to inspect. Usage sits at the end of the body, so this has to fit the whole body. */

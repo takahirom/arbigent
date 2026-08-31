@@ -5,6 +5,8 @@ import io.github.takahirom.arbigent.ArbigentFiles
 import io.github.takahirom.arbigent.ConfidentialInfo
 import io.github.takahirom.arbigent.parseApiUsageRecord
 import io.github.takahirom.arbigent.writeApiUsageRecord
+import java.io.ByteArrayOutputStream
+import java.util.zip.GZIPOutputStream
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -132,6 +134,62 @@ class ApiUsageRecorderTest {
   @Test
   fun returnsNullWhenUsageIsNotAnObject() {
     assertNull(parseApiUsageRecord(requestUuid = null, responseBody = """{"usage":"unexpected"}"""))
+  }
+
+  @Test
+  fun returnsNullWhenUsageHasNoKnownTokenField() {
+    // An empty usage object would otherwise produce a file of nulls, which a consumer counts as a
+    // call that cost nothing.
+    assertNull(parseApiUsageRecord(requestUuid = null, responseBody = """{"usage":{}}"""))
+    assertNull(
+      parseApiUsageRecord(requestUuid = null, responseBody = """{"usage":{"something_else":1}}""")
+    )
+  }
+
+  @Test
+  fun decodesGzippedResponseBytes() {
+    // A network interceptor runs below OkHttp's transparent decompression, so the bytes it hands
+    // over are still gzipped whenever the server compressed the response.
+    val body = """{"model":"test-model","usage":{"prompt_tokens":11,"completion_tokens":3}}"""
+    val record = parseApiUsageRecord(
+      requestUuid = "uuid-1",
+      responseBytes = gzip(body),
+      contentEncoding = "gzip"
+    )
+    requireNotNull(record)
+    assertEquals(11, record.inputTokens)
+    assertEquals(3, record.outputTokens)
+  }
+
+  @Test
+  fun readsPlainResponseBytes() {
+    val body = """{"model":"test-model","usage":{"prompt_tokens":11,"completion_tokens":3}}"""
+    listOf(null, "identity").forEach { encoding ->
+      val record = parseApiUsageRecord(
+        requestUuid = null,
+        responseBytes = body.toByteArray(),
+        contentEncoding = encoding
+      )
+      requireNotNull(record)
+      assertEquals(11, record.inputTokens)
+    }
+  }
+
+  @Test
+  fun returnsNullWhenGzipIsClaimedButTheBytesAreNot() {
+    assertNull(
+      parseApiUsageRecord(
+        requestUuid = null,
+        responseBytes = "not gzip".toByteArray(),
+        contentEncoding = "gzip"
+      )
+    )
+  }
+
+  private fun gzip(text: String): ByteArray {
+    val out = ByteArrayOutputStream()
+    GZIPOutputStream(out).use { it.write(text.toByteArray()) }
+    return out.toByteArray()
   }
 
   @Test
