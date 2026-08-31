@@ -166,10 +166,13 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
               // Recording here rather than where the API call log is written means every call
               // through this client is counted, whatever code path made it.
               // peekBody keeps the body readable for the caller; string() would consume it.
+              // The bytes are still gzipped here when the server compressed them, because a network
+              // interceptor runs below OkHttp's transparent decompression - hence Content-Encoding.
               runCatching {
                 parseApiUsageRecord(
                   requestUuid = logRequest.url.queryParameter("requestUuid"),
-                  responseBody = response.peekBody(API_USAGE_PEEK_BYTE_LIMIT).string()
+                  responseBytes = response.peekBody(API_USAGE_PEEK_BYTE_LIMIT).bytes(),
+                  contentEncoding = response.header("Content-Encoding")
                 )?.let(::writeApiUsageRecord)
               }
               return response
