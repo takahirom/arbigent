@@ -189,12 +189,31 @@ class ReusableScenariosTest {
       - id: "caller"
         uses: "part"
         replayWithFallback: true
+        imageAssertions:
+        - assertionPrompt: "The home screen is shown"
       reusableScenarios:
       - id: "part"
         goal: "Do something"
       """
     )
     assertEquals(true, project.scenarioContents.single { it.id == "caller" }.replayWithFallback)
+  }
+
+  /**
+   * Replay is verified by the image assertions and by nothing else, so enabling it on a scenario
+   * that has none would produce a run that cannot fail.
+   */
+  @Test
+  fun replayWithFallbackWithoutImageAssertionsFailsAtLoad() {
+    assertValidationError(
+      "replayWithFallback requires imageAssertions",
+      """
+      scenarios:
+      - id: "unverified"
+        goal: "Do something"
+        replayWithFallback: true
+      """
+    )
   }
 
   /**

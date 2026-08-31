@@ -188,6 +188,8 @@ Previous steps:
     - id: "cache-enabled"
       goal: "Test cache enabled"
       replayWithFallback: true
+      imageAssertions:
+      - assertionPrompt: "The expected screen is shown"
       cacheOptions:
         forceCacheDisabled: true
     - id: "cache-disabled"

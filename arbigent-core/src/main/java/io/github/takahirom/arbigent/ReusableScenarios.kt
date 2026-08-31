@@ -70,6 +70,14 @@ private fun ArbigentProjectFileContent.reusableScenarioErrors(): List<String> {
     val where = (if (isReusable) "reusableScenarios" else "scenarios") + " '" + content.id + "'"
     val isCall = content.isCallForm()
 
+    // Replay makes no AI decision, so the image assertions are the only thing left that can tell a
+    // replayed run apart from a correct one. Without them the scenario cannot fail, which is worse
+    // than not replaying at all.
+    if (content.replayWithFallback && content.imageAssertions.isEmpty()) {
+      errors += "$where: replayWithFallback requires imageAssertions; they are what verifies a " +
+        "replayed run, and without them the scenario would pass whatever is on screen"
+    }
+
     if (isCall) {
       if (content.goal.isNotEmpty()) {
         errors += "$where: a call-form scenario (uses/steps) must not have a goal"
