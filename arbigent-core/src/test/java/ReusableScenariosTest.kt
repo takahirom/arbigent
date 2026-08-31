@@ -217,6 +217,35 @@ class ReusableScenariosTest {
   }
 
   /**
+   * Only the scenario that is actually run carries the flag, so the dependencies it drags in are
+   * not required to assert anything. Requiring assertions all the way down the chain would make
+   * the flag unusable on any realistic graph.
+   */
+  @Test
+  fun dependenciesOfAReplayedScenarioNeedNoImageAssertions() {
+    val project = load(
+      """
+      scenarios:
+      - id: "launch"
+        goal: "Launch the app"
+      - id: "setup"
+        dependency: "launch"
+        goal: "Finish the initial setup"
+      - id: "watch"
+        dependency: "setup"
+        goal: "Watch something"
+        replayWithFallback: true
+        imageAssertions:
+        - assertionPrompt: "Something is playing"
+      """
+    )
+    assertEquals(
+      listOf("Launch the app", "Finish the initial setup", "Watch something"),
+      project.tasksOf("watch").map { it.goal },
+    )
+  }
+
+  /**
    * The counterpart of the test above: this is why replayWithFallback cannot live inside
    * cacheOptions. Per-task execution options are rejected on a call-form scenario, which would
    * leave the flag with nowhere to go for most real scenarios.
