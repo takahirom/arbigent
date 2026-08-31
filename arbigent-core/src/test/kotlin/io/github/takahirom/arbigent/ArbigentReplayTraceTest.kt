@@ -80,6 +80,81 @@ class ArbigentReplayTraceTest {
     assertEquals("Open the model", restored.steps.first().decisionOutput.step.memo)
   }
 
+  /**
+   * A task identity is the resolved goal and hints of the task, so it is long free text, and in
+   * Japanese it encodes to several bytes per character. Spelling it out in the file name produced
+   * names past the 255 byte limit a file name component has, and every write failed, which left
+   * replay permanently unable to find a trace.
+   */
+  @Test
+  fun `a trace for a long non-ascii task identity can be stored and read back`() {
+    val directory = Files.createTempDirectory("arbigent-replay-trace-long-name").toFile()
+    val store = ArbigentReplayTraceStore { directory }
+    val key = ArbigentReplayTraceKey(
+      version = "1.2.3",
+      // Synthetic multi-byte text: what matters here is only the encoded byte length.
+      scenarioId = "\u3042".repeat(30),
+      taskIndex = 3,
+      taskIdentity = "\u3042".repeat(400),
+      goal = "\u3042".repeat(30),
+    )
+
+    store.write(key, minimalTrace(key))
+
+    assertNotNull(store.read(key), "the trace could not be read back")
+    val fileName = directory.listFiles().orEmpty().single().name
+    assertTrue(
+      fileName.toByteArray().size <= 255,
+      "file name is ${fileName.toByteArray().size} bytes, which no common filesystem accepts",
+    )
+  }
+
+  @Test
+  fun `traces that differ only in task index do not share a file`() {
+    val directory = Files.createTempDirectory("arbigent-replay-trace-distinct").toFile()
+    val store = ArbigentReplayTraceStore { directory }
+    val first = ArbigentReplayTraceKey(
+      version = "1.2.3",
+      scenarioId = "scenario",
+      taskIndex = 0,
+      taskIdentity = "identity",
+      goal = "Goal",
+    )
+    val second = first.copy(taskIndex = 1)
+
+    store.write(first, minimalTrace(first))
+    store.write(second, minimalTrace(second))
+
+    assertEquals(2, directory.listFiles().orEmpty().size)
+    assertEquals(0, assertNotNull(store.read(first)).taskIndex)
+    assertEquals(1, assertNotNull(store.read(second)).taskIndex)
+  }
+
+  /** The smallest trace [ArbigentReplayTrace.isValidFor] accepts: one step that reaches the goal. */
+  private fun minimalTrace(key: ArbigentReplayTraceKey): ArbigentReplayTrace {
+    val action = GoalAchievedAgentAction()
+    return ArbigentReplayTrace(
+      version = key.version,
+      scenarioId = key.scenarioId,
+      taskIndex = key.taskIndex,
+      taskIdentity = key.taskIdentity,
+      goalHash = key.goalHash,
+      steps = listOf(
+        ArbigentReplayTraceStep(
+          decisionOutput = ArbigentAi.DecisionOutput(
+            agentActions = listOf(action),
+            step = ArbigentContextHolder.Step(
+              stepId = "step-1",
+              agentAction = action,
+              cacheKey = "cache-key",
+              screenshotFilePath = "screenshot.png",
+            ),
+          ),
+        ),
+      ),
+    )
+  }
+
   @Test
   fun `a trace store failure does not fail the run that just passed`() {
     val notADirectory = Files.createTempFile("arbigent-replay-trace-blocked", ".txt").toFile()
