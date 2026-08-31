@@ -249,12 +249,14 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
           }
 
           GroupHeader("Replay with fallback")
-          val replayWithFallback by appStateHolder.replayWithFallbackFlow.collectAsState()
           CheckboxRow(
             modifier = Modifier.padding(start = 16.dp),
-            text = "Replay recorded actions first (scenarios can override)",
-            checked = replayWithFallback,
-            onCheckedChange = { appStateHolder.replayWithFallbackFlow.value = it },
+            text = "Replay recorded actions first (scenarios with no image assertions run normally)",
+            checked = cacheStrategy.replayWithFallback,
+            onCheckedChange = { enabled ->
+              appStateHolder.cacheStrategyFlow.value =
+                appStateHolder.cacheStrategyFlow.value.copy(replayWithFallback = enabled)
+            },
           )
 
           GroupHeader("MCP JSON Configuration")
