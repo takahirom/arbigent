@@ -1,5 +1,6 @@
 package io.github.takahirom.arbigent.sample.test
 
+import io.github.takahirom.arbigent.API_USAGE_DECODED_BYTE_LIMIT
 import io.github.takahirom.arbigent.ApiUsageRecord
 import io.github.takahirom.arbigent.ArbigentFiles
 import io.github.takahirom.arbigent.ConfidentialInfo
@@ -184,6 +185,27 @@ class ApiUsageRecorderTest {
         contentEncoding = "gzip"
       )
     )
+  }
+
+  @Test
+  fun returnsNullWhenTheDecompressedBodyIsTooLarge() {
+    // A small gzip payload can expand enormously. Decoding without a cap would let one response
+    // decide how much memory this observational code takes, so an oversized body is dropped.
+    val huge = gzip("x".repeat(API_USAGE_DECODED_BYTE_LIMIT + 1))
+    assertTrue(huge.size < API_USAGE_DECODED_BYTE_LIMIT)
+    assertNull(parseApiUsageRecord(requestUuid = null, responseBytes = huge, contentEncoding = "gzip"))
+  }
+
+  @Test
+  fun decodesABodyRightUnderTheLimit() {
+    // Padding inside the JSON keeps it valid while making the decompressed size large.
+    val padding = "y".repeat(API_USAGE_DECODED_BYTE_LIMIT - 200)
+    val body = """{"model":"$padding","usage":{"prompt_tokens":5,"completion_tokens":1}}"""
+    assertTrue(body.length < API_USAGE_DECODED_BYTE_LIMIT)
+    val record =
+      parseApiUsageRecord(requestUuid = null, responseBytes = gzip(body), contentEncoding = "gzip")
+    requireNotNull(record)
+    assertEquals(5, record.inputTokens)
   }
 
   private fun gzip(text: String): ByteArray {

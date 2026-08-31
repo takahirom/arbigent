@@ -9,6 +9,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.UUID
 import java.util.zip.GZIPInputStream
@@ -98,9 +99,7 @@ public fun parseApiUsageRecord(
   contentEncoding: String?,
 ): ApiUsageRecord? {
   val decoded = if (contentEncoding?.contains("gzip", ignoreCase = true) == true) {
-    runCatching {
-      GZIPInputStream(ByteArrayInputStream(responseBytes)).use { it.readBytes() }
-    }.getOrNull() ?: return null
+    runCatching { gunzipUpTo(responseBytes, API_USAGE_DECODED_BYTE_LIMIT) }.getOrNull() ?: return null
   } else {
     responseBytes
   }
@@ -112,8 +111,33 @@ public fun parseApiUsageRecord(
 public const val API_USAGE_PEEK_BYTE_LIMIT: Long = 8L * 1024 * 1024
 
 /**
+ * Cap on the decompressed size. The peek limit bounds the compressed bytes only, and gzip expands
+ * by a large factor, so decoding without a cap would let one response decide how much memory this
+ * observational code takes. A response bigger than this is not decoded and not recorded.
+ */
+@ArbigentInternalApi
+public const val API_USAGE_DECODED_BYTE_LIMIT: Int = 16 * 1024 * 1024
+
+/** Returns null when the decompressed body is larger than [limit], rather than growing to fit it. */
+private fun gunzipUpTo(bytes: ByteArray, limit: Int): ByteArray? {
+  GZIPInputStream(ByteArrayInputStream(bytes)).use { input ->
+    val out = ByteArrayOutputStream()
+    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+    while (true) {
+      val read = input.read(buffer)
+      if (read < 0) return out.toByteArray()
+      if (out.size() + read > limit) return null
+      out.write(buffer, 0, read)
+    }
+  }
+}
+
+/**
  * Writes one file per recorded call. Recording is observational, so every failure is dropped
  * silently rather than breaking the API call that is being observed.
+ *
+ * Nothing clears the directory, so running against the same result directory twice leaves the
+ * records of both runs in it, the same way [ArbigentFiles.jsonlsDir] behaves.
  *
  * The record holds only a uuid, a model name and token counts, so it is not expected to contain
  * the API key. It still goes through [removeConfidentialInfo] because every other file this class
