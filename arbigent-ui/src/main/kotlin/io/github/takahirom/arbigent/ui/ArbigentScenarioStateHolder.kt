@@ -33,8 +33,8 @@ constructor(
   private val _aiOptions = MutableStateFlow<ArbigentAiOptions?>(null)
   val aiOptionsFlow: StateFlow<ArbigentAiOptions?> = _aiOptions
 
-  private val _replayWithFallback = MutableStateFlow(false)
-  val replayWithFallbackFlow: StateFlow<Boolean> = _replayWithFallback
+  private val _replayWithFallback = MutableStateFlow<Boolean?>(null)
+  val replayWithFallbackFlow: StateFlow<Boolean?> = _replayWithFallback
   private val _cacheOptions = MutableStateFlow<ArbigentScenarioCacheOptions?>(null)
   val cacheOptionsFlow: StateFlow<ArbigentScenarioCacheOptions?> = _cacheOptions
 
@@ -183,7 +183,8 @@ constructor(
   }
 
   fun onReplayWithFallbackChanged(enabled: Boolean) {
-    _replayWithFallback.value = enabled
+    // Unchecked means "inherit the project setting", not "force off".
+    _replayWithFallback.value = if (enabled) true else null
   }
 
   fun onAdditionalActionsChanged(actions: List<String>?) {
@@ -244,7 +245,7 @@ constructor(
     scenarioTypeStateFlow.value = ArbigentScenarioType.Scenario
     _aiOptions.value = null
     _cacheOptions.value = null
-    _replayWithFallback.value = false
+    _replayWithFallback.value = null
     _additionalActions.value = null
     _mcpOptions.value = null
   }

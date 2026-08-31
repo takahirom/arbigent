@@ -24,6 +24,17 @@ class ReusableScenariosTest {
       reusableScenarios = reusableScenarios
     ).agentTasks
 
+  private fun ArbigentProjectFileContent.scenarioOf(scenarioId: String) =
+    scenarioContents.createArbigentScenario(
+      projectSettings = settings,
+      scenario = scenarioContents.first { it.id == scenarioId },
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = ArbigentAiDecisionCache.Disabled,
+      fixedScenarios = fixedScenarios,
+      reusableScenarios = reusableScenarios
+    )
+
   // ----- Expansion -----
 
   @Test
@@ -204,9 +215,8 @@ class ReusableScenariosTest {
    * that has none would produce a run that cannot fail.
    */
   @Test
-  fun replayWithFallbackWithoutImageAssertionsFailsAtLoad() {
-    assertValidationError(
-      "replayWithFallback requires imageAssertions",
+  fun replayWithFallbackWithoutImageAssertionsFailsWhenTheScenarioIsBuilt() {
+    val project = load(
       """
       scenarios:
       - id: "unverified"
@@ -214,6 +224,36 @@ class ReusableScenariosTest {
         replayWithFallback: true
       """
     )
+    val exception = assertFailsWith<ArbigentProjectValidationException> {
+      project.tasksOf("unverified")
+    }
+    assertTrue(
+      exception.message.orEmpty().contains("replayWithFallback requires imageAssertions"),
+      "Expected the leaf to be rejected, got: ${exception.message}",
+    )
+  }
+
+  /**
+   * The project-wide default applies to every scenario, so it must not reject the ones that are
+   * never run: only the scenario actually being built has to be verifiable.
+   */
+  @Test
+  fun projectWideReplayWithFallbackOnlyRejectsTheScenarioBeingRun() {
+    val project = load(
+      """
+      settings:
+        replayWithFallback: true
+      scenarios:
+      - id: "unverified"
+        goal: "Do something"
+      - id: "verified"
+        goal: "Do something else"
+        imageAssertions:
+        - assertionPrompt: "The screen is shown"
+      """
+    )
+    assertEquals(true, project.scenarioOf("verified").replayWithFallback)
+    assertFailsWith<ArbigentProjectValidationException> { project.tasksOf("unverified") }
   }
 
   /**

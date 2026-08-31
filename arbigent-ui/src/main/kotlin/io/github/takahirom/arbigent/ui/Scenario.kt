@@ -577,7 +577,7 @@ internal fun ScenarioOptions(
         CheckboxRow(
           modifier = Modifier.padding(start = 16.dp),
           text = "Replay recorded actions first",
-          checked = replayWithFallback,
+          checked = replayWithFallback == true,
           onCheckedChange = updatedScenarioStateHolder::onReplayWithFallbackChanged,
         )
       }
