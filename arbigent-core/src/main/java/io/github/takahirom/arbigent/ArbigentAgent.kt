@@ -95,8 +95,8 @@ public class ArbigentAgent internal constructor(
   }
 
   private val decisionInterceptors: List<ArbigentDecisionInterceptor> = buildList {
-    if (attemptMode == ArbigentAttemptMode.OptimisticReplay && replayTrace != null) {
-      add(ArbigentTraceReplayDecisionInterceptor(replayTrace))
+    if (attemptMode == ArbigentAttemptMode.ReplayWithFallback && replayTrace != null) {
+      add(ArbigentReplayDecisionInterceptor(replayTrace))
     }
     addAll(interceptors.filterIsInstance<ArbigentDecisionInterceptor>())
   }
@@ -1291,8 +1291,8 @@ private suspend fun step(
         targetElement = action?.withTargetIdentity(elements),
       ),
     )
-  } catch (exception: OptimisticReplayDivergenceException) {
-    val reason = "Optimistic replay diverged: ${exception.message}"
+  } catch (exception: ReplayDivergenceException) {
+    val reason = "Replay diverged: ${exception.message}"
     arbigentInfoLog(reason)
     contextHolder.addStep(
       ArbigentContextHolder.Step(
@@ -1333,14 +1333,14 @@ private suspend fun step(
       contextHolder.addStep(decisionOutput.step)
     } else {
       imageAssertionOutput.results.filter { it.isPassed.not() }.forEach {
-        val failureReason = "Failed optimistic replay image assertion '${it.assertionPrompt}': ${it.explanation}"
-        if (stepInput.attemptMode == ArbigentAttemptMode.OptimisticReplay) {
+        val failureReason = "Failed replay image assertion '${it.assertionPrompt}': ${it.explanation}"
+        if (stepInput.attemptMode == ArbigentAttemptMode.ReplayWithFallback) {
           arbigentInfoLog(failureReason)
         }
         contextHolder.addStep(
           ArbigentContextHolder.Step(
             stepId = stepId,
-            feedback = if (stepInput.attemptMode == ArbigentAttemptMode.OptimisticReplay) {
+            feedback = if (stepInput.attemptMode == ArbigentAttemptMode.ReplayWithFallback) {
               failureReason
             } else {
               "Failed to reach the goal by image assertion. Image assertion prompt:${it.assertionPrompt}. explanation:${it.explanation}"
@@ -1352,7 +1352,7 @@ private suspend fun step(
           )
         )
       }
-      if (stepInput.attemptMode == ArbigentAttemptMode.OptimisticReplay) {
+      if (stepInput.attemptMode == ArbigentAttemptMode.ReplayWithFallback) {
         return StepResult.Failed
       }
     }

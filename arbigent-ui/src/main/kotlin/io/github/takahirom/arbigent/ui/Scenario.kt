@@ -574,9 +574,9 @@ internal fun ScenarioOptions(
         )
         CheckboxRow(
           modifier = Modifier.padding(start = 16.dp),
-          text = "Optimistic trace replay",
-          checked = cacheOptions?.optimisticTraceReplay == true,
-          onCheckedChange = updatedScenarioStateHolder::onOptimisticTraceReplayChanged,
+          text = "Replay recorded actions first",
+          checked = cacheOptions?.replayWithFallback == true,
+          onCheckedChange = updatedScenarioStateHolder::onReplayWithFallbackChanged,
         )
       }
     }

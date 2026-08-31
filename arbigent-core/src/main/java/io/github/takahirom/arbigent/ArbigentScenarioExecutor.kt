@@ -189,7 +189,7 @@ public class ArbigentScenarioExecutor internal constructor(
     _taskAssignmentsHistoryStateFlow.value = listOf()
 
     val replayTraceKeys = scenario.replayTraceKeys()
-    val replayTraces = if (scenario.cacheOptions?.optimisticTraceReplay == true) {
+    val replayTraces = if (scenario.cacheOptions?.replayWithFallback == true) {
       replayTraceKeys.map(replayTraceStore::read)
         .takeIf { traces -> traces.isNotEmpty() && traces.all { it != null } }
         ?.map { trace -> requireNotNull(trace) }
@@ -197,12 +197,12 @@ public class ArbigentScenarioExecutor internal constructor(
       null
     }
     var attemptMode = if (replayTraces != null) {
-      ArbigentAttemptMode.OptimisticReplay
+      ArbigentAttemptMode.ReplayWithFallback
     } else {
       ArbigentAttemptMode.Normal
     }
-    if (attemptMode == ArbigentAttemptMode.OptimisticReplay) {
-      arbigentInfoLog("Starting optimistic replay for scenario ${scenario.id}")
+    if (attemptMode == ArbigentAttemptMode.ReplayWithFallback) {
+      arbigentInfoLog("Starting replay for scenario ${scenario.id}")
     }
 
     var finishedSuccessfully = false
@@ -222,7 +222,7 @@ public class ArbigentScenarioExecutor internal constructor(
               dispatcher = dispatcher,
               attemptMode = attemptMode,
               replayTrace = replayTraces?.get(index)
-                .takeIf { attemptMode == ArbigentAttemptMode.OptimisticReplay },
+                .takeIf { attemptMode == ArbigentAttemptMode.ReplayWithFallback },
             ),
           )
         }
@@ -266,10 +266,10 @@ public class ArbigentScenarioExecutor internal constructor(
           yield()
         }
         if (!finishedSuccessfully) {
-          if (attemptMode == ArbigentAttemptMode.OptimisticReplay) {
-            val reason = optimisticReplayFailureReason()
+          if (attemptMode == ArbigentAttemptMode.ReplayWithFallback) {
+            val reason = replayFailureReason()
             arbigentInfoLog(
-              "Optimistic replay fallback for scenario ${scenario.id}: $reason. " +
+              "Replay fallback for scenario ${scenario.id}: $reason. " +
                 "Restarting all tasks and initializers in normal mode.",
             )
             attemptMode = ArbigentAttemptMode.Normal
@@ -292,7 +292,7 @@ public class ArbigentScenarioExecutor internal constructor(
       }
     }
     if (!isGoalAchieved()) {
-      if (normalRetriesExhausted && scenario.cacheOptions?.optimisticTraceReplay == true) {
+      if (normalRetriesExhausted && scenario.cacheOptions?.replayWithFallback == true) {
         replayTraceKeys.forEach(replayTraceStore::delete)
       }
       _isFailedToArchiveFlow.value = true
@@ -301,7 +301,7 @@ public class ArbigentScenarioExecutor internal constructor(
         "Failed to archive scenario:" + statusText() + " retryRemain:$retryRemain"
       )
     } else {
-      if (scenario.cacheOptions?.optimisticTraceReplay == true) {
+      if (scenario.cacheOptions?.replayWithFallback == true) {
         taskAssignments().forEachIndexed { index, assignment ->
           val key = replayTraceKeys[index]
           val trace = assignment.agent.latestArbigentContext()
@@ -311,7 +311,7 @@ public class ArbigentScenarioExecutor internal constructor(
           } else {
             replayTraceStore.delete(key)
             arbigentInfoLog(
-              "Skipped unsafe optimistic replay trace for scenario ${scenario.id}, task ${index + 1}",
+              "Skipped unsafe replay trace for scenario ${scenario.id}, task ${index + 1}",
             )
           }
         }
@@ -321,16 +321,16 @@ public class ArbigentScenarioExecutor internal constructor(
     arbigentDebugLog("Arbigent.execute end")
   }
 
-  private fun optimisticReplayFailureReason(): String {
+  private fun replayFailureReason(): String {
     return taskAssignments().asSequence()
       .mapNotNull { assignment -> assignment.agent.latestArbigentContext() }
       .flatMap { contextHolder -> contextHolder.steps().asReversed().asSequence() }
       .mapNotNull { step -> step.feedback }
       .firstOrNull { feedback ->
-        feedback.startsWith("Optimistic replay diverged") ||
-          feedback.startsWith("Failed optimistic replay image assertion")
+        feedback.startsWith("Replay diverged") ||
+          feedback.startsWith("Failed replay image assertion")
       }
-      ?: "optimistic task execution failed"
+      ?: "replay task execution failed"
   }
 
   public fun cancel() {

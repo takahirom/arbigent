@@ -8,14 +8,14 @@ import java.util.Base64
 
 public enum class ArbigentAttemptMode {
   Normal,
-  OptimisticReplay,
+  ReplayWithFallback,
 }
 
-internal class OptimisticReplayDivergenceException(
+internal class ReplayDivergenceException(
   override val message: String,
 ) : Exception(message)
 
-internal class ArbigentTraceReplayDecisionInterceptor(
+internal class ArbigentReplayDecisionInterceptor(
   private val trace: ArbigentReplayTrace,
 ) : ArbigentDecisionInterceptor {
   override suspend fun intercept(
@@ -28,21 +28,21 @@ internal class ArbigentTraceReplayDecisionInterceptor(
       .distinctBy { step -> step.stepId }
       .count()
     val recorded = trace.steps.getOrNull(replayIndex)
-      ?: throw OptimisticReplayDivergenceException(
+      ?: throw ReplayDivergenceException(
         "trace ended before replay step ${replayIndex + 1}",
       )
     val recordedAction = recorded.decisionOutput.agentActions.singleOrNull()
-      ?: throw OptimisticReplayDivergenceException(
+      ?: throw ReplayDivergenceException(
         "trace step ${replayIndex + 1} does not contain exactly one action",
       )
     val targetIdentity = recorded.decisionOutput.step.targetElement
     val reboundAction = if (recordedAction.requiresElementIdentity()) {
       val identity = targetIdentity
-        ?: throw OptimisticReplayDivergenceException(
+        ?: throw ReplayDivergenceException(
           "trace step ${replayIndex + 1} ${recordedAction.actionName} has no target identity",
         )
       val currentElement = identity.findMatch(decisionInput.elements)
-        ?: throw OptimisticReplayDivergenceException(
+        ?: throw ReplayDivergenceException(
           "step ${replayIndex + 1} target ${identity.description()} is absent from the current UI",
         )
       recordedAction.rebindTo(currentElement, decisionInput.elements)
@@ -50,7 +50,7 @@ internal class ArbigentTraceReplayDecisionInterceptor(
       recordedAction
     }
 
-    arbigentInfoLog("Optimistic replay step ${replayIndex + 1}: ${reboundAction.stepLogText()}")
+    arbigentInfoLog("Replay step ${replayIndex + 1}: ${reboundAction.stepLogText()}")
     return recorded.decisionOutput.copy(
       agentActions = listOf(reboundAction),
       step = recorded.decisionOutput.step.copy(
@@ -168,7 +168,7 @@ private fun ArbigentAgentAction.targetElement(elements: ArbigentElementList): Ar
   is DpadAutoFocusWithTextAgentAction -> elements.elementMatchingText(text)
   is DpadAutoFocusWithIdAgentAction -> elements.elementMatchingResourceId(id)
   // Coordinate actions explicitly target content outside the UI hierarchy and therefore cannot
-  // be replayed safely in optimistic mode.
+  // be replayed safely in replay mode.
   is ClickAtCoordinates -> null
   else -> null
 }
@@ -315,13 +315,13 @@ internal class ArbigentReplayTraceStore(
       json.decodeFromString<ArbigentReplayTrace>(file.readText())
         .takeIf { it.isValidFor(key) }
     } catch (exception: Exception) {
-      arbigentErrorLog("Failed to read optimistic replay trace ${key.storageKey}: $exception")
+      arbigentErrorLog("Failed to read replay trace ${key.storageKey}: $exception")
       null
     }
   }
 
   fun write(key: ArbigentReplayTraceKey, trace: ArbigentReplayTrace) {
-    require(trace.isValidFor(key)) { "Cannot store an invalid optimistic replay trace" }
+    require(trace.isValidFor(key)) { "Cannot store an invalid replay trace" }
     val file = fileFor(key)
     file.parentFile.mkdirs()
     file.writeText(json.encodeToString(trace))
@@ -330,7 +330,7 @@ internal class ArbigentReplayTraceStore(
   fun delete(key: ArbigentReplayTraceKey) {
     val file = fileFor(key)
     if (file.exists() && !file.delete()) {
-      arbigentErrorLog("Failed to delete optimistic replay trace ${key.storageKey}")
+      arbigentErrorLog("Failed to delete replay trace ${key.storageKey}")
     }
   }
 

@@ -180,9 +180,9 @@ constructor(
     }
   }
 
-  fun onOptimisticTraceReplayChanged(enabled: Boolean) {
+  fun onReplayWithFallbackChanged(enabled: Boolean) {
     _cacheOptions.value = (_cacheOptions.value ?: ArbigentScenarioCacheOptions())
-      .copy(optimisticTraceReplay = enabled)
+      .copy(replayWithFallback = enabled)
   }
 
   fun onAdditionalActionsChanged(actions: List<String>?) {

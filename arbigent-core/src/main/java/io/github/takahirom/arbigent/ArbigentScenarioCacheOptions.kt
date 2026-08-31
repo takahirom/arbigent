@@ -16,5 +16,5 @@ public data class ArbigentScenarioCacheOptions(
     /**
      * Replay the last successful action trace before using normal AI decision execution.
      */
-    val optimisticTraceReplay: Boolean = false,
+    val replayWithFallback: Boolean = false,
 )

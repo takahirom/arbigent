@@ -97,7 +97,7 @@ class ArbigentReplayTraceTest {
   }
 
   @Test
-  fun `failed optimistic execution keeps decision cache while normal execution purges it`() = runTest {
+  fun `failed replay attempt keeps decision cache while normal execution purges it`() = runTest {
     val cache = ArbigentAiDecisionCache.Memory.create()
     val cachedAction = GoalAchievedAgentAction()
     cache.set(
@@ -126,12 +126,12 @@ class ArbigentReplayTraceTest {
       )
     }
 
-    interceptor.intercept(executeInput(ArbigentAttemptMode.OptimisticReplay)) {
+    interceptor.intercept(executeInput(ArbigentAttemptMode.ReplayWithFallback)) {
       ArbigentAgent.ExecutionResult.Failed(contextHolder)
     }
     assertNotNull(
       cache.get("layout-cache-key"),
-      "A failed optimistic attempt must keep the layout cache for the fallback retry",
+      "A failed replay attempt must keep the layout cache for the fallback retry",
     )
 
     interceptor.intercept(executeInput(ArbigentAttemptMode.Normal)) {
