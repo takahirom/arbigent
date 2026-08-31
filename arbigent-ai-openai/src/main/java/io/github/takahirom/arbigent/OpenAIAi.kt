@@ -126,12 +126,26 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
                 arbigentDebugLog(log)
               }
 
-              return chain.proceed(
+              val response = chain.proceed(
                 request
                   .newBuilder()
                   .url(request.url.newBuilder().removeAllQueryParameters("requestUuid").build())
                   .build()
               )
+              // Record token usage here rather than in decideAgentActions, because this client is
+              // shared with the image assertion model. Assertions are delegated to Roborazzi and
+              // never reach the code that writes the jsonls files, so their usage was invisible.
+              // peekBody keeps the body readable for the caller; string() would consume it.
+              // The bytes are still gzipped here when the server compressed them, because a network
+              // interceptor runs below OkHttp's transparent decompression - hence Content-Encoding.
+              runCatching {
+                parseApiUsageRecord(
+                  requestUuid = logRequest.url.queryParameter("requestUuid"),
+                  responseBytes = response.peekBody(API_USAGE_PEEK_BYTE_LIMIT).bytes(),
+                  contentEncoding = response.header("Content-Encoding")
+                )?.let(::writeApiUsageRecord)
+              }
+              return response
             }
           }
         )

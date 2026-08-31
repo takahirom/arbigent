@@ -578,6 +578,7 @@ fun logResultsLocation(resultFile: File, resultDir: File) {
   arbigentInfoLog("  • YAML Results: ${resultFile.absolutePath}")
   arbigentInfoLog("  • Screenshots: ${ArbigentFiles.screenshotsDir.absolutePath}/")
   arbigentInfoLog("  • API Logs: ${ArbigentFiles.jsonlsDir.absolutePath}/")
+  arbigentInfoLog("  • Token Usage: ${ArbigentFiles.usagesDir.absolutePath}/")
   arbigentInfoLog("  • HTML Report: ${File(resultDir, "report.html").absolutePath}")
 }
 
@@ -587,6 +588,7 @@ fun logResultsAvailable(resultFile: File, resultDir: File) {
   arbigentInfoLog("  • YAML Results: ${resultFile.absolutePath}")
   arbigentInfoLog("  • Screenshots: ${ArbigentFiles.screenshotsDir.absolutePath}/")
   arbigentInfoLog("  • API Logs: ${ArbigentFiles.jsonlsDir.absolutePath}/")
+  arbigentInfoLog("  • Token Usage: ${ArbigentFiles.usagesDir.absolutePath}/")
   arbigentInfoLog("  • HTML Report: ${File(resultDir, "report.html").absolutePath}")
 }
 
