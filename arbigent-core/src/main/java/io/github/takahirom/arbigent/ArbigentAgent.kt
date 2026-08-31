@@ -33,18 +33,16 @@ public class ArbigentAgent internal constructor(
   // originates at the application composition root. Keeping it mandatory means the compiler rejects
   // any construction path that forgets to propagate it, so there is no silent fallback.
   dispatcher: CoroutineDispatcher,
-  private val attemptMode: ArbigentAttemptMode = ArbigentAttemptMode.Normal,
-  private val replayTrace: ArbigentReplayTrace? = null,
+  // Required (no default), for the same reason as dispatcher: a forgotten trace would silently
+  // degrade to normal execution, and the failed attempt would then purge the AI-decision cache as
+  // if it were an ordinary failure. Null means normal AI-driven execution.
+  private val replayTrace: ArbigentReplayTrace?,
 ) {
-  public constructor(
-    agentConfig: AgentConfig,
-    dispatcher: CoroutineDispatcher,
-  ) : this(
-    agentConfig = agentConfig,
-    dispatcher = dispatcher,
-    attemptMode = ArbigentAttemptMode.Normal,
-    replayTrace = null,
-  )
+  private val attemptMode: ArbigentAttemptMode = if (replayTrace != null) {
+    ArbigentAttemptMode.ReplayWithFallback
+  } else {
+    ArbigentAttemptMode.Normal
+  }
 
   private val ai by lazy { agentConfig.aiFactory() }
   public val device: ArbigentDevice by lazy { agentConfig.deviceFactory() }
@@ -95,7 +93,7 @@ public class ArbigentAgent internal constructor(
   }
 
   private val decisionInterceptors: List<ArbigentDecisionInterceptor> = buildList {
-    if (attemptMode == ArbigentAttemptMode.ReplayWithFallback && replayTrace != null) {
+    if (replayTrace != null) {
       add(ArbigentReplayDecisionInterceptor(replayTrace))
     }
     addAll(interceptors.filterIsInstance<ArbigentDecisionInterceptor>())
@@ -274,7 +272,7 @@ public class ArbigentAgent internal constructor(
     val device: ArbigentDevice,
     val ai: ArbigentAi,
     val aiOptions: ArbigentAiOptions?,
-    val attemptMode: ArbigentAttemptMode = ArbigentAttemptMode.Normal,
+    val attemptMode: ArbigentAttemptMode,
     val cacheOptions: ArbigentScenarioCacheOptions = ArbigentScenarioCacheOptions(),
     val createContextHolder: (String, Int) -> ArbigentContextHolder,
     val addContextHolder: (ArbigentContextHolder) -> Unit,
@@ -307,7 +305,7 @@ public class ArbigentAgent internal constructor(
     val prompt: ArbigentPrompt,
     val aiOptions: ArbigentAiOptions?,
     val cacheOptions: ArbigentScenarioCacheOptions = ArbigentScenarioCacheOptions(),
-    val attemptMode: ArbigentAttemptMode = ArbigentAttemptMode.Normal,
+    val attemptMode: ArbigentAttemptMode,
     val mcpClient: MCPClient? = null,
     val mcpOptions: ArbigentMcpOptions? = null,
   )

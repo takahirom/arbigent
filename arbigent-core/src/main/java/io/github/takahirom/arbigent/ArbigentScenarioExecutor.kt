@@ -220,7 +220,6 @@ public class ArbigentScenarioExecutor internal constructor(
             ArbigentAgent(
               agentConfig = task.agentConfig,
               dispatcher = dispatcher,
-              attemptMode = attemptMode,
               replayTrace = replayTraces?.get(index)
                 .takeIf { attemptMode == ArbigentAttemptMode.ReplayWithFallback },
             ),
