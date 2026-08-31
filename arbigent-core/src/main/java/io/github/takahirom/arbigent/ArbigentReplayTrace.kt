@@ -109,7 +109,9 @@ internal class ArbigentReplayDecisionInterceptor(
         cacheKey = decisionInput.cacheKey,
         timestamp = TimeProvider.get().currentTimeMillis(),
         screenshotFilePath = decisionInput.screenshotFilePath,
-        apiCallJsonLFilePath = decisionInput.apiCallJsonLFilePath,
+        // No AI call was made, so nothing wrote a JSONL for this step. Carrying the path anyway
+        // would name an artifact that does not exist, and the report copies every path it is given.
+        apiCallJsonLFilePath = null,
         stepSource = ArbigentStepSource.Replay,
       ),
     )

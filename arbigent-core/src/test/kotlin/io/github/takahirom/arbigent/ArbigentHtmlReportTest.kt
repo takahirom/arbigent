@@ -47,6 +47,16 @@ class ArbigentHtmlReportTest(private val behavior: DescribedBehavior<ArbigentHtm
                             assertReportFileExists()
                         }
                     }
+                    describe("with a replayed step whose JSONL was never written") {
+                        doIt {
+                            createScreenshotFile()
+                            generateReportWithMissingJsonl()
+                        }
+                        itShould("export without failing") {
+                            capture(it)
+                            assertReportExistsWithoutJsonl()
+                        }
+                    }
                     describe("with existing annotated files") {
                         doIt {
                             createScreenshotFile()
@@ -113,6 +123,26 @@ class ArbigentHtmlReportRobot(private val tempFolder: TemporaryFolder) {
         result = createTestProjectExecutionResult(step)
         outputDir = tempFolder.newFolder("output")
         ArbigentHtmlReport().saveReportHtml(outputDir.absolutePath, result)
+        return this
+    }
+
+    fun generateReportWithMissingJsonl(): ArbigentHtmlReportRobot {
+        val step = createTestStep().copy(
+            apiCallJsonPath = File(tempFolder.root, "never-written.jsonl").absolutePath,
+            stepSource = ArbigentStepSource.Replay,
+        )
+        result = createTestProjectExecutionResult(step)
+        outputDir = tempFolder.newFolder("output-missing-jsonl")
+        ArbigentHtmlReport().saveReportHtml(outputDir.absolutePath, result)
+        return this
+    }
+
+    fun assertReportExistsWithoutJsonl(): ArbigentHtmlReportRobot {
+        assertTrue(File(outputDir, "report.html").exists(), "Report should be written")
+        assertTrue(
+            !File(outputDir, "jsonls/never-written.jsonl").exists(),
+            "A JSONL that was never written must not be copied"
+        )
         return this
     }
 
