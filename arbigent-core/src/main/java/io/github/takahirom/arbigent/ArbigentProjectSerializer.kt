@@ -256,6 +256,8 @@ public data class ArbigentAiOptions(
 public data class ArbigentProjectSettings(
   public val prompt: ArbigentPrompt = ArbigentPrompt(),
   public val cacheStrategy: CacheStrategy = CacheStrategy(),
+  // Project-wide default for the scenario-level flag of the same name.
+  public val replayWithFallback: Boolean = false,
   public val aiOptions: ArbigentAiOptions? = null,
   @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
   public val mcpJson: String = DefaultMcpJson,
@@ -464,10 +466,22 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
     scenario.deviceFormFactor
   }
 
+  // Checked here rather than at load time because the project-wide default applies to every
+  // scenario, and only the one being run has to be verifiable. Its image assertions are the sole
+  // thing that can tell a replayed run from a wrong one, so a leaf without them must not replay.
+  val replayWithFallback = scenario.replayWithFallback ?: projectSettings.replayWithFallback
+  if (replayWithFallback && scenario.imageAssertions.isEmpty()) {
+    val error = "scenarios '${scenario.id}': replayWithFallback requires imageAssertions on the " +
+      "scenario being run; they are what verifies a replayed run, and without them it would " +
+      "pass whatever is on screen"
+    throw ArbigentProjectValidationException(arbigentValidationReport(listOf(error)), listOf(error))
+  }
+
   return ArbigentScenario(
     id = scenario.id,
     agentTasks = result,
     maxRetry = scenario.maxRetry,
+    replayWithFallback = replayWithFallback,
     maxStepCount = scenario.maxStep,
     tags = scenario.tags,
     deviceFormFactor = effectiveScenarioDeviceFormFactor,
@@ -512,6 +526,10 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
   @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
   public val noteForHumans: String = "",
   public val maxRetry: Int = 3,
+  // Scenario-run level, like maxRetry: the executor reads it for the whole run, so it is allowed
+  // on call-form scenarios unlike the per-task execution options below. Null inherits
+  // settings.replayWithFallback.
+  public val replayWithFallback: Boolean? = null,
   public val maxStep: Int = 10,
   public val tags: ArbigentContentTags = setOf(),
   public val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Unspecified,

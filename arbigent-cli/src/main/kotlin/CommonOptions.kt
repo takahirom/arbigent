@@ -83,6 +83,9 @@ fun setupArbigentFiles(workingDirectory: String?, logFile: String): ArbigentResu
   ArbigentFiles.logFile = resolveFile(workingDirectory, logFile)
   ArbigentFiles.cacheDir = resolveFile(workingDirectory, defaultCachePath + File.separator + BuildConfig.VERSION_NAME)
   ArbigentFiles.cacheDir.mkdirs()
+  // Traces live beside the cache, not under the result dir: they must survive across runs, and
+  // keeping them out of the version subdir means a cache reset does not discard them.
+  ArbigentFiles.traceDir = resolveFile(workingDirectory, defaultCachePath + File.separator + "traces")
   val resultFile = File(resultDir, "result.yml")
   return ArbigentResultDirs(resultDir, resultFile)
 }

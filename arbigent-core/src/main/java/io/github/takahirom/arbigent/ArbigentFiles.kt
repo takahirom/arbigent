@@ -10,4 +10,5 @@ public object ArbigentFiles {
     File(parentDir + File.separator + "jsonls")
   public var logFile: File? = File(parentDir + File.separator + "arbigent.log")
   public var cacheDir: File = File(parentDir + File.separator + "cache" + File.separator + BuildConfig.VERSION_NAME)
+  public var traceDir: File = File(parentDir + File.separator + "traces")
 }

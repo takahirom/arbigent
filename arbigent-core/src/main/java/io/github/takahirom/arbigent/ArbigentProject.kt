@@ -171,6 +171,7 @@ public data class ArbigentScenario(
   val id: String,
   val agentTasks: List<ArbigentAgentTask>,
   val maxRetry: Int = 0,
+  val replayWithFallback: Boolean = false,
   val maxStepCount: Int,
   val tags: ArbigentContentTags,
   val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Mobile,

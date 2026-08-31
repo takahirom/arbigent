@@ -1,5 +1,6 @@
 package io.github.takahirom.arbigent.ui
 
+import io.github.takahirom.arbigent.result.ArbigentStepSource
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -506,6 +507,15 @@ internal fun ScenarioFundamentalOptions(
             .padding(4.dp),
         )
       }
+      // Scenario-run level, like max retry: it applies to the whole run, so a call-form scenario
+      // must be able to set it too — this section renders before the call-form early return.
+      val replayWithFallback by updatedScenarioStateHolder.replayWithFallbackFlow.collectAsState()
+      CheckboxRow(
+        modifier = Modifier.padding(4.dp),
+        text = "Replay recorded actions first",
+        checked = replayWithFallback == true,
+        onCheckedChange = updatedScenarioStateHolder::onReplayWithFallbackChanged,
+      )
       GroupHeader("Max step count")
       Row(
         verticalAlignment = Alignment.CenterVertically
@@ -563,16 +573,14 @@ internal fun ScenarioOptions(
     ) {
       GroupHeader("Cache Options")
       val cacheOptions by updatedScenarioStateHolder.cacheOptionsFlow.collectAsState()
-      Column {
-        CheckboxRow(
-          modifier = Modifier.padding(start = 16.dp),
-          text = "Force disable Cache for this scenario",
-          checked = cacheOptions?.forceCacheDisabled == true,
-          onCheckedChange = { disabled ->
-            updatedScenarioStateHolder.onOverrideCacheForceDisabledChanged(disabled)
-          }
-        )
-      }
+      CheckboxRow(
+        modifier = Modifier.padding(start = 16.dp),
+        text = "Force disable Cache for this scenario",
+        checked = cacheOptions?.forceCacheDisabled == true,
+        onCheckedChange = { disabled ->
+          updatedScenarioStateHolder.onOverrideCacheForceDisabledChanged(disabled)
+        }
+      )
     }
     if (mcpServerNames.isNotEmpty()) {
       Column(
@@ -1211,9 +1219,9 @@ private fun ContentPanel(
                 Text(
                   text = "Step ${stepIndex + 1} (${formatTimestamp(step.timestamp)})",
                 )
-                if (step.cacheHit) {
+                if (step.stepSource != ArbigentStepSource.Ai) {
                   Text(
-                    "Cache hit",
+                    if (step.stepSource == ArbigentStepSource.Replay) "Replayed" else "Cache hit",
                     modifier = Modifier.padding(4.dp)
                       .background(JewelTheme.colorPalette.purple(8))
                   )

@@ -52,6 +52,7 @@ Used both in `scenarios` and `reusableScenarios`.
 | `initializeMethods` | [InitializationMethod](#initializationmethod) | `Noop` | **Deprecated**; use `initializationMethods`. |
 | `noteForHumans` | String (multiline) | `""` | Free-form note; not sent to the AI. |
 | `maxRetry` | Int | `3` | Retries on failure. |
+| `replayWithFallback` | Boolean? | `null` (inherits `settings.replayWithFallback`) | Replay the actions recorded on the last successful run instead of asking the AI for each step, reproducing the recorded pacing so the app is driven as it was when it passed. Set it on an executable scenario (a goal-form or call-form entry in `scenarios`), not on a `reusableScenarios` definition — only the scenario you run reads it. Requires `imageAssertions` on that scenario: they are what verifies a replayed run. If a recorded target element is gone, or an assertion fails, the whole scenario restarts in normal AI-driven mode. |
 | `maxStep` | Int | `10` | Max AI steps per attempt. |
 | `tags` | Set of [Tag](#tag) | `[]` | Tags for `run --tags` (serialized as a sequence). |
 | `deviceFormFactor` | [DeviceFormFactor](#deviceformfactor) | `Unspecified` | Target form factor. |
@@ -67,9 +68,11 @@ Used both in `scenarios` and `reusableScenarios`.
 > A calling scenario (one that sets `uses`/`steps`) is validated at load time: `uses`
 > and `steps` are mutually exclusive, and it must NOT set `goal`, `maxStep`,
 > `initializationMethods`, `imageAssertions`, `userPromptTemplate`, `type: Execution`,
-> a non-default `imageAssertionHistoryCount`, or the legacy `initializeMethods` — those
-> belong to the reusable definition. Reusable definitions must NOT have `dependency` or
-> `tags`.
+> a non-default `imageAssertionHistoryCount`, the legacy `initializeMethods`, or the
+> per-task execution options `aiOptions` / `cacheOptions` / `additionalActions` /
+> `mcpOptions` — those belong to the reusable definition. Scenario-run level keys such as
+> `maxRetry` and `replayWithFallback` are allowed, since the executor reads them for the
+> run as a whole. Reusable definitions must NOT have `dependency` or `tags`.
 
 ### ScenarioType
 
@@ -97,6 +100,7 @@ Legacy scenario-level field, tagged by `type:`. Distinct from the `CleanupData`
 |---|---|---|---|
 | `prompt` | [Prompt](#prompt) | `{}` | System/user prompt configuration. |
 | `cacheStrategy` | [CacheStrategy](#cachestrategy) | `{}` | AI-decision caching. |
+| `replayWithFallback` | Boolean | `false` | Project-wide default for the scenario key of the same name. Only the scenario actually being run must carry `imageAssertions`; the ones never run are unaffected. |
 | `aiOptions` | [AiOptions](#aioptions)? | `null` | Project-wide AI options. |
 | `mcpJson` | String (multiline) | `"{}"` | MCP server configuration as a JSON string. |
 | `deviceFormFactor` | [DeviceFormFactor](#deviceformfactor) | `Unspecified` | Default form factor for all scenarios. |
