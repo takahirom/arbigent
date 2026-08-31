@@ -27,8 +27,10 @@ import java.util.zip.GZIPInputStream
 @Serializable
 public class ApiUsageRecord(
   /**
-   * Set only for calls that carry a `requestUuid` query parameter, which today means decision
-   * calls. Image assertion calls have no uuid, so a consumer can use this to tell them apart.
+   * Correlation id of the request, when it carries one. This is not a call type, because what
+   * carries a uuid differs per provider: with the OpenAI provider only decision calls have one,
+   * since image assertions are delegated to Roborazzi, while the Anthropic provider makes the
+   * image assertion call itself and gives it its own `image-assertion-` prefixed uuid.
    */
   @SerialName("request_uuid") public val requestUuid: String? = null,
   public val model: String? = null,
