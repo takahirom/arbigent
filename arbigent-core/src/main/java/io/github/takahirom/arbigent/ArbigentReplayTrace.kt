@@ -7,7 +7,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.security.MessageDigest
-import java.util.Base64
 
 public enum class ArbigentAttemptMode {
   Normal,
@@ -355,18 +354,21 @@ internal data class ArbigentReplayTraceKey(
 ) {
   val goalHash: String = goal.sha256()
 
-  val storageKey: String = buildString {
-    append("v")
-    append(version.toPathToken())
-    append("-scenario-")
-    append(scenarioId.toPathToken())
-    append("-task-")
-    append(taskIndex)
-    append("-")
-    append(taskIdentity.toPathToken())
-    append("-goal-")
-    append(goalHash)
-  }
+  /**
+   * File name of this trace. Every part is folded into a single hash instead of being spelled out,
+   * because [taskIdentity] is the resolved goal and hints of the task: encoding it produced names
+   * of 300 to 900 bytes for Japanese text, well past the 255 byte limit a single file name
+   * component has on ext4 and APFS, and every write failed with FileNotFoundException so no
+   * scenario could ever replay. Nothing is lost by not naming the parts: the trace file itself
+   * carries the scenario id, task index and goal hash, and reading one validates them again.
+   */
+  val storageKey: String = listOf(
+    version,
+    scenarioId,
+    taskIndex.toString(),
+    taskIdentity,
+    goalHash,
+  ).joinToString(separator = "\u0000").sha256()
 }
 
 internal class ArbigentReplayTraceStore(
@@ -417,7 +419,3 @@ internal class ArbigentReplayTraceStore(
 private fun String.sha256(): String = MessageDigest.getInstance("SHA-256")
   .digest(toByteArray())
   .joinToString("") { byte -> "%02x".format(byte) }
-
-private fun String.toPathToken(): String = Base64.getUrlEncoder()
-  .withoutPadding()
-  .encodeToString(toByteArray())
