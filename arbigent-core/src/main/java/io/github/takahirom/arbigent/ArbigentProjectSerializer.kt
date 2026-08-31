@@ -471,12 +471,17 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
     scenario.deviceFormFactor
   }
 
-  // Replay is verified by the image assertions and by nothing else, so a scenario without them is
-  // run normally rather than replayed. A project-wide default that does not apply to a scenario is
-  // ordinary, so this reports rather than rejects.
+  // Replay is verified by the image assertions and by nothing else. Looking at the scenario's own
+  // imageAssertions is not enough: a call-form scenario carries none of its own, and what verifies
+  // it lives on the last leaf of the expansion — that leaf's assertions plus any declared at the
+  // call site. A project-wide default that does not apply to a scenario is ordinary, so this
+  // reports rather than rejects.
+  val verifyingAssertions = resolution.leaves.lastOrNull()
+    ?.let { leaf -> leaf.content?.imageAssertions.orEmpty() + leaf.callSiteAssertions }
+    .orEmpty()
   val replayWithFallback = if (!projectSettings.cacheStrategy.replayWithFallback) {
     false
-  } else if (scenario.imageAssertions.isEmpty()) {
+  } else if (verifyingAssertions.isEmpty()) {
     arbigentInfoLog(
       "Not replaying scenario '${scenario.id}': it has no imageAssertions to verify a replayed run",
     )

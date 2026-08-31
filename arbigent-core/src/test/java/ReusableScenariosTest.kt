@@ -252,6 +252,64 @@ class ReusableScenariosTest {
     assertEquals(listOf("Launch the app", "Watch something"), project.tasksOf("watch").map { it.goal })
   }
 
+  /**
+   * A call-form scenario carries no goal and often no assertions of its own; what verifies it lives
+   * on the leaf it calls. Judging by the scenario's own imageAssertions would refuse to replay a
+   * run that is in fact verified.
+   */
+  @Test
+  fun aCallFormScenarioIsReplayedWhenItsLeafAsserts() {
+    val project = load(
+      """
+      settings:
+        cacheStrategy:
+          replayWithFallback: true
+      scenarios:
+      - id: "open-timetable"
+        uses: "open-screen"
+        with:
+          screen: "Timetable"
+      reusableScenarios:
+      - id: "open-screen"
+        inputs:
+          screen:
+            required: true
+        goal: "Open {{inputs.screen}}"
+        imageAssertions:
+        - assertionPrompt: "The {{inputs.screen}} screen is shown"
+      """
+    )
+    assertEquals(true, project.scenarioOf("open-timetable").replayWithFallback)
+  }
+
+  /**
+   * The same call form, verified at the call site instead of on the leaf.
+   */
+  @Test
+  fun aCallFormScenarioIsReplayedWhenTheCallSiteAsserts() {
+    val project = load(
+      """
+      settings:
+        cacheStrategy:
+          replayWithFallback: true
+      scenarios:
+      - id: "open-timetable"
+        uses: "open-screen"
+        with:
+          screen: "Timetable"
+        imageAssertions:
+        - assertionPrompt: "The timetable is shown"
+      reusableScenarios:
+      - id: "open-screen"
+        inputs:
+          screen:
+            required: true
+        goal: "Open {{inputs.screen}}"
+      """
+    )
+    assertEquals(true, project.scenarioOf("open-timetable").replayWithFallback)
+  }
+
   @Test
   fun replayWithFallbackSurvivesSerialization() {
     val project = load(
