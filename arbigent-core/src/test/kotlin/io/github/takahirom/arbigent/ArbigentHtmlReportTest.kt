@@ -138,10 +138,15 @@ class ArbigentHtmlReportRobot(private val tempFolder: TemporaryFolder) {
     }
 
     fun assertReportExistsWithoutJsonl(): ArbigentHtmlReportRobot {
-        assertTrue(File(outputDir, "report.html").exists(), "Report should be written")
+        val reportFile = File(outputDir, "report.html")
+        assertTrue(reportFile.exists(), "Report should be written")
         assertTrue(
             !File(outputDir, "jsonls/never-written.jsonl").exists(),
             "A JSONL that was never written must not be copied"
+        )
+        assertTrue(
+            !reportFile.readText().contains("never-written.jsonl"),
+            "The export must not point at a JSONL it did not package"
         )
         return this
     }
