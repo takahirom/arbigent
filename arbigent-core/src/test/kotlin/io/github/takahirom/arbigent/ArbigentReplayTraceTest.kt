@@ -5,6 +5,7 @@ import io.github.takahirom.arbigent.sample.test.FakeDevice
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import kotlinx.coroutines.test.runTest
 import maestro.TreeNode
+import java.io.File
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -75,6 +76,44 @@ class ArbigentReplayTraceTest {
       restored.steps.first().decisionOutput.step.targetElement,
     )
     assertEquals("Open the model", restored.steps.first().decisionOutput.step.memo)
+  }
+
+  @Test
+  fun `a trace store failure does not fail the run that just passed`() {
+    val notADirectory = Files.createTempFile("arbigent-replay-trace-blocked", ".txt").toFile()
+    val store = ArbigentReplayTraceStore { File(notADirectory, "traces") }
+    val key = ArbigentReplayTraceKey(
+      version = "1.2.3",
+      scenarioId = "scenario",
+      taskIndex = 0,
+      taskIdentity = "scenario",
+      goal = "Goal",
+    )
+    val action = GoalAchievedAgentAction()
+    val trace = ArbigentReplayTrace(
+      version = key.version,
+      scenarioId = key.scenarioId,
+      taskIndex = key.taskIndex,
+      taskIdentity = key.taskIdentity,
+      goalHash = key.goalHash,
+      steps = listOf(
+        ArbigentReplayTraceStep(
+          decisionOutput = ArbigentAi.DecisionOutput(
+            agentActions = listOf(action),
+            step = ArbigentContextHolder.Step(
+              stepId = "step-1",
+              agentAction = action,
+              cacheKey = "cache-key",
+              screenshotFilePath = "screenshot.png",
+            ),
+          ),
+        ),
+      ),
+    )
+
+    store.write(key, trace)
+
+    assertNull(store.read(key))
   }
 
   @Test

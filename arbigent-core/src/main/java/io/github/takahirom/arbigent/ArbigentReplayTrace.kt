@@ -324,9 +324,15 @@ internal class ArbigentReplayTraceStore(
 
   fun write(key: ArbigentReplayTraceKey, trace: ArbigentReplayTrace) {
     require(trace.isValidFor(key)) { "Cannot store an invalid replay trace" }
-    val file = fileFor(key)
-    file.parentFile.mkdirs()
-    file.writeText(json.encodeToString(trace))
+    // A trace is an optimization for the next run, so failing to store one must not turn the
+    // scenario that just passed into a failure.
+    try {
+      val file = fileFor(key)
+      file.parentFile.mkdirs()
+      file.writeText(json.encodeToString(trace))
+    } catch (exception: Exception) {
+      arbigentErrorLog("Failed to store replay trace ${key.storageKey}: $exception")
+    }
   }
 
   fun delete(key: ArbigentReplayTraceKey) {
