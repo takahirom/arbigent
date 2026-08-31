@@ -189,7 +189,7 @@ public class ArbigentScenarioExecutor internal constructor(
     _taskAssignmentsHistoryStateFlow.value = listOf()
 
     val replayTraceKeys = scenario.replayTraceKeys()
-    val replayTraces = if (scenario.cacheOptions?.replayWithFallback == true) {
+    val replayTraces = if (scenario.replayWithFallback) {
       replayTraceKeys.map(replayTraceStore::read)
         .takeIf { traces -> traces.isNotEmpty() && traces.all { it != null } }
         ?.map { trace -> requireNotNull(trace) }
@@ -291,7 +291,7 @@ public class ArbigentScenarioExecutor internal constructor(
       }
     }
     if (!isGoalAchieved()) {
-      if (normalRetriesExhausted && scenario.cacheOptions?.replayWithFallback == true) {
+      if (normalRetriesExhausted && scenario.replayWithFallback) {
         replayTraceKeys.forEach(replayTraceStore::delete)
       }
       _isFailedToArchiveFlow.value = true
@@ -300,7 +300,7 @@ public class ArbigentScenarioExecutor internal constructor(
         "Failed to archive scenario:" + statusText() + " retryRemain:$retryRemain"
       )
     } else {
-      if (scenario.cacheOptions?.replayWithFallback == true) {
+      if (scenario.replayWithFallback) {
         taskAssignments().forEachIndexed { index, assignment ->
           val key = replayTraceKeys[index]
           val trace = assignment.agent.latestArbigentContext()

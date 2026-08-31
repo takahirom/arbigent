@@ -187,9 +187,9 @@ Previous steps:
     scenarios:
     - id: "cache-enabled"
       goal: "Test cache enabled"
+      replayWithFallback: true
       cacheOptions:
         forceCacheDisabled: true
-        replayWithFallback: true
     - id: "cache-disabled"
       goal: "Test cache disabled"
       cacheOptions:
@@ -211,7 +211,7 @@ Previous steps:
       aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
     )
     assertEquals(true, scenarioWithCacheEnabled.cacheOptions?.forceCacheDisabled, "Cache override should be disabled")
-    assertEquals(true, scenarioWithCacheEnabled.cacheOptions?.replayWithFallback)
+    assertEquals(true, scenarioWithCacheEnabled.replayWithFallback)
 
     // Test scenario with cache override disabled
     val scenarioWithCacheDisabled = projectWithCacheOptions.scenarioContents.createArbigentScenario(
@@ -222,7 +222,7 @@ Previous steps:
       aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
     )
     assertEquals(false, scenarioWithCacheDisabled.cacheOptions?.forceCacheDisabled, "Cache override should be enabled")
-    assertEquals(false, scenarioWithCacheDisabled.cacheOptions?.replayWithFallback)
+    assertEquals(false, scenarioWithCacheDisabled.replayWithFallback)
 
     // Test scenario with default cache settings
     val scenarioWithDefaultCache = projectWithCacheOptions.scenarioContents.createArbigentScenario(

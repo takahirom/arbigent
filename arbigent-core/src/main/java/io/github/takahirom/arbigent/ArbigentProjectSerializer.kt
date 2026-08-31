@@ -468,6 +468,7 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
     id = scenario.id,
     agentTasks = result,
     maxRetry = scenario.maxRetry,
+    replayWithFallback = scenario.replayWithFallback,
     maxStepCount = scenario.maxStep,
     tags = scenario.tags,
     deviceFormFactor = effectiveScenarioDeviceFormFactor,
@@ -512,6 +513,9 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
   @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
   public val noteForHumans: String = "",
   public val maxRetry: Int = 3,
+  // Scenario-run level, like maxRetry: the executor reads it for the whole run, so it is allowed
+  // on call-form scenarios unlike the per-task execution options below.
+  public val replayWithFallback: Boolean = false,
   public val maxStep: Int = 10,
   public val tags: ArbigentContentTags = setOf(),
   public val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Unspecified,

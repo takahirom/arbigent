@@ -563,6 +563,7 @@ internal fun ScenarioOptions(
     ) {
       GroupHeader("Cache Options")
       val cacheOptions by updatedScenarioStateHolder.cacheOptionsFlow.collectAsState()
+      val replayWithFallback by updatedScenarioStateHolder.replayWithFallbackFlow.collectAsState()
       Column {
         CheckboxRow(
           modifier = Modifier.padding(start = 16.dp),
@@ -575,7 +576,7 @@ internal fun ScenarioOptions(
         CheckboxRow(
           modifier = Modifier.padding(start = 16.dp),
           text = "Replay recorded actions first",
-          checked = cacheOptions?.replayWithFallback == true,
+          checked = replayWithFallback,
           onCheckedChange = updatedScenarioStateHolder::onReplayWithFallbackChanged,
         )
       }

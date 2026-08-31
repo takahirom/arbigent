@@ -176,6 +176,49 @@ class ReusableScenariosTest {
     assertEquals(25, project.tasksOf("caller")[0].maxStep)
   }
 
+  /**
+   * replayWithFallback is a scenario-run level knob like maxRetry, not a per-task execution
+   * option, so a call-form scenario must be able to carry it. Most real scenarios are call-form,
+   * and the executor reads this flag from the scenario it was asked to run.
+   */
+  @Test
+  fun replayWithFallbackIsAllowedOnCallFormScenario() {
+    val project = load(
+      """
+      scenarios:
+      - id: "caller"
+        uses: "part"
+        replayWithFallback: true
+      reusableScenarios:
+      - id: "part"
+        goal: "Do something"
+      """
+    )
+    assertEquals(true, project.scenarioContents.single { it.id == "caller" }.replayWithFallback)
+  }
+
+  /**
+   * The counterpart of the test above: this is why replayWithFallback cannot live inside
+   * cacheOptions. Per-task execution options are rejected on a call-form scenario, which would
+   * leave the flag with nowhere to go for most real scenarios.
+   */
+  @Test
+  fun cacheOptionsOnCallFormFailAtLoad() {
+    assertValidationError(
+      "execution options (aiOptions/mcpOptions/cacheOptions/additionalActions) are not allowed on a call-form scenario",
+      """
+      scenarios:
+      - id: "caller"
+        uses: "part"
+        cacheOptions:
+          forceCacheDisabled: true
+      reusableScenarios:
+      - id: "part"
+        goal: "Do something"
+      """
+    )
+  }
+
   // ----- Call-site assertions -----
 
   /**

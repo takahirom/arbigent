@@ -12,9 +12,5 @@ public data class ArbigentScenarioCacheOptions(
      * - true: Force cache disable
      * - false: Do nothing
      */
-    val forceCacheDisabled: Boolean = false,
-    /**
-     * Replay the last successful action trace before using normal AI decision execution.
-     */
-    val replayWithFallback: Boolean = false,
+    val forceCacheDisabled: Boolean = false
 )
