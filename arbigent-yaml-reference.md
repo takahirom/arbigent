@@ -177,6 +177,7 @@ Values in `launchArguments`, tagged by `type:`.
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `forceCacheDisabled` | Boolean | `false` | Disable AI-decision caching for this scenario. |
+| `optimisticTraceReplay` | Boolean | `false` | Replay the previous successful run's actions without asking the AI. Image assertions still run. If an action's target element is gone, or an assertion fails, the whole scenario is retried in normal mode. |
 
 ## McpOptions
 
