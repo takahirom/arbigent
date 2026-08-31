@@ -27,6 +27,7 @@ import org.jetbrains.jewel.ui.icons.AllIconsKeys
 import org.jetbrains.jewel.ui.painter.hints.Size
 import org.jetbrains.jewel.ui.component.ActionButton
 import org.jetbrains.jewel.ui.component.Dropdown
+import org.jetbrains.jewel.ui.component.CheckboxRow
 import org.jetbrains.jewel.ui.component.GroupHeader
 import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.jewel.ui.component.TextField
@@ -246,6 +247,15 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
               }
             )
           }
+
+          GroupHeader("Replay with fallback")
+          val replayWithFallback by appStateHolder.replayWithFallbackFlow.collectAsState()
+          CheckboxRow(
+            modifier = Modifier.padding(start = 16.dp),
+            text = "Replay recorded actions first (scenarios can override)",
+            checked = replayWithFallback,
+            onCheckedChange = { appStateHolder.replayWithFallbackFlow.value = it },
+          )
 
           GroupHeader("MCP JSON Configuration")
           val mcpJson: TextFieldState = remember {

@@ -234,6 +234,32 @@ class ReusableScenariosTest {
   }
 
   /**
+   * The project-wide default has to survive a save/load round trip, otherwise turning it on in the
+   * project settings dialog would silently be lost on the next open.
+   */
+  @Test
+  fun projectWideReplayWithFallbackSurvivesSerialization() {
+    val project = load(
+      """
+      settings:
+        replayWithFallback: true
+      scenarios:
+      - id: "verified"
+        goal: "Do something"
+        imageAssertions:
+        - assertionPrompt: "The screen is shown"
+      """
+    )
+    assertEquals(true, project.settings.replayWithFallback)
+
+    val file = java.io.File.createTempFile("arbigent-settings-round-trip", ".yaml")
+    file.deleteOnExit()
+    ArbigentProjectSerializer().save(project, file)
+    val reloaded = ArbigentProjectSerializer().load(file.readText())
+    assertEquals(true, reloaded.settings.replayWithFallback)
+  }
+
+  /**
    * The project-wide default applies to every scenario, so it must not reject the ones that are
    * never run: only the scenario actually being built has to be verifiable.
    */

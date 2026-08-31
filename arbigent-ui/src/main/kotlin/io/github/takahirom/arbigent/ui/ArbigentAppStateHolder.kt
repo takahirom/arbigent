@@ -301,6 +301,7 @@ class ArbigentAppStateHolder(
   val promptFlow = MutableStateFlow(ArbigentPrompt())
   val tagManager = ArbigentTagManager()
   val cacheStrategyFlow = MutableStateFlow(CacheStrategy())
+  val replayWithFallbackFlow = MutableStateFlow(false)
   val aiOptionsFlow = MutableStateFlow<ArbigentAiOptions?>(null)
   val mcpJsonFlow = MutableStateFlow("{}")
   val mcpServerNamesFlow: StateFlow<List<String>> = mcpJsonFlow
@@ -420,6 +421,7 @@ class ArbigentAppStateHolder(
       settings = ArbigentProjectSettings(
         prompt = promptFlow.value,
         cacheStrategy = cacheStrategyFlow.value,
+        replayWithFallback = replayWithFallbackFlow.value,
         aiOptions = aiOptionsFlow.value,
         mcpJson = mcpJsonFlow.value,
         deviceFormFactor = defaultDeviceFormFactorFlow.value,
@@ -450,6 +452,7 @@ class ArbigentAppStateHolder(
         projectSettings = ArbigentProjectSettings(
           prompt = this@ArbigentAppStateHolder.promptFlow.value,
           cacheStrategy = this@ArbigentAppStateHolder.cacheStrategyFlow.value,
+          replayWithFallback = this@ArbigentAppStateHolder.replayWithFallbackFlow.value,
           aiOptions = this@ArbigentAppStateHolder.aiOptionsFlow.value,
           mcpJson = this@ArbigentAppStateHolder.mcpJsonFlow.value,
           deviceFormFactor = this@ArbigentAppStateHolder.defaultDeviceFormFactorFlow.value,
@@ -526,6 +529,7 @@ class ArbigentAppStateHolder(
       settings = ArbigentProjectSettings(
         prompt = promptFlow.value,
         cacheStrategy = cacheStrategyFlow.value,
+        replayWithFallback = replayWithFallbackFlow.value,
         aiOptions = aiOptionsFlow.value,
         mcpJson = mcpJsonFlow.value,
         deviceFormFactor = defaultDeviceFormFactorFlow.value,
@@ -598,6 +602,7 @@ class ArbigentAppStateHolder(
     }
     promptFlow.value = projectFile.settings.prompt
     cacheStrategyFlow.value = projectFile.settings.cacheStrategy
+    replayWithFallbackFlow.value = projectFile.settings.replayWithFallback
     aiOptionsFlow.value = projectFile.settings.aiOptions
     mcpJsonFlow.value = projectFile.settings.mcpJson
     defaultDeviceFormFactorFlow.value = projectFile.settings.deviceFormFactor
