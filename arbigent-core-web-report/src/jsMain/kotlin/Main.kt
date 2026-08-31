@@ -339,7 +339,13 @@ private fun StepView(step: ArbigentAgentTaskStepResult) {
             }
           } else {
             Div {
-              Text("AI Request/Response (JSONL): ${step.apiCallJsonPath} (Cache Hit)")
+              Text(
+                "AI Request/Response (JSONL): ${step.apiCallJsonPath} " +
+                  when (step.stepSource) {
+                    ArbigentStepSource.Replay -> "(Replayed)"
+                    else -> "(Cache Hit)"
+                  }
+              )
             }
           }
         }

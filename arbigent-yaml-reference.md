@@ -52,7 +52,7 @@ Used both in `scenarios` and `reusableScenarios`.
 | `initializeMethods` | [InitializationMethod](#initializationmethod) | `Noop` | **Deprecated**; use `initializationMethods`. |
 | `noteForHumans` | String (multiline) | `""` | Free-form note; not sent to the AI. |
 | `maxRetry` | Int | `3` | Retries on failure. |
-| `replayWithFallback` | Boolean? | `null` (inherits `settings.replayWithFallback`) | Replay the actions recorded on the last successful run instead of asking the AI for each step, reproducing the recorded pacing so the app is driven as it was when it passed. Requires `imageAssertions` on this scenario: they are what verifies a replayed run. If a recorded target element is gone, or an assertion fails, the whole scenario restarts in normal AI-driven mode. |
+| `replayWithFallback` | Boolean? | `null` (inherits `settings.replayWithFallback`) | Replay the actions recorded on the last successful run instead of asking the AI for each step, reproducing the recorded pacing so the app is driven as it was when it passed. Set it on an executable scenario (a goal-form or call-form entry in `scenarios`), not on a `reusableScenarios` definition — only the scenario you run reads it. Requires `imageAssertions` on that scenario: they are what verifies a replayed run. If a recorded target element is gone, or an assertion fails, the whole scenario restarts in normal AI-driven mode. |
 | `maxStep` | Int | `10` | Max AI steps per attempt. |
 | `tags` | Set of [Tag](#tag) | `[]` | Tags for `run --tags` (serialized as a sequence). |
 | `deviceFormFactor` | [DeviceFormFactor](#deviceformfactor) | `Unspecified` | Target form factor. |

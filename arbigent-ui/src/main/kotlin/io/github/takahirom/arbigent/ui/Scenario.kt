@@ -507,6 +507,15 @@ internal fun ScenarioFundamentalOptions(
             .padding(4.dp),
         )
       }
+      // Scenario-run level, like max retry: it applies to the whole run, so a call-form scenario
+      // must be able to set it too — this section renders before the call-form early return.
+      val replayWithFallback by updatedScenarioStateHolder.replayWithFallbackFlow.collectAsState()
+      CheckboxRow(
+        modifier = Modifier.padding(4.dp),
+        text = "Replay recorded actions first",
+        checked = replayWithFallback == true,
+        onCheckedChange = updatedScenarioStateHolder::onReplayWithFallbackChanged,
+      )
       GroupHeader("Max step count")
       Row(
         verticalAlignment = Alignment.CenterVertically
@@ -564,23 +573,14 @@ internal fun ScenarioOptions(
     ) {
       GroupHeader("Cache Options")
       val cacheOptions by updatedScenarioStateHolder.cacheOptionsFlow.collectAsState()
-      val replayWithFallback by updatedScenarioStateHolder.replayWithFallbackFlow.collectAsState()
-      Column {
-        CheckboxRow(
-          modifier = Modifier.padding(start = 16.dp),
-          text = "Force disable Cache for this scenario",
-          checked = cacheOptions?.forceCacheDisabled == true,
-          onCheckedChange = { disabled ->
-            updatedScenarioStateHolder.onOverrideCacheForceDisabledChanged(disabled)
-          }
-        )
-        CheckboxRow(
-          modifier = Modifier.padding(start = 16.dp),
-          text = "Replay recorded actions first",
-          checked = replayWithFallback == true,
-          onCheckedChange = updatedScenarioStateHolder::onReplayWithFallbackChanged,
-        )
-      }
+      CheckboxRow(
+        modifier = Modifier.padding(start = 16.dp),
+        text = "Force disable Cache for this scenario",
+        checked = cacheOptions?.forceCacheDisabled == true,
+        onCheckedChange = { disabled ->
+          updatedScenarioStateHolder.onOverrideCacheForceDisabledChanged(disabled)
+        }
+      )
     }
     if (mcpServerNames.isNotEmpty()) {
       Column(
