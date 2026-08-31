@@ -231,27 +231,43 @@ internal data class ArbigentReplayTrace(
   val goalHash: String,
   val steps: List<ArbigentReplayTraceStep>,
 ) {
-  fun isValidFor(key: ArbigentReplayTraceKey): Boolean {
-    return version == key.version &&
-      scenarioId == key.scenarioId &&
-      taskIndex == key.taskIndex &&
-      taskIdentity == key.taskIdentity &&
-      goalHash == key.goalHash &&
-      steps.isNotEmpty() &&
-      steps.all { traceStep ->
-        val action = traceStep.decisionOutput.agentActions.singleOrNull()
-        action != null &&
-          (!action.requiresElementIdentity() || traceStep.decisionOutput.step.targetElement != null)
-      } &&
-      steps.last().decisionOutput.agentActions.any { it is GoalAchievedAgentAction }
+  fun isValidFor(key: ArbigentReplayTraceKey): Boolean = invalidReasonFor(key) == null
+
+  /**
+   * Why this trace cannot be replayed, or null when it can. A trace is rejected as a whole, so
+   * without a reason a scenario silently never replays and the cause is invisible.
+   */
+  fun invalidReasonFor(key: ArbigentReplayTraceKey): String? {
+    if (version != key.version) return "it was recorded by arbigent $version, not ${key.version}"
+    if (scenarioId != key.scenarioId) return "it was recorded for scenario $scenarioId"
+    if (taskIndex != key.taskIndex) return "it was recorded for task ${taskIndex + 1}"
+    if (taskIdentity != key.taskIdentity) return "it was recorded for a different task"
+    if (goalHash != key.goalHash) return "the goal changed since it was recorded"
+    if (steps.isEmpty()) return "it has no steps"
+    steps.forEachIndexed { index, traceStep ->
+      val action = traceStep.decisionOutput.agentActions.singleOrNull()
+        ?: return "step ${index + 1} does not contain exactly one action"
+      if (action.requiresElementIdentity() && traceStep.decisionOutput.step.targetElement == null) {
+        return "step ${index + 1} (${action.stepLogText()}) targets an element with no text, " +
+          "resource id or accessibility id to find it by on the next run"
+      }
+    }
+    if (steps.last().decisionOutput.agentActions.none { it is GoalAchievedAgentAction }) {
+      return "it does not end by reaching the goal"
+    }
+    return null
   }
 
   companion object {
-    fun fromContext(
+    /**
+     * The trace this run would produce. Ask [invalidReasonFor] whether it can actually be stored;
+     * building it unconditionally is what lets the caller report why it was rejected.
+     */
+    fun candidateFrom(
       key: ArbigentReplayTraceKey,
       contextHolder: ArbigentContextHolder,
-    ): ArbigentReplayTrace? {
-      val trace = ArbigentReplayTrace(
+    ): ArbigentReplayTrace {
+      return ArbigentReplayTrace(
         version = key.version,
         scenarioId = key.scenarioId,
         taskIndex = key.taskIndex,
@@ -271,7 +287,6 @@ internal data class ArbigentReplayTrace(
           }
           .toList(),
       )
-      return trace.takeIf { it.isValidFor(key) }
     }
   }
 }

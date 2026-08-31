@@ -303,14 +303,19 @@ public class ArbigentScenarioExecutor internal constructor(
       if (scenario.replayWithFallback) {
         taskAssignments().forEachIndexed { index, assignment ->
           val key = replayTraceKeys[index]
-          val trace = assignment.agent.latestArbigentContext()
-            ?.let { contextHolder -> ArbigentReplayTrace.fromContext(key, contextHolder) }
-          if (trace != null) {
-            replayTraceStore.write(key, trace)
+          val candidate = assignment.agent.latestArbigentContext()
+            ?.let { ArbigentReplayTrace.candidateFrom(key, it) }
+          val reason = if (candidate == null) {
+            "the run produced no steps to record"
+          } else {
+            candidate.invalidReasonFor(key)
+          }
+          if (reason == null) {
+            replayTraceStore.write(key, requireNotNull(candidate))
           } else {
             replayTraceStore.delete(key)
             arbigentInfoLog(
-              "Skipped unsafe replay trace for scenario ${scenario.id}, task ${index + 1}",
+              "Not recording a replay trace for scenario ${scenario.id}, task ${index + 1}: $reason",
             )
           }
         }
