@@ -98,7 +98,20 @@ class ArbigentReplayTraceTest {
 
   @Test
   fun `failed optimistic execution keeps decision cache while normal execution purges it`() = runTest {
-    val cache = RecordingDecisionCache()
+    val cache = ArbigentAiDecisionCache.Memory.create()
+    val cachedAction = GoalAchievedAgentAction()
+    cache.set(
+      "layout-cache-key",
+      ArbigentAi.DecisionOutput(
+        agentActions = listOf(cachedAction),
+        step = ArbigentContextHolder.Step(
+          stepId = "step",
+          agentAction = cachedAction,
+          cacheKey = "layout-cache-key",
+          screenshotFilePath = "screenshot.png",
+        ),
+      ),
+    )
     val interceptor = ArbigentDecisionCacheInterceptor(
       aiDecisionCache = cache,
       cacheOptions = ArbigentScenarioCacheOptions(),
@@ -116,12 +129,18 @@ class ArbigentReplayTraceTest {
     interceptor.intercept(executeInput(ArbigentAttemptMode.OptimisticReplay)) {
       ArbigentAgent.ExecutionResult.Failed(contextHolder)
     }
-    assertEquals(emptyList(), cache.removedKeys)
+    assertNotNull(
+      cache.get("layout-cache-key"),
+      "A failed optimistic attempt must keep the layout cache for the fallback retry",
+    )
 
     interceptor.intercept(executeInput(ArbigentAttemptMode.Normal)) {
       ArbigentAgent.ExecutionResult.Failed(contextHolder)
     }
-    assertEquals(listOf("layout-cache-key"), cache.removedKeys)
+    assertNull(
+      cache.get("layout-cache-key"),
+      "A failed normal attempt must purge the layout cache as before",
+    )
   }
 
   private fun executeInput(attemptMode: ArbigentAttemptMode): ArbigentAgent.ExecuteInput {
@@ -148,18 +167,6 @@ class ArbigentReplayTraceTest {
       imageAssertionChain = { ArbigentAi.ImageAssertionOutput(emptyList()) },
       executeActionChain = { ArbigentAgent.ExecuteActionsOutput() },
     )
-  }
-
-  private class RecordingDecisionCache : ArbigentAiDecisionCache.Enabled {
-    val removedKeys = mutableListOf<String>()
-
-    override suspend fun get(key: String): ArbigentAi.DecisionOutput? = null
-
-    override suspend fun set(key: String, value: ArbigentAi.DecisionOutput) = Unit
-
-    override suspend fun remove(key: String) {
-      removedKeys += key
-    }
   }
 
   private fun element(
