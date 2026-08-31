@@ -2,6 +2,7 @@ package io.github.takahirom.arbigent
 
 import io.github.takahirom.arbigent.result.ArbigentStepSource
 
+import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -16,6 +17,53 @@ public enum class ArbigentAttemptMode {
 internal class ReplayDivergenceException(
   override val message: String,
 ) : Exception(message)
+
+/**
+ * Waits before a replayed step is captured, so the app is as far along as it was when the trace
+ * was recorded. This must run before [step] reads the elements and UI tree: replay makes no AI
+ * call, so without it the next screen is snapshotted before it has settled and an index-based
+ * action resolves against a half-built element list.
+ */
+internal class ArbigentReplayPacingStepInterceptor(
+  private val trace: ArbigentReplayTrace,
+) : ArbigentStepInterceptor {
+  private var previousStepStartedAtMillis: Long? = null
+
+  override suspend fun intercept(
+    stepInput: ArbigentAgent.StepInput,
+    chain: ArbigentStepInterceptor.Chain,
+  ): ArbigentAgent.StepResult {
+    val replayIndex = stepInput.arbigentContextHolder.steps()
+      .asSequence()
+      .filter { step -> step.agentAction != null }
+      .distinctBy { step -> step.stepId }
+      .count()
+    waitOutRecordedGap(replayIndex)
+    previousStepStartedAtMillis = TimeProvider.get().currentTimeMillis()
+    return chain.proceed(stepInput)
+  }
+
+  private suspend fun waitOutRecordedGap(replayIndex: Int) {
+    val previousStartedAt = previousStepStartedAtMillis ?: return
+    val previousRecordedAt = trace.steps.getOrNull(replayIndex - 1)
+      ?.decisionOutput?.step?.timestamp ?: return
+    val recordedAt = trace.steps.getOrNull(replayIndex)?.decisionOutput?.step?.timestamp ?: return
+    val recordedGap = recordedAt - previousRecordedAt
+    if (recordedGap <= 0) return
+    val alreadySpent = TimeProvider.get().currentTimeMillis() - previousStartedAt
+    val remaining = (recordedGap - alreadySpent).coerceAtMost(MAX_PACING_WAIT_MILLIS)
+    if (remaining <= 0) return
+    arbigentInfoLog(
+      "Replay pacing: waiting ${remaining}ms before capturing step ${replayIndex + 1}",
+    )
+    delay(remaining)
+  }
+
+  private companion object {
+    // A recorded gap can be pathological (a hiccup while recording); do not inherit it unbounded.
+    const val MAX_PACING_WAIT_MILLIS = 60_000L
+  }
+}
 
 internal class ArbigentReplayDecisionInterceptor(
   private val trace: ArbigentReplayTrace,
@@ -66,6 +114,7 @@ internal class ArbigentReplayDecisionInterceptor(
       ),
     )
   }
+
 }
 
 @Serializable

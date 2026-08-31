@@ -81,8 +81,12 @@ public class ArbigentAgent internal constructor(
       }
     }
   )
-  private val stepInterceptors: List<ArbigentStepInterceptor> = interceptors
-    .filterIsInstance<ArbigentStepInterceptor>()
+  private val stepInterceptors: List<ArbigentStepInterceptor> = buildList {
+    if (replayTrace != null) {
+      add(ArbigentReplayPacingStepInterceptor(replayTrace))
+    }
+    addAll(interceptors.filterIsInstance<ArbigentStepInterceptor>())
+  }
   private val stepChain: suspend (StepInput) -> StepResult = { input ->
     var chain: suspend (StepInput) -> StepResult = { stepInput -> step(stepInput) }
     stepInterceptors.reversed().forEach { interceptor ->
