@@ -28,6 +28,23 @@ class AssertionScreenshotHistoryTest {
     )
   }
 
+  /**
+   * A stuck screen, or a screenshot that could not be taken, records a step against the screen the
+   * assertion is about before the assertion runs. Handing that screenshot over as its own
+   * predecessor would leave the assertion comparing an image with itself.
+   */
+  @Test
+  fun `a step already recorded against the current screenshot does not fill the history`() {
+    assertEquals(
+      listOf("s2", "s1"),
+      assertionScreenshotFilePaths(
+        currentScreenshotFilePath = "s2",
+        previousScreenshotFilePaths = listOf("s2", "s1"),
+        historyCount = 2,
+      ),
+    )
+  }
+
   @Test
   fun `the first step of a task has nothing to compare against`() {
     assertEquals(
