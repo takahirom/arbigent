@@ -125,7 +125,24 @@ class TaskLevelReplayFallbackTest {
         firstTaskDecisions,
         "the first task should have replayed without asking the AI anything",
       )
+
+      // The replacement agent starts from the device state the replayed actions left behind, so
+      // its own steps alone would not replay from the start of the task. Both Fake AI runs decide
+      // two actions and then the goal; the replay executed the two actions before the assertion
+      // failed, so the stored trace holds those two plus the three the replacement decided.
+      assertEquals(
+        5,
+        secondTaskTraceStepCount(),
+        "the fallback trace should keep what the task replayed before it fell back",
+      )
     }
+
+  private fun secondTaskTraceStepCount(): Int {
+    val trace = ArbigentFiles.traceDir.listFiles().orEmpty()
+      .map { it.readText() }
+      .single { """"taskIndex"\s*:\s*1""".toRegex().containsMatchIn(it) }
+    return """"decisionOutput"""".toRegex().findAll(trace).count()
+  }
 
   /**
    * [FakeAi] labels every step it decides with the same id, and a trace keeps one step per id, so

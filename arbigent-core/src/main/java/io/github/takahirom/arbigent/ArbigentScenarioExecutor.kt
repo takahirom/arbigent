@@ -208,9 +208,14 @@ public class ArbigentScenarioExecutor internal constructor(
     var finishedSuccessfully = false
     var retryRemain = scenario.maxRetry
     var normalRetriesExhausted = false
+    // What a task replayed before it fell back, by task index. A replacement agent starts from the
+    // device state those actions left behind and records only what it did from there, so a trace
+    // written from its steps alone would not be replayable from the start of the task.
+    val replayedPrefixes = mutableMapOf<Int, List<ArbigentContextHolder.Step>>()
     try {
       do {
         yield()
+        replayedPrefixes.clear()
         _taskAssignmentsStateFlow.value.forEach {
           it.agent.cancel()
         }
@@ -273,6 +278,7 @@ public class ArbigentScenarioExecutor internal constructor(
                   "${replayFailureReason(agent)}. Re-running this task in normal mode and keeping the " +
                   "tasks before it.",
               )
+              replayedPrefixes[index] = agent.latestArbigentContext()?.steps().orEmpty()
               agent.cancel()
               _taskAssignmentsStateFlow.value = taskAssignments().toMutableList().also {
                 it[index] = ArbigentTaskAssignment(
@@ -341,7 +347,13 @@ public class ArbigentScenarioExecutor internal constructor(
         taskAssignments().forEachIndexed { index, assignment ->
           val key = replayTraceKeys[index]
           val candidate = assignment.agent.latestArbigentContext()
-            ?.let { ArbigentReplayTrace.candidateFrom(key, it) }
+            ?.let {
+              ArbigentReplayTrace.candidateFrom(
+                key = key,
+                contextHolder = it,
+                precedingSteps = replayedPrefixes[index].orEmpty(),
+              )
+            }
           val reason = if (candidate == null) {
             "the run produced no steps to record"
           } else {
