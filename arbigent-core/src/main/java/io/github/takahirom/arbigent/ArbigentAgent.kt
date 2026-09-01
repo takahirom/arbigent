@@ -804,17 +804,14 @@ public fun AgentConfigBuilder(
       ): ArbigentAi.ImageAssertionOutput {
         val output = chain.proceed(
           imageAssertionInput.copy(
-            screenshotFilePaths = (1..imageAssertions.historyCount).mapNotNull { index ->
-              val path: String? = if (index == 1) {
-                imageAssertionInput.screenshotFilePaths.first()
-              } else {
-                imageAssertionInput.arbigentContextHolder.steps().reversed()
-                  .map { it.screenshotFilePath }
-                  .distinct()
-                  .getOrNull(index - 1)
-              }
-              path
-            },
+            screenshotFilePaths = assertionScreenshotFilePaths(
+              currentScreenshotFilePath = imageAssertionInput.screenshotFilePaths.first(),
+              previousScreenshotFilePaths = imageAssertionInput.arbigentContextHolder.steps()
+                .reversed()
+                .map { it.screenshotFilePath }
+                .distinct(),
+              historyCount = imageAssertions.historyCount,
+            ),
             assertions = imageAssertionInput.assertions + imageAssertions
           )
         )
@@ -905,6 +902,28 @@ public interface ArbigentStepInterceptor : ArbigentInterceptor {
   }
 }
 
+
+/**
+ * Screenshots handed to an image assertion: the one being judged, followed by up to
+ * [historyCount] - 1 earlier ones, newest first.
+ *
+ * An assertion runs before its own step is recorded, so [previousScreenshotFilePaths] already
+ * starts at the immediately preceding screenshot. Skipping that first entry both delayed a
+ * two-image assertion until the third step of a task and then compared non-adjacent screenshots.
+ * An assertion about what changed between images cannot pass while it is handed only one.
+ *
+ * A step can be recorded against the screen the assertion is about before the assertion runs — a
+ * stuck screen or a failed screenshot both leave one behind — so the screenshot being judged is
+ * dropped from the history rather than handed over a second time as its own predecessor.
+ */
+internal fun assertionScreenshotFilePaths(
+  currentScreenshotFilePath: String,
+  previousScreenshotFilePaths: List<String>,
+  historyCount: Int,
+): List<String> = listOf(currentScreenshotFilePath) +
+  previousScreenshotFilePaths
+    .filterNot { it == currentScreenshotFilePath }
+    .take((historyCount - 1).coerceAtLeast(0))
 
 public fun defaultAgentActionTypesForVisualMode(): List<AgentActionType> {
   return listOf(
