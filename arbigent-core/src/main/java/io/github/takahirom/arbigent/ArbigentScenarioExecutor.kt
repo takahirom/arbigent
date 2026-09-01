@@ -226,8 +226,12 @@ public class ArbigentScenarioExecutor internal constructor(
           )
         }
         _taskAssignmentsHistoryStateFlow.value += listOf(taskAssignments())
-        for ((index, taskAgent) in taskAssignments().withIndex()) {
-          val (task, agent) = taskAgent
+        // Tasks that already fell back to normal execution in this attempt. A task gets one
+        // fallback: failing again is an ordinary failure and restarts the whole scenario.
+        val fellBackTaskIndexes = mutableSetOf<Int>()
+        var index = 0
+        while (index < taskAssignments().size) {
+          val (task, agent) = taskAssignments()[index]
           _arbigentScenarioRunningInfoStateFlow.value = ArbigentScenarioRunningInfo(
             allTasks = taskAssignments().size,
             runningTasks = index + 1,
@@ -255,6 +259,35 @@ public class ArbigentScenarioExecutor internal constructor(
             )
           }
           if (!agent.isGoalAchieved()) {
+            // A replayed task that fails is not evidence that the tasks before it are wrong: it is
+            // this task's recorded actions, or the assertion judging them, that did not hold. Only
+            // this task is re-run under the AI, and the tasks after it replay again — a trace that
+            // no longer starts from the screen the AI left behind diverges on its first step and
+            // falls back the same way. Restarting the whole scenario instead would throw away
+            // every task already replayed, which is the entire saving the mode exists for.
+            if (attemptMode == ArbigentAttemptMode.ReplayWithFallback &&
+              fellBackTaskIndexes.add(index)
+            ) {
+              arbigentInfoLog(
+                "Replay fallback for scenario ${scenario.id}, task ${index + 1}: " +
+                  "${replayFailureReason(agent)}. Re-running this task in normal mode and keeping the " +
+                  "tasks before it.",
+              )
+              agent.cancel()
+              _taskAssignmentsStateFlow.value = taskAssignments().toMutableList().also {
+                it[index] = ArbigentTaskAssignment(
+                  task,
+                  ArbigentAgent(
+                    agentConfig = task.agentConfig,
+                    dispatcher = dispatcher,
+                    replayTrace = null,
+                  ),
+                )
+              }
+              _taskAssignmentsHistoryStateFlow.value += listOf(taskAssignments())
+              yield()
+              continue
+            }
             arbigentDebugLog("Arbigent.execute break because agent is not achieved")
             break
           }
@@ -262,13 +295,17 @@ public class ArbigentScenarioExecutor internal constructor(
             arbigentDebugLog("Arbigent.execute all agents are achieved")
             finishedSuccessfully = true
           }
+          index++
           yield()
         }
         if (!finishedSuccessfully) {
           if (attemptMode == ArbigentAttemptMode.ReplayWithFallback) {
-            val reason = replayFailureReason()
+            // A task failed even after its own fallback to normal execution. The tasks before it
+            // are now the suspect: a replayed one may have ended somewhere close enough that its
+            // assertions passed but wrong enough that this task cannot proceed. Every retry from
+            // here is fully AI-driven, so replaying a drifting prefix cannot burn them all.
             arbigentInfoLog(
-              "Replay fallback for scenario ${scenario.id}: $reason. " +
+              "Replay fallback for scenario ${scenario.id} did not recover. " +
                 "Restarting all tasks and initializers in normal mode.",
             )
             attemptMode = ArbigentAttemptMode.Normal
@@ -325,9 +362,13 @@ public class ArbigentScenarioExecutor internal constructor(
     arbigentDebugLog("Arbigent.execute end")
   }
 
-  private fun replayFailureReason(): String {
-    return taskAssignments().asSequence()
-      .mapNotNull { assignment -> assignment.agent.latestArbigentContext() }
+  /**
+   * Why the replayed [agent] gave up, taken from its own steps. Reading every task's steps instead
+   * would report a divergence an earlier task recovered from, in preference to the one that
+   * actually stopped this task.
+   */
+  private fun replayFailureReason(agent: ArbigentAgent): String {
+    return listOfNotNull(agent.latestArbigentContext()).asSequence()
       .flatMap { contextHolder -> contextHolder.steps().asReversed().asSequence() }
       .mapNotNull { step -> step.feedback }
       .firstOrNull { feedback ->
