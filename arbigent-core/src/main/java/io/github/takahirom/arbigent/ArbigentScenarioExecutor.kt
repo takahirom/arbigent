@@ -278,7 +278,13 @@ public class ArbigentScenarioExecutor internal constructor(
                   "${replayFailureReason(agent)}. Re-running this task in normal mode and keeping the " +
                   "tasks before it.",
               )
-              replayedPrefixes[index] = agent.latestArbigentContext()?.steps().orEmpty()
+              // A task that starts by resetting the device resets again when it is re-run here, so
+              // the AI ran from the same place a replay of this task would start from and its steps
+              // stand alone as a trace. Only a task that carries on from the previous one needs the
+              // actions it had already replayed put back in front of them.
+              if (!task.resetsDeviceState()) {
+                replayedPrefixes[index] = agent.latestArbigentContext()?.steps().orEmpty()
+              }
               agent.cancel()
               _taskAssignmentsStateFlow.value = taskAssignments().toMutableList().also {
                 it[index] = ArbigentTaskAssignment(

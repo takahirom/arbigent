@@ -137,6 +137,91 @@ class TaskLevelReplayFallbackTest {
       )
     }
 
+  /**
+   * A task that begins by resetting the device begins the same way when it is re-run, so what the
+   * AI did after the reset is a trace on its own. Keeping the actions replayed before the reset
+   * would have the next run replay them again on top of it.
+   */
+  @Test
+  fun `a task that resets the device records only what it did after the reset`() = runTest {
+    ArbigentFiles.traceDir =
+      Files.createTempDirectory("arbigent-task-level-fallback-reset").toFile()
+    val testDispatcher = coroutineContext[CoroutineDispatcher]!!
+
+    var failNextAssertion = false
+    val firstTaskConfig = AgentConfig {
+      deviceFactory { FakeDevice() }
+      aiFactory { FakeAi() }
+      addInterceptor(object : ArbigentDecisionInterceptor {
+        override suspend fun intercept(
+          decisionInput: ArbigentAi.DecisionInput,
+          chain: ArbigentDecisionInterceptor.Chain,
+        ): ArbigentAi.DecisionOutput = chain.proceed(decisionInput).withStepIdOf(decisionInput)
+      })
+    }
+    val secondTaskConfig = AgentConfig {
+      deviceFactory { FakeDevice() }
+      aiFactory { FakeAi() }
+      addInterceptor(object : ArbigentInitializerInterceptor {
+        override val resetsDeviceState: Boolean = true
+
+        override fun intercept(device: ArbigentDevice, chain: ArbigentInitializerInterceptor.Chain) {
+          chain.proceed(device)
+        }
+      })
+      addInterceptor(object : ArbigentDecisionInterceptor {
+        override suspend fun intercept(
+          decisionInput: ArbigentAi.DecisionInput,
+          chain: ArbigentDecisionInterceptor.Chain,
+        ): ArbigentAi.DecisionOutput = chain.proceed(decisionInput).withStepIdOf(decisionInput)
+      })
+      addInterceptor(object : ArbigentImageAssertionInterceptor {
+        override fun intercept(
+          imageAssertionInput: ArbigentAi.ImageAssertionInput,
+          chain: ArbigentImageAssertionInterceptor.Chain,
+        ): ArbigentAi.ImageAssertionOutput {
+          if (!failNextAssertion) return chain.proceed(imageAssertionInput)
+          failNextAssertion = false
+          return ArbigentAi.ImageAssertionOutput(
+            listOf(
+              ArbigentAi.ImageAssertionResult(
+                assertionPrompt = "prompt",
+                isPassed = false,
+                fulfillmentPercent = 0,
+                explanation = "explanation",
+              ),
+            ),
+          )
+        }
+      })
+    }
+
+    fun scenario() = ArbigentScenario(
+      id = "scenario",
+      agentTasks = listOf(
+        ArbigentAgentTask("task-1", "goal1", firstTaskConfig),
+        ArbigentAgentTask("task-2", "goal2", secondTaskConfig),
+      ),
+      maxStepCount = 10,
+      tags = setOf(),
+      isLeaf = true,
+      replayWithFallback = true,
+    )
+
+    ArbigentScenarioExecutor(testDispatcher).execute(scenario(), MCPClient())
+    advanceUntilIdle()
+
+    failNextAssertion = true
+    ArbigentScenarioExecutor(testDispatcher).execute(scenario(), MCPClient())
+    advanceUntilIdle()
+
+    assertEquals(
+      3,
+      secondTaskTraceStepCount(),
+      "a task that resets should record its re-run alone, without the replayed prefix",
+    )
+  }
+
   private fun secondTaskTraceStepCount(): Int {
     val trace = ArbigentFiles.traceDir.listFiles().orEmpty()
       .map { it.readText() }
