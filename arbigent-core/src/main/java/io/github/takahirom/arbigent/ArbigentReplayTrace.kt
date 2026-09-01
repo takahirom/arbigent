@@ -337,6 +337,7 @@ internal data class ArbigentReplayTrace(
     fun candidateFrom(
       key: ArbigentReplayTraceKey,
       contextHolder: ArbigentContextHolder,
+      precedingSteps: List<ArbigentContextHolder.Step> = emptyList(),
     ): ArbigentReplayTrace {
       return ArbigentReplayTrace(
         version = key.version,
@@ -344,10 +345,7 @@ internal data class ArbigentReplayTrace(
         taskIndex = key.taskIndex,
         taskIdentity = key.taskIdentity,
         goalHash = key.goalHash,
-        steps = contextHolder.steps()
-          .asSequence()
-          .filter { step -> step.agentAction != null }
-          .distinctBy { step -> step.stepId }
+        steps = (precedingSteps.replayable() + contextHolder.steps().replayable())
           .map { step ->
             ArbigentReplayTraceStep(
               decisionOutput = ArbigentAi.DecisionOutput(
@@ -355,10 +353,19 @@ internal data class ArbigentReplayTrace(
                 step = step,
               ),
             )
-          }
-          .toList(),
+          },
       )
     }
+
+    /**
+     * The actions of these steps, in order. Steps carrying no action are feedback the agent left
+     * for itself, and a step id repeats when several were recorded for one decision.
+     */
+    private fun List<ArbigentContextHolder.Step>.replayable(): List<ArbigentContextHolder.Step> =
+      asSequence()
+        .filter { step -> step.agentAction != null }
+        .distinctBy { step -> step.stepId }
+        .toList()
   }
 }
 

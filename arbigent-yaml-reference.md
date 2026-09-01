@@ -119,7 +119,7 @@ Legacy scenario-level field, tagged by `type:`. Distinct from the `CleanupData`
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `aiDecisionCacheStrategy` | [AiDecisionCacheStrategy](#aidecisioncachestrategy) | `Disabled` | Backend for the AI-decision cache. |
-| `replayWithFallback` | Boolean | `false` | Replay the actions a scenario recorded on its last successful run instead of asking the AI for each step, reproducing the recorded pacing so the app is driven as it was when it passed. Project-wide only: replay is decided once for a whole run. A scenario with no `imageAssertions` is run normally, since they are what verifies a replayed run. If a recorded target element is gone, or an assertion fails, the scenario restarts in normal AI-driven mode. |
+| `replayWithFallback` | Boolean | `false` | Replay the actions a scenario recorded on its last successful run instead of asking the AI for each step, reproducing the recorded pacing so the app is driven as it was when it passed. Project-wide only: replay is decided once for a whole run. A scenario with no `imageAssertions` is run normally, since they are what verifies a replayed run. If a recorded target element is gone, or an assertion fails, only that task is re-run in normal AI-driven mode and the tasks after it go back to replaying; the tasks before it keep what they replayed. If that task fails again, the whole scenario restarts in normal AI-driven mode. |
 
 #### AiDecisionCacheStrategy
 

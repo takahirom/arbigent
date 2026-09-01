@@ -702,6 +702,8 @@ public fun AgentConfigBuilder(
 
       is ArbigentScenarioContent.InitializationMethod.LaunchApp -> {
         addInterceptor(object : ArbigentInitializerInterceptor {
+          override val resetsDeviceState: Boolean = true
+
           override fun intercept(
             device: ArbigentDevice,
             chain: ArbigentInitializerInterceptor.Chain
@@ -726,6 +728,8 @@ public fun AgentConfigBuilder(
 
       is ArbigentScenarioContent.InitializationMethod.CleanupData -> {
         addInterceptor(object : ArbigentInitializerInterceptor {
+          override val resetsDeviceState: Boolean = true
+
           override fun intercept(
             device: ArbigentDevice,
             chain: ArbigentInitializerInterceptor.Chain
@@ -746,6 +750,8 @@ public fun AgentConfigBuilder(
 
       is ArbigentScenarioContent.InitializationMethod.OpenLink -> {
         addInterceptor(object : ArbigentInitializerInterceptor {
+          override val resetsDeviceState: Boolean = true
+
           override fun intercept(
             device: ArbigentDevice,
             chain: ArbigentInitializerInterceptor.Chain
@@ -766,6 +772,11 @@ public fun AgentConfigBuilder(
 
       is ArbigentScenarioContent.InitializationMethod.MaestroYaml -> {
         addInterceptor(object : ArbigentInitializerInterceptor {
+          // A flow can do anything, so it is read as resetting: taking a trace from the wrong
+          // starting point costs a diverged replay, replaying actions the flow already undid can
+          // repeat them for real.
+          override val resetsDeviceState: Boolean = true
+
           override fun intercept(
             device: ArbigentDevice,
             chain: ArbigentInitializerInterceptor.Chain
@@ -847,6 +858,19 @@ public interface ArbigentInterceptor
 
 public interface ArbigentInitializerInterceptor : ArbigentInterceptor {
   public fun intercept(device: ArbigentDevice, chain: Chain)
+
+  /**
+   * Whether this initializer puts the device somewhere known regardless of where it was, the way
+   * launching an app or clearing its data does. Backing out or waiting does not.
+   *
+   * A recorded trace only replays correctly from the state it was recorded from. Initializers run
+   * again at the start of every run of their task, so a task that resets is back at the same place
+   * each time and what the AI did after the reset is a trace on its own. A task that does not reset
+   * starts wherever the previous task left off, so a run that fell back mid-task only makes sense
+   * as a trace together with the actions it had already replayed.
+   */
+  public val resetsDeviceState: Boolean
+    get() = false
   public fun interface Chain {
     public fun proceed(device: ArbigentDevice)
   }
