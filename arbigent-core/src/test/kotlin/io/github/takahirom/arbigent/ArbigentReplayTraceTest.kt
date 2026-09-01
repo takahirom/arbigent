@@ -213,6 +213,29 @@ class ArbigentReplayTraceTest {
   }
 
   @Test
+  fun `a target whose text sits in a child is still identified and found after it moves`() {
+    // The shape an Android TV card or tab has: the focusable container carries no identifying
+    // attribute and the text is in a non-clickable child.
+    val original = tvCardElement(text = "Special footage")
+    val identity = assertNotNull(ArbigentElementIdentity.from(original, listOf(original)))
+    assertEquals("Special footage", identity.text)
+
+    // The same card after focus moved it to a different position in the element list.
+    val moved = tvCardElement(text = "Special footage")
+    val current = ArbigentElementList(
+      listOf(tvCardElement(text = "Documentary"), tvCardElement(text = "Trailer"), moved),
+      screenWidth = 100,
+    )
+    assertEquals(moved, identity.findMatch(current))
+
+    assertNull(
+      identity.findMatch(
+        ArbigentElementList(listOf(tvCardElement(text = "Documentary")), screenWidth = 100),
+      ),
+    )
+  }
+
+  @Test
   fun `failed replay attempt keeps decision cache while normal execution purges it`() = runTest {
     val cache = ArbigentAiDecisionCache.Memory.create()
     val cachedAction = GoalAchievedAgentAction()
@@ -344,6 +367,39 @@ class ArbigentReplayTraceTest {
       executeActionChain = { ArbigentAgent.ExecuteActionsOutput() },
     )
   }
+
+  private fun tvCardElement(text: String): ArbigentElement = ArbigentElement(
+    index = 0,
+    textForAI = "View(text=$text, )",
+    rawText = text,
+    identifierData = ArbigentElement.IdentifierData(emptyList(), 0),
+    treeNode = TreeNode(
+      attributes = mutableMapOf(
+        "class" to "android.view.View",
+        "clickable" to "true",
+        "text" to "",
+        "resource-id" to "",
+        "accessibilityText" to "",
+      ),
+      children = listOf(
+        TreeNode(
+          attributes = mutableMapOf(
+            "class" to "android.widget.TextView",
+            "clickable" to "false",
+            "text" to text,
+            "resource-id" to "",
+            "accessibilityText" to "",
+          ),
+          children = emptyList(),
+        ),
+      ),
+    ),
+    x = 0,
+    y = 0,
+    width = 10,
+    height = 10,
+    isVisible = true,
+  )
 
   private fun element(
     text: String,
