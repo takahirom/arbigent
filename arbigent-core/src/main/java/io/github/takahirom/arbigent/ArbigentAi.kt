@@ -54,6 +54,16 @@ public interface ArbigentAi {
     val arbigentContextHolder: ArbigentContextHolder,
     val screenshotFilePaths: List<String>,
     val assertions: ArbigentImageAssertions,
+    /**
+     * Takes one more screenshot of the screen being judged, after a short wait, and returns its
+     * path. Null when the caller cannot take one.
+     *
+     * An assertion that asks what changed between images has nothing to answer with when the step
+     * history is too short to fill [ArbigentImageAssertions.historyCount] — the first steps of a
+     * task have no earlier screenshot at all. Judging it on fewer images than it asked for reads
+     * as a failed assertion rather than as missing input, so the frames are captured now instead.
+     */
+    val captureAdditionalScreenshot: (() -> String?)? = null,
   )
   public data class ImageAssertionOutput(
     val results: List<ImageAssertionResult>

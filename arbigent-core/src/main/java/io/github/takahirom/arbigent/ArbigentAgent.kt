@@ -811,6 +811,7 @@ public fun AgentConfigBuilder(
                 .map { it.screenshotFilePath }
                 .distinct(),
               historyCount = imageAssertions.historyCount,
+              captureAdditionalScreenshot = imageAssertionInput.captureAdditionalScreenshot,
             ),
             assertions = imageAssertionInput.assertions + imageAssertions
           )
@@ -903,6 +904,73 @@ public interface ArbigentStepInterceptor : ArbigentInterceptor {
 }
 
 
+private fun takeScreenshot(device: ArbigentDevice, id: String) {
+  for (it in 0..2) {
+    try {
+      device.executeActions(
+        actions = listOf(
+          MaestroCommand(
+            takeScreenshotCommand = TakeScreenshotCommand(id)
+          ),
+        ),
+      )
+      break
+    } catch (e: StatusRuntimeException) {
+      arbigentDebugLog("Failed to take screenshot: $e retry:$it")
+      Thread.sleep(1000)
+    }
+  }
+}
+
+private fun convertScreenshot(
+  originalScreenshotFilePath: String,
+  id: String,
+  imageFormat: ImageFormat,
+): String {
+  if (imageFormat == ImageFormat.PNG) {
+    return originalScreenshotFilePath
+  }
+  val convertedScreenshotFilePath =
+    ArbigentFiles.screenshotsDir.absolutePath + File.separator + "$id.webp"
+  val originalFile = File(originalScreenshotFilePath)
+  val originalImage = ImageIO.read(originalFile)
+  ArbigentImageEncoder.saveImage(
+    originalImage,
+    convertedScreenshotFilePath,
+    ImageFormat.WEBP
+  )
+  originalFile.delete()
+  originalImage.flush()
+  return convertedScreenshotFilePath
+}
+
+/**
+ * Takes one more screenshot of the same screen after [ADDITIONAL_SCREENSHOT_WAIT_MILLIS], so an
+ * assertion about what changes between images has a second frame to look at. Returns null when the
+ * screenshot could not be taken; the assertion then runs on what it already has.
+ */
+private fun captureAdditionalScreenshot(
+  device: ArbigentDevice,
+  stepId: String,
+  sequence: Int,
+  imageFormat: ImageFormat,
+): String? {
+  val id = "$stepId-history-$sequence"
+  Thread.sleep(ADDITIONAL_SCREENSHOT_WAIT_MILLIS)
+  takeScreenshot(device, id)
+  val originalScreenshotFilePath =
+    ArbigentFiles.screenshotsDir.absolutePath + File.separator + "$id.png"
+  if (!File(originalScreenshotFilePath).exists()) {
+    arbigentErrorLog("Failed to take an additional screenshot for the image assertion history.")
+    return null
+  }
+  return convertScreenshot(originalScreenshotFilePath, id, imageFormat)
+}
+
+// Long enough that a playing video or an animation has moved on, short enough to add to every
+// assertion that needs it without changing how a run feels.
+private const val ADDITIONAL_SCREENSHOT_WAIT_MILLIS = 1000L
+
 /**
  * Screenshots handed to an image assertion: the one being judged, followed by up to
  * [historyCount] - 1 earlier ones, newest first.
@@ -916,8 +984,18 @@ internal fun assertionScreenshotFilePaths(
   currentScreenshotFilePath: String,
   previousScreenshotFilePaths: List<String>,
   historyCount: Int,
-): List<String> = listOf(currentScreenshotFilePath) +
-  previousScreenshotFilePaths.take((historyCount - 1).coerceAtLeast(0))
+  captureAdditionalScreenshot: (() -> String?)? = null,
+): List<String> {
+  val paths = (listOf(currentScreenshotFilePath) +
+    previousScreenshotFilePaths.take((historyCount - 1).coerceAtLeast(0))).toMutableList()
+  // The first steps of a task have no earlier screenshot to offer. Rather than judging an
+  // assertion on fewer images than it asked for, which reads as the assertion failing, take the
+  // missing frames now.
+  while (paths.size < historyCount && captureAdditionalScreenshot != null) {
+    paths += captureAdditionalScreenshot() ?: break
+  }
+  return paths
+}
 
 public fun defaultAgentActionTypesForVisualMode(): List<AgentActionType> {
   return listOf(
@@ -1184,23 +1262,7 @@ private suspend fun step(
 
   val stepId = contextHolder.generateStepId()
   val elements = device.elements()
-  for (it in 0..2) {
-    try {
-      device.executeActions(
-        actions = listOf(
-          MaestroCommand(
-            takeScreenshotCommand = TakeScreenshotCommand(
-              stepId
-            )
-          ),
-        ),
-      )
-      break
-    } catch (e: StatusRuntimeException) {
-      arbigentDebugLog("Failed to take screenshot: $e retry:$it")
-      Thread.sleep(1000)
-    }
-  }
+  takeScreenshot(device, stepId)
   val uiTreeStrings = device.viewTreeString()
   val uiTreeHash = uiTreeStrings.optimizedTreeString.hashCode().toString().replace("-", "")
   val contextHash = contextHolder.context(aiOptions).hashCode().toString().replace("-", "")
@@ -1221,22 +1283,7 @@ private suspend fun step(
     return StepResult.Failed
   }
   val imageFormat = stepInput.aiOptions?.imageFormat ?: ImageFormat.PNG
-  val screenshotFilePath = if (imageFormat == ImageFormat.PNG) {
-    originalScreenshotFilePath
-  } else {
-    val convertedScreenshotFilePath =
-      ArbigentFiles.screenshotsDir.absolutePath + File.separator + "$stepId.webp"
-    val originalFile = File(originalScreenshotFilePath)
-    val originalImage = ImageIO.read(originalFile)
-    ArbigentImageEncoder.saveImage(
-      originalImage,
-      convertedScreenshotFilePath,
-      ImageFormat.WEBP
-    )
-    originalFile.delete()
-    originalImage.flush()
-    convertedScreenshotFilePath
-  }
+  val screenshotFilePath = convertScreenshot(originalScreenshotFilePath, stepId, imageFormat)
   val requestUuid = java.util.UUID.randomUUID().toString()
   val decisionJsonlFilePath = ArbigentFiles.jsonlsDir.absolutePath + File.separator + "$requestUuid.jsonl"
   val lastStepOrNull = contextHolder.steps().lastOrNull()
@@ -1327,6 +1374,11 @@ private suspend fun step(
         ai = ai,
         arbigentContextHolder = contextHolder,
         screenshotFilePaths = listOf(screenshotFilePath),
+        captureAdditionalScreenshot = object : () -> String? {
+          private var sequence = 0
+          override fun invoke(): String? =
+            captureAdditionalScreenshot(device, stepId, ++sequence, imageFormat)
+        },
         // Added by interceptors
         assertions = ArbigentImageAssertions()
       )
