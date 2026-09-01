@@ -972,8 +972,9 @@ private fun captureAdditionalScreenshot(
 private const val ADDITIONAL_SCREENSHOT_WAIT_MILLIS = 1000L
 
 /**
- * Screenshots handed to an image assertion: the one being judged, followed by up to
- * [historyCount] - 1 earlier ones, newest first.
+ * Screenshots handed to an image assertion, newest first: the one being judged, followed by up to
+ * [historyCount] - 1 earlier ones. When there are not that many, frames taken now fill the gap and
+ * lead the list, since they are newer than the one being judged.
  *
  * An assertion runs before its own step is recorded, so [previousScreenshotFilePaths] already
  * starts at the immediately preceding screenshot. Skipping that first entry both delayed a
@@ -991,10 +992,14 @@ internal fun assertionScreenshotFilePaths(
   // The first steps of a task have no earlier screenshot to offer. Rather than judging an
   // assertion on fewer images than it asked for, which reads as the assertion failing, take the
   // missing frames now.
-  while (paths.size < historyCount && captureAdditionalScreenshot != null) {
-    paths += captureAdditionalScreenshot() ?: break
+  val additionalPaths = mutableListOf<String>()
+  while (paths.size + additionalPaths.size < historyCount && captureAdditionalScreenshot != null) {
+    additionalPaths += captureAdditionalScreenshot() ?: break
   }
-  return paths
+  // Nothing labels these images for the model: their order is the only thing that says which one
+  // is the newest. A frame taken now is newer than the one being judged, so it goes in front of
+  // it, keeping the whole list newest first however it was filled.
+  return additionalPaths.reversed() + paths
 }
 
 public fun defaultAgentActionTypesForVisualMode(): List<AgentActionType> {

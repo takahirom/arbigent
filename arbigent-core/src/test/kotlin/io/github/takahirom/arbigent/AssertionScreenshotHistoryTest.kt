@@ -44,7 +44,7 @@ class AssertionScreenshotHistoryTest {
   fun `a step with no history to offer takes the missing frames now`() {
     val captured = mutableListOf<String>()
     assertEquals(
-      listOf("s1", "extra1", "extra2"),
+      listOf("extra2", "extra1", "s1"),
       assertionScreenshotFilePaths(
         currentScreenshotFilePath = "s1",
         previousScreenshotFilePaths = emptyList(),
@@ -55,6 +55,23 @@ class AssertionScreenshotHistoryTest {
       ),
     )
     assertEquals(2, captured.size)
+  }
+
+  /**
+   * Nothing tells the model which image is which, so a list that runs newest to oldest in one case
+   * and jumps around in another makes an assertion about what changed answerable only by luck.
+   */
+  @Test
+  fun `a frame taken to fill a partly filled history still leads the list`() {
+    assertEquals(
+      listOf("extra1", "s2", "s1"),
+      assertionScreenshotFilePaths(
+        currentScreenshotFilePath = "s2",
+        previousScreenshotFilePaths = listOf("s1"),
+        historyCount = 3,
+        captureAdditionalScreenshot = { "extra1" },
+      ),
+    )
   }
 
   @Test
