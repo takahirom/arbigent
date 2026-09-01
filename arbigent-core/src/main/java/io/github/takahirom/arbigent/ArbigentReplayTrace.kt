@@ -5,6 +5,7 @@ import io.github.takahirom.arbigent.result.ArbigentStepSource
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import maestro.TreeNode
 import java.io.File
 import java.security.MessageDigest
 
@@ -148,12 +149,10 @@ public data class ArbigentElementIdentity(
       .getOrNull(occurrence)
   }
 
-  private fun matches(element: ArbigentElement): Boolean {
-    val attributes = element.treeNode.attributes
-    return text.matchesAttribute(attributes, TEXT_ATTRIBUTE_KEYS) &&
-      resourceId.matchesAttribute(attributes, RESOURCE_ID_ATTRIBUTE_KEYS) &&
-      accessibilityId.matchesAttribute(attributes, ACCESSIBILITY_ATTRIBUTE_KEYS)
-  }
+  private fun matches(element: ArbigentElement): Boolean =
+    text.matchesAttribute(element, TEXT_ATTRIBUTE_KEYS) &&
+      resourceId.matchesAttribute(element, RESOURCE_ID_ATTRIBUTE_KEYS) &&
+      accessibilityId.matchesAttribute(element, ACCESSIBILITY_ATTRIBUTE_KEYS)
 
   public fun description(): String = listOfNotNull(
     text?.let { "text='$it'" },
@@ -162,19 +161,18 @@ public data class ArbigentElementIdentity(
   ).joinToString(", ") + " (occurrence $occurrence)"
 
   private fun String?.matchesAttribute(
-    attributes: Map<String, String>,
+    element: ArbigentElement,
     keys: List<String>,
-  ): Boolean = this == null || keys.any { key -> attributes[key].nonBlankOrNull() == this }
+  ): Boolean = this == null || element.firstNonBlank(keys) == this
 
   public companion object {
     public fun from(
       element: ArbigentElement,
       allElements: List<ArbigentElement>,
     ): ArbigentElementIdentity? {
-      val attributes = element.treeNode.attributes
-      val text = attributes.firstNonBlank(TEXT_ATTRIBUTE_KEYS)
-      val resourceId = attributes.firstNonBlank(RESOURCE_ID_ATTRIBUTE_KEYS)
-      val accessibilityId = attributes.firstNonBlank(ACCESSIBILITY_ATTRIBUTE_KEYS)
+      val text = element.firstNonBlank(TEXT_ATTRIBUTE_KEYS)
+      val resourceId = element.firstNonBlank(RESOURCE_ID_ATTRIBUTE_KEYS)
+      val accessibilityId = element.firstNonBlank(ACCESSIBILITY_ATTRIBUTE_KEYS)
       if (text == null && resourceId == null && accessibilityId == null) return null
 
       val identityWithoutOccurrence = ArbigentElementIdentity(
@@ -198,8 +196,27 @@ public data class ArbigentElementIdentity(
       "name",
     )
 
-    private fun Map<String, String>.firstNonBlank(keys: List<String>): String? =
-      keys.firstNotNullOfOrNull { key -> get(key).nonBlankOrNull() }
+    /**
+     * First non-blank value for [keys], searched over the element's own node and then its
+     * descendants, the same way the element text shown to the AI is built.
+     *
+     * Reading only the node's own attributes made this return null for the shape an Android TV
+     * card or tab actually has: the focusable container carries no text, resource-id or
+     * accessibility text at all, and the text lives in a non-clickable child TextView. No identity
+     * meant no identity was recorded, so a replayed index action was neither rebound to the
+     * element's current position nor reported as a divergence — it silently operated on whatever
+     * happened to sit at the recorded index.
+     */
+    private fun ArbigentElement.firstNonBlank(keys: List<String>): String? =
+      keys.firstNotNullOfOrNull { key ->
+        treeNode.dfs { node -> node.attributes[key].nonBlankOrNull() != null }
+          ?.attributes?.get(key).nonBlankOrNull()
+      }
+
+    private fun TreeNode.dfs(condition: (TreeNode) -> Boolean): TreeNode? {
+      if (condition(this)) return this
+      return children.firstNotNullOfOrNull { child -> child.dfs(condition) }
+    }
 
     private fun String?.nonBlankOrNull(): String? = this?.takeIf(String::isNotBlank)
   }
