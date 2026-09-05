@@ -218,6 +218,9 @@ class ArbigentReplayScriptWriterTest {
     assertTrue(log.contains("\"bounds\":\"[0,0][100,100]\""), log)
     assertTrue(log.contains("\"center\":{\"x\":50,\"y\":50}"), log)
     assertTrue(log.contains("\"screen\":[{\"text\":\"text\""), log)
+
+    val markdown = File(dir, "open-settings.md").readText()
+    assertTrue(markdown.contains("center: (50, 50)"), markdown)
   }
 
   @Test
@@ -241,7 +244,7 @@ class ArbigentReplayScriptWriterTest {
   }
 
   @Test
-  fun `writes the log and the runner, with a file-safe name`() {
+  fun `writes the log, the summary and the runner, with a file-safe name`() {
     val dir = Files.createTempDirectory("replay-scripts").toFile()
     ArbigentReplayScriptWriter(dir).write(
       scenarioId = "open settings/main",
@@ -260,6 +263,7 @@ class ArbigentReplayScriptWriterTest {
       ArbigentReplayScriptWriter.fileBaseName("a/b") != ArbigentReplayScriptWriter.fileBaseName("a b"),
     )
     assertTrue(dir.listFiles().orEmpty().none { it.name.endsWith(".tmp") }, "temp file left behind")
+    assertTrue(File(dir, log.name.removeSuffix(".jsonl") + ".md").isFile)
     val runner = File(dir, "replay.sh")
     assertTrue(runner.isFile)
     assertTrue(runner.canExecute(), "the runner has to be runnable without chmod")
@@ -286,6 +290,22 @@ class ArbigentReplayScriptWriterTest {
       signature = emptyList(),
     )
     assertEquals(emptyList(), dir.listFiles()?.toList().orEmpty())
+  }
+
+  @Test
+  fun `the markdown names the steps, the target and the way to replay them`() {
+    val dir = Files.createTempDirectory("replay-scripts").toFile()
+    ArbigentReplayScriptWriter(dir).write(
+      scenarioId = "open-settings",
+      goals = listOf("Open the settings screen"),
+      tasks = recordedRun(),
+      signature = listOf("com.example.app:id/settings_title"),
+    )
+    val markdown = File(dir, "open-settings.md").readText()
+    assertTrue(markdown.startsWith("# open-settings"))
+    assertTrue(markdown.contains("launch(com.example.app, clearState)"))
+    assertTrue(markdown.contains("./replay.sh open-settings.jsonl"))
+    assertTrue(markdown.contains("com.example.app:id/settings_title"))
   }
 
   private fun lineType(line: String): String =
@@ -336,6 +356,7 @@ class ArbigentReplayScriptExecutorTest {
     advanceUntilIdle()
 
     assertTrue(File(dir, "settings-scenario.jsonl").isFile)
+    assertTrue(File(dir, "settings-scenario.md").isFile)
     assertTrue(File(dir, "replay.sh").isFile)
   }
 

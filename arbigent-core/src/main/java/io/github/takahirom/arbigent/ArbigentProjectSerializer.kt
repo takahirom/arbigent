@@ -270,7 +270,7 @@ public data class ArbigentProjectSettings(
 
 /**
  * Emits a replay script per scenario after a successful run: an event log of what was sent to the
- * device, so the same screens can be reached again without the AI.
+ * device, a readable step summary, and a runner that replays them with `adb` alone.
  *
  * Absent from the project file means the feature is off, so an existing project keeps writing
  * nothing until it opts in.
