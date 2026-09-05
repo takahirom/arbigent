@@ -226,14 +226,11 @@ class ReplayScriptRunnerTest {
     val dir = Files.createTempDirectory("replay-runner-nopython").toFile()
     val script = File(dir, "replay.sh")
     script.writeText(readResource("replay.sh"))
-    val process = ProcessBuilder("/bin/sh", script.absolutePath, "whatever.jsonl")
-      .directory(dir)
-      .redirectErrorStream(true)
-    process.environment()["PATH"] = dir.absolutePath
-    val started = process.start()
-    val output = started.inputStream.bufferedReader().readText()
-    started.waitFor(60, TimeUnit.SECONDS)
-    assertEquals(1, started.exitValue(), output)
+    val (code, output) = run(
+      dir, listOf("/bin/sh", script.absolutePath, "whatever.jsonl"),
+      environment = mapOf("PATH" to dir.absolutePath),
+    )
+    assertEquals(1, code, output)
     assertTrue(output.contains("python3 is required"), output)
   }
 
@@ -497,13 +494,18 @@ class ReplayScriptRunnerTest {
    * Output goes to a file so the time limit applies before anything is read: a hung runner keeps
    * its stdout open, and reading the pipe first would wait on it forever.
    */
-  private fun run(workingDir: File, command: List<String>): Pair<Int, String> {
+  private fun run(
+    workingDir: File,
+    command: List<String>,
+    environment: Map<String, String> = emptyMap(),
+  ): Pair<Int, String> {
     val outputFile = File.createTempFile("replay-runner-output", ".txt", workingDir)
-    val process = ProcessBuilder(command)
+    val builder = ProcessBuilder(command)
       .directory(workingDir)
       .redirectErrorStream(true)
       .redirectOutput(outputFile)
-      .start()
+    builder.environment().putAll(environment)
+    val process = builder.start()
     if (!process.waitFor(60, TimeUnit.SECONDS)) {
       process.destroyForcibly().waitFor()
       fail("the runner did not finish within 60 seconds:\n${outputFile.readText()}")
