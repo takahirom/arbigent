@@ -31,7 +31,8 @@ internal data class ArbigentReplayScriptStep(
 )
 
 /**
- * Writes the replay event log for one successful scenario.
+ * Writes the replay event log for one successful scenario, and the runner shared by every scenario
+ * in the directory.
  *
  * Only successful runs are written. A failed scenario leaves whatever was written before untouched,
  * because a half-finished log replays to a screen the scenario never reached, which is worse than
@@ -56,12 +57,24 @@ internal class ArbigentReplayScriptWriter(
     outputDir.mkdirs()
     val baseName = fileBaseName(scenarioId)
     val logFile = File(outputDir, "$baseName.jsonl")
+    // The runner lands before the log so a log that exists is always runnable.
+    writeRunner()
     writeAtomically(
       logFile,
       jsonLines(scenarioId, goals, tasks, steps, signature, screenWidth, screenHeight)
         .joinToString(separator = "\n", postfix = "\n"),
     )
     arbigentInfoLog("Wrote replay script for scenario $scenarioId to ${logFile.absolutePath}")
+  }
+
+  // The runner is shared by every replay in the directory, so it is replaced atomically like the
+  // logs: a runner mid-copy must never be what a concurrent replay executes.
+  private fun writeRunner() {
+    val source = checkNotNull(javaClass.classLoader.getResourceAsStream(RUNNER_FILE_NAME)) {
+      "$RUNNER_FILE_NAME is missing from the arbigent resources"
+    }
+    val text = source.use { it.readBytes().decodeToString() }
+    writeAtomically(File(outputDir, RUNNER_FILE_NAME), text, executable = true)
   }
 
   private fun flatten(
@@ -71,7 +84,7 @@ internal class ArbigentReplayScriptWriter(
     return tasks.flatMap { task ->
       task.steps.mapNotNull { step ->
         // A step that sent nothing to the device (a memo, a goal-achieved decision) has nothing to
-        // replay, and numbering it would make the step numbers in the log skip.
+        // replay, and numbering it would make the runner's --step numbers skip.
         if (step.events.isEmpty()) return@mapNotNull null
         if (!step.isInit) number++
         ArbigentReplayScriptStep(
@@ -182,6 +195,8 @@ internal class ArbigentReplayScriptWriter(
   }
 
   internal companion object {
+    const val RUNNER_FILE_NAME: String = "replay.sh"
+
     private val json = Json { encodeDefaults = true }
 
     /**

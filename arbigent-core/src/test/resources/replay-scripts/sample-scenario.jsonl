@@ -1,0 +1,14 @@
+{"type":"scenario_start","task":"open-settings","taskIndex":0,"step":0,"ts":1000,"goal":"Open the settings screen","appId":"com.example.app","width":1920,"height":1080}
+{"type":"init","task":"open-settings","taskIndex":0,"step":0,"ts":1001,"event":{"type":"launch_app","appId":"com.example.app","clearState":true,"launchArguments":{"debug_menu":true,"entry":"settings"},"timestamp":1001}}
+{"type":"decision","task":"open-settings","taskIndex":0,"step":1,"ts":1100,"action":"DpadDownAgentAction","log":"Press the down key 3 times","goal":"Open the settings screen","memo":"Move focus to the settings tab","screenshot":"step1.png"}
+{"type":"target","task":"open-settings","taskIndex":0,"step":1,"ts":1100,"text":"Settings","resourceId":"com.example.app:id/settings_tab","occurrence":0,"bounds":"[100,200][300,260]","center":{"x":200,"y":230}}
+{"type":"device","task":"open-settings","taskIndex":0,"step":1,"ts":1101,"event":{"type":"key_press","keyName":"KEYCODE_DPAD_DOWN","timestamp":1101}}
+{"type":"device","task":"open-settings","taskIndex":0,"step":1,"ts":1102,"event":{"type":"key_press","keyName":"KEYCODE_DPAD_DOWN","timestamp":1102}}
+{"type":"device","task":"open-settings","taskIndex":0,"step":1,"ts":1103,"event":{"type":"key_press","keyName":"KEYCODE_DPAD_DOWN","timestamp":1103}}
+{"type":"decision","task":"open-settings","taskIndex":0,"step":2,"ts":1200,"action":"DpadCenterAgentAction","log":"Press the center key","goal":"Open the settings screen","screenshot":"step2.png","screen":[{"text":"Settings"},{"resourceId":"com.example.app:id/settings_tab"}]}
+{"type":"device","task":"open-settings","taskIndex":0,"step":2,"ts":1201,"event":{"type":"key_press","keyName":"KEYCODE_DPAD_CENTER","timestamp":1201}}
+{"type":"decision","task":"open-settings","taskIndex":0,"step":3,"ts":1250,"action":"ClickWithTextAgentAction","log":"Click on text: Account","goal":"Open the settings screen","screenshot":"step3.png"}
+{"type":"target","task":"open-settings","taskIndex":0,"step":3,"ts":1250,"text":"Account","resourceId":"com.example.app:id/account_row","occurrence":0,"bounds":"[100,400][900,460]","center":{"x":500,"y":430}}
+{"type":"device","task":"open-settings","taskIndex":0,"step":3,"ts":1251,"event":{"type":"tap_element","textRegex":"Account","index":0,"timestamp":1251}}
+{"type":"init","task":"open-settings","taskIndex":0,"step":0,"ts":1260,"event":{"type":"launch_app","appId":"com.example.app","clearState":false,"stopApp":true,"launchArguments":{},"timestamp":1260}}
+{"type":"scenario_end","task":"open-settings","taskIndex":0,"step":3,"ts":1300,"status":"success","signature":["com.example.app:id/settings_title","com.example.app:id/settings_list"]}
