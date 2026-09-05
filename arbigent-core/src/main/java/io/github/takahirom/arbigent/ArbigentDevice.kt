@@ -248,7 +248,17 @@ public class MaestroDevice(
   }
 
   @Volatile private var connection: Connection =
-    Connection(maestro, Orchestra(maestro = maestro), onClose)
+    Connection(maestro, newOrchestra(maestro), onClose)
+
+  // Every Orchestra this device runs commands through reports each command back here as soon as
+  // Maestro finishes it, so a flow of several commands (repeated key presses) that fails half way
+  // still leaves the commands that were actually sent in the event log. A command Maestro rejected
+  // (an element it could not find, which the agent then retries with a looser selector) never
+  // completes and so never reaches the log.
+  private fun newOrchestra(maestro: Maestro): Orchestra = Orchestra(
+    maestro = maestro,
+    onCommandComplete = { _, command -> recordDeviceEvents(command) },
+  )
 
   // Volatile read of the live connection so callers keep using `maestro`/`orchestra` unchanged.
   private val maestro: Maestro get() = connection.maestro
@@ -273,15 +283,11 @@ public class MaestroDevice(
     deviceEventListeners.remove(listener)
   }
 
-  private fun recordDeviceEvents(actions: List<MaestroCommand>) {
+  private fun recordDeviceEvents(command: MaestroCommand) {
     if (deviceEventListeners.isEmpty()) return
     runCatching {
       val deviceInfo = maestro.cachedDeviceInfo
-      actions.forEach { command ->
-        emitDeviceEvents(
-          command.toArbigentDeviceEvents(deviceInfo.widthPixels, deviceInfo.heightPixels)
-        )
-      }
+      emitDeviceEvents(command.toArbigentDeviceEvents(deviceInfo.widthPixels, deviceInfo.heightPixels))
     }.onFailure { arbigentDebugLog("Failed to record device events: ${it.message}") }
   }
 
@@ -326,13 +332,8 @@ public class MaestroDevice(
           val file = resolveScreenshotFile(screenshotsDir, screenshot.path)
           maestro.takeScreenshot(file.sink(), false)
         } else {
-          val result = orchestra.runFlow(actions)
-          // Recorded after the flow, and only when Maestro reports it succeeded, so a command it
-          // rejected (an element it could not find, which the agent then retries with a looser
-          // selector) or gave up on never reaches the log.
-          if (result.success) {
-            recordDeviceEvents(actions)
-          }
+          // Device events are recorded per command by the Orchestra callback (see newOrchestra).
+          orchestra.runFlow(actions)
         }
       }
     }
@@ -804,7 +805,10 @@ public class MaestroDevice(
 
         // Adopt the new device's whole Connection (maestro + orchestra + its onClose, which owns the
         // new iproxy) in one volatile swap. The old connection was already torn down above.
-        this.connection = newDevice.connection
+        // The new device's own Orchestra would report commands to that throwaway instance, so this
+        // device builds its own around the adopted maestro to keep recording after the swap.
+        val adopted = newDevice.connection
+        this.connection = Connection(adopted.maestro, newOrchestra(adopted.maestro), adopted.onClose)
 
         // Reset counter on successful reconnection
         reconnectAttempts = 0
