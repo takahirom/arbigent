@@ -190,6 +190,53 @@ class ReplayScriptRunnerTest {
   }
 
   @Test
+  fun `step numbers below one and inverted ranges are usage errors`() {
+    val dir = Files.createTempDirectory("replay-runner-range").toFile()
+    val script = File(dir, "runner.py")
+    script.writeText(extractPython())
+    val log = File(dir, "sample-scenario.jsonl")
+    log.writeText(readResource(fixture))
+
+    listOf(listOf("--from", "0"), listOf("--step", "-1"), listOf("--until", "0"), listOf("--from", "3", "--until", "2"))
+      .forEach { flags ->
+        val (code, output) = run(dir, listOf("python3", script.absolutePath, log.absolutePath, "--show") + flags)
+        assertEquals(1, code, "$flags: $output")
+        assertTrue(output.contains("replay.sh:"), "$flags: $output")
+        assertTrue(!output.contains("nothing to replay"), "$flags should be rejected as an argument, not an empty range: $output")
+      }
+  }
+
+  @Test
+  fun `a log that cannot be read is a usage error rather than a traceback`() {
+    val dir = Files.createTempDirectory("replay-runner-unreadable").toFile()
+    val script = File(dir, "runner.py")
+    script.writeText(extractPython())
+    val log = File(dir, "sample-scenario.jsonl")
+    log.writeBytes(byteArrayOf(0xff.toByte(), 0xfe.toByte(), '{'.code.toByte()))
+
+    val (code, output) = run(dir, listOf("python3", script.absolutePath, log.absolutePath, "--show"))
+    assertEquals(1, code, output)
+    assertTrue(output.contains("could not read event log"), output)
+    assertTrue(!output.contains("Traceback"), output)
+  }
+
+  @Test
+  fun `the wrapper refuses to run without python3 instead of exiting 127`() {
+    val dir = Files.createTempDirectory("replay-runner-nopython").toFile()
+    val script = File(dir, "replay.sh")
+    script.writeText(readResource("replay.sh"))
+    val process = ProcessBuilder("/bin/sh", script.absolutePath, "whatever.jsonl")
+      .directory(dir)
+      .redirectErrorStream(true)
+    process.environment()["PATH"] = dir.absolutePath
+    val started = process.start()
+    val output = started.inputStream.bufferedReader().readText()
+    started.waitFor(60, TimeUnit.SECONDS)
+    assertEquals(1, started.exitValue(), output)
+    assertTrue(output.contains("python3 is required"), output)
+  }
+
+  @Test
   fun `--show on an empty range is a usage error`() {
     val dir = Files.createTempDirectory("replay-runner-empty").toFile()
     val script = File(dir, "runner.py")
