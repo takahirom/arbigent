@@ -221,6 +221,9 @@ class ArbigentReplayScriptWriterTest {
     assertTrue(log.contains("\"bounds\":\"[0,0][100,100]\""), log)
     assertTrue(log.contains("\"center\":{\"x\":50,\"y\":50}"), log)
     assertTrue(log.contains("\"screen\":[{\"text\":\"text\""), log)
+
+    val markdown = File(dir, "open-settings.md").readText()
+    assertTrue(markdown.contains("center: (50, 50)"), markdown)
   }
 
   @Test
@@ -260,7 +263,7 @@ class ArbigentReplayScriptWriterTest {
   }
 
   @Test
-  fun `writes the log with a file-safe name`() {
+  fun `writes the log and the summary, with a file-safe name`() {
     val dir = Files.createTempDirectory("replay-scripts").toFile()
     ArbigentReplayScriptWriter(dir).write(
       scenarioId = "open settings/main",
@@ -280,6 +283,7 @@ class ArbigentReplayScriptWriterTest {
       ArbigentReplayScriptWriter.fileBaseName("a/b") != ArbigentReplayScriptWriter.fileBaseName("a b"),
     )
     assertTrue(dir.listFiles().orEmpty().none { it.name.endsWith(".tmp") }, "temp file left behind")
+    assertTrue(File(dir, log.name.removeSuffix(".jsonl") + ".md").isFile)
 
     val lines = log.readLines().filter { it.isNotBlank() }
     assertEquals("scenario_start", lineType(lines.first()))
@@ -321,6 +325,45 @@ class ArbigentReplayScriptWriterTest {
       platform = ArbigentDeviceOs.Android,
     )
     assertEquals(emptyList(), dir.listFiles()?.toList().orEmpty())
+  }
+
+  @Test
+  fun `the markdown names the steps, the target and the way to replay them`() {
+    val dir = Files.createTempDirectory("replay-scripts").toFile()
+    ArbigentReplayScriptWriter(dir).write(
+      scenarioId = "open-settings",
+      goals = listOf("Open the settings screen"),
+      tasks = recordedRun(),
+      signature = listOf("com.example.app:id/settings_title"),
+      platform = ArbigentDeviceOs.Android,
+    )
+    val markdown = File(dir, "open-settings.md").readText()
+    assertTrue(markdown.startsWith("# open-settings"))
+    assertTrue(markdown.contains("launch(com.example.app, clearState)"))
+    assertTrue(markdown.contains("./arbigentw replay open-settings.jsonl --with-init"))
+    assertTrue(!markdown.contains("--step 0"), "setup is not a numbered step and has no single-step command")
+    assertTrue(
+      markdown.indexOf("--with-init") < markdown.indexOf("./arbigentw replay open-settings.jsonl\n"),
+      "the command that replays the setup too comes first, since that is the one a fresh device needs",
+    )
+    assertTrue(markdown.contains("com.example.app:id/settings_title"))
+  }
+
+  @Test
+  fun `each numbered step in the markdown carries its own single-step replay command`() = runTest {
+    val dir = Files.createTempDirectory("replay-scripts-step-command").toFile()
+    ArbigentReplayScriptWriter(dir).write(
+      scenarioId = "open-settings",
+      goals = listOf("Open the settings screen"),
+      tasks = recordedRunWithTarget(),
+      signature = emptyList(),
+      platform = ArbigentDeviceOs.Android,
+    )
+    val markdown = File(dir, "open-settings.md").readText()
+    assertTrue(
+      markdown.contains("- replay: `./arbigentw replay open-settings.jsonl --step 1`"),
+      "an agent driving one step at a time copies this instead of working the number out:\n$markdown",
+    )
   }
 
   private fun lineType(line: String): String =
@@ -376,6 +419,7 @@ class ArbigentReplayScriptExecutorTest {
     advanceUntilIdle()
 
     assertTrue(File(dir, "settings-scenario.jsonl").isFile)
+    assertTrue(File(dir, "settings-scenario.md").isFile)
   }
 
   @OptIn(ExperimentalStdlibApi::class)
