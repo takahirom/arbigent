@@ -30,6 +30,21 @@ public sealed interface ArbigentDeviceEvent {
     override val timestamp: Long = TimeProvider.get().currentTimeMillis(),
   ) : ArbigentDeviceEvent
 
+  /**
+   * A tap on an element Maestro located by text or resource id at the time. The selector is kept
+   * so a replay can find the element again in the current hierarchy and press its center, since the
+   * pixel it landed on in the recorded run is only right while the layout has not moved. [index] is
+   * the zero-based position among the matches, as Maestro counts them.
+   */
+  @Serializable
+  @SerialName("tap_element")
+  public data class TapElement(
+    val textRegex: String? = null,
+    val idRegex: String? = null,
+    val index: Int = 0,
+    override val timestamp: Long = TimeProvider.get().currentTimeMillis(),
+  ) : ArbigentDeviceEvent
+
   /** [keyName] is an Android `KEYCODE_*` name, ready for `adb shell input keyevent`. */
   @Serializable
   @SerialName("key_press")
@@ -61,12 +76,16 @@ public sealed interface ArbigentDeviceEvent {
    * replay can pass each one through the matching `am start` flag. An app that reads a launch extra
    * to decide what to show (a test-only entry point, a first-run flow) starts somewhere else without
    * them, and every later step then diverges.
+   *
+   * [stopApp] mirrors Maestro's default of force-stopping the app before starting it, so a replay
+   * starts a fresh process the way the recorded run did instead of resuming whatever was left.
    */
   @Serializable
   @SerialName("launch_app")
   public data class LaunchApp(
     val appId: String,
     val clearState: Boolean = false,
+    val stopApp: Boolean = true,
     val launchArguments: Map<String, JsonPrimitive> = emptyMap(),
     override val timestamp: Long = TimeProvider.get().currentTimeMillis(),
   ) : ArbigentDeviceEvent
@@ -146,14 +165,21 @@ internal fun MaestroCommand.toArbigentDeviceEvents(
   tapOnPoint?.let { command ->
     return listOf(ArbigentDeviceEvent.Tap(command.x, command.y, timestamp))
   }
-  // Element-relative taps depend on the view hierarchy Maestro saw at the time, which the replay
-  // script cannot reconstruct. The recorded step target tells the reader what to press instead.
+  // Element taps are how the agent clicks by text or id, so they are the common case on phones.
+  // Only a selector with something a hierarchy dump can be searched for is replayable.
   tapOnElement?.let { command ->
-    val selector = listOfNotNull(
-      command.selector.textRegex?.let { "text=$it" },
-      command.selector.idRegex?.let { "id=$it" },
-    ).joinToString(" ").ifEmpty { "element" }
-    return listOf(ArbigentDeviceEvent.Unsupported("tapOn $selector", timestamp))
+    val selector = command.selector
+    if (selector.textRegex == null && selector.idRegex == null) {
+      return listOf(ArbigentDeviceEvent.Unsupported("tapOn $selector", timestamp))
+    }
+    return listOf(
+      ArbigentDeviceEvent.TapElement(
+        textRegex = selector.textRegex,
+        idRegex = selector.idRegex,
+        index = selector.index?.toIntOrNull() ?: 0,
+        timestamp = timestamp,
+      )
+    )
   }
   backPressCommand?.let { return listOf(ArbigentDeviceEvent.KeyPress("KEYCODE_BACK", timestamp)) }
   pressKeyCommand?.let { command ->
@@ -171,6 +197,8 @@ internal fun MaestroCommand.toArbigentDeviceEvents(
       ArbigentDeviceEvent.LaunchApp(
         appId = command.appId,
         clearState = command.clearState == true,
+        // Maestro treats a missing stopApp as true.
+        stopApp = command.stopApp != false,
         launchArguments = command.launchArguments.orEmpty().mapValues { (_, value) -> value.toJsonPrimitive() },
         timestamp = timestamp,
       )

@@ -326,8 +326,10 @@ public class MaestroDevice(
           val file = resolveScreenshotFile(screenshotsDir, screenshot.path)
           maestro.takeScreenshot(file.sink(), false)
         } else {
-          recordDeviceEvents(actions)
           orchestra.runFlow(actions)
+          // Recorded after the flow so a command Maestro rejected (an element it could not find,
+          // which the agent then retries with a looser selector) never reaches the log.
+          recordDeviceEvents(actions)
         }
       }
     }
