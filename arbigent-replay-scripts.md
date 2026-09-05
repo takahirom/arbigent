@@ -52,7 +52,7 @@ Exit codes:
 | Code | Meaning |
 |---|---|
 | 0 | Every step was sent. The end-screen check prints `PASS` or `WARN` but does not change the code. |
-| 1 | Usage error, an unreadable or unfinished log, an empty step range, `adb` is not on `PATH`, or the chosen backend is not available. |
+| 1 | Usage error (including a step number below 1 or `--from` after `--until`), an unreadable or unfinished log, an empty step range, `python3` or `adb` is not on `PATH`, or the chosen backend is not available. |
 | 2 | A recorded target never appeared, or an element the recording tapped is not on screen. The app has diverged from the recording. |
 | 3 | The device rejected a command (a tap, a launch, `pm clear`), or the hierarchy could not be read at all (no device, a wrong serial, a hung `adb`). Nothing after it was sent. |
 
@@ -68,7 +68,7 @@ Every line has `type`, `task`, `taskIndex`, `step` and `ts`. The line types are:
 - `decision`: what the AI decided on a step (`action`, `log`, `memo`, `screenshot`) and the `screen` hints.
 - `target`: the element the step acted on, with `occurrence`, `bounds` (`[left,top][right,bottom]`) and `center`.
 - `init`: an event sent during the task's setup phase (`launch_app` with `launchArguments`, `clear_state`).
-- `device`: an event sent during a step (`tap`, `tap_element`, `key_press`, `input_text`, `swipe`, `wait`, `open_link`, `stop_app`). A `tap_element` keeps the text or id pattern the agent clicked by, and the runner finds that element in the current hierarchy before tapping, so a layout that moved still gets the right tap. Anything the runner cannot reproduce is recorded as `unsupported` with the command name, so the gap is visible instead of silent.
+- `device`: an event sent during a step (`tap`, `tap_element`, `key_press`, `input_text`, `swipe`, `wait`, `open_link`, `stop_app`). A `tap_element` keeps the text or id pattern the agent clicked by, and the runner finds that element in the current hierarchy before tapping, so a layout that moved still gets the right tap. Anything the runner cannot reproduce faithfully is recorded as `unsupported` with the command name, so the gap is visible instead of silent: a long press, a repeated tap, a tap at a relative point, a selector narrowed by position, traits or state, a swipe anchored on an element, and `killApp` all fall back to the agent rather than being replayed as a different interaction.
 - `scenario_end`: `status` and the resource-id `signature` of the final screen.
 
 Coordinates are device pixels, the same space `adb shell input tap` uses.
