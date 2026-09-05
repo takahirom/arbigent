@@ -202,6 +202,22 @@ class ArbigentReplayScriptWriterTest {
   }
 
   @Test
+  fun `each numbered step in the markdown carries its own single-step replay command`() = runTest {
+    val dir = Files.createTempDirectory("replay-scripts").toFile()
+    ArbigentReplayScriptWriter(dir).write(
+      scenarioId = "open-settings",
+      goals = listOf("Open the settings screen"),
+      tasks = recordedRunWithTarget(),
+      signature = emptyList(),
+    )
+    val markdown = File(dir, "open-settings.md").readText()
+    assertTrue(
+      markdown.contains("- replay: `./replay.sh open-settings.jsonl --step 1`"),
+      "an agent driving one step at a time copies this instead of working the number out:\n$markdown",
+    )
+  }
+
+  @Test
   fun `the log carries the screen size and the target geometry`() = runTest {
     val dir = Files.createTempDirectory("replay-scripts-bounds").toFile()
     ArbigentReplayScriptWriter(dir).write(
@@ -305,6 +321,7 @@ class ArbigentReplayScriptWriterTest {
     assertTrue(markdown.startsWith("# open-settings"))
     assertTrue(markdown.contains("launch(com.example.app, clearState)"))
     assertTrue(markdown.contains("./replay.sh open-settings.jsonl --with-init"))
+    assertTrue(!markdown.contains("--step 0"), "setup is not a numbered step and has no single-step command")
     assertTrue(
       markdown.indexOf("--with-init") < markdown.indexOf("./replay.sh open-settings.jsonl\n"),
       "the command that replays the setup too comes first, since that is the one a fresh device needs",

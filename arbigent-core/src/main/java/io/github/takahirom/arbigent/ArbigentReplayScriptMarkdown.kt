@@ -54,6 +54,11 @@ internal fun renderReplayScriptMarkdown(
       val fallback = step.targetBounds?.let { " (or tap ${it.centerX},${it.centerY})" }.orEmpty()
       appendLine("   - wait for: ${target.description()}$fallback")
     }
+    // The exact command for this one step, so an agent driving the app a step at a time can copy it
+    // instead of working the number out from the option list.
+    if (!step.isInit) {
+      appendLine("   - replay: `./${ArbigentReplayScriptWriter.RUNNER_FILE_NAME} $baseName.jsonl --step ${step.number}`")
+    }
     appendLine()
   }
   if (signature.isNotEmpty()) {
