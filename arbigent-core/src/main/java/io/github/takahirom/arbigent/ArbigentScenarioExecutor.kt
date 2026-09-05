@@ -431,13 +431,23 @@ public class ArbigentScenarioExecutor internal constructor(
   ) {
     val settings = scenario.replayScripts ?: return
     runCatching {
+      // The runner drives the device with adb, so a script recorded on anything else could not be
+      // replayed by it. iOS and Web would need their own event mapping and runner.
+      val device = taskAssignments().last().agent.device
+      val os = device.os()
+      if (os != ArbigentDeviceOs.Android) {
+        arbigentInfoLog(
+          "Not writing a replay script for scenario ${scenario.id}: replay scripts are Android-only and this device is $os",
+        )
+        return
+      }
       val outputDir = settings.outputDir
         ?.let { File(it) }
         ?: File(ArbigentFiles.parentDir, DefaultReplayScriptsDirName)
       // The signature is what the last task left on screen. It is advisory: a replay that reaches a
       // screen with none of these ids has almost certainly gone somewhere else.
       val signature = runCatching {
-        val elements = taskAssignments().last().agent.device.elements().elements
+        val elements = device.elements().elements
         elements
           .mapNotNull { element -> ArbigentElementIdentity.from(element, elements)?.resourceId }
           .distinct()

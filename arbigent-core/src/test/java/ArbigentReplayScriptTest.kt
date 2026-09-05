@@ -250,8 +250,16 @@ class ArbigentReplayScriptWriterTest {
       signature = listOf("com.example.app:id/settings_title"),
     )
 
-    val log = File(dir, "open_settings_main.jsonl")
-    assertTrue(log.isFile, "expected the sanitized log file to exist")
+    val log = dir.listFiles().orEmpty().single { it.name.endsWith(".jsonl") }
+    assertTrue(
+      log.name.matches(Regex("open_settings_main-[0-9a-f]{6}\\.jsonl")),
+      "a sanitized name carries a hash so 'open settings/main' and 'open settings main' do not collide: ${log.name}",
+    )
+    assertEquals("open-settings", ArbigentReplayScriptWriter.fileBaseName("open-settings"))
+    assertTrue(
+      ArbigentReplayScriptWriter.fileBaseName("a/b") != ArbigentReplayScriptWriter.fileBaseName("a b"),
+    )
+    assertTrue(dir.listFiles().orEmpty().none { it.name.endsWith(".tmp") }, "temp file left behind")
 
     val lines = log.readLines().filter { it.isNotBlank() }
     assertEquals("scenario_start", lineType(lines.first()))
@@ -282,9 +290,13 @@ class ArbigentReplayScriptWriterTest {
 }
 
 /** A device that reports what it was asked to do, the way MaestroDevice does. */
-private class RecordingFakeDevice : io.github.takahirom.arbigent.ArbigentDevice by FakeDevice() {
+private class RecordingFakeDevice(
+  private val os: io.github.takahirom.arbigent.ArbigentDeviceOs = io.github.takahirom.arbigent.ArbigentDeviceOs.Android,
+) : io.github.takahirom.arbigent.ArbigentDevice by FakeDevice() {
   private val listeners = mutableListOf<io.github.takahirom.arbigent.ArbigentDeviceEventListener>()
   private val delegate = FakeDevice()
+
+  override fun os(): io.github.takahirom.arbigent.ArbigentDeviceOs = os
 
   override fun addDeviceEventListener(listener: io.github.takahirom.arbigent.ArbigentDeviceEventListener) {
     if (!listeners.contains(listener)) listeners.add(listener)
@@ -320,7 +332,26 @@ class ArbigentReplayScriptExecutorTest {
     )
     advanceUntilIdle()
 
-    assertTrue(File(dir, "settings_scenario.jsonl").isFile)
+    assertTrue(File(dir, "settings-scenario.jsonl").isFile)
+  }
+
+  @OptIn(ExperimentalStdlibApi::class)
+  @Test
+  fun `a scenario run on anything but Android writes no script`() = runTest {
+    val dispatcher = coroutineContext[kotlinx.coroutines.CoroutineDispatcher]!!
+    val dir = Files.createTempDirectory("replay-scripts-ios").toFile()
+    val agentConfig = io.github.takahirom.arbigent.AgentConfig {
+      deviceFactory { RecordingFakeDevice(os = io.github.takahirom.arbigent.ArbigentDeviceOs.Ios) }
+      aiFactory { FakeAi() }
+    }
+    io.github.takahirom.arbigent.ArbigentScenarioExecutor(dispatcher).execute(
+      scenario(agentConfig, dir),
+      MCPClient(),
+    )
+    advanceUntilIdle()
+
+    // The runner speaks adb, so a script from an iOS run could never be replayed by it.
+    assertEquals(emptyList(), dir.listFiles()?.toList().orEmpty())
   }
 
   @OptIn(ExperimentalStdlibApi::class)
@@ -328,7 +359,7 @@ class ArbigentReplayScriptExecutorTest {
   fun `a failed scenario leaves the previous script untouched`() = runTest {
     val dispatcher = coroutineContext[kotlinx.coroutines.CoroutineDispatcher]!!
     val dir = Files.createTempDirectory("replay-scripts-failure").toFile()
-    val existing = File(dir, "settings_scenario.jsonl")
+    val existing = File(dir, "settings-scenario.jsonl")
     existing.writeText("previous run\n")
 
     val agentConfig = io.github.takahirom.arbigent.AgentConfig {
@@ -350,7 +381,7 @@ class ArbigentReplayScriptExecutorTest {
     agentConfig: io.github.takahirom.arbigent.AgentConfig,
     dir: File,
   ) = io.github.takahirom.arbigent.ArbigentScenario(
-    id = "settings scenario",
+    id = "settings-scenario",
     agentTasks = listOf(io.github.takahirom.arbigent.ArbigentAgentTask("task1", "Open the settings screen", agentConfig)),
     maxStepCount = 10,
     tags = emptySet(),

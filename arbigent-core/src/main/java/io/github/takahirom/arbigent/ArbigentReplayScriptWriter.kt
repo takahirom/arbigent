@@ -54,11 +54,12 @@ internal class ArbigentReplayScriptWriter(
       return
     }
     outputDir.mkdirs()
-    val baseName = sanitizeFileName(scenarioId)
+    val baseName = fileBaseName(scenarioId)
     val logFile = File(outputDir, "$baseName.jsonl")
-    logFile.writeText(
+    writeAtomically(
+      logFile,
       jsonLines(scenarioId, goals, tasks, steps, signature, screenWidth, screenHeight)
-        .joinToString(separator = "\n", postfix = "\n")
+        .joinToString(separator = "\n", postfix = "\n"),
     )
     arbigentInfoLog("Wrote replay script for scenario $scenarioId to ${logFile.absolutePath}")
   }
@@ -191,6 +192,42 @@ internal class ArbigentReplayScriptWriter(
       scenarioId.replace(Regex("[^\\p{L}\\p{N}_-]"), "_")
         // A name that starts with a dash reads as an option on the runner's command line.
         .replaceFirst(Regex("^-"), "_")
+
+    /**
+     * The file name a scenario's script is written under. Two ids that sanitize to the same string
+     * (`a/b` and `a b`) would otherwise overwrite each other, so a name the sanitizer had to change
+     * carries a short hash of the original id.
+     */
+    fun fileBaseName(scenarioId: String): String {
+      val sanitized = sanitizeFileName(scenarioId)
+      if (sanitized == scenarioId) return sanitized
+      val hash = java.security.MessageDigest.getInstance("SHA-256")
+        .digest(scenarioId.toByteArray())
+        .take(3)
+        .joinToString("") { "%02x".format(it) }
+      return "$sanitized-$hash"
+    }
+
+    /**
+     * Writes through a sibling temp file and renames, so a reader (a CI upload, a runner started
+     * on the previous script) never sees a half-written file.
+     */
+    fun writeAtomically(target: File, text: String) {
+      val temp = File(target.parentFile, "${target.name}.tmp")
+      temp.writeText(text)
+      try {
+        java.nio.file.Files.move(
+          temp.toPath(), target.toPath(),
+          java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+          java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+        )
+      } catch (e: java.nio.file.AtomicMoveNotSupportedException) {
+        java.nio.file.Files.move(
+          temp.toPath(), target.toPath(),
+          java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+        )
+      }
+    }
   }
 }
 
