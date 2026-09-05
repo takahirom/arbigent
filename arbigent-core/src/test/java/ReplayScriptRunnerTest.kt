@@ -142,6 +142,102 @@ class ReplayScriptRunnerTest {
     assertTrue(output.contains("\"x\": 50"), output)
   }
 
+  @Test
+  fun `setup that ran after a step stays after it`() {
+    val dir = Files.createTempDirectory("replay-runner-order").toFile()
+    val script = File(dir, "runner.py")
+    script.writeText(extractPython())
+    val log = File(dir, "sample-scenario.jsonl")
+    log.writeText(readResource(fixture))
+
+    val (code, output) = run(
+      dir,
+      listOf("python3", script.absolutePath, log.absolutePath, "--show", "--with-init"),
+    )
+    assertEquals(0, code, output)
+    val setups = output.lines().withIndex().filter { it.value.startsWith("0. setup") }.map { it.index }
+    val lastStep = output.lines().indexOfFirst { it.startsWith("3. ") }
+    assertEquals(2, setups.size, "a task that launched the app again must show two setup blocks:\n$output")
+    assertTrue(setups[0] < lastStep && lastStep < setups[1], "the second setup must follow step 3:\n$output")
+    assertTrue(output.contains("tap(text='Account')"), output)
+  }
+
+  @Test
+  fun `a log without a successful end is refused`() {
+    val dir = Files.createTempDirectory("replay-runner-torn").toFile()
+    val script = File(dir, "runner.py")
+    script.writeText(extractPython())
+    val torn = File(dir, "torn.jsonl")
+    torn.writeText(readResource(fixture).lines().filter { !it.contains("scenario_end") }.joinToString("\n"))
+    val (code, output) = run(dir, listOf("python3", script.absolutePath, torn.absolutePath, "--show"))
+    assertEquals(1, code, output)
+    assertTrue(output.contains("does not end with a successful scenario_end"), output)
+
+    val broken = File(dir, "broken.jsonl")
+    broken.writeText(readResource(fixture) + "{not json\n")
+    val (brokenCode, brokenOutput) = run(dir, listOf("python3", script.absolutePath, broken.absolutePath, "--show"))
+    assertEquals(1, brokenCode, brokenOutput)
+    assertTrue(brokenOutput.contains("is not JSON"), brokenOutput)
+  }
+
+  @Test
+  fun `a timeout that could never elapse is a usage error`() {
+    val dir = Files.createTempDirectory("replay-runner-timeout").toFile()
+    val script = File(dir, "runner.py")
+    script.writeText(extractPython())
+    val log = File(dir, "sample-scenario.jsonl")
+    log.writeText(readResource(fixture))
+    for (value in listOf("nan", "inf", "0", "-3")) {
+      val (code, output) = run(
+        dir,
+        listOf("python3", script.absolutePath, log.absolutePath, "--show", "--timeout", value),
+      )
+      assertEquals(1, code, "--timeout $value should be refused:\n$output")
+      assertTrue(output.contains("positive number of seconds"), output)
+    }
+  }
+
+  @Test
+  fun `remote arguments are quoted for the device shell and element taps resolve like maestro`() {
+    val dir = Files.createTempDirectory("replay-runner-quote").toFile()
+    val script = File(dir, "runner.py")
+    script.writeText(extractPython())
+    val probe = File(dir, "probe.py")
+    probe.writeText(
+      """
+      import json, runpy
+      module = runpy.run_path(SCRIPT_PATH, run_name="replay_runner")
+      adb_command = module["adb_command"]
+      escape_text = module["escape_text"]
+      resolve = module["resolve_element"]
+      nodes = [
+          {"text": "Account", "resourceId": "com.example.app:id/row", "accessibilityId": None},
+          {"text": "account settings", "resourceId": "com.example.app:id/row", "accessibilityId": None},
+          {"text": None, "resourceId": "settings_tab", "accessibilityId": "Open menu"},
+      ]
+      print(json.dumps({
+          "shell": adb_command(["shell", "am", "start", "--es", "entry", "a b; rm -rf /"]),
+          "text": escape_text("100% sure"),
+          "exact": resolve(nodes, {"textRegex": "account", "index": 0})["text"],
+          "second": resolve(nodes, {"textRegex": ".*account.*", "index": 1})["text"],
+          "shortId": resolve(nodes, {"idRegex": "com.example.app:id/settings_tab"})["accessibilityId"],
+          "label": resolve(nodes, {"textRegex": "Open Menu"})["resourceId"],
+          "none": resolve(nodes, {"textRegex": "Nowhere"}) is None,
+      }))
+      """.trimIndent().replace("SCRIPT_PATH", "\"" + script.absolutePath + "\"")
+    )
+
+    val (code, output) = run(dir, listOf("python3", probe.absolutePath))
+    assertEquals(0, code, output)
+    assertTrue(output.contains("\"shell\": [\"adb\", \"shell\", \"am start --es entry 'a b; rm -rf /'\"]"), output)
+    assertTrue(output.contains("\"text\": \"100%%ssure\""), output)
+    assertTrue(output.contains("\"exact\": \"Account\""), output)
+    assertTrue(output.contains("\"second\": \"account settings\""), output)
+    assertTrue(output.contains("\"shortId\": \"Open menu\""), output)
+    assertTrue(output.contains("\"label\": \"settings_tab\""), output)
+    assertTrue(output.contains("\"none\": true"), output)
+  }
+
   /** The shell wrapper feeds the runner to python on stdin, so the test needs the same slice. */
   private fun extractPython(): String {
     val source = readResource("replay.sh")
