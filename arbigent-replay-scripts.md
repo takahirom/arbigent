@@ -2,6 +2,8 @@
 
 Arbigent can write down what it sent to the device while a scenario ran, so the same screens can be reached again later with nothing but `adb`. This is aimed at coding agents (Claude Code, Codex, CI bots) and at people who want to look at the screen a scenario ended on without paying for another AI-driven run.
 
+Replay scripts are **Android only**. The runner speaks `adb`, so a scenario that ran on an iOS simulator or in a browser records nothing; Arbigent logs that it skipped the script and the run is otherwise unaffected. iOS and Web would need their own event mapping and a runner built on `simctl`/`idb` or a browser driver, which does not exist yet.
+
 After a scenario **succeeds**, Arbigent writes three files into the replay-scripts directory:
 
 | File | What it is for |
@@ -10,7 +12,9 @@ After a scenario **succeeds**, Arbigent writes three files into the replay-scrip
 | `<scenario-id>.md` | A readable summary of the same run: goal, numbered steps, the element each step acted on, and the exact `replay.sh` commands. Read this first. |
 | `replay.sh` | The runner, shared by every scenario in the directory. A POSIX `sh` wrapper around a python3 script that needs only the standard library and `adb`. |
 
-A failed scenario writes nothing and leaves the previous files untouched, because a half-finished log would replay to a screen the scenario never reached.
+A failed scenario writes nothing and leaves the previous files untouched, because a half-finished log would replay to a screen the scenario never reached. Files are written through a temporary sibling and renamed into place, so a reader never sees a partial one. A scenario id that is not a plain file name (`open settings/main`) is sanitized and gets a short hash appended (`open_settings_main-3f9a1c`), so two ids that sanitize alike do not overwrite each other.
+
+**The files contain what the run saw and typed.** Typed text, launch extras, opened URLs, the agent's memos and every label on the screens it visited are stored in plain text. Treat the directory like a log: do not enable the feature for a scenario that types a real password, and think about who can download the artifact before uploading it from CI.
 
 ## Turning it on
 
@@ -35,7 +39,7 @@ settings:
 
 Options:
 
-- `--with-init` also replays the setup phase (app launch with its recorded extras, state clear). Without it the runner assumes the app is already on the first screen.
+- `--with-init` also replays the setup phase (app launch with its recorded extras, state clear). Without it the runner assumes the app is already on the first screen. A setup block that ran in the middle of a scenario (a relaunch before a later task) is replayed only when the step after it is in the selected range; the block before the first step is always replayed, since it is what launches the app.
 - `--device SERIAL` picks a device when more than one is attached.
 - `--timeout SEC` is how long each step waits for its recorded target or screen hints before giving up (default 10).
 - `--no-wait` sends the events without waiting for anything. Useful when the runner's waiting is what is going wrong.
@@ -48,11 +52,11 @@ Exit codes:
 | Code | Meaning |
 |---|---|
 | 0 | Every step was sent. The end-screen check prints `PASS` or `WARN` but does not change the code. |
-| 1 | Usage error, an unreadable or unfinished log, `adb` is not on `PATH`, or the chosen backend is not available. |
+| 1 | Usage error, an unreadable or unfinished log, an empty step range, `adb` is not on `PATH`, or the chosen backend is not available. |
 | 2 | A recorded target never appeared, or an element the recording tapped is not on screen. The app has diverged from the recording. |
-| 3 | The device rejected a command (a tap, a launch, `pm clear`). Nothing after it was sent. |
+| 3 | The device rejected a command (a tap, a launch, `pm clear`), or the hierarchy could not be read at all (no device, a wrong serial, a hung `adb`). Nothing after it was sent. |
 
-Known gaps: `adb shell input text` only types printable ASCII, so a step that typed anything else stops with exit code 2. Maestro grants an app its runtime permissions when it launches it, and the runner does not, so a replay that starts from a cleared state may meet a permission dialog the recording never saw.
+Known gaps: `adb shell input text` only types printable ASCII and cannot carry a literal `%s`, so a step that typed either stops with exit code 2. Maestro grants an app its runtime permissions when it launches it, and the runner does not, so a replay that starts from a cleared state may meet a permission dialog the recording never saw. Screen hints are advisory: when none of them shows up in time the runner says so and sends the step anyway, because a hint describes the screen the decision looked at, not what it acted on, and a Compose screen can expose none of them to `uiautomator`.
 
 Exit code 2 is the signal for an agent to stop replaying and drive the app itself from the current screen. The `.md` tells it which step it was on and what that step expected to see.
 
