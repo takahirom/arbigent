@@ -217,7 +217,10 @@ internal class ArbigentReplayScriptWriter(
       val temp = File(target.parentFile, "${target.name}.${ProcessHandle.current().pid()}.${System.nanoTime()}.tmp")
       try {
         temp.writeText(text)
-        if (executable) temp.setExecutable(true, false)
+        // A runner nobody can execute is worse than no runner: fail before it replaces the old one.
+        if (executable && !temp.setExecutable(true, false)) {
+          throw java.io.IOException("Could not make ${temp.name} executable")
+        }
         try {
           java.nio.file.Files.move(
             temp.toPath(), target.toPath(),
