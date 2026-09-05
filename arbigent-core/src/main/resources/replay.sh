@@ -198,28 +198,41 @@ def load_events(path):
     return events
 
 
-def require_complete(meta, path):
-    """A log without a successful end was never finished; replaying part of it is not a replay."""
-    if not meta["started"]:
-        fail_usage("%s has no scenario_start line" % path)
-    if meta["status"] != "success":
+def require_complete(events, path):
+    """A replay log is one finished run: a scenario_start first, a successful scenario_end last.
+
+    Anything else (a missing or failed end, lines after the end, a second start, or lines from
+    another scenario) means the file is not the record of one successful run, and replaying a part
+    of it would not be a replay.
+    """
+    if not events or events[0].get("type") != "scenario_start":
+        fail_usage("%s does not start with a scenario_start line" % path)
+    if len([event for event in events if event.get("type") == "scenario_start"]) > 1:
+        fail_usage("%s has more than one scenario_start line; a replay log holds a single run" % path)
+    last = events[-1]
+    if last.get("type") != "scenario_end" or last.get("status") != "success":
         fail_usage(
-            "%s does not end with a successful scenario_end (the run was cut short or failed)" % path
+            "%s does not end with a successful scenario_end "
+            "(the run was cut short or failed, or lines were appended after it)" % path
         )
+    if any(event.get("type") == "scenario_end" for event in events[:-1]):
+        fail_usage("%s has a scenario_end line before the end of the file" % path)
+    task = events[0].get("task")
+    for event in events:
+        if event.get("task", task) != task:
+            fail_usage("%s mixes lines from scenarios %r and %r" % (path, task, event.get("task")))
 
 
 def group_steps(events):
     """Turns the flat log into (meta, steps): one entry per step, in the order they ran."""
     meta = {
         "goal": "", "appId": None, "signature": [], "task": "", "width": None, "height": None,
-        "started": False, "status": None,
     }
     steps = []
     previous_key = None
     for event in events:
         kind = event.get("type")
         if kind == "scenario_start":
-            meta["started"] = True
             meta["goal"] = event.get("goal", "")
             meta["appId"] = event.get("appId")
             meta["task"] = event.get("task", "")
@@ -227,7 +240,6 @@ def group_steps(events):
             meta["height"] = event.get("height")
             continue
         if kind == "scenario_end":
-            meta["status"] = event.get("status")
             meta["signature"] = event.get("signature", [])
             continue
         number = event.get("step", 0)
@@ -1037,7 +1049,24 @@ def report_divergence(options, meta, step, remaining, nodes, reason):
         out.write("  remaining steps:\n")
         for later in remaining:
             out.write("    %d. %s\n" % (later["number"], later["log"] or later["action"]))
-    out.write("  resume with: ./replay.sh %s --from %d\n" % (shlex.quote(options.log), step["number"]))
+    write_resume_hint(out, options, step, remaining)
+
+
+def write_resume_hint(out, options, step, remaining):
+    """The command that picks up where this run stopped, when there is one.
+
+    Step zero is not a valid `--from`, so a failed setup block points at the first numbered step it
+    was preparing (with `--with-init`, so that block is replayed first); when nothing numbered is
+    left there is nothing to resume.
+    """
+    if not step["isInit"]:
+        out.write("  resume with: ./replay.sh %s --from %d\n" % (shlex.quote(options.log), step["number"]))
+        return
+    later = [item["number"] for item in remaining if not item["isInit"]]
+    if later:
+        out.write(
+            "  resume with: ./replay.sh %s --with-init --from %d\n" % (shlex.quote(options.log), later[0])
+        )
 
 
 def describe_node(node):
@@ -1094,8 +1123,9 @@ def check_signature(options, signature):
 
 def main():
     options = parse_args(sys.argv[1:])
-    meta, steps = group_steps(load_events(options.log))
-    require_complete(meta, options.log)
+    events = load_events(options.log)
+    require_complete(events, options.log)
+    meta, steps = group_steps(events)
     selected = select_steps(steps, options)
     if not selected:
         sys.stderr.write("replay.sh: nothing to replay for the given range\n")
@@ -1131,9 +1161,7 @@ def main():
             return EXIT_DIVERGED
         except DeviceCommandFailed as error:
             sys.stderr.write("\nreplay.sh: step %d: %s\n" % (step["number"], error))
-            sys.stderr.write(
-                "  resume with: ./replay.sh %s --from %d\n" % (shlex.quote(options.log), step["number"])
-            )
+            write_resume_hint(sys.stderr, options, step, remaining)
             return EXIT_DEVICE
         if unsupported is not None:
             report_divergence(

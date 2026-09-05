@@ -355,6 +355,74 @@ class ReplayScriptRunnerTest {
   }
 
   @Test
+  fun `a log that is more than one finished run is refused`() {
+    val dir = Files.createTempDirectory("replay-runner-shape").toFile()
+    val script = File(dir, "runner.py")
+    script.writeText(extractPython())
+    val lines = readResource(fixture).lines().filter { it.isNotBlank() }
+    val deviceLine = lines.first { it.contains("\"type\":\"device\"") || it.contains("\"type\": \"device\"") }
+    val startLine = lines.first { it.contains("scenario_start") }
+
+    fun refuse(name: String, content: List<String>, expected: String) {
+      val log = File(dir, name)
+      log.writeText(content.joinToString("\n"))
+      val (code, output) = run(dir, listOf("python3", script.absolutePath, log.absolutePath, "--show"))
+      assertEquals(1, code, output)
+      assertTrue(output.contains(expected), output)
+    }
+
+    // A device line appended after the successful end is not part of the run that succeeded.
+    refuse("appended.jsonl", lines + deviceLine, "does not end with a successful scenario_end")
+    // Two runs concatenated into one file.
+    refuse("doubled.jsonl", lines + lines, "more than one scenario_start")
+    refuse("restarted.jsonl", listOf(startLine) + lines, "more than one scenario_start")
+    refuse("headless.jsonl", lines.drop(1), "does not start with a scenario_start")
+    // A line from another scenario spliced into the middle.
+    val foreign = deviceLine.replace("\"open-settings\"", "\"other-scenario\"")
+    assertTrue(foreign != deviceLine)
+    refuse("mixed.jsonl", lines.dropLast(1) + foreign + lines.last(), "mixes lines from scenarios")
+  }
+
+  @Test
+  fun `a failed setup block points the resume hint at the step it prepared`() {
+    val dir = Files.createTempDirectory("replay-runner-resume").toFile()
+    val script = File(dir, "runner.py")
+    script.writeText(extractPython())
+    val probe = File(dir, "probe.py")
+    probe.writeText(
+      """
+      import io, json, runpy
+      module = runpy.run_path(SCRIPT_PATH, run_name="replay_runner")
+      options = module["Options"]()
+      options.log = "open settings.jsonl"
+
+      def step(number):
+          return {"number": number, "isInit": number == 0}
+
+      def hint(current, remaining):
+          out = io.StringIO()
+          module["write_resume_hint"](out, options, current, remaining)
+          return out.getvalue().strip()
+
+      print(json.dumps({
+          "normal": hint(step(2), [step(3)]),
+          "firstSetup": hint(step(0), [step(1), step(2)]),
+          "laterSetup": hint(step(0), [step(3)]),
+          "trailingSetup": hint(step(0), []),
+      }))
+      """.trimIndent().replace("SCRIPT_PATH", "\"" + script.absolutePath + "\"")
+    )
+
+    val (code, output) = run(dir, listOf("python3", probe.absolutePath))
+    assertEquals(0, code, output)
+    assertTrue(output.contains("\"normal\": \"resume with: ./replay.sh 'open settings.jsonl' --from 2\""), output)
+    // Step zero is not a valid --from, so the setup is replayed through --with-init on the next step.
+    assertTrue(output.contains("\"firstSetup\": \"resume with: ./replay.sh 'open settings.jsonl' --with-init --from 1\""), output)
+    assertTrue(output.contains("\"laterSetup\": \"resume with: ./replay.sh 'open settings.jsonl' --with-init --from 3\""), output)
+    assertTrue(output.contains("\"trailingSetup\": \"\""), output)
+  }
+
+  @Test
   fun `a timeout that could never elapse is a usage error`() {
     val dir = Files.createTempDirectory("replay-runner-timeout").toFile()
     val script = File(dir, "runner.py")
