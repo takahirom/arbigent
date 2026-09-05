@@ -215,19 +215,26 @@ internal class ArbigentReplayScriptWriter(
      */
     fun writeAtomically(target: File, text: String, executable: Boolean = false) {
       val temp = File(target.parentFile, "${target.name}.${ProcessHandle.current().pid()}.${System.nanoTime()}.tmp")
-      temp.writeText(text)
-      if (executable) temp.setExecutable(true, false)
       try {
-        java.nio.file.Files.move(
-          temp.toPath(), target.toPath(),
-          java.nio.file.StandardCopyOption.REPLACE_EXISTING,
-          java.nio.file.StandardCopyOption.ATOMIC_MOVE,
-        )
-      } catch (e: java.nio.file.AtomicMoveNotSupportedException) {
-        java.nio.file.Files.move(
-          temp.toPath(), target.toPath(),
-          java.nio.file.StandardCopyOption.REPLACE_EXISTING,
-        )
+        temp.writeText(text)
+        if (executable) temp.setExecutable(true, false)
+        try {
+          java.nio.file.Files.move(
+            temp.toPath(), target.toPath(),
+            java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+            java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+          )
+        } catch (e: java.io.IOException) {
+          // Filesystems that cannot rename atomically, or cannot replace an existing file that way,
+          // still get the finished content in one step; only the replacement is no longer atomic.
+          java.nio.file.Files.move(
+            temp.toPath(), target.toPath(),
+            java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+          )
+        }
+      } finally {
+        // A failed write or move must not leave staging files next to the logs CI uploads.
+        temp.delete()
       }
     }
   }

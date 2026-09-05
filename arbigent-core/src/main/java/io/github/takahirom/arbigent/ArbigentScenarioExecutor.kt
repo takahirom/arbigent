@@ -266,9 +266,12 @@ public class ArbigentScenarioExecutor internal constructor(
           )
           keepRecordedStepsOf = null
           // The recorder must never decide a scenario's fate: a device that cannot take a listener
-          // just loses its replay script for this task.
+          // just costs the scenario its replay script, since a log missing this task's actions
+          // would replay from a screen the recording never reached.
           val listening = replayScriptRecorder?.let { recorder ->
-            runCatching { agent.device.addDeviceEventListener(recorder) }.isSuccess
+            runCatching { agent.device.addDeviceEventListener(recorder) }
+              .onFailure { recorder.markEventsLost() }
+              .isSuccess
           } ?: false
           try {
             supervisorScope {
@@ -430,6 +433,12 @@ public class ArbigentScenarioExecutor internal constructor(
     recorder: ArbigentReplayScriptRecorder,
   ) {
     val settings = scenario.replayScripts ?: return
+    if (!recorder.isComplete) {
+      arbigentInfoLog(
+        "Not writing a replay script for scenario ${scenario.id}: a task ran without its device events being recorded",
+      )
+      return
+    }
     runCatching {
       // The runner drives the device with adb, so a script recorded on anything else could not be
       // replayed by it. iOS and Web would need their own event mapping and runner.

@@ -274,6 +274,18 @@ class ArbigentReplayScriptWriterTest {
   }
 
   @Test
+  fun `a write that cannot finish leaves no staging file behind`() {
+    val dir = Files.createTempDirectory("replay-scripts-torn").toFile()
+    // A non-empty directory in the target's place makes both the atomic and the plain move fail
+    // (an empty one would be replaced).
+    val target = File(dir, "blocked.jsonl").apply { mkdirs() }
+    File(target, "inner.txt").writeText("occupied")
+    val failed = runCatching { ArbigentReplayScriptWriter.writeAtomically(target, "content") }
+    assertTrue(failed.isFailure, "replacing a directory should not succeed")
+    assertEquals(listOf("blocked.jsonl"), dir.list().orEmpty().toList(), "the staging file must be cleaned up")
+  }
+
+  @Test
   fun `a run that sent nothing writes no files`() {
     val dir = Files.createTempDirectory("replay-scripts").toFile()
     ArbigentReplayScriptWriter(dir).write(
@@ -292,6 +304,7 @@ class ArbigentReplayScriptWriterTest {
 /** A device that reports what it was asked to do, the way MaestroDevice does. */
 private class RecordingFakeDevice(
   private val os: io.github.takahirom.arbigent.ArbigentDeviceOs = io.github.takahirom.arbigent.ArbigentDeviceOs.Android,
+  private var refusedRegistrations: Int = 0,
 ) : io.github.takahirom.arbigent.ArbigentDevice by FakeDevice() {
   private val listeners = mutableListOf<io.github.takahirom.arbigent.ArbigentDeviceEventListener>()
   private val delegate = FakeDevice()
@@ -299,6 +312,10 @@ private class RecordingFakeDevice(
   override fun os(): io.github.takahirom.arbigent.ArbigentDeviceOs = os
 
   override fun addDeviceEventListener(listener: io.github.takahirom.arbigent.ArbigentDeviceEventListener) {
+    if (refusedRegistrations > 0) {
+      refusedRegistrations--
+      throw IllegalStateException("device refused the listener")
+    }
     if (!listeners.contains(listener)) listeners.add(listener)
   }
 
@@ -333,6 +350,28 @@ class ArbigentReplayScriptExecutorTest {
     advanceUntilIdle()
 
     assertTrue(File(dir, "settings-scenario.jsonl").isFile)
+  }
+
+  @OptIn(ExperimentalStdlibApi::class)
+  @Test
+  fun `a task whose events could not be recorded costs the scenario its script`() = runTest {
+    val dispatcher = coroutineContext[kotlinx.coroutines.CoroutineDispatcher]!!
+    val dir = Files.createTempDirectory("replay-scripts-unrecorded").toFile()
+    // One device serves both tasks; it refuses the first task's listener and accepts the second's.
+    val device = RecordingFakeDevice(refusedRegistrations = 1)
+    val agentConfig = io.github.takahirom.arbigent.AgentConfig {
+      deviceFactory { device }
+      aiFactory { FakeAi() }
+    }
+    io.github.takahirom.arbigent.ArbigentScenarioExecutor(dispatcher).execute(
+      scenario(agentConfig, dir, goals = listOf("Open the settings screen", "Open the account page")),
+      MCPClient(),
+    )
+    advanceUntilIdle()
+
+    // The second task recorded fine, but a log without the first task's actions would replay from a
+    // screen the recording never showed how to reach.
+    assertEquals(emptyList(), dir.listFiles()?.toList().orEmpty())
   }
 
   @OptIn(ExperimentalStdlibApi::class)
@@ -380,9 +419,12 @@ class ArbigentReplayScriptExecutorTest {
   private fun scenario(
     agentConfig: io.github.takahirom.arbigent.AgentConfig,
     dir: File,
+    goals: List<String> = listOf("Open the settings screen"),
   ) = io.github.takahirom.arbigent.ArbigentScenario(
     id = "settings-scenario",
-    agentTasks = listOf(io.github.takahirom.arbigent.ArbigentAgentTask("task1", "Open the settings screen", agentConfig)),
+    agentTasks = goals.mapIndexed { index, goal ->
+      io.github.takahirom.arbigent.ArbigentAgentTask("task${index + 1}", goal, agentConfig)
+    },
     maxStepCount = 10,
     tags = emptySet(),
     isLeaf = true,
