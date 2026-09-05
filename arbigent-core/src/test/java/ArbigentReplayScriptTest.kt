@@ -259,6 +259,10 @@ class ArbigentReplayScriptWriterTest {
     assertTrue(lines.any { lineType(it) == "init" })
     assertTrue(lines.all { it.contains("\"taskIndex\"") && it.contains("\"step\"") && it.contains("\"ts\"") })
     assertTrue(log.readText().contains("com.example.app"))
+    assertEquals(
+      "_flag_like", ArbigentReplayScriptWriter.sanitizeFileName("-flag like"),
+      "a name starting with a dash would be read as an option by the runner",
+    )
   }
 
   @Test

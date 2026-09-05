@@ -116,6 +116,20 @@ internal class ArbigentReplayScriptRecorder : ArbigentExecuteActionsInterceptor,
     executeActionsInput: ExecuteActionsInput,
     chain: ArbigentExecuteActionsInterceptor.Chain,
   ): ExecuteActionsOutput {
+    // Recording is a side line: whatever goes wrong while describing the step, the action itself
+    // still runs. Events sent while no step is open land in the init bucket, which the runner
+    // treats as setup, so a step that failed to record loses its metadata but not its events.
+    val opened = runCatching { openStep(executeActionsInput) }
+      .onFailure { arbigentDebugLog("Replay script: could not record a step: $it") }
+      .isSuccess
+    return try {
+      chain.proceed(executeActionsInput)
+    } finally {
+      if (opened) synchronized(lock) { currentStep = null }
+    }
+  }
+
+  private fun openStep(executeActionsInput: ExecuteActionsInput) {
     val step = executeActionsInput.decisionOutput.step
     val elements = executeActionsInput.elements
     val recorded = RecordedStep(
@@ -137,11 +151,6 @@ internal class ArbigentReplayScriptRecorder : ArbigentExecuteActionsInterceptor,
       if (elements.screenHeight > 0) screenHeight = elements.screenHeight
       currentTask()?.steps?.add(recorded)
       currentStep = recorded
-    }
-    return try {
-      chain.proceed(executeActionsInput)
-    } finally {
-      synchronized(lock) { currentStep = null }
     }
   }
 
