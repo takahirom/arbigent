@@ -11,6 +11,7 @@ import maestro.orchestra.MaestroCommand
 import maestro.orchestra.Orchestra
 import okio.sink
 import java.io.File
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.pow
 import kotlin.system.measureTimeMillis
@@ -61,6 +62,20 @@ public interface ArbigentDevice {
   public fun elements(): ArbigentElementList
   public fun waitForAppToSettle(appId: String? = null)
   public fun os(): ArbigentDeviceOs
+
+  /**
+   * Observes the low-level interactions this device performs, for recording replay scripts.
+   *
+   * Devices that cannot report their interactions keep the no-op defaults, so listening is always
+   * safe to ask for and simply records nothing.
+   */
+  @ArbigentInternalApi
+  public fun addDeviceEventListener(listener: ArbigentDeviceEventListener) {
+  }
+
+  @ArbigentInternalApi
+  public fun removeDeviceEventListener(listener: ArbigentDeviceEventListener) {
+  }
 }
 
 public data class ArbigentElement(
@@ -98,7 +113,12 @@ public data class ArbigentElement(
 
 public data class ArbigentElementList(
   val elements: List<ArbigentElement>,
-  val screenWidth: Int
+  val screenWidth: Int,
+  /**
+   * Screen height in the same coordinate space as [ArbigentElement] bounds. Defaults to 0 when the
+   * device did not report it.
+   */
+  val screenHeight: Int = 0
 ) {
 
   public fun getPromptTexts(): String {
@@ -193,7 +213,8 @@ public data class ArbigentElementList(
 
       return ArbigentElementList(
         elements = elements,
-        screenWidth = (deviceInfo.widthGrid)
+        screenWidth = (deviceInfo.widthGrid),
+        screenHeight = (deviceInfo.heightGrid)
       )
     }
   }
@@ -233,8 +254,45 @@ public class MaestroDevice(
   private val maestro: Maestro get() = connection.maestro
   private val orchestra: Orchestra get() = connection.orchestra
 
+  // Copy-on-write because listeners are attached and detached by the scenario executor on its own
+  // coroutine while commands are being sent from the agent's, and a recording device must never be
+  // the reason a run fails.
+  private val deviceEventListeners = CopyOnWriteArrayList<ArbigentDeviceEventListener>()
+
   init {
     arbigentInfoLog("MaestroDevice created: screenshotsDir:${screenshotsDir.absolutePath}")
+  }
+
+  @ArbigentInternalApi
+  override fun addDeviceEventListener(listener: ArbigentDeviceEventListener) {
+    deviceEventListeners.addIfAbsent(listener)
+  }
+
+  @ArbigentInternalApi
+  override fun removeDeviceEventListener(listener: ArbigentDeviceEventListener) {
+    deviceEventListeners.remove(listener)
+  }
+
+  private fun recordDeviceEvents(actions: List<MaestroCommand>) {
+    if (deviceEventListeners.isEmpty()) return
+    runCatching {
+      val deviceInfo = maestro.cachedDeviceInfo
+      actions.forEach { command ->
+        emitDeviceEvents(
+          command.toArbigentDeviceEvents(deviceInfo.widthPixels, deviceInfo.heightPixels)
+        )
+      }
+    }.onFailure { arbigentDebugLog("Failed to record device events: ${it.message}") }
+  }
+
+  private fun emitDeviceEvents(events: List<ArbigentDeviceEvent>) {
+    if (deviceEventListeners.isEmpty()) return
+    events.forEach { event ->
+      deviceEventListeners.forEach { listener ->
+        runCatching { listener.onDeviceEvent(event) }
+          .onFailure { arbigentDebugLog("Device event listener failed: ${it.message}") }
+      }
+    }
   }
 
   override fun deviceName(): String {
@@ -268,6 +326,7 @@ public class MaestroDevice(
           val file = resolveScreenshotFile(screenshotsDir, screenshot.path)
           maestro.takeScreenshot(file.sink(), false)
         } else {
+          recordDeviceEvents(actions)
           orchestra.runFlow(actions)
         }
       }
@@ -292,7 +351,11 @@ public class MaestroDevice(
         Thread.sleep(1000)
       }
     }
-    return ArbigentElementList(emptyList(), maestro.cachedDeviceInfo.widthPixels)
+    return ArbigentElementList(
+      emptyList(),
+      maestro.cachedDeviceInfo.widthPixels,
+      maestro.cachedDeviceInfo.heightPixels
+    )
   }
 
 
@@ -557,6 +620,12 @@ public class MaestroDevice(
       val direction = directionCandidates.random()
       arbigentDebugLog("directionCandidates: $directionCandidates \ndirection: $direction")
       runBlocking {
+        // Recorded here rather than in executeActions because the focus walk drives maestro
+        // directly: these presses are the only device interaction a D-pad focus action performs,
+        // and a replay that skipped them would never move the focus at all.
+        emitDeviceEvents(
+          listOf(arbigentKeyPressEvent(direction))
+        )
         maestro.pressKey(direction)
         maestro.waitForAnimationToEnd("100")
       }
