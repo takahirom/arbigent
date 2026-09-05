@@ -61,6 +61,11 @@ internal class ArbigentReplayPacingStepInterceptor(
    * "the screen has settled on the recorded target" means without asking the AI. Elapsed time is
    * counted in poll intervals rather than read from the clock, so the loop advances with the
    * suspending [delay] instead of spinning against a clock that the caller may be controlling.
+   *
+   * The deadline is soft by design: it is checked between polls, and a poll is one blocking
+   * [ArbigentDevice.elements] read, so the wait can overrun by at most one hierarchy dump (bounded
+   * by the device's own retry policy). Interrupting a dump midway would leave Maestro's driver in an
+   * undefined state, and a step captured a few seconds late is still a correct step.
    */
   private suspend fun awaitStableTarget(
     replayIndex: Int,
@@ -97,6 +102,11 @@ internal class ArbigentReplayPacingStepInterceptor(
    * A cheap stand-in for the current screen, or null while the target is absent. Built from the
    * same element snapshot the match is looked for in, because the UI tree string is expensive
    * enough that polling it would itself slow replay down.
+   *
+   * It covers what an action resolves against: order, text (which Arbigent already reads from the
+   * descendants), resource id, bounds and visibility. A list in which the same elements are still
+   * sliding into place therefore reads as unsettled, while a repaint that changes nothing an action
+   * could see does not hold the replay up.
    */
   private fun targetSignature(
     device: ArbigentDevice,
@@ -112,7 +122,8 @@ internal class ArbigentReplayPacingStepInterceptor(
     }
     if (identity.findMatch(elements) == null) return null
     return elements.elements.joinToString(separator = "|", prefix = "${elements.elements.size}#") {
-      "${it.rawText}/${it.treeNode.attributes["resource-id"].orEmpty()}"
+      "${it.rawText}/${it.treeNode.attributes["resource-id"].orEmpty()}" +
+        "@${it.x},${it.y},${it.width},${it.height},${it.isVisible}"
     }
   }
 
