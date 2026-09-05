@@ -5,7 +5,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonPrimitive
 import maestro.KeyCode
 import maestro.SwipeDirection
+import maestro.orchestra.ElementSelector
 import maestro.orchestra.MaestroCommand
+import maestro.orchestra.TapOnElementCommand
 
 /**
  * A single low-level interaction Arbigent sent to the device, recorded at the point where the
@@ -151,6 +153,9 @@ internal fun MaestroCommand.toArbigentDeviceEvents(
   timestamp: Long = TimeProvider.get().currentTimeMillis(),
 ): List<ArbigentDeviceEvent> {
   tapOnPointV2Command?.let { command ->
+    if (command.longPress == true || command.repeat != null) {
+      return listOf(ArbigentDeviceEvent.Unsupported("tapOnPointV2 ${command.point} (longPress/repeat)", timestamp))
+    }
     val point = command.point
     // Arbigent always issues absolute points; a percentage point would need the driver's own
     // resolution rules, so it is recorded as a divergence instead of guessed at.
@@ -171,6 +176,15 @@ internal fun MaestroCommand.toArbigentDeviceEvents(
     val selector = command.selector
     if (selector.textRegex == null && selector.idRegex == null) {
       return listOf(ArbigentDeviceEvent.Unsupported("tapOn $selector", timestamp))
+    }
+    // A plain tap on the first element matching text/id/index is all the replay can reproduce.
+    // Anything that changes which element is hit or how (a long press, a repeated tap, a tap at a
+    // relative point, a selector narrowed by position, traits or state) is recorded as a
+    // divergence rather than silently downgraded to a different interaction.
+    if (command.longPress == true || command.repeat != null || command.relativePoint != null ||
+      selector.hasConstraintsBeyondTextIdIndex()
+    ) {
+      return listOf(ArbigentDeviceEvent.Unsupported("tapOn $selector (${command.describeExtras()})", timestamp))
     }
     return listOf(
       ArbigentDeviceEvent.TapElement(
@@ -205,13 +219,19 @@ internal fun MaestroCommand.toArbigentDeviceEvents(
     )
   }
   stopAppCommand?.let { return listOf(ArbigentDeviceEvent.StopApp(it.appId, timestamp)) }
-  killAppCommand?.let { return listOf(ArbigentDeviceEvent.StopApp(it.appId, timestamp)) }
+  // killApp asks the driver to kill the process without clearing tasks, which `am force-stop`
+  // does not reproduce exactly, so it is left to the AI fallback.
+  killAppCommand?.let { return listOf(ArbigentDeviceEvent.Unsupported("killApp ${it.appId}", timestamp)) }
   clearStateCommand?.let { return listOf(ArbigentDeviceEvent.ClearState(it.appId, timestamp)) }
   openLinkCommand?.let { return listOf(ArbigentDeviceEvent.OpenLink(it.link, timestamp)) }
   scrollCommand?.let {
     return listOf(swipeEvent(SwipeDirection.UP, SCROLL_DURATION_MS, screenWidth, screenHeight, timestamp))
   }
   swipeCommand?.let { command ->
+    // A swipe that starts on an element depends on where that element is at replay time.
+    if (command.elementSelector != null) {
+      return listOf(ArbigentDeviceEvent.Unsupported("swipe from element ${command.elementSelector}", timestamp))
+    }
     val start = command.startPoint
     val end = command.endPoint
     if (start != null && end != null) {
@@ -357,3 +377,16 @@ private fun Any.toJsonPrimitive(): JsonPrimitive = when (this) {
   is Number -> JsonPrimitive(this)
   else -> JsonPrimitive(toString())
 }
+
+/** True when the selector narrows the match by anything other than text, id and index. */
+private fun ElementSelector.hasConstraintsBeyondTextIdIndex(): Boolean =
+  size != null || below != null || above != null || leftOf != null || rightOf != null ||
+    containsChild != null || containsDescendants != null || childOf != null || traits != null ||
+    enabled != null || selected != null || checked != null || focused != null || css != null
+
+private fun TapOnElementCommand.describeExtras(): String = buildList {
+  if (longPress == true) add("longPress")
+  if (repeat != null) add("repeat")
+  if (relativePoint != null) add("relativePoint")
+  if (selector.hasConstraintsBeyondTextIdIndex()) add("constrained selector")
+}.joinToString(", ")

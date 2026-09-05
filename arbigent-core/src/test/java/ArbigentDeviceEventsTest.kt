@@ -9,11 +9,13 @@ import kotlinx.serialization.json.JsonPrimitive
 import maestro.KeyCode
 import maestro.Point
 import maestro.SwipeDirection
+import maestro.TapRepeat
 import maestro.orchestra.BackPressCommand
 import maestro.orchestra.ClearStateCommand
 import maestro.orchestra.ElementSelector
 import maestro.orchestra.EraseTextCommand
 import maestro.orchestra.InputTextCommand
+import maestro.orchestra.KillAppCommand
 import maestro.orchestra.LaunchAppCommand
 import maestro.orchestra.MaestroCommand
 import maestro.orchestra.OpenLinkCommand
@@ -193,5 +195,50 @@ class ArbigentDeviceEventsTest {
   fun `a screenshot is arbigent's own observation and is not replayed`() {
     val command = MaestroCommand(takeScreenshotCommand = TakeScreenshotCommand(path = "shot"))
     assertEquals(emptyList(), command.events())
+  }
+
+  @Test
+  fun `taps that are not a plain single tap are unsupported instead of downgraded`() {
+    val plain = TapOnElementCommand(selector = ElementSelector(textRegex = "Settings"))
+    assertTrue(plain.let { MaestroCommand(tapOnElement = it) }.events().single() is ArbigentDeviceEvent.TapElement)
+    listOf(
+      plain.copy(longPress = true),
+      plain.copy(repeat = TapRepeat(2, 100L)),
+      plain.copy(relativePoint = "50%,50%"),
+      plain.copy(selector = ElementSelector(textRegex = "Settings", below = ElementSelector(textRegex = "Account"))),
+      plain.copy(selector = ElementSelector(textRegex = "Settings", enabled = true)),
+      plain.copy(selector = ElementSelector(idRegex = "row", childOf = ElementSelector(idRegex = "list"))),
+    ).forEach { command ->
+      assertTrue(
+        MaestroCommand(tapOnElement = command).events().single() is ArbigentDeviceEvent.Unsupported,
+        "a replay can only tap the first text/id match once, so $command must fall back to the AI",
+      )
+    }
+    assertTrue(
+      MaestroCommand(tapOnPointV2Command = TapOnPointV2Command(point = "10,20", longPress = true))
+        .events().single() is ArbigentDeviceEvent.Unsupported
+    )
+    assertTrue(
+      MaestroCommand(tapOnPointV2Command = TapOnPointV2Command(point = "10,20", repeat = TapRepeat(3, 50L)))
+        .events().single() is ArbigentDeviceEvent.Unsupported
+    )
+  }
+
+  @Test
+  fun `a swipe anchored on an element is unsupported`() {
+    val command = MaestroCommand(
+      swipeCommand = SwipeCommand(
+        direction = SwipeDirection.UP,
+        elementSelector = ElementSelector(idRegex = "list"),
+        duration = 400L,
+      )
+    )
+    assertTrue(command.events().single() is ArbigentDeviceEvent.Unsupported)
+  }
+
+  @Test
+  fun `kill app is not the same as force-stop and is left to the fallback`() {
+    val events = MaestroCommand(killAppCommand = KillAppCommand(appId = "com.example.app")).events()
+    assertTrue(events.single() is ArbigentDeviceEvent.Unsupported)
   }
 }
