@@ -424,7 +424,7 @@ def adb_command(args):
 def adb(options, args, capture=False):
     """Runs one adb command and returns (code, stdout, stderr).
 
-    --device is passed as ANDROID_SERIAL so `android` sees it too. Output is captured either way so
+    --device is passed as ANDROID_SERIAL. Output is captured either way so
     a failure can be quoted; with capture=False it is also echoed, as it was before.
     """
     env = dict(os.environ)
@@ -526,11 +526,12 @@ def dump_tree(options, backend=None):
         nodes = dump_tree_uiautomator(options)
     except DeviceCommandFailed:
         # adb itself failed, so `android layout` (which also goes through adb) is tried only because
-        # it may reach the device a different way; without it the failure stands.
+        # it may reach the device a different way. An empty answer from it proves nothing here: it
+        # prints an empty tree for a device it cannot reach either, so the failure stands.
         if shutil.which("android") is None:
             raise
         nodes = dump_tree_android_cli(options)
-        if nodes is None:
+        if not nodes:
             raise
         return nodes
     if nodes:
@@ -552,8 +553,13 @@ def dump_tree_android_cli(options):
     if options.device:
         env["ANDROID_SERIAL"] = options.device
     try:
+        # The CLI does not read ANDROID_SERIAL: with it alone, a serial that does not exist quietly
+        # reads whatever single device is attached instead.
+        command = ["android", "layout"]
+        if options.device:
+            command += ["--device", options.device]
         process = subprocess.run(
-            ["android", "layout"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
+            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
             timeout=ADB_TIMEOUT_SECONDS,
         )
         if process.returncode != 0:
