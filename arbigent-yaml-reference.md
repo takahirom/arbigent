@@ -102,7 +102,7 @@ Legacy scenario-level field, tagged by `type:`. Distinct from the `CleanupData`
 | `mcpJson` | String (multiline) | `"{}"` | MCP server configuration as a JSON string. |
 | `deviceFormFactor` | [DeviceFormFactor](#deviceformfactor) | `Unspecified` | Default form factor for all scenarios. |
 | `additionalActions` | `List<String>?` | `null` | Project-wide extra actions. |
-| `replayScripts` | [ReplayScripts](#replayscripts)? | `null` | Write a replay script per successful scenario. Absent means off. |
+| `replayScripts` | [ReplayScripts](#replayscripts)? | `null` | Write a replay script for each successful scenario that recorded device events. Absent means off. |
 
 ### Prompt
 

@@ -4,7 +4,7 @@ Arbigent can write down what it sent to the device while a scenario ran, so the 
 
 Replay scripts are **Android only**. The runner speaks `adb`, so a scenario that ran on an iOS simulator or in a browser records nothing; Arbigent logs that it skipped the script and the run is otherwise unaffected. iOS and Web would need their own event mapping and a runner built on `simctl`/`idb` or a browser driver, which does not exist yet.
 
-After a scenario **succeeds**, Arbigent writes three files into the replay-scripts directory:
+After a scenario **succeeds** and recorded at least one device event, Arbigent writes three files into the replay-scripts directory (a successful run that sent nothing to the device writes nothing, since there is nothing to replay):
 
 | File | What it is for |
 |---|---|
@@ -52,7 +52,7 @@ Exit codes:
 | Code | Meaning |
 |---|---|
 | 0 | Every step was sent. The end-screen check prints `PASS` or `WARN` but does not change the code. |
-| 1 | Usage error (including a step number below 1 or `--from` after `--until`), an unreadable or unfinished log, an empty step range, `python3` or `adb` is not on `PATH`, or the chosen backend is not available. |
+| 1 | Usage error (including a step number below 1 or `--from` after `--until`), an unreadable log or one that is not a single finished run (no successful `scenario_end` as its last line, a second `scenario_start`, or lines from another scenario), an empty step range, `python3` or `adb` is not on `PATH`, or the chosen backend is not available. |
 | 2 | A recorded target never appeared, or an element the recording tapped is not on screen. The app has diverged from the recording. |
 | 3 | The device rejected a command (a tap, a launch, `pm clear`), or the hierarchy could not be read at all (no device, a wrong serial, a hung `adb`). Nothing after it was sent. |
 
@@ -64,9 +64,9 @@ Exit code 2 is the signal for an agent to stop replaying and drive the app itsel
 
 Every line has `type`, `task`, `taskIndex`, `step` and `ts`. The line types are:
 
-- `scenario_start`: the goal, the app id, and the screen size in the coordinate space the bounds use.
+- `scenario_start`: the goal, the app id (only when the setup launched an app), and the screen size in the coordinate space the bounds use (`width`/`height`, only when the device reported them).
 - `decision`: what the AI decided on a step (`action`, `log`, `memo`, `screenshot`) and the `screen` hints.
-- `target`: the element the step acted on, with `occurrence`, `bounds` (`[left,top][right,bottom]`) and `center`.
+- `target`: the element the step acted on, with `occurrence`; `bounds` (`[left,top][right,bottom]`) and `center` are present only when the element's geometry was known.
 - `init`: an event sent during the task's setup phase (`launch_app` with `launchArguments`, `clear_state`).
 - `device`: an event sent during a step (`tap`, `tap_element`, `key_press`, `input_text`, `swipe`, `wait`, `open_link`, `stop_app`). A `tap_element` keeps the text or id pattern the agent clicked by, and the runner finds that element in the current hierarchy before tapping, so a layout that moved still gets the right tap. Anything the runner cannot reproduce faithfully is recorded as `unsupported` with the command name, so the gap is visible instead of silent: a long press, a repeated tap, a tap at a relative point, a selector narrowed by position, traits or state, a swipe anchored on an element, and `killApp` all fall back to the agent rather than being replayed as a different interaction.
 - `scenario_end`: `status` and the resource-id `signature` of the final screen.
@@ -95,6 +95,8 @@ jobs:
           api-level: 34
           arch: x86_64
           script: |
+            # Build (or download from an earlier job) the APK the scenarios exercise first.
+            ./gradlew :app:assembleRelease
             adb install app/build/outputs/apk/release/app-release.apk
             ./arbigent run --project-file=arbigent-project.yaml --os=android
       - uses: actions/upload-artifact@v4
