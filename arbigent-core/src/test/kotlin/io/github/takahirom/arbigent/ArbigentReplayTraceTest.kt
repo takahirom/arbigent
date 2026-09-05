@@ -3,6 +3,7 @@ package io.github.takahirom.arbigent
 import io.github.takahirom.arbigent.sample.test.FakeAi
 import io.github.takahirom.arbigent.sample.test.FakeDevice
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
+import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
 import maestro.TreeNode
 import java.io.File
@@ -129,6 +130,152 @@ class ArbigentReplayTraceTest {
     assertEquals(0, assertNotNull(store.read(first)).taskIndex)
     assertEquals(1, assertNotNull(store.read(second)).taskIndex)
   }
+
+  @Test
+  fun `a replayed step waits until its recorded target is present on two polls in a row`() =
+    runTest {
+      val absent = ArbigentElementList(emptyList(), screenWidth = 1000)
+      val present = ArbigentElementList(listOf(element("target", "id", "desc")), screenWidth = 1000)
+      val device = ScriptedDevice(listOf(absent, absent, present, present))
+      var proceeded = false
+
+      ArbigentReplayPacingStepInterceptor(traceWithTarget()).intercept(
+        stepInput(device),
+      ) {
+        proceeded = true
+        ArbigentAgent.StepResult.Continue
+      }
+
+      assertTrue(proceeded, "the step should have been captured once the target settled")
+      assertEquals(
+        4,
+        device.elementsCallCount,
+        "the target should be confirmed on two consecutive polls, no more and no less",
+      )
+      assertEquals(1500, currentTime, "each poll is one interval apart")
+    }
+
+  @Test
+  fun `a replayed step whose target never appears is captured once the deadline passes`() = runTest {
+    val absent = ArbigentElementList(emptyList(), screenWidth = 1000)
+    val device = ScriptedDevice(listOf(absent))
+    var proceeded = false
+
+    ArbigentReplayPacingStepInterceptor(traceWithTarget()).intercept(stepInput(device)) {
+      proceeded = true
+      ArbigentAgent.StepResult.Continue
+    }
+
+    assertTrue(proceeded, "a target that never appears is divergence to detect later, not here")
+    assertEquals(10_000, currentTime, "the wait should end at the ten second floor")
+    assertTrue(device.elementsCallCount >= 2, "the deadline should have been polled towards")
+  }
+
+  @Test
+  fun `a replayed step with no recorded target keeps the recorded pace`() = runTest {
+    val trace = traceWithoutTarget(firstTimestamp = 1_000, secondTimestamp = 4_000)
+    val device = ScriptedDevice(listOf(ArbigentElementList(emptyList(), screenWidth = 1000)))
+    val contextHolder = ArbigentContextHolder("goal", 10)
+    val interceptor = ArbigentReplayPacingStepInterceptor(trace)
+
+    // The first call has nothing to pace against; it is what records when replay reached step one.
+    interceptor.intercept(stepInput(device, contextHolder)) { ArbigentAgent.StepResult.Continue }
+    val action = GoalAchievedAgentAction()
+    contextHolder.addStep(
+      ArbigentContextHolder.Step(
+        stepId = "step-1",
+        agentAction = action,
+        cacheKey = "cache-key",
+        screenshotFilePath = "screenshot.png",
+      ),
+    )
+    interceptor.intercept(stepInput(device, contextHolder)) { ArbigentAgent.StepResult.Continue }
+
+    assertTrue(
+      currentTime in 2_000..3_000,
+      "the second step should have waited out the recorded gap, but waited ${currentTime}ms",
+    )
+    assertEquals(0, device.elementsCallCount, "pacing should not read the screen")
+  }
+
+  /** Hands out a scripted screen per [elements] call, repeating the last one once exhausted. */
+  private class ScriptedDevice(
+    private val screens: List<ArbigentElementList>,
+  ) : ArbigentDevice by FakeDevice() {
+    var elementsCallCount: Int = 0
+      private set
+
+    override fun elements(): ArbigentElementList {
+      val screen = screens[elementsCallCount.coerceAtMost(screens.lastIndex)]
+      elementsCallCount++
+      return screen
+    }
+  }
+
+  private fun stepInput(
+    device: ArbigentDevice,
+    contextHolder: ArbigentContextHolder = ArbigentContextHolder("goal", 10),
+  ): ArbigentAgent.StepInput = ArbigentAgent.StepInput(
+    arbigentContextHolder = contextHolder,
+    agentActionTypes = defaultAgentActionTypesForVisualMode(),
+    device = device,
+    deviceFormFactor = ArbigentScenarioDeviceFormFactor.Mobile,
+    ai = FakeAi(),
+    decisionChain = { error("Decision chain should not run") },
+    imageAssertionChain = { ArbigentAi.ImageAssertionOutput(emptyList()) },
+    executeActionChain = { ArbigentAgent.ExecuteActionsOutput() },
+    prompt = ArbigentPrompt(),
+    aiOptions = null,
+    attemptMode = ArbigentAttemptMode.ReplayWithFallback,
+  )
+
+  private fun traceWithTarget(): ArbigentReplayTrace {
+    val action = ClickWithTextAgentAction("target")
+    return trace(
+      listOf(
+        ArbigentContextHolder.Step(
+          stepId = "step-1",
+          agentAction = action,
+          cacheKey = "cache-key",
+          screenshotFilePath = "screenshot.png",
+          targetElement = ArbigentElementIdentity(text = "target"),
+        ) to action,
+      ),
+    )
+  }
+
+  private fun traceWithoutTarget(
+    firstTimestamp: Long,
+    secondTimestamp: Long,
+  ): ArbigentReplayTrace {
+    val action = GoalAchievedAgentAction()
+    return trace(
+      listOf(firstTimestamp, secondTimestamp).mapIndexed { index, timestamp ->
+        ArbigentContextHolder.Step(
+          stepId = "step-${index + 1}",
+          agentAction = action,
+          cacheKey = "cache-key",
+          screenshotFilePath = "screenshot.png",
+          timestamp = timestamp,
+        ) to action
+      },
+    )
+  }
+
+  private fun trace(
+    steps: List<Pair<ArbigentContextHolder.Step, ArbigentAgentAction>>,
+  ): ArbigentReplayTrace = ArbigentReplayTrace(
+    version = "1.2.3",
+    scenarioId = "scenario",
+    taskIndex = 0,
+    taskIdentity = "scenario",
+    goalHash = "goal-hash",
+    steps = steps.map { (step, action) ->
+      ArbigentReplayTraceStep(
+        decisionOutput = ArbigentAi.DecisionOutput(agentActions = listOf(action), step = step),
+      )
+    },
+  )
 
   /** The smallest trace [ArbigentReplayTrace.isValidFor] accepts: one step that reaches the goal. */
   private fun minimalTrace(key: ArbigentReplayTraceKey): ArbigentReplayTrace {

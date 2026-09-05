@@ -3,6 +3,7 @@ package io.github.takahirom.arbigent
 import io.github.takahirom.arbigent.result.ArbigentStepSource
 
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import maestro.TreeNode
@@ -19,10 +20,17 @@ internal class ReplayDivergenceException(
 ) : Exception(message)
 
 /**
- * Waits before a replayed step is captured, so the app is as far along as it was when the trace
- * was recorded. This must run before [step] reads the elements and UI tree: replay makes no AI
- * call, so without it the next screen is snapshotted before it has settled and an index-based
- * action resolves against a half-built element list.
+ * Waits before a replayed step is captured, so the screen the step is about to be resolved against
+ * is the screen the recorded action was decided on. This must run before [step] reads the elements
+ * and UI tree: replay makes no AI call, so without it the next screen is snapshotted before it has
+ * settled and an index-based action resolves against a half-built element list.
+ *
+ * The wait is on the recorded target of the step about to be replayed: poll the elements until that
+ * target is present and the element list is unchanged between two polls. The recorded interval
+ * between two trace steps is not a sleep — it includes the AI latency of the recording run, which
+ * replay does not pay — so it is used only to bound the wait, and only as the pace itself for steps
+ * that have no target to wait for (reaching the goal, back, scroll, wait, and text actions recorded
+ * without an identity).
  */
 internal class ArbigentReplayPacingStepInterceptor(
   private val trace: ArbigentReplayTrace,
@@ -38,18 +46,93 @@ internal class ArbigentReplayPacingStepInterceptor(
       .filter { step -> step.agentAction != null }
       .distinctBy { step -> step.stepId }
       .count()
-    waitOutRecordedGap(replayIndex)
+    val identity = trace.steps.getOrNull(replayIndex)?.decisionOutput?.step?.targetElement
+    if (identity != null) {
+      awaitStableTarget(replayIndex, identity, stepInput.device)
+    } else {
+      waitOutRecordedGap(replayIndex)
+    }
     previousStepStartedAtMillis = TimeProvider.get().currentTimeMillis()
     return chain.proceed(stepInput)
   }
 
+  /**
+   * Waits until [identity] is present and the element list around it stops changing, which is what
+   * "the screen has settled on the recorded target" means without asking the AI. Elapsed time is
+   * counted in poll intervals rather than read from the clock, so the loop advances with the
+   * suspending [delay] instead of spinning against a clock that the caller may be controlling.
+   */
+  private suspend fun awaitStableTarget(
+    replayIndex: Int,
+    identity: ArbigentElementIdentity,
+    device: ArbigentDevice,
+  ) {
+    val deadline = waitDeadlineMillis(replayIndex)
+    val waitedMillis = withTimeoutOrNull(deadline) {
+      var previousSignature: String? = null
+      var waited = 0L
+      while (true) {
+        val signature = targetSignature(device, identity)
+        if (signature != null && signature == previousSignature) break
+        previousSignature = signature
+        delay(POLL_INTERVAL_MILLIS)
+        waited += POLL_INTERVAL_MILLIS
+      }
+      waited
+    }
+    if (waitedMillis != null) {
+      arbigentInfoLog(
+        "Replay wait: target ${identity.description()} found and stable after ${waitedMillis}ms " +
+          "before capturing step ${replayIndex + 1}",
+      )
+    } else {
+      arbigentInfoLog(
+        "Replay wait: deadline ${deadline}ms reached while waiting for target " +
+          "${identity.description()} before capturing step ${replayIndex + 1}; capturing anyway",
+      )
+    }
+  }
+
+  /**
+   * A cheap stand-in for the current screen, or null while the target is absent. Built from the
+   * same element snapshot the match is looked for in, because the UI tree string is expensive
+   * enough that polling it would itself slow replay down.
+   */
+  private fun targetSignature(
+    device: ArbigentDevice,
+    identity: ArbigentElementIdentity,
+  ): String? {
+    val elements = try {
+      device.elements()
+    } catch (exception: Exception) {
+      // Reading the hierarchy can fail while the screen is mid-transition, which is exactly the
+      // state this waits out. Treat it as "not there yet".
+      arbigentDebugLog("Replay wait: could not read elements: $exception")
+      return null
+    }
+    if (identity.findMatch(elements) == null) return null
+    return elements.elements.joinToString(separator = "|", prefix = "${elements.elements.size}#") {
+      "${it.rawText}/${it.treeNode.attributes["resource-id"].orEmpty()}"
+    }
+  }
+
+  /** How long the wait may take: the recorded gap, never below 10 seconds nor above a minute. */
+  private fun waitDeadlineMillis(replayIndex: Int): Long {
+    val recordedGap = recordedGapMillis(replayIndex) ?: return MIN_TARGET_WAIT_MILLIS
+    return recordedGap.coerceAtMost(MAX_PACING_WAIT_MILLIS).coerceAtLeast(MIN_TARGET_WAIT_MILLIS)
+  }
+
+  private fun recordedGapMillis(replayIndex: Int): Long? {
+    val previousRecordedAt = trace.steps.getOrNull(replayIndex - 1)
+      ?.decisionOutput?.step?.timestamp ?: return null
+    val recordedAt = trace.steps.getOrNull(replayIndex)?.decisionOutput?.step?.timestamp
+      ?: return null
+    return (recordedAt - previousRecordedAt).takeIf { it > 0 }
+  }
+
   private suspend fun waitOutRecordedGap(replayIndex: Int) {
     val previousStartedAt = previousStepStartedAtMillis ?: return
-    val previousRecordedAt = trace.steps.getOrNull(replayIndex - 1)
-      ?.decisionOutput?.step?.timestamp ?: return
-    val recordedAt = trace.steps.getOrNull(replayIndex)?.decisionOutput?.step?.timestamp ?: return
-    val recordedGap = recordedAt - previousRecordedAt
-    if (recordedGap <= 0) return
+    val recordedGap = recordedGapMillis(replayIndex) ?: return
     val alreadySpent = TimeProvider.get().currentTimeMillis() - previousStartedAt
     val remaining = (recordedGap - alreadySpent).coerceAtMost(MAX_PACING_WAIT_MILLIS)
     if (remaining <= 0) return
@@ -62,6 +145,10 @@ internal class ArbigentReplayPacingStepInterceptor(
   private companion object {
     // A recorded gap can be pathological (a hiccup while recording); do not inherit it unbounded.
     const val MAX_PACING_WAIT_MILLIS = 60_000L
+
+    // A short recorded gap says the recording run was fast, not that the replayed screen will be.
+    const val MIN_TARGET_WAIT_MILLIS = 10_000L
+    const val POLL_INTERVAL_MILLIS = 500L
   }
 }
 
