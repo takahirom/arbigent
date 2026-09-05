@@ -67,6 +67,17 @@ internal class ArbigentReplayScriptRecorder : ArbigentExecuteActionsInterceptor,
   private var currentStep: RecordedStep? = null
   private var screenWidth: Int = 0
   private var screenHeight: Int = 0
+  private var eventsLost = false
+
+  /**
+   * False once a task ran without this recorder attached to the device: the steps it kept from
+   * then on have no device events behind them, and a script written from them would be missing the
+   * actions that reached the screen the later tasks continued from.
+   */
+  val isComplete: Boolean get() = synchronized(lock) { !eventsLost }
+
+  /** Records that a task's device events could not be captured. Cleared by [reset]. */
+  fun markEventsLost(): Unit = synchronized(lock) { eventsLost = true }
 
   /**
    * The screen size the steps' coordinates are in, or `0 to 0` when no step reported one. Read
@@ -87,6 +98,7 @@ internal class ArbigentReplayScriptRecorder : ArbigentExecuteActionsInterceptor,
     currentStep = null
     screenWidth = 0
     screenHeight = 0
+    eventsLost = false
   }
 
   /**
