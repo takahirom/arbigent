@@ -245,6 +245,9 @@ public class ArbigentScenarioExecutor internal constructor(
         // Tasks that already fell back to normal execution in this attempt. A task gets one
         // fallback: failing again is an ordinary failure and restarts the whole scenario.
         val fellBackTaskIndexes = mutableSetOf<Int>()
+        // The task whose already-recorded replay-script steps must survive its re-run, set by the
+        // fallback below for a task that carries on from the screen the previous one left.
+        var keepRecordedStepsOf: Int? = null
         var index = 0
         while (index < taskAssignments().size) {
           val (task, agent) = taskAssignments()[index]
@@ -259,29 +262,36 @@ public class ArbigentScenarioExecutor internal constructor(
           replayScriptRecorder?.beginTask(
             taskIndex = index,
             goal = task.goal,
-            discardPrevious = true,
+            discardPrevious = keepRecordedStepsOf != index,
           )
-          replayScriptRecorder?.let { agent.device.addDeviceEventListener(it) }
-          supervisorScope {
-            agent.latestArbigentContextFlow
-              .flatMapLatest {
-                it?.stepsFlow ?: emptyFlow()
-              }
-              .onEach { steps ->
-                val context = agent.latestArbigentContext()
-                _arbigentScenarioRunningInfoStateFlow.value = _arbigentScenarioRunningInfoStateFlow.value?.copy(
-                  maxStep = task.maxStep,
-                  currentStep = context?.countMeaningfulActions() ?: 0
-                )
-              }
-              .launchIn(coroutineScope)
-            try {
+          keepRecordedStepsOf = null
+          // The recorder must never decide a scenario's fate: a device that cannot take a listener
+          // just loses its replay script for this task.
+          val listening = replayScriptRecorder?.let { recorder ->
+            runCatching { agent.device.addDeviceEventListener(recorder) }.isSuccess
+          } ?: false
+          try {
+            supervisorScope {
+              agent.latestArbigentContextFlow
+                .flatMapLatest {
+                  it?.stepsFlow ?: emptyFlow()
+                }
+                .onEach { steps ->
+                  val context = agent.latestArbigentContext()
+                  _arbigentScenarioRunningInfoStateFlow.value = _arbigentScenarioRunningInfoStateFlow.value?.copy(
+                    maxStep = task.maxStep,
+                    currentStep = context?.countMeaningfulActions() ?: 0
+                  )
+                }
+                .launchIn(coroutineScope)
               agent.execute(
                 agentTask = task,
                 mcpClient = mcpClient,
               )
-            } finally {
-              replayScriptRecorder?.let { agent.device.removeDeviceEventListener(it) }
+            }
+          } finally {
+            if (listening) {
+              runCatching { agent.device.removeDeviceEventListener(replayScriptRecorder!!) }
             }
           }
           if (!agent.isGoalAchieved()) {
@@ -309,11 +319,7 @@ public class ArbigentScenarioExecutor internal constructor(
               // Same reasoning for the replay script: a task that resets the device runs again from
               // the screen it started from, so what it recorded before is superseded; a task that
               // carries on keeps it, or the script would jump over actions the device has had.
-              replayScriptRecorder?.beginTask(
-                taskIndex = index,
-                goal = task.goal,
-                discardPrevious = task.resetsDeviceState(),
-              )
+              if (!task.resetsDeviceState()) keepRecordedStepsOf = index
               agent.cancel()
               _taskAssignmentsStateFlow.value = taskAssignments().toMutableList().also {
                 it[index] = ArbigentTaskAssignment(

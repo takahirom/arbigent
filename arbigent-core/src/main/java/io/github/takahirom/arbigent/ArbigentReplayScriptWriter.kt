@@ -189,6 +189,8 @@ internal class ArbigentReplayScriptWriter(
      */
     fun sanitizeFileName(scenarioId: String): String =
       scenarioId.replace(Regex("[^\\p{L}\\p{N}_-]"), "_")
+        // A name that starts with a dash reads as an option on the runner's command line.
+        .replaceFirst(Regex("^-"), "_")
   }
 }
 
