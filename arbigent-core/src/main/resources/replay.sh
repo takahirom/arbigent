@@ -261,21 +261,45 @@ def group_steps(events):
     return meta, steps
 
 
+def step_is_wanted(step, options):
+    number = step["number"]
+    if options.step is not None and number != options.step:
+        return False
+    if options.start is not None and number < options.start:
+        return False
+    if options.until is not None and number > options.until:
+        return False
+    return True
+
+
 def select_steps(steps, options):
+    """The steps a range asks for, with the setup blocks that belong to them.
+
+    A setup block rides with the step that came after it: a relaunch in the middle of a run is only
+    needed if the step it prepared for is replayed. The block before the first step is the exception
+    and is always included with --with-init, because it is how the app gets launched at all. A block
+    at the very end rides with the step before it.
+    """
+    include_init = options.with_init and options.step is None
     selected = []
+    pending = []
+    seen_step = False
+    last_wanted = False
     for step in steps:
         if step["isInit"]:
-            if options.with_init and options.step is None:
-                selected.append(step)
+            if include_init:
+                pending.append(step)
             continue
-        number = step["number"]
-        if options.step is not None and number != options.step:
-            continue
-        if options.start is not None and number < options.start:
-            continue
-        if options.until is not None and number > options.until:
-            continue
-        selected.append(step)
+        last_wanted = step_is_wanted(step, options)
+        if last_wanted:
+            selected.extend(pending)
+            selected.append(step)
+        elif not seen_step:
+            selected.extend(pending)
+        pending = []
+        seen_step = True
+    if pending and (last_wanted or not seen_step):
+        selected.extend(pending)
     return selected
 
 
@@ -490,12 +514,25 @@ def dump_tree(options, backend=None):
     """
     backend = backend or options.backend
     if backend == "android":
-        return dump_tree_android_cli(options) or []
+        nodes = dump_tree_android_cli(options)
+        if nodes is None:
+            raise DeviceCommandFailed("android layout failed")
+        return nodes
     if backend == "uiautomator":
         return dump_tree_uiautomator(options)
     if backend == "maestro":
         return dump_tree_maestro(options)
-    nodes = dump_tree_uiautomator(options)
+    try:
+        nodes = dump_tree_uiautomator(options)
+    except DeviceCommandFailed:
+        # adb itself failed, so `android layout` (which also goes through adb) is tried only because
+        # it may reach the device a different way; without it the failure stands.
+        if shutil.which("android") is None:
+            raise
+        nodes = dump_tree_android_cli(options)
+        if nodes is None:
+            raise
+        return nodes
     if nodes:
         return nodes
     if shutil.which("android") is not None:
@@ -543,20 +580,31 @@ def dump_tree_uiautomator(options):
 
     While the screen is still moving the command exits 0 but prints "could not get idle state"
     instead of writing the file, so the exit code alone is not enough to tell success from failure.
+
+    A dump that never produced a tree is an empty list, which a caller reads as "nothing on screen".
+    When adb itself failed every time (no device, a serial that is not there, a hang) that reading
+    would be wrong, so that case raises DeviceCommandFailed instead of pretending the screen is empty.
     """
     # One file per runner process, removed once read: the dump holds every string on screen, and
     # two replays against the same device must not read each other's.
     remote = "/sdcard/arbigent-replay-dump-%d.xml" % os.getpid()
+    adb_failures = []
     try:
         for attempt in range(UIAUTOMATOR_DUMP_ATTEMPTS):
             if attempt:
                 time.sleep(STABILITY_POLL_SECONDS)
             code, out, err = adb(options, ["shell", "uiautomator", "dump", remote], capture=True)
             combined = (out + err).decode("utf-8", "replace")
+            if code != 0 and "could not get idle state" not in combined:
+                adb_failures.append(combined.strip() or "exit %d" % code)
+                continue
             if code != 0 or "ERROR" in combined or "could not get idle state" in combined:
                 continue
-            code, out, _ = adb(options, ["exec-out", "cat", remote], capture=True)
-            if code != 0 or not out.strip():
+            code, out, err = adb(options, ["exec-out", "cat", remote], capture=True)
+            if code != 0:
+                adb_failures.append((out + err).decode("utf-8", "replace").strip() or "exit %d" % code)
+                continue
+            if not out.strip():
                 continue
             try:
                 root = ElementTree.fromstring(out.decode("utf-8", "replace"))
@@ -565,6 +613,8 @@ def dump_tree_uiautomator(options):
             nodes = []
             flatten_xml(root, nodes)
             return nodes
+        if len(adb_failures) == UIAUTOMATOR_DUMP_ATTEMPTS:
+            raise DeviceCommandFailed("uiautomator dump failed: %s" % adb_failures[-1])
         return []
     finally:
         adb(options, ["shell", "rm", "-f", remote], capture=True)
@@ -691,7 +741,12 @@ def wait_for(options, target):
     while True:
         nodes = dump_tree(options)
         if find_match(nodes, target) is not None:
-            return "matched", wait_until_stable(options, nodes)
+            stable = wait_until_stable(options, nodes)
+            if find_match(stable, target) is not None:
+                return "matched", stable
+            # The target was on a screen that was still changing and is gone from the one it turned
+            # into (a splash, a list that reloaded), so the wait starts over from the settled screen.
+            nodes = stable
         if nodes and not identity_is_resolvable(nodes, target):
             stable = wait_until_stable(options, nodes, cap=max(0.0, deadline - time.monotonic()))
             if find_match(stable, target) is not None:
@@ -794,6 +849,10 @@ def send_event(options, event, step, nodes):
         if not typeable(text):
             raise Diverged(
                 "adb shell input text cannot type %r (only printable ASCII travels through it)" % text
+            )
+        if "%s" in text:
+            raise Diverged(
+                "adb shell input text cannot type %r (a literal %%s comes out as a space)" % text
             )
         checked(adb(options, ["shell", "input", "text", escape_text(text)]), "text input")
     elif kind == "swipe":
@@ -902,7 +961,8 @@ def escape_text(text):
     """`input text` splits its argument on spaces, so a space travels as `%s`.
 
     The argument is shell-quoted on the way in, so no other character needs escaping. A literal
-    `%s` in the text is the one thing this cannot express: the device turns it into a space too.
+    `%s` in the text is the one thing this cannot express: the device turns it into a space too, so
+    send_event refuses such a text before it gets here.
     """
     return text.replace(" ", "%s")
 
@@ -916,6 +976,16 @@ def send_step_events(options, step, nodes):
             return event
         previous_was_key = event.get("type") == "key_press"
     return None
+
+
+def nodes_for_report(options, nodes):
+    """The nodes to print with a divergence: a fresh dump unless reading the screen fails too."""
+    if nodes:
+        return nodes
+    try:
+        return dump_tree(options)
+    except DeviceCommandFailed:
+        return []
 
 
 def report_divergence(options, meta, step, remaining, nodes, reason):
@@ -965,8 +1035,10 @@ def wait_for_screen(options, hints):
     while True:
         nodes = dump_tree(options)
         if any(find_match(nodes, hint) is not None for hint in hints):
-            wait_until_stable(options, nodes)
-            return True
+            stable = wait_until_stable(options, nodes)
+            if any(find_match(stable, hint) is not None for hint in hints):
+                return True
+            nodes = stable
         if time.monotonic() >= deadline:
             sys.stdout.write(
                 "   wait: none of the recorded screen hints appeared within %.0fs, continuing\n"
@@ -1002,12 +1074,12 @@ def main():
     meta, steps = group_steps(load_events(options.log))
     require_complete(meta, options.log)
     selected = select_steps(steps, options)
-    if options.show:
-        show(meta, selected)
-        return EXIT_OK
     if not selected:
         sys.stderr.write("replay.sh: nothing to replay for the given range\n")
         return EXIT_USAGE
+    if options.show:
+        show(meta, selected)
+        return EXIT_OK
     require_adb()
     if options.backend == "android" and shutil.which("android") is None:
         fail_usage("--backend android needs the `android` CLI on PATH")
@@ -1016,20 +1088,20 @@ def main():
         label = "setup" if step["isInit"] else (step["log"] or step["action"])
         sys.stdout.write("step %d: %s\n" % (step["number"], label))
         nodes = []
-        if step["target"] and not options.no_wait and not step["isInit"]:
-            status, nodes = wait_for(options, step["target"])
-            if status == "absent":
-                report_divergence(
-                    options, meta, step, remaining, nodes,
-                    "the target never appeared within %.0fs" % options.timeout,
-                )
-                return EXIT_DIVERGED
-        elif step["screen"] and not options.no_wait and not step["isInit"]:
-            wait_for_screen(options, step["screen"])
         try:
+            if step["target"] and not options.no_wait and not step["isInit"]:
+                status, nodes = wait_for(options, step["target"])
+                if status == "absent":
+                    report_divergence(
+                        options, meta, step, remaining, nodes,
+                        "the target never appeared within %.0fs" % options.timeout,
+                    )
+                    return EXIT_DIVERGED
+            elif step["screen"] and not options.no_wait and not step["isInit"]:
+                wait_for_screen(options, step["screen"])
             unsupported = send_step_events(options, step, nodes)
         except Diverged as error:
-            report_divergence(options, meta, step, remaining, nodes or dump_tree(options), str(error))
+            report_divergence(options, meta, step, remaining, nodes_for_report(options, nodes), str(error))
             return EXIT_DIVERGED
         except DeviceCommandFailed as error:
             sys.stderr.write("\nreplay.sh: step %d: %s\n" % (step["number"], error))
@@ -1039,7 +1111,7 @@ def main():
             return EXIT_DEVICE
         if unsupported is not None:
             report_divergence(
-                options, meta, step, remaining, nodes or dump_tree(options),
+                options, meta, step, remaining, nodes_for_report(options, nodes),
                 "this step used %s, which adb cannot reproduce" % describe_event(unsupported),
             )
             return EXIT_DIVERGED
