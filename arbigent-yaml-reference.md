@@ -102,6 +102,7 @@ Legacy scenario-level field, tagged by `type:`. Distinct from the `CleanupData`
 | `mcpJson` | String (multiline) | `"{}"` | MCP server configuration as a JSON string. |
 | `deviceFormFactor` | [DeviceFormFactor](#deviceformfactor) | `Unspecified` | Default form factor for all scenarios. |
 | `additionalActions` | `List<String>?` | `null` | Project-wide extra actions. |
+| `replayScripts` | [ReplayScripts](#replayscripts)? | `null` | Write a replay script for each successful scenario that recorded device events. Absent means off. |
 
 ### Prompt
 
@@ -130,6 +131,15 @@ Tagged by `type:`.
 | `Disabled` | (none) |
 | `InMemory` | `maxCacheSize: Long = 100`, `expireAfterWriteMs: Long` (default 24h in ms) |
 | `Disk` | `maxCacheSize: Long` (default `524288000`, i.e. 500 MiB) |
+
+### ReplayScripts
+
+See [arbigent-replay-scripts.md](arbigent-replay-scripts.md).
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `enabled` | Boolean | `true` | Whether to write the scripts. |
+| `outputDir` | String? | `null` | Where to write them. Relative paths resolve against the working directory; `null` means `replay-scripts/` inside the result directory. |
 
 ## AiOptions
 
