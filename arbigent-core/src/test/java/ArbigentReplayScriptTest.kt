@@ -241,7 +241,7 @@ class ArbigentReplayScriptWriterTest {
   }
 
   @Test
-  fun `writes the log with a file-safe name`() {
+  fun `writes the log and the runner, with a file-safe name`() {
     val dir = Files.createTempDirectory("replay-scripts").toFile()
     ArbigentReplayScriptWriter(dir).write(
       scenarioId = "open settings/main",
@@ -260,6 +260,9 @@ class ArbigentReplayScriptWriterTest {
       ArbigentReplayScriptWriter.fileBaseName("a/b") != ArbigentReplayScriptWriter.fileBaseName("a b"),
     )
     assertTrue(dir.listFiles().orEmpty().none { it.name.endsWith(".tmp") }, "temp file left behind")
+    val runner = File(dir, "replay.sh")
+    assertTrue(runner.isFile)
+    assertTrue(runner.canExecute(), "the runner has to be runnable without chmod")
 
     val lines = log.readLines().filter { it.isNotBlank() }
     assertEquals("scenario_start", lineType(lines.first()))
@@ -333,6 +336,7 @@ class ArbigentReplayScriptExecutorTest {
     advanceUntilIdle()
 
     assertTrue(File(dir, "settings-scenario.jsonl").isFile)
+    assertTrue(File(dir, "replay.sh").isFile)
   }
 
   @OptIn(ExperimentalStdlibApi::class)
