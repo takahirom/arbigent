@@ -57,22 +57,24 @@ internal class ArbigentReplayScriptWriter(
     outputDir.mkdirs()
     val baseName = fileBaseName(scenarioId)
     val logFile = File(outputDir, "$baseName.jsonl")
+    // The runner lands before the log so a log that exists is always runnable.
+    writeRunner()
     writeAtomically(
       logFile,
       jsonLines(scenarioId, goals, tasks, steps, signature, screenWidth, screenHeight)
         .joinToString(separator = "\n", postfix = "\n"),
     )
-    writeRunner()
     arbigentInfoLog("Wrote replay script for scenario $scenarioId to ${logFile.absolutePath}")
   }
 
+  // The runner is shared by every replay in the directory, so it is replaced atomically like the
+  // logs: a runner mid-copy must never be what a concurrent replay executes.
   private fun writeRunner() {
-    val runner = File(outputDir, RUNNER_FILE_NAME)
     val source = checkNotNull(javaClass.classLoader.getResourceAsStream(RUNNER_FILE_NAME)) {
       "$RUNNER_FILE_NAME is missing from the arbigent resources"
     }
-    source.use { input -> runner.outputStream().use { output -> input.copyTo(output) } }
-    runner.setExecutable(true, false)
+    val text = source.use { it.readBytes().decodeToString() }
+    writeAtomically(File(outputDir, RUNNER_FILE_NAME), text, executable = true)
   }
 
   private fun flatten(

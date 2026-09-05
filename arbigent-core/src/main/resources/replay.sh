@@ -4,6 +4,10 @@
 # The event log beside this script records what Arbigent actually sent to the device. This script
 # sends the same things again, waiting before each step for the element that step targeted so a
 # replay that drifts stops and says where, instead of tapping blindly.
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "replay.sh: python3 is required but was not found on PATH" >&2
+  exit 1
+fi
 exec python3 - "$@" <<'PY'
 """Replay an Arbigent device event log with adb."""
 
@@ -126,14 +130,20 @@ def parse_args(argv):
         index += 1
     if options.log is None:
         fail_usage("no event log given")
+    if options.start is not None and options.until is not None and options.start > options.until:
+        fail_usage("--from %d is after --until %d" % (options.start, options.until))
     return options
 
 
 def int_or_fail(name, value):
+    """Steps are numbered from 1, so zero or a negative number never names one."""
     try:
-        return int(value)
+        number = int(value)
     except ValueError:
         fail_usage("%s needs a whole number, got %r" % (name, value))
+    if number < 1:
+        fail_usage("%s needs a step number of 1 or more, got %r" % (name, value))
+    return number
 
 
 def timeout_or_fail(name, value):
@@ -169,18 +179,22 @@ def load_events(path):
     if not os.path.exists(path):
         fail_usage("no such event log: %s" % path)
     events = []
-    with open(path, "r") as handle:
-        for number, line in enumerate(handle, 1):
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                event = json.loads(line)
-            except ValueError:
-                fail_usage("%s line %d is not JSON: %s" % (path, number, line[:120]))
-            if not isinstance(event, dict) or not isinstance(event.get("type"), str):
-                fail_usage("%s line %d is not an event record" % (path, number))
-            events.append(event)
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            lines = handle.read().splitlines()
+    except (OSError, UnicodeError) as error:
+        fail_usage("could not read event log %s: %s" % (path, error))
+    for number, line in enumerate(lines, 1):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            event = json.loads(line)
+        except ValueError:
+            fail_usage("%s line %d is not JSON: %s" % (path, number, line[:120]))
+        if not isinstance(event, dict) or not isinstance(event.get("type"), str):
+            fail_usage("%s line %d is not an event record" % (path, number))
+        events.append(event)
     return events
 
 
