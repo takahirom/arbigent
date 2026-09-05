@@ -57,8 +57,8 @@ internal class ArbigentReplayScriptWriter(
     outputDir.mkdirs()
     val baseName = fileBaseName(scenarioId)
     val logFile = File(outputDir, "$baseName.jsonl")
-    // The summary and the runner land before the log so a log that exists is always runnable and
-    // already described.
+    // The summary and the runner land before the log: the log is what a replay reads, so once it is
+    // in place everything it points at already exists.
     writeAtomically(
       File(outputDir, "$baseName.md"),
       renderReplayScriptMarkdown(scenarioId, baseName, goals, tasks, steps, signature),
