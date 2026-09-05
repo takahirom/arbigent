@@ -163,6 +163,106 @@ class ReplayScriptRunnerTest {
   }
 
   @Test
+  fun `a setup block is replayed only with the step it prepared for`() {
+    val dir = Files.createTempDirectory("replay-runner-init-range").toFile()
+    val script = File(dir, "runner.py")
+    script.writeText(extractPython())
+    val log = File(dir, "sample-scenario.jsonl")
+    log.writeText(readResource(fixture))
+
+    // The relaunch after step 3 is not needed when the replay stops at step 2, but the launch
+    // before step 1 is: it is how the app gets on screen at all.
+    val (untilCode, untilOutput) = run(
+      dir,
+      listOf("python3", script.absolutePath, log.absolutePath, "--show", "--with-init", "--until", "2"),
+    )
+    assertEquals(0, untilCode, untilOutput)
+    assertEquals(1, untilOutput.lines().count { it.startsWith("0. setup") }, untilOutput)
+    assertTrue(untilOutput.lines().first { it.startsWith("0. setup") }.isNotEmpty())
+
+    val (fromCode, fromOutput) = run(
+      dir,
+      listOf("python3", script.absolutePath, log.absolutePath, "--show", "--with-init", "--from", "3"),
+    )
+    assertEquals(0, fromCode, fromOutput)
+    assertEquals(2, fromOutput.lines().count { it.startsWith("0. setup") }, fromOutput)
+    assertTrue(!fromOutput.contains("1. Press the down key"), fromOutput)
+  }
+
+  @Test
+  fun `--show on an empty range is a usage error`() {
+    val dir = Files.createTempDirectory("replay-runner-empty").toFile()
+    val script = File(dir, "runner.py")
+    script.writeText(extractPython())
+    val log = File(dir, "sample-scenario.jsonl")
+    log.writeText(readResource(fixture))
+
+    val (code, output) = run(
+      dir,
+      listOf("python3", script.absolutePath, log.absolutePath, "--show", "--from", "9"),
+    )
+    assertEquals(1, code, output)
+    assertTrue(output.contains("nothing to replay"), output)
+  }
+
+  @Test
+  fun `a dump that adb could not take at all is a device failure, not an empty screen`() {
+    val dir = Files.createTempDirectory("replay-runner-dump").toFile()
+    val script = File(dir, "runner.py")
+    script.writeText(extractPython())
+    val probe = File(dir, "probe.py")
+    probe.writeText(
+      """
+      import json, runpy
+      module = runpy.run_path(SCRIPT_PATH, run_name="replay_runner")
+      Options = module["Options"]
+      DeviceCommandFailed = module["DeviceCommandFailed"]
+      Diverged = module["Diverged"]
+      module["time"].sleep = lambda seconds: None
+      calls = []
+
+      def fake_adb(kind):
+          def adb(options, args, capture=False):
+              calls.append(args)
+              if args[:2] == ["shell", "rm"]:
+                  return 0, b"", b""
+              if kind == "no-device":
+                  return 1, b"", b"adb: device 'bogus' not found"
+              if kind == "busy":
+                  return 0, b"ERROR: could not get idle state.", b""
+              return 0, b"", b""
+          return adb
+
+      options = Options()
+      options.backend = "uiautomator"
+      result = {}
+      module["adb"] = fake_adb("no-device")
+      module["dump_tree_uiautomator"].__globals__["adb"] = module["adb"]
+      try:
+          module["dump_tree"](options)
+          result["noDevice"] = "returned"
+      except DeviceCommandFailed as error:
+          result["noDevice"] = "failed: %s" % error
+      module["dump_tree_uiautomator"].__globals__["adb"] = fake_adb("busy")
+      result["busy"] = module["dump_tree"](options)
+      try:
+          module["send_event"](options, {"type": "input_text", "text": "50%s off"}, {}, [])
+          result["percent"] = "sent"
+      except Diverged as error:
+          result["percent"] = "diverged"
+      print(json.dumps(result))
+      """.trimIndent().replace("SCRIPT_PATH", "\"" + script.absolutePath + "\"")
+    )
+
+    val (code, output) = run(dir, listOf("python3", probe.absolutePath))
+    assertEquals(0, code, output)
+    assertTrue(output.contains("\"noDevice\": \"failed: uiautomator dump failed: adb: device 'bogus' not found\""), output)
+    // A screen that is merely still animating is not a device failure.
+    assertTrue(output.contains("\"busy\": []"), output)
+    assertTrue(output.contains("\"percent\": \"diverged\""), output)
+  }
+
+  @Test
   fun `a log without a successful end is refused`() {
     val dir = Files.createTempDirectory("replay-runner-torn").toFile()
     val script = File(dir, "runner.py")
