@@ -44,7 +44,18 @@ public data class AnthropicContent(
   val name: String? = null,
   val input: JsonObject? = null,
   @SerialName("tool_use_id") val toolUseId: String? = null,
+  /** Prompt cache breakpoint. Anthropic caches only the prefix up to a block that has one. */
+  @SerialName("cache_control") val cacheControl: AnthropicCacheControl? = null,
 )
+
+@Serializable
+public data class AnthropicCacheControl(
+  val type: String,
+) {
+  public companion object {
+    public val Ephemeral: AnthropicCacheControl = AnthropicCacheControl(type = "ephemeral")
+  }
+}
 
 @Serializable
 public data class AnthropicImageSource(
@@ -93,10 +104,16 @@ public data class AnthropicMessagesResponse(
   val usage: AnthropicUsage? = null
 )
 
+/**
+ * Anthropic counts cache reads and writes separately from [inputTokens], which holds only the
+ * uncached part, unlike OpenAI where the cached count is a subset of the prompt tokens.
+ */
 @Serializable
 public data class AnthropicUsage(
   @SerialName("input_tokens") val inputTokens: Int? = null,
-  @SerialName("output_tokens") val outputTokens: Int? = null
+  @SerialName("output_tokens") val outputTokens: Int? = null,
+  @SerialName("cache_creation_input_tokens") val cacheCreationInputTokens: Int? = null,
+  @SerialName("cache_read_input_tokens") val cacheReadInputTokens: Int? = null,
 )
 
 @Serializable

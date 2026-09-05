@@ -42,6 +42,12 @@ public class ApiUsageRecord(
    * because reporting those here would mean something different.
    */
   @SerialName("cached_input_tokens") public val cachedInputTokens: Int? = null,
+  /**
+   * Anthropic style cache counts. These are billed separately from [inputTokens], which then
+   * holds only the uncached part, so they are kept apart from [cachedInputTokens].
+   */
+  @SerialName("cache_read_input_tokens") public val cacheReadInputTokens: Int? = null,
+  @SerialName("cache_creation_input_tokens") public val cacheCreationInputTokens: Int? = null,
   @SerialName("output_tokens") public val outputTokens: Int? = null,
   @SerialName("total_tokens") public val totalTokens: Int? = null,
 )
@@ -78,6 +84,8 @@ public fun parseApiUsageRecord(requestUuid: String?, responseBody: String): ApiU
     model = runCatching { root["model"]?.jsonPrimitive?.contentOrNull }.getOrNull(),
     inputTokens = int("prompt_tokens") ?: int("input_tokens"),
     cachedInputTokens = cachedInt(),
+    cacheReadInputTokens = int("cache_read_input_tokens"),
+    cacheCreationInputTokens = int("cache_creation_input_tokens"),
     outputTokens = int("completion_tokens") ?: int("output_tokens"),
     totalTokens = int("total_tokens"),
     // A usage object with no field this code knows about carries no number worth recording, and a

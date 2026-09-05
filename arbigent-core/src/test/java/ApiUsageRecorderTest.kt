@@ -78,8 +78,8 @@ class ApiUsageRecorderTest {
   @Test
   fun parsesAnthropicUsage() {
     // Anthropic reports input_tokens / output_tokens like the Responses API, but has no nested
-    // details object. Its cache counters are not a subset of input_tokens, so they are left out
-    // rather than reported as cached_input_tokens, which would mean something else.
+    // details object. Its cache counters are not a subset of input_tokens, so they go to their own
+    // fields rather than to cached_input_tokens, which would mean something else.
     val record = parseApiUsageRecord(
       requestUuid = null,
       responseBody = """
@@ -89,7 +89,8 @@ class ApiUsageRecorderTest {
           "usage": {
             "input_tokens": 700,
             "output_tokens": 25,
-            "cache_read_input_tokens": 400
+            "cache_read_input_tokens": 400,
+            "cache_creation_input_tokens": 120
           }
         }
       """.trimIndent()
@@ -99,6 +100,28 @@ class ApiUsageRecorderTest {
     assertEquals(700, record.inputTokens)
     assertEquals(25, record.outputTokens)
     assertNull(record.cachedInputTokens)
+    assertEquals(400, record.cacheReadInputTokens)
+    assertEquals(120, record.cacheCreationInputTokens)
+  }
+
+  @Test
+  fun leavesAnthropicCacheFieldsNullForOpenAiUsage() {
+    val record = parseApiUsageRecord(
+      requestUuid = null,
+      responseBody = """
+        {
+          "usage": {
+            "prompt_tokens": 100,
+            "completion_tokens": 5,
+            "prompt_tokens_details": { "cached_tokens": 64 }
+          }
+        }
+      """.trimIndent()
+    )
+    requireNotNull(record)
+    assertEquals(64, record.cachedInputTokens)
+    assertNull(record.cacheReadInputTokens)
+    assertNull(record.cacheCreationInputTokens)
   }
 
   @Test

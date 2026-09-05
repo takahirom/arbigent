@@ -3,9 +3,11 @@ import io.github.takahirom.arbigent.ArbigentAiOptions
 import io.github.takahirom.arbigent.ChatCompletionRequest
 import io.github.takahirom.arbigent.ChatCompletionResponse
 import io.github.takahirom.arbigent.ChatMessage
+import io.github.takahirom.arbigent.PromptTokensDetails
 import io.github.takahirom.arbigent.FunctionDefinition
 import io.github.takahirom.arbigent.OpenAIAi
 import io.github.takahirom.arbigent.ToolDefinition
+import io.github.takahirom.arbigent.Usage
 import kotlinx.serialization.json.*
 import org.junit.Assert.*
 import org.junit.Test
@@ -437,5 +439,38 @@ class BuildRequestBodyTest {
       "tools should be JsonNull or absent when null",
       tools == null || tools == JsonNull
     )
+  }
+
+  // --- Prompt caching ---
+
+  @Test
+  fun `chat completions usage keeps cached_tokens`() {
+    val json = Json { ignoreUnknownKeys = true }
+
+    val usage = json.decodeFromString<Usage>(
+      """{"prompt_tokens":5000,"completion_tokens":20,"total_tokens":5020,
+         "prompt_tokens_details":{"cached_tokens":1449,"audio_tokens":0}}"""
+    )
+
+    assertEquals(5000, usage.promptTokens)
+    assertEquals(PromptTokensDetails(cachedTokens = 1449), usage.promptTokensDetails)
+  }
+
+  @Test
+  fun `normalizeResponsesApiResponse maps cached tokens from input_tokens_details`() {
+    val responseBody = """
+      {
+        "id": "resp_1", "created_at": 1, "model": "gpt-5.6",
+        "output": [ { "type": "message", "role": "assistant", "content": [ { "type": "output_text", "text": "hi" } ] } ],
+        "usage": { "input_tokens": 3000, "output_tokens": 10, "total_tokens": 3010,
+                   "input_tokens_details": { "cached_tokens": 2048 } }
+      }
+    """.trimIndent()
+
+    val normalized = openAiAi.normalizeResponsesApiResponse(responseBody, "gpt-5.6")
+    val response = Json { ignoreUnknownKeys = true }.decodeFromString<ChatCompletionResponse>(normalized)
+
+    assertEquals(3000, response.usage?.promptTokens)
+    assertEquals(2048, response.usage?.promptTokensDetails?.cachedTokens)
   }
 }

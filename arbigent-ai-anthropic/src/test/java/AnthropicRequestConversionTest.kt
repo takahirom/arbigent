@@ -1,6 +1,7 @@
 import io.github.takahirom.arbigent.AgentActionType
 import io.github.takahirom.arbigent.AnthropicAi
 import io.github.takahirom.arbigent.AnthropicAiRateLimitExceededException
+import io.github.takahirom.arbigent.AnthropicCacheControl
 import io.github.takahirom.arbigent.AnthropicContent
 import io.github.takahirom.arbigent.AnthropicErrorResponse
 import io.github.takahirom.arbigent.AnthropicImageSource
@@ -336,6 +337,62 @@ class AnthropicRequestConversionTest {
     )
 
     assertEquals("image/webp", message.content[0].source?.mediaType)
+  }
+
+  // --- Prompt caching ---
+
+  @Test
+  fun `buildUserMessage does not put cache_control on user content`() {
+    // The user turn changes every step (screenshot, UI tree, previous steps), so a breakpoint there
+    // would be written each step and never read back. The only breakpoint is on the system prompt.
+    val message = anthropicAi.buildUserMessage(imageBase64 = "aW1n", mimeType = "image/png", promptText = "goal")
+
+    assertTrue(message.content.all { it.cacheControl == null })
+  }
+
+  @Test
+  fun `buildSystemContents marks only the last block as a cache breakpoint`() {
+    val prompt = ArbigentPrompt(additionalSystemPrompts = listOf("Extra instruction"))
+
+    val system = anthropicAi.buildSystemContents(prompt, ArbigentScenarioDeviceFormFactor.Mobile)
+
+    assertTrue(system.size >= 2)
+    assertEquals(AnthropicCacheControl.Ephemeral, system.last().cacheControl)
+    assertTrue(system.dropLast(1).all { it.cacheControl == null })
+  }
+
+  @Test
+  fun `cache_control is serialized as an ephemeral object and omitted when absent`() {
+    val request = AnthropicMessagesRequest(
+      model = "claude-sonnet-4-5",
+      maxTokens = 1024,
+      system = anthropicAi.buildSystemContents(ArbigentPrompt(), ArbigentScenarioDeviceFormFactor.Mobile),
+      messages = listOf(AnthropicMessage(role = "user", content = listOf(AnthropicContent(type = "text", text = "hi")))),
+    )
+
+    val body = anthropicAi.buildRequestBody(request, null).jsonObject
+
+    val systemBlocks = body["system"]!!.jsonArray
+    assertEquals(
+      "ephemeral",
+      systemBlocks.last().jsonObject["cache_control"]!!.jsonObject["type"]!!.jsonPrimitive.content
+    )
+    val userBlock = body["messages"]!!.jsonArray.first().jsonObject["content"]!!.jsonArray.first().jsonObject
+    assertFalse(userBlock.containsKey("cache_control"))
+  }
+
+  @Test
+  fun `response usage keeps the cache read and write counts`() {
+    val json = Json { ignoreUnknownKeys = true }
+
+    val response = json.decodeFromString<AnthropicMessagesResponse>(
+      """{"type":"message","content":[],"usage":{"input_tokens":10,"output_tokens":3,
+         "cache_read_input_tokens":1500,"cache_creation_input_tokens":0}}"""
+    )
+
+    assertEquals(10, response.usage?.inputTokens)
+    assertEquals(1500, response.usage?.cacheReadInputTokens)
+    assertEquals(0, response.usage?.cacheCreationInputTokens)
   }
 
   // --- Tool schema conversion ---
