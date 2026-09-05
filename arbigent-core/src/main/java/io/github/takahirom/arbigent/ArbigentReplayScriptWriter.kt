@@ -11,8 +11,8 @@ import java.io.File
 /**
  * One recorded step of a scenario, after task-local recordings have been flattened and numbered.
  *
- * Every artifact written for a run is rendered from this shape, so they cannot disagree about which
- * step is which.
+ * The event log and the markdown summary are two views of the same run, so both are written from
+ * this shape and cannot disagree about which step is which.
  */
 internal data class ArbigentReplayScriptStep(
   val taskIndex: Int,
@@ -31,8 +31,8 @@ internal data class ArbigentReplayScriptStep(
 )
 
 /**
- * Writes the replay event log for one successful scenario, and the runner shared by every scenario
- * in the directory.
+ * Writes the replay artifacts for one successful scenario: the event log, the readable summary, and
+ * the runner shared by every scenario in the directory.
  *
  * Only successful runs are written. A failed scenario leaves whatever was written before untouched,
  * because a half-finished log replays to a screen the scenario never reached, which is worse than
@@ -57,7 +57,12 @@ internal class ArbigentReplayScriptWriter(
     outputDir.mkdirs()
     val baseName = fileBaseName(scenarioId)
     val logFile = File(outputDir, "$baseName.jsonl")
-    // The runner lands before the log so a log that exists is always runnable.
+    // The summary and the runner land before the log: the log is what a replay reads, so once it is
+    // in place everything it points at already exists.
+    writeAtomically(
+      File(outputDir, "$baseName.md"),
+      renderReplayScriptMarkdown(scenarioId, baseName, goals, tasks, steps, signature),
+    )
     writeRunner()
     writeAtomically(
       logFile,
