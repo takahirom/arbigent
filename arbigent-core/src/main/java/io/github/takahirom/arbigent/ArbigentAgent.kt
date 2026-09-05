@@ -39,6 +39,10 @@ public class ArbigentAgent internal constructor(
   // degrade to normal execution, and the failed attempt would then purge the AI-decision cache as
   // if it were an ordinary failure. Null means normal AI-driven execution.
   private val replayTrace: ArbigentReplayTrace?,
+  // Interceptors the executor adds for this one run, on top of the scenario's own. The agent
+  // config is built when the project is loaded, so anything scoped to a single execution (the
+  // replay-script recorder) cannot come from there.
+  additionalInterceptors: List<ArbigentInterceptor> = emptyList(),
 ) {
   private val attemptMode: ArbigentAttemptMode = if (replayTrace != null) {
     ArbigentAttemptMode.ReplayWithFallback
@@ -48,7 +52,7 @@ public class ArbigentAgent internal constructor(
 
   private val ai by lazy { agentConfig.aiFactory() }
   public val device: ArbigentDevice by lazy { agentConfig.deviceFactory() }
-  private val interceptors: List<ArbigentInterceptor> = agentConfig.interceptors
+  private val interceptors: List<ArbigentInterceptor> = agentConfig.interceptors + additionalInterceptors
   private val deviceFormFactor = agentConfig.deviceFormFactor
   private val prompt = agentConfig.prompt
   private val aiOptions = agentConfig.aiOptions
