@@ -209,12 +209,14 @@ internal class ArbigentReplayScriptWriter(
     }
 
     /**
-     * Writes through a sibling temp file and renames, so a reader (a CI upload, a runner started
-     * on the previous script) never sees a half-written file.
+     * Writes through a uniquely named sibling temp file and renames, so a reader (a CI upload, a
+     * runner started on the previous script) never sees a half-written file and two writers (two
+     * arbigent processes sharing an output dir) never stage into the same temp file.
      */
-    fun writeAtomically(target: File, text: String) {
-      val temp = File(target.parentFile, "${target.name}.tmp")
+    fun writeAtomically(target: File, text: String, executable: Boolean = false) {
+      val temp = File(target.parentFile, "${target.name}.${ProcessHandle.current().pid()}.${System.nanoTime()}.tmp")
       temp.writeText(text)
+      if (executable) temp.setExecutable(true, false)
       try {
         java.nio.file.Files.move(
           temp.toPath(), target.toPath(),
