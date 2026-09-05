@@ -180,6 +180,7 @@ public data class ArbigentScenario(
   val isLeaf: Boolean,
   val cacheOptions: ArbigentScenarioCacheOptions? = null,
   val mcpOptions: ArbigentMcpOptions? = null,
+  val replayScripts: ReplayScriptsSettings? = null,
 ) {
   public fun goal(): String? {
     return agentTasks.lastOrNull()?.goal

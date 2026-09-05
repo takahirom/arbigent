@@ -5,6 +5,7 @@ import io.github.takahirom.arbigent.coroutines.buildFlatMapLatestSingleSourceSta
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.Serializable
+import java.io.File
 import kotlin.coroutines.cancellation.CancellationException
 
 public data class ArbigentScenarioRunningInfo(
@@ -205,6 +206,12 @@ public class ArbigentScenarioExecutor internal constructor(
       arbigentInfoLog("Starting replay for scenario ${scenario.id}")
     }
 
+    // One recorder for the whole execution: the device is shared by every task, and the script it
+    // writes has to describe the run end to end, not one task at a time.
+    val replayScriptRecorder = scenario.replayScripts
+      ?.takeIf { it.enabled }
+      ?.let { ArbigentReplayScriptRecorder() }
+
     var finishedSuccessfully = false
     var retryRemain = scenario.maxRetry
     var normalRetriesExhausted = false
@@ -216,6 +223,9 @@ public class ArbigentScenarioExecutor internal constructor(
       do {
         yield()
         replayedPrefixes.clear()
+        // Every task starts again from the top on a retry, so anything recorded from the abandoned
+        // attempt would replay actions the successful run never performed.
+        replayScriptRecorder?.reset()
         _taskAssignmentsStateFlow.value.forEach {
           it.agent.cancel()
         }
@@ -227,6 +237,7 @@ public class ArbigentScenarioExecutor internal constructor(
               dispatcher = dispatcher,
               replayTrace = replayTraces?.get(index)
                 .takeIf { attemptMode == ArbigentAttemptMode.ReplayWithFallback },
+              additionalInterceptors = listOfNotNull(replayScriptRecorder),
             ),
           )
         }
@@ -234,6 +245,9 @@ public class ArbigentScenarioExecutor internal constructor(
         // Tasks that already fell back to normal execution in this attempt. A task gets one
         // fallback: failing again is an ordinary failure and restarts the whole scenario.
         val fellBackTaskIndexes = mutableSetOf<Int>()
+        // The task whose already-recorded replay-script steps must survive its re-run, set by the
+        // fallback below for a task that carries on from the screen the previous one left.
+        var keepRecordedStepsOf: Int? = null
         var index = 0
         while (index < taskAssignments().size) {
           val (task, agent) = taskAssignments()[index]
@@ -245,23 +259,40 @@ public class ArbigentScenarioExecutor internal constructor(
             maxStep = 0,
             currentStep = 0,
           )
-          supervisorScope {
-            agent.latestArbigentContextFlow
-              .flatMapLatest {
-                it?.stepsFlow ?: emptyFlow()
-              }
-              .onEach { steps ->
-                val context = agent.latestArbigentContext()
-                _arbigentScenarioRunningInfoStateFlow.value = _arbigentScenarioRunningInfoStateFlow.value?.copy(
-                  maxStep = task.maxStep,
-                  currentStep = context?.countMeaningfulActions() ?: 0
-                )
-              }
-              .launchIn(coroutineScope)
-            agent.execute(
-              agentTask = task,
-              mcpClient = mcpClient,
-            )
+          replayScriptRecorder?.beginTask(
+            taskIndex = index,
+            goal = task.goal,
+            discardPrevious = keepRecordedStepsOf != index,
+          )
+          keepRecordedStepsOf = null
+          // The recorder must never decide a scenario's fate: a device that cannot take a listener
+          // just loses its replay script for this task.
+          val listening = replayScriptRecorder?.let { recorder ->
+            runCatching { agent.device.addDeviceEventListener(recorder) }.isSuccess
+          } ?: false
+          try {
+            supervisorScope {
+              agent.latestArbigentContextFlow
+                .flatMapLatest {
+                  it?.stepsFlow ?: emptyFlow()
+                }
+                .onEach { steps ->
+                  val context = agent.latestArbigentContext()
+                  _arbigentScenarioRunningInfoStateFlow.value = _arbigentScenarioRunningInfoStateFlow.value?.copy(
+                    maxStep = task.maxStep,
+                    currentStep = context?.countMeaningfulActions() ?: 0
+                  )
+                }
+                .launchIn(coroutineScope)
+              agent.execute(
+                agentTask = task,
+                mcpClient = mcpClient,
+              )
+            }
+          } finally {
+            if (listening) {
+              runCatching { agent.device.removeDeviceEventListener(replayScriptRecorder!!) }
+            }
           }
           if (!agent.isGoalAchieved()) {
             // A replayed task that fails is not evidence that the tasks before it are wrong: it is
@@ -285,6 +316,10 @@ public class ArbigentScenarioExecutor internal constructor(
               if (!task.resetsDeviceState()) {
                 replayedPrefixes[index] = agent.latestArbigentContext()?.steps().orEmpty()
               }
+              // Same reasoning for the replay script: a task that resets the device runs again from
+              // the screen it started from, so what it recorded before is superseded; a task that
+              // carries on keeps it, or the script would jump over actions the device has had.
+              if (!task.resetsDeviceState()) keepRecordedStepsOf = index
               agent.cancel()
               _taskAssignmentsStateFlow.value = taskAssignments().toMutableList().also {
                 it[index] = ArbigentTaskAssignment(
@@ -293,6 +328,7 @@ public class ArbigentScenarioExecutor internal constructor(
                     agentConfig = task.agentConfig,
                     dispatcher = dispatcher,
                     replayTrace = null,
+                    additionalInterceptors = listOfNotNull(replayScriptRecorder),
                   ),
                 )
               }
@@ -375,9 +411,60 @@ public class ArbigentScenarioExecutor internal constructor(
           }
         }
       }
+      if (replayScriptRecorder != null) {
+        writeReplayScripts(scenario, replayScriptRecorder)
+      }
       arbigentInfoLog("🟢 ${scenario.id} scenario completed successfully")
     }
     arbigentDebugLog("Arbigent.execute end")
+  }
+
+  /**
+   * Writes the replay script for a scenario that has just succeeded.
+   *
+   * Wrapped so a filesystem problem cannot turn a green scenario red: the script is a by-product of
+   * the run, and failing to write it says nothing about whether the goal was reached.
+   */
+  private fun writeReplayScripts(
+    scenario: ArbigentScenario,
+    recorder: ArbigentReplayScriptRecorder,
+  ) {
+    val settings = scenario.replayScripts ?: return
+    runCatching {
+      // The runner drives the device with adb, so a script recorded on anything else could not be
+      // replayed by it. iOS and Web would need their own event mapping and runner.
+      val device = taskAssignments().last().agent.device
+      val os = device.os()
+      if (os != ArbigentDeviceOs.Android) {
+        arbigentInfoLog(
+          "Not writing a replay script for scenario ${scenario.id}: replay scripts are Android-only and this device is $os",
+        )
+        return
+      }
+      val outputDir = settings.outputDir
+        ?.let { File(it) }
+        ?: File(ArbigentFiles.parentDir, DefaultReplayScriptsDirName)
+      // The signature is what the last task left on screen. It is advisory: a replay that reaches a
+      // screen with none of these ids has almost certainly gone somewhere else.
+      val signature = runCatching {
+        val elements = device.elements().elements
+        elements
+          .mapNotNull { element -> ArbigentElementIdentity.from(element, elements)?.resourceId }
+          .distinct()
+          .take(MaxSignatureElements)
+      }.getOrElse { emptyList() }
+      val (screenWidth, screenHeight) = recorder.screenSize()
+      ArbigentReplayScriptWriter(outputDir).write(
+        scenarioId = scenario.id,
+        goals = scenario.agentTasks.map { it.goal },
+        tasks = recorder.recordedTasks(),
+        signature = signature,
+        screenWidth = screenWidth,
+        screenHeight = screenHeight,
+      )
+    }.onFailure {
+      arbigentInfoLog("Failed to write a replay script for scenario ${scenario.id}: ${it.message}")
+    }
   }
 
   /**
@@ -458,3 +545,9 @@ public fun ArbigentScenarioExecutor(
   builder.block()
   return builder.build()
 }
+
+/** Where replay scripts go when the project does not say. */
+private const val DefaultReplayScriptsDirName = "replay-scripts"
+
+/** How many resource ids describe the end screen. Enough to recognise it, few enough to read. */
+private const val MaxSignatureElements = 5

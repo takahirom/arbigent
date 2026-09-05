@@ -261,11 +261,26 @@ public data class ArbigentProjectSettings(
   public val mcpJson: String = DefaultMcpJson,
   public val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Unspecified,
   public val additionalActions: List<String>? = null,
+  public val replayScripts: ReplayScriptsSettings? = null,
 ) {
   public companion object {
     public const val DefaultMcpJson: String = "{}"
   }
 }
+
+/**
+ * Emits a replay script per scenario after a successful run: an event log of what was sent to the
+ * device, so the same screens can be reached again without the AI.
+ *
+ * Absent from the project file means the feature is off, so an existing project keeps writing
+ * nothing until it opts in.
+ */
+@Serializable
+public data class ReplayScriptsSettings(
+  public val enabled: Boolean = true,
+  /** Where to write. Relative paths resolve against the working directory. */
+  public val outputDir: String? = null,
+)
 
 @Serializable
 public data class ArbigentPrompt(
@@ -500,7 +515,8 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
     deviceFormFactor = effectiveScenarioDeviceFormFactor,
     isLeaf = this.none { it.dependencyId == scenario.id },
     cacheOptions = scenario.cacheOptions,
-    mcpOptions = scenario.mcpOptions
+    mcpOptions = scenario.mcpOptions,
+    replayScripts = projectSettings.replayScripts?.takeIf { it.enabled },
   )
 }
 

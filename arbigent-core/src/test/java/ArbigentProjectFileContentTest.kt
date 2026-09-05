@@ -337,6 +337,48 @@ Previous steps:
     )
   }
 
+  private val projectWithReplayScripts = ArbigentProjectSerializer().load(
+    """
+    settings:
+      replayScripts:
+        enabled: true
+        outputDir: "build/replay-scripts"
+    scenarios:
+    - id: "replay-scripts-scenario"
+      goal: "Test replay scripts"
+    """
+  )
+
+  @Test
+  fun testReplayScriptsSettings() {
+    val settings = projectWithReplayScripts.settings.replayScripts
+    assertNotNull(settings, "replayScripts should be parsed")
+    assertEquals(true, settings.enabled)
+    assertEquals("build/replay-scripts", settings.outputDir)
+
+    val scenario = projectWithReplayScripts.scenarioContents.createArbigentScenario(
+      projectSettings = projectWithReplayScripts.settings,
+      scenario = projectWithReplayScripts.scenarioContents[0],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.Disabled.toCache()
+    )
+    assertEquals(settings, scenario.replayScripts, "the scenario should carry the project setting")
+  }
+
+  @Test
+  fun testReplayScriptsAbsentMeansOff() {
+    assertNull(basicProject.settings.replayScripts)
+    val scenario = basicProject.scenarioContents.createArbigentScenario(
+      projectSettings = basicProject.settings,
+      scenario = basicProject.scenarioContents[0],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.Disabled.toCache()
+    )
+    assertNull(scenario.replayScripts)
+  }
+
   private val projectWithAdditionalActions = ArbigentProjectSerializer().load(
     """
     settings:
