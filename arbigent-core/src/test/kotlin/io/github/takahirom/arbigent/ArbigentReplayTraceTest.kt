@@ -156,6 +156,28 @@ class ArbigentReplayTraceTest {
     }
 
   @Test
+  fun `a target that is still moving is not treated as settled`() = runTest {
+    // Same text, same id, different place: the element is animating into position.
+    val moving = ArbigentElementList(listOf(element("target", "id", "desc", y = 100)), screenWidth = 1000)
+    val settled = ArbigentElementList(listOf(element("target", "id", "desc", y = 0)), screenWidth = 1000)
+    val device = ScriptedDevice(listOf(moving, settled, settled))
+    var proceeded = false
+
+    ArbigentReplayPacingStepInterceptor(traceWithTarget()).intercept(stepInput(device)) {
+      proceeded = true
+      ArbigentAgent.StepResult.Continue
+    }
+
+    assertTrue(proceeded)
+    assertEquals(
+      3,
+      device.elementsCallCount,
+      "a change in bounds alone must count as an unsettled screen and cost one more poll",
+    )
+    assertEquals(1000, currentTime)
+  }
+
+  @Test
   fun `a replayed step whose target never appears is captured once the deadline passes`() = runTest {
     val absent = ArbigentElementList(emptyList(), screenWidth = 1000)
     val device = ScriptedDevice(listOf(absent))
@@ -552,6 +574,7 @@ class ArbigentReplayTraceTest {
     text: String,
     resourceId: String,
     accessibilityId: String,
+    y: Int = 0,
   ): ArbigentElement = ArbigentElement(
     index = 0,
     textForAI = text,
@@ -566,7 +589,7 @@ class ArbigentReplayTraceTest {
       children = emptyList(),
     ),
     x = 0,
-    y = 0,
+    y = y,
     width = 10,
     height = 10,
     isVisible = true,
