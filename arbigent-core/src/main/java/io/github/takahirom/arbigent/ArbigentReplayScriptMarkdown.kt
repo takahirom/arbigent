@@ -64,6 +64,14 @@ internal fun renderReplayScriptMarkdown(
   }
   appendLine("## Replay")
   appendLine()
+  appendLine("From a fresh device, setup included:")
+  appendLine()
+  appendLine("```")
+  appendLine("./${ArbigentReplayScriptWriter.RUNNER_FILE_NAME} $baseName.jsonl --with-init")
+  appendLine("```")
+  appendLine()
+  appendLine("With the app already on the screen the recording started from:")
+  appendLine()
   appendLine("```")
   appendLine("./${ArbigentReplayScriptWriter.RUNNER_FILE_NAME} $baseName.jsonl")
   appendLine("```")
@@ -103,12 +111,23 @@ private fun summarizeEvents(events: List<ArbigentDeviceEvent>): String {
 
 private fun ArbigentDeviceEvent.describe(): String = when (this) {
   is ArbigentDeviceEvent.Tap -> "tap($x,$y)"
+  is ArbigentDeviceEvent.TapElement -> buildString {
+    append("tap(")
+    val parts = listOfNotNull(
+      textRegex?.let { "text='$it'" },
+      idRegex?.let { "id='$it'" },
+      index.takeIf { it > 0 }?.let { "index=$it" },
+    )
+    append(parts.joinToString(", ").ifEmpty { "element" })
+    append(')')
+  }
   is ArbigentDeviceEvent.KeyPress -> keyName
   is ArbigentDeviceEvent.InputText -> "text(\"$text\")"
   is ArbigentDeviceEvent.Swipe -> "swipe($startX,$startY -> $endX,$endY, ${durationMs}ms)"
   is ArbigentDeviceEvent.LaunchApp -> buildString {
     append("launch(").append(appId)
     if (clearState) append(", clearState")
+    if (!stopApp) append(", keepRunning")
     launchArguments.forEach { (key, value) -> append(", ").append(key).append('=').append(value.toString()) }
     append(')')
   }

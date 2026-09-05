@@ -304,7 +304,11 @@ class ArbigentReplayScriptWriterTest {
     val markdown = File(dir, "open-settings.md").readText()
     assertTrue(markdown.startsWith("# open-settings"))
     assertTrue(markdown.contains("launch(com.example.app, clearState)"))
-    assertTrue(markdown.contains("./replay.sh open-settings.jsonl"))
+    assertTrue(markdown.contains("./replay.sh open-settings.jsonl --with-init"))
+    assertTrue(
+      markdown.indexOf("--with-init") < markdown.indexOf("./replay.sh open-settings.jsonl\n"),
+      "the command that replays the setup too comes first, since that is the one a fresh device needs",
+    )
     assertTrue(markdown.contains("com.example.app:id/settings_title"))
   }
 
