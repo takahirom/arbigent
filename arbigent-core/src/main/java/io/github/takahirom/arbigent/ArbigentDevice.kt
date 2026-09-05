@@ -326,10 +326,13 @@ public class MaestroDevice(
           val file = resolveScreenshotFile(screenshotsDir, screenshot.path)
           maestro.takeScreenshot(file.sink(), false)
         } else {
-          orchestra.runFlow(actions)
-          // Recorded after the flow so a command Maestro rejected (an element it could not find,
-          // which the agent then retries with a looser selector) never reaches the log.
-          recordDeviceEvents(actions)
+          val result = orchestra.runFlow(actions)
+          // Recorded after the flow, and only when Maestro reports it succeeded, so a command it
+          // rejected (an element it could not find, which the agent then retries with a looser
+          // selector) or gave up on never reaches the log.
+          if (result.success) {
+            recordDeviceEvents(actions)
+          }
         }
       }
     }
@@ -622,13 +625,14 @@ public class MaestroDevice(
       val direction = directionCandidates.random()
       arbigentDebugLog("directionCandidates: $directionCandidates \ndirection: $direction")
       runBlocking {
+        maestro.pressKey(direction)
         // Recorded here rather than in executeActions because the focus walk drives maestro
         // directly: these presses are the only device interaction a D-pad focus action performs,
-        // and a replay that skipped them would never move the focus at all.
+        // and a replay that skipped them would never move the focus at all. Recorded after the
+        // press so one the device refused is not replayed either.
         emitDeviceEvents(
           listOf(arbigentKeyPressEvent(direction))
         )
-        maestro.pressKey(direction)
         maestro.waitForAnimationToEnd("100")
       }
     }
