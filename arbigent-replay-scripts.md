@@ -48,8 +48,11 @@ Exit codes:
 | Code | Meaning |
 |---|---|
 | 0 | Every step was sent. The end-screen check prints `PASS` or `WARN` but does not change the code. |
-| 1 | Usage error, `adb` is not on `PATH`, or the chosen backend is not available. |
-| 2 | A recorded target never appeared. The app has diverged from the recording. |
+| 1 | Usage error, an unreadable or unfinished log, `adb` is not on `PATH`, or the chosen backend is not available. |
+| 2 | A recorded target never appeared, or an element the recording tapped is not on screen. The app has diverged from the recording. |
+| 3 | The device rejected a command (a tap, a launch, `pm clear`). Nothing after it was sent. |
+
+Known gaps: `adb shell input text` only types printable ASCII, so a step that typed anything else stops with exit code 2. Maestro grants an app its runtime permissions when it launches it, and the runner does not, so a replay that starts from a cleared state may meet a permission dialog the recording never saw.
 
 Exit code 2 is the signal for an agent to stop replaying and drive the app itself from the current screen. The `.md` tells it which step it was on and what that step expected to see.
 
@@ -61,7 +64,7 @@ Every line has `type`, `task`, `taskIndex`, `step` and `ts`. The line types are:
 - `decision`: what the AI decided on a step (`action`, `log`, `memo`, `screenshot`) and the `screen` hints.
 - `target`: the element the step acted on, with `occurrence`, `bounds` (`[left,top][right,bottom]`) and `center`.
 - `init`: an event sent during the task's setup phase (`launch_app` with `launchArguments`, `clear_state`).
-- `device`: an event sent during a step (`tap`, `key_press`, `input_text`, `swipe`, `wait`, `open_link`, `stop_app`). Anything the runner cannot reproduce is recorded as `unsupported` with the command name, so the gap is visible instead of silent.
+- `device`: an event sent during a step (`tap`, `tap_element`, `key_press`, `input_text`, `swipe`, `wait`, `open_link`, `stop_app`). A `tap_element` keeps the text or id pattern the agent clicked by, and the runner finds that element in the current hierarchy before tapping, so a layout that moved still gets the right tap. Anything the runner cannot reproduce is recorded as `unsupported` with the command name, so the gap is visible instead of silent.
 - `scenario_end`: `status` and the resource-id `signature` of the final screen.
 
 Coordinates are device pixels, the same space `adb shell input tap` uses.
