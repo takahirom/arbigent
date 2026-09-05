@@ -2,12 +2,16 @@ package io.github.takahirom.arbigent.sample.test
 
 import io.github.takahirom.arbigent.ArbigentDeviceEvent
 import io.github.takahirom.arbigent.toArbigentDeviceEvents
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlinx.serialization.json.JsonPrimitive
 import maestro.KeyCode
 import maestro.Point
 import maestro.SwipeDirection
 import maestro.orchestra.BackPressCommand
 import maestro.orchestra.ClearStateCommand
+import maestro.orchestra.ElementSelector
 import maestro.orchestra.EraseTextCommand
 import maestro.orchestra.InputTextCommand
 import maestro.orchestra.LaunchAppCommand
@@ -18,11 +22,9 @@ import maestro.orchestra.ScrollCommand
 import maestro.orchestra.StopAppCommand
 import maestro.orchestra.SwipeCommand
 import maestro.orchestra.TakeScreenshotCommand
+import maestro.orchestra.TapOnElementCommand
 import maestro.orchestra.TapOnPointV2Command
 import maestro.orchestra.WaitForAnimationToEndCommand
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 private const val WIDTH = 1080
 private const val HEIGHT = 1920
@@ -36,6 +38,27 @@ class ArbigentDeviceEventsTest {
   fun `tap on point becomes a tap`() {
     val events = MaestroCommand(tapOnPointV2Command = TapOnPointV2Command(point = "120,340")).events()
     assertEquals(listOf(ArbigentDeviceEvent.Tap(120, 340, TS)), events)
+  }
+
+  @Test
+  fun `tap on an element keeps its selector so a replay can find it again`() {
+    assertEquals(
+      listOf(ArbigentDeviceEvent.TapElement(textRegex = "Settings", index = 1, timestamp = TS)),
+      MaestroCommand(
+        tapOnElement = TapOnElementCommand(selector = ElementSelector(textRegex = "Settings", index = "1"))
+      ).events(),
+    )
+    assertEquals(
+      listOf(ArbigentDeviceEvent.TapElement(idRegex = ".*button", timestamp = TS)),
+      MaestroCommand(
+        tapOnElement = TapOnElementCommand(selector = ElementSelector(idRegex = ".*button"))
+      ).events(),
+    )
+    assertTrue(
+      MaestroCommand(tapOnElement = TapOnElementCommand(selector = ElementSelector(enabled = true)))
+        .events().single() is ArbigentDeviceEvent.Unsupported,
+      "a selector with nothing to search the hierarchy for cannot be replayed",
+    )
   }
 
   @Test
@@ -83,6 +106,13 @@ class ArbigentDeviceEventsTest {
       listOf(ArbigentDeviceEvent.LaunchApp("com.example.app", clearState = true, timestamp = TS)),
       MaestroCommand(
         launchAppCommand = LaunchAppCommand(appId = "com.example.app", clearState = true)
+      ).events(),
+      "maestro force-stops before launching unless told otherwise, so stopApp defaults to true",
+    )
+    assertEquals(
+      listOf(ArbigentDeviceEvent.LaunchApp("com.example.app", stopApp = false, timestamp = TS)),
+      MaestroCommand(
+        launchAppCommand = LaunchAppCommand(appId = "com.example.app", stopApp = false)
       ).events(),
     )
     assertEquals(
