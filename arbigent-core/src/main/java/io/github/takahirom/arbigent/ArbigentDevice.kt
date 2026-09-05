@@ -11,6 +11,7 @@ import maestro.orchestra.MaestroCommand
 import maestro.orchestra.Orchestra
 import okio.sink
 import java.io.File
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.pow
 import kotlin.system.measureTimeMillis
@@ -61,6 +62,20 @@ public interface ArbigentDevice {
   public fun elements(): ArbigentElementList
   public fun waitForAppToSettle(appId: String? = null)
   public fun os(): ArbigentDeviceOs
+
+  /**
+   * Observes the low-level interactions this device performs, for recording replay scripts.
+   *
+   * Devices that cannot report their interactions keep the no-op defaults, so listening is always
+   * safe to ask for and simply records nothing.
+   */
+  @ArbigentInternalApi
+  public fun addDeviceEventListener(listener: ArbigentDeviceEventListener) {
+  }
+
+  @ArbigentInternalApi
+  public fun removeDeviceEventListener(listener: ArbigentDeviceEventListener) {
+  }
 }
 
 public data class ArbigentElement(
@@ -98,7 +113,12 @@ public data class ArbigentElement(
 
 public data class ArbigentElementList(
   val elements: List<ArbigentElement>,
-  val screenWidth: Int
+  val screenWidth: Int,
+  /**
+   * Screen height in the same coordinate space as [ArbigentElement] bounds. Defaults to 0 when the
+   * device did not report it.
+   */
+  val screenHeight: Int = 0
 ) {
 
   public fun getPromptTexts(): String {
@@ -193,7 +213,8 @@ public data class ArbigentElementList(
 
       return ArbigentElementList(
         elements = elements,
-        screenWidth = (deviceInfo.widthGrid)
+        screenWidth = (deviceInfo.widthGrid),
+        screenHeight = (deviceInfo.heightGrid)
       )
     }
   }
@@ -227,14 +248,57 @@ public class MaestroDevice(
   }
 
   @Volatile private var connection: Connection =
-    Connection(maestro, Orchestra(maestro = maestro), onClose)
+    Connection(maestro, newOrchestra(maestro), onClose)
+
+  // Every Orchestra this device runs commands through reports each command back here as soon as
+  // Maestro finishes it, so a flow of several commands (repeated key presses) that fails half way
+  // still leaves the commands that were actually sent in the event log. A command Maestro rejected
+  // (an element it could not find, which the agent then retries with a looser selector) never
+  // completes and so never reaches the log.
+  private fun newOrchestra(maestro: Maestro): Orchestra = Orchestra(
+    maestro = maestro,
+    onCommandComplete = { _, command -> recordDeviceEvents(command) },
+  )
 
   // Volatile read of the live connection so callers keep using `maestro`/`orchestra` unchanged.
   private val maestro: Maestro get() = connection.maestro
   private val orchestra: Orchestra get() = connection.orchestra
 
+  // Copy-on-write because listeners are attached and detached by the scenario executor on its own
+  // coroutine while commands are being sent from the agent's, and a recording device must never be
+  // the reason a run fails.
+  private val deviceEventListeners = CopyOnWriteArrayList<ArbigentDeviceEventListener>()
+
   init {
     arbigentInfoLog("MaestroDevice created: screenshotsDir:${screenshotsDir.absolutePath}")
+  }
+
+  @ArbigentInternalApi
+  override fun addDeviceEventListener(listener: ArbigentDeviceEventListener) {
+    deviceEventListeners.addIfAbsent(listener)
+  }
+
+  @ArbigentInternalApi
+  override fun removeDeviceEventListener(listener: ArbigentDeviceEventListener) {
+    deviceEventListeners.remove(listener)
+  }
+
+  private fun recordDeviceEvents(command: MaestroCommand) {
+    if (deviceEventListeners.isEmpty()) return
+    runCatching {
+      val deviceInfo = maestro.cachedDeviceInfo
+      emitDeviceEvents(command.toArbigentDeviceEvents(deviceInfo.widthPixels, deviceInfo.heightPixels))
+    }.onFailure { arbigentDebugLog("Failed to record device events: ${it.message}") }
+  }
+
+  private fun emitDeviceEvents(events: List<ArbigentDeviceEvent>) {
+    if (deviceEventListeners.isEmpty()) return
+    events.forEach { event ->
+      deviceEventListeners.forEach { listener ->
+        runCatching { listener.onDeviceEvent(event) }
+          .onFailure { arbigentDebugLog("Device event listener failed: ${it.message}") }
+      }
+    }
   }
 
   override fun deviceName(): String {
@@ -268,6 +332,7 @@ public class MaestroDevice(
           val file = resolveScreenshotFile(screenshotsDir, screenshot.path)
           maestro.takeScreenshot(file.sink(), false)
         } else {
+          // Device events are recorded per command by the Orchestra callback (see newOrchestra).
           orchestra.runFlow(actions)
         }
       }
@@ -292,7 +357,11 @@ public class MaestroDevice(
         Thread.sleep(1000)
       }
     }
-    return ArbigentElementList(emptyList(), maestro.cachedDeviceInfo.widthPixels)
+    return ArbigentElementList(
+      emptyList(),
+      maestro.cachedDeviceInfo.widthPixels,
+      maestro.cachedDeviceInfo.heightPixels
+    )
   }
 
 
@@ -558,6 +627,13 @@ public class MaestroDevice(
       arbigentDebugLog("directionCandidates: $directionCandidates \ndirection: $direction")
       runBlocking {
         maestro.pressKey(direction)
+        // Recorded here rather than in executeActions because the focus walk drives maestro
+        // directly: these presses are the only device interaction a D-pad focus action performs,
+        // and a replay that skipped them would never move the focus at all. Recorded after the
+        // press so one the device refused is not replayed either.
+        emitDeviceEvents(
+          listOf(arbigentKeyPressEvent(direction))
+        )
         maestro.waitForAnimationToEnd("100")
       }
     }
@@ -729,7 +805,10 @@ public class MaestroDevice(
 
         // Adopt the new device's whole Connection (maestro + orchestra + its onClose, which owns the
         // new iproxy) in one volatile swap. The old connection was already torn down above.
-        this.connection = newDevice.connection
+        // The new device's own Orchestra would report commands to that throwaway instance, so this
+        // device builds its own around the adopted maestro to keep recording after the swap.
+        val adopted = newDevice.connection
+        this.connection = Connection(adopted.maestro, newOrchestra(adopted.maestro), adopted.onClose)
 
         // Reset counter on successful reconnection
         reconnectAttempts = 0
