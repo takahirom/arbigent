@@ -332,7 +332,7 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
     prompt: ArbigentPrompt,
     formFactor: ArbigentScenarioDeviceFormFactor,
   ): List<AnthropicContent> {
-    return when (formFactor) {
+    val contents = when (formFactor) {
       ArbigentScenarioDeviceFormFactor.Tv -> prompt.systemPromptsForTv
       else -> prompt.systemPrompts
     }.map {
@@ -340,6 +340,17 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
     } + prompt.additionalSystemPrompts.map {
       AnthropicContent(type = "text", text = it)
     }
+    return contents.withCacheBreakpointOnLastBlock()
+  }
+
+  /**
+   * Anthropic caches nothing unless a block carries `cache_control`. The prefix is hashed in the
+   * order tools, system, messages, so a breakpoint on the last system block covers the tool
+   * definitions too. System and tools are the same for every step of a scenario.
+   */
+  private fun List<AnthropicContent>.withCacheBreakpointOnLastBlock(): List<AnthropicContent> {
+    if (isEmpty()) return this
+    return dropLast(1) + last().copy(cacheControl = AnthropicCacheControl.Ephemeral)
   }
 
   internal fun decisionToolChoice(aiOptions: ArbigentAiOptions?): AnthropicToolChoice {
@@ -425,7 +436,9 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
     val elements = decisionInput.elements
     val agentActionList = decisionInput.agentActionTypes
     arbigentInfoLog {
-      "AI usage: ${response.usage}"
+      val usage = response.usage
+      "AI usage: $usage (prompt cache: read ${usage?.cacheReadInputTokens ?: 0}, " +
+        "written ${usage?.cacheCreationInputTokens ?: 0}, uncached ${usage?.inputTokens ?: 0})"
     }
 
     return try {
