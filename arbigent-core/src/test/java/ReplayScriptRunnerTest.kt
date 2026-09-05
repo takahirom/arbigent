@@ -6,6 +6,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 /**
  * Checks the python runner shipped as a resource, because a syntax error in it would otherwise only
@@ -237,6 +238,32 @@ class ReplayScriptRunnerTest {
   }
 
   @Test
+  fun `--step with --with-init replays the launch and the setup that prepared that step`() {
+    val dir = Files.createTempDirectory("replay-runner-step-init").toFile()
+    val script = File(dir, "runner.py")
+    script.writeText(extractPython())
+    val log = File(dir, "sample-scenario.jsonl")
+    log.writeText(readResource(fixture))
+
+    // Step 2 needs only the launch; step 3 also owns the relaunch recorded right after it.
+    val (code, output) = run(
+      dir,
+      listOf("python3", script.absolutePath, log.absolutePath, "--show", "--with-init", "--step", "2"),
+    )
+    assertEquals(0, code, output)
+    assertEquals(1, output.lines().count { it.startsWith("0. setup") }, "--step must not drop --with-init:\n$output")
+    assertTrue(output.contains("2. Press the center key"), output)
+    assertTrue(!output.contains("1. Press the down key"), output)
+
+    val (lastCode, lastOutput) = run(
+      dir,
+      listOf("python3", script.absolutePath, log.absolutePath, "--show", "--with-init", "--step", "3"),
+    )
+    assertEquals(0, lastCode, lastOutput)
+    assertEquals(2, lastOutput.lines().count { it.startsWith("0. setup") }, lastOutput)
+  }
+
+  @Test
   fun `--show on an empty range is a usage error`() {
     val dir = Files.createTempDirectory("replay-runner-empty").toFile()
     val script = File(dir, "runner.py")
@@ -398,13 +425,21 @@ class ReplayScriptRunnerTest {
     checkNotNull(javaClass.classLoader.getResourceAsStream(name)) { "missing resource $name" }
       .use { it.readBytes().decodeToString() }
 
+  /**
+   * Output goes to a file so the time limit applies before anything is read: a hung runner keeps
+   * its stdout open, and reading the pipe first would wait on it forever.
+   */
   private fun run(workingDir: File, command: List<String>): Pair<Int, String> {
+    val outputFile = File.createTempFile("replay-runner-output", ".txt", workingDir)
     val process = ProcessBuilder(command)
       .directory(workingDir)
       .redirectErrorStream(true)
+      .redirectOutput(outputFile)
       .start()
-    val output = process.inputStream.bufferedReader().readText()
-    process.waitFor(60, TimeUnit.SECONDS)
-    return process.exitValue() to output
+    if (!process.waitFor(60, TimeUnit.SECONDS)) {
+      process.destroyForcibly().waitFor()
+      fail("the runner did not finish within 60 seconds:\n${outputFile.readText()}")
+    }
+    return process.exitValue() to outputFile.readText()
   }
 }

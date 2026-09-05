@@ -292,9 +292,10 @@ def select_steps(steps, options):
     A setup block rides with the step that came after it: a relaunch in the middle of a run is only
     needed if the step it prepared for is replayed. The block before the first step is the exception
     and is always included with --with-init, because it is how the app gets launched at all. A block
-    at the very end rides with the step before it.
+    at the very end rides with the step before it. --step N follows the same rule, so
+    `--step N --with-init` launches the app and replays the setup that prepared step N.
     """
-    include_init = options.with_init and options.step is None
+    include_init = options.with_init
     selected = []
     pending = []
     seen_step = False
@@ -606,8 +607,10 @@ def dump_tree_uiautomator(options):
     would be wrong, so that case raises DeviceCommandFailed instead of pretending the screen is empty.
     """
     # One file per runner process, removed once read: the dump holds every string on screen, and
-    # two replays against the same device must not read each other's.
-    remote = "/sdcard/arbigent-replay-dump-%d.xml" % os.getpid()
+    # two replays against the same device must not read each other's. It goes under the shell
+    # user's private tmp rather than shared external storage, so a dump left behind by a killed
+    # runner is not readable by every app on the device.
+    remote = "/data/local/tmp/arbigent-replay-dump-%d.xml" % os.getpid()
     adb_failures = []
     try:
         for attempt in range(UIAUTOMATOR_DUMP_ATTEMPTS):
@@ -1103,6 +1106,9 @@ def main():
     require_adb()
     if options.backend == "android" and shutil.which("android") is None:
         fail_usage("--backend android needs the `android` CLI on PATH")
+    if options.backend == "maestro":
+        # Refused before anything is sent: the first hierarchy read may come after a step's events.
+        fail_usage("--backend maestro is not implemented yet; use uiautomator or android")
     for position, step in enumerate(selected):
         remaining = selected[position + 1:]
         label = "setup" if step["isInit"] else (step["log"] or step["action"])
