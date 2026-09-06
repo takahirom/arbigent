@@ -315,6 +315,33 @@ class ArbigentReplayScriptWriterTest {
   }
 
   @Test
+  fun `a log that cannot be published leaves the previous pair of artifacts alone`() {
+    val dir = Files.createTempDirectory("replay-scripts-partial").toFile()
+    val markdown = File(dir, "open-settings.md").apply { writeText("previous summary") }
+    // A non-empty directory in the log's place makes both the atomic and the plain move fail.
+    File(dir, "open-settings.jsonl").apply { mkdirs() }.let { File(it, "inner.txt").writeText("occupied") }
+
+    val failed = runCatching {
+      ArbigentReplayScriptWriter(dir).write(
+        scenarioId = "open-settings",
+        goals = listOf("Open the settings screen"),
+        tasks = recordedRun(),
+        signature = emptyList(),
+        platform = ArbigentDeviceOs.Android,
+      )
+    }
+
+    assertTrue(failed.isFailure, "replacing a directory should not succeed")
+    // The summary must not advertise a run whose log was never written, and no staging file may
+    // be left beside the artifacts CI uploads.
+    assertEquals("previous summary", markdown.readText())
+    assertEquals(
+      listOf("open-settings.jsonl", "open-settings.md"),
+      dir.list().orEmpty().sorted(),
+    )
+  }
+
+  @Test
   fun `a run that sent nothing writes no files`() {
     val dir = Files.createTempDirectory("replay-scripts").toFile()
     ArbigentReplayScriptWriter(dir).write(

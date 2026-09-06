@@ -64,16 +64,33 @@ internal class ArbigentReplayScriptWriter(
     outputDir.mkdirs()
     val baseName = fileBaseName(scenarioId)
     val logFile = File(outputDir, "$baseName.jsonl")
-    // The summary lands before the log so a log that exists is always already described.
-    writeAtomically(
-      File(outputDir, "$baseName.md"),
+    val markdownFile = File(outputDir, "$baseName.md")
+    // Both files are staged before either is published, so a failure part way through leaves the
+    // previous pair in place instead of a summary standing beside a log from a different run.
+    val stagedMarkdown = stage(
+      markdownFile,
       renderReplayScriptMarkdown(scenarioId, baseName, goals, tasks, steps, signature),
     )
-    writeAtomically(
-      logFile,
-      jsonLines(scenarioId, goals, tasks, steps, signature, platform, screenWidth, screenHeight)
-        .joinToString(separator = "\n", postfix = "\n"),
-    )
+    val stagedLog = try {
+      stage(
+        logFile,
+        jsonLines(scenarioId, goals, tasks, steps, signature, platform, screenWidth, screenHeight)
+          .joinToString(separator = "\n", postfix = "\n"),
+      )
+    } catch (failure: Throwable) {
+      stagedMarkdown.delete()
+      throw failure
+    }
+    try {
+      // The log is published first because it is the artifact a replay actually runs: if the second
+      // rename fails, an old summary beside the new log is less misleading than a new summary
+      // beside a log from another run.
+      publish(stagedLog, logFile)
+      publish(stagedMarkdown, markdownFile)
+    } finally {
+      stagedMarkdown.delete()
+      stagedLog.delete()
+    }
     arbigentInfoLog("Wrote replay script for scenario $scenarioId to ${logFile.absolutePath}")
   }
 
@@ -230,37 +247,48 @@ internal class ArbigentReplayScriptWriter(
      * runner started on the previous script) never sees a half-written file and two writers (two
      * arbigent processes sharing an output dir) never stage into the same temp file.
      */
-    fun writeAtomically(target: File, text: String, executable: Boolean = false) {
+    fun writeAtomically(target: File, text: String) {
+      val temp = stage(target, text)
+      try {
+        publish(temp, target)
+      } finally {
+        temp.delete()
+      }
+    }
+
+    /** Writes [text] into a uniquely named temp file beside [target], ready to be renamed over it. */
+    private fun stage(target: File, text: String): File {
       val temp = File(target.parentFile, "${target.name}.${ProcessHandle.current().pid()}.${System.nanoTime()}.tmp")
       try {
         temp.writeText(text)
-        // A runner nobody can execute is worse than no runner: fail before it replaces the old one.
-        if (executable && !temp.setExecutable(true, false)) {
-          throw java.io.IOException("Could not make ${temp.name} executable")
-        }
+      } catch (failure: Throwable) {
+        // A failed write must not leave staging files next to the logs CI uploads.
+        temp.delete()
+        throw failure
+      }
+      return temp
+    }
+
+    private fun publish(temp: File, target: File) {
+      try {
+        java.nio.file.Files.move(
+          temp.toPath(), target.toPath(),
+          java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+          java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+        )
+      } catch (atomicFailure: java.io.IOException) {
+        // Filesystems that cannot rename atomically, or cannot replace an existing file that way,
+        // still get the finished content in one step; only the replacement is no longer atomic.
         try {
           java.nio.file.Files.move(
             temp.toPath(), target.toPath(),
             java.nio.file.StandardCopyOption.REPLACE_EXISTING,
-            java.nio.file.StandardCopyOption.ATOMIC_MOVE,
           )
-        } catch (atomicFailure: java.io.IOException) {
-          // Filesystems that cannot rename atomically, or cannot replace an existing file that way,
-          // still get the finished content in one step; only the replacement is no longer atomic.
-          try {
-            java.nio.file.Files.move(
-              temp.toPath(), target.toPath(),
-              java.nio.file.StandardCopyOption.REPLACE_EXISTING,
-            )
-          } catch (fallbackFailure: java.io.IOException) {
-            // Why the atomic move failed is what explains the fallback's failure, so keep both.
-            fallbackFailure.addSuppressed(atomicFailure)
-            throw fallbackFailure
-          }
+        } catch (fallbackFailure: java.io.IOException) {
+          // Why the atomic move failed is what explains the fallback's failure, so keep both.
+          fallbackFailure.addSuppressed(atomicFailure)
+          throw fallbackFailure
         }
-      } finally {
-        // A failed write or move must not leave staging files next to the logs CI uploads.
-        temp.delete()
       }
     }
   }
