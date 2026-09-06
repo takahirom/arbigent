@@ -53,12 +53,13 @@ jobs:
 
       - uses: actions/checkout@v4
 
+      # Temurin 17 is in the runner's tool cache, so this resolves locally instead of
+      # downloading a JDK. Nothing built here bundles a runtime, so it does not need the
+      # JetBrains Runtime that arbigent-ui packages with jpackage.
       - uses: actions/setup-java@v4
         with:
-          distribution: 'jetbrains'
+          distribution: 'temurin'
           java-version: '17'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/setup-python@v5
         with:
