@@ -440,16 +440,10 @@ public class ArbigentScenarioExecutor internal constructor(
       return
     }
     runCatching {
-      // The runner drives the device with adb, so a script recorded on anything else could not be
-      // replayed by it. iOS and Web would need their own event mapping and runner.
+      // The platform is recorded in the log, because a replay is only meaningful on the kind of
+      // device the events came from.
       val device = taskAssignments().last().agent.device
       val os = device.os()
-      if (os != ArbigentDeviceOs.Android) {
-        arbigentInfoLog(
-          "Not writing a replay script for scenario ${scenario.id}: replay scripts are Android-only and this device is $os",
-        )
-        return
-      }
       val outputDir = settings.outputDir
         ?.let { File(it) }
         ?: File(ArbigentFiles.parentDir, DefaultReplayScriptsDirName)
@@ -468,6 +462,7 @@ public class ArbigentScenarioExecutor internal constructor(
         goals = scenario.agentTasks.map { it.goal },
         tasks = recorder.recordedTasks(),
         signature = signature,
+        platform = os,
         screenWidth = screenWidth,
         screenHeight = screenHeight,
       )

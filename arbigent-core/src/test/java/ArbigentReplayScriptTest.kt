@@ -4,6 +4,7 @@ import io.github.takahirom.arbigent.ArbigentAgent
 import io.github.takahirom.arbigent.ArbigentAi
 import io.github.takahirom.arbigent.ArbigentContextHolder
 import io.github.takahirom.arbigent.ArbigentDeviceEvent
+import io.github.takahirom.arbigent.ArbigentDeviceOs
 import io.github.takahirom.arbigent.ArbigentElement
 import io.github.takahirom.arbigent.ArbigentElementIdentity
 import io.github.takahirom.arbigent.ArbigentExecuteActionsInterceptor
@@ -209,6 +210,7 @@ class ArbigentReplayScriptWriterTest {
       goals = listOf("Open the settings screen"),
       tasks = recordedRunWithTarget(),
       signature = emptyList(),
+      platform = ArbigentDeviceOs.Android,
       screenWidth = 1000,
       screenHeight = 2000,
     )
@@ -221,6 +223,21 @@ class ArbigentReplayScriptWriterTest {
   }
 
   @Test
+  fun `the log declares its schema version and platform`() = runTest {
+    val dir = Files.createTempDirectory("replay-scripts-platform").toFile()
+    ArbigentReplayScriptWriter(dir).write(
+      scenarioId = "open-settings",
+      goals = listOf("Open the settings screen"),
+      tasks = recordedRun(),
+      signature = emptyList(),
+      platform = ArbigentDeviceOs.Ios,
+    )
+    val start = File(dir, "open-settings.jsonl").readLines().first()
+    assertTrue(start.contains("\"schemaVersion\":1"), start)
+    assertTrue(start.contains("\"platform\":\"ios\""), start)
+  }
+
+  @Test
   fun `a screen size the device never reported is left out`() = runTest {
     val dir = Files.createTempDirectory("replay-scripts-nosize").toFile()
     ArbigentReplayScriptWriter(dir).write(
@@ -228,6 +245,7 @@ class ArbigentReplayScriptWriterTest {
       goals = listOf("Open the settings screen"),
       tasks = recordedRun(),
       signature = emptyList(),
+      platform = ArbigentDeviceOs.Android,
     )
     val start = File(dir, "open-settings.jsonl").readLines().first()
     assertTrue(!start.contains("\"width\""), start)
@@ -248,6 +266,7 @@ class ArbigentReplayScriptWriterTest {
       goals = listOf("Open the settings screen"),
       tasks = recordedRun(),
       signature = listOf("com.example.app:id/settings_title"),
+      platform = ArbigentDeviceOs.Android,
     )
 
     val log = dir.listFiles().orEmpty().single { it.name.endsWith(".jsonl") }
@@ -298,6 +317,7 @@ class ArbigentReplayScriptWriterTest {
       goals = listOf("Nothing happened"),
       tasks = listOf(ArbigentReplayScriptRecorder.RecordedTask(0, "Nothing happened")),
       signature = emptyList(),
+      platform = ArbigentDeviceOs.Android,
     )
     assertEquals(emptyList(), dir.listFiles()?.toList().orEmpty())
   }
@@ -381,7 +401,7 @@ class ArbigentReplayScriptExecutorTest {
 
   @OptIn(ExperimentalStdlibApi::class)
   @Test
-  fun `a scenario run on anything but Android writes no script`() = runTest {
+  fun `a scenario run on iOS records its platform`() = runTest {
     val dispatcher = coroutineContext[kotlinx.coroutines.CoroutineDispatcher]!!
     val dir = Files.createTempDirectory("replay-scripts-ios").toFile()
     val agentConfig = io.github.takahirom.arbigent.AgentConfig {
@@ -394,8 +414,8 @@ class ArbigentReplayScriptExecutorTest {
     )
     advanceUntilIdle()
 
-    // The runner speaks adb, so a script from an iOS run could never be replayed by it.
-    assertEquals(emptyList(), dir.listFiles()?.toList().orEmpty())
+    val start = File(dir, "settings-scenario.jsonl").readLines().first()
+    assertTrue(start.contains("\"platform\":\"ios\""), start)
   }
 
   @OptIn(ExperimentalStdlibApi::class)

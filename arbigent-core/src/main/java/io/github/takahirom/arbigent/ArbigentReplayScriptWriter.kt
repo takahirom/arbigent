@@ -9,6 +9,12 @@ import kotlinx.serialization.json.put
 import java.io.File
 
 /**
+ * The shape of the jsonl replay log. Bump it whenever an existing field changes meaning or goes
+ * away, so a reader can refuse a log it cannot interpret.
+ */
+internal const val ReplayLogSchemaVersion: Int = 1
+
+/**
  * One recorded step of a scenario, after task-local recordings have been flattened and numbered.
  *
  * Every artifact written for a run is rendered from this shape, so they cannot disagree about which
@@ -45,6 +51,7 @@ internal class ArbigentReplayScriptWriter(
     goals: List<String>,
     tasks: List<ArbigentReplayScriptRecorder.RecordedTask>,
     signature: List<String>,
+    platform: ArbigentDeviceOs,
     screenWidth: Int = 0,
     screenHeight: Int = 0,
   ) {
@@ -58,7 +65,7 @@ internal class ArbigentReplayScriptWriter(
     val logFile = File(outputDir, "$baseName.jsonl")
     writeAtomically(
       logFile,
-      jsonLines(scenarioId, goals, tasks, steps, signature, screenWidth, screenHeight)
+      jsonLines(scenarioId, goals, tasks, steps, signature, platform, screenWidth, screenHeight)
         .joinToString(separator = "\n", postfix = "\n"),
     )
     arbigentInfoLog("Wrote replay script for scenario $scenarioId to ${logFile.absolutePath}")
@@ -98,6 +105,7 @@ internal class ArbigentReplayScriptWriter(
     tasks: List<ArbigentReplayScriptRecorder.RecordedTask>,
     steps: List<ArbigentReplayScriptStep>,
     signature: List<String>,
+    platform: ArbigentDeviceOs,
     screenWidth: Int,
     screenHeight: Int,
   ): List<String> {
@@ -109,6 +117,9 @@ internal class ArbigentReplayScriptWriter(
       .firstOrNull()?.appId
     lines += buildJsonObject {
       header("scenario_start", scenarioId, taskIndex = 0, step = 0, ts = firstTimestamp)
+      put("schemaVersion", ReplayLogSchemaVersion)
+      // A log is only replayable on the kind of device it was recorded on.
+      put("platform", platform.name.lowercase())
       put("goal", goals.joinToString(separator = " -> "))
       appId?.let { put("appId", it) }
       // Only when the device reported one; a zero would read as a real screen size.
