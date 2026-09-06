@@ -132,11 +132,12 @@ class ArbigentReplayCommand : CliktCommand(name = "replay") {
       device.close()
     }
     // The drivers Maestro starts leave non-daemon threads behind that closing the device does not
-    // join - a scheduled executor from the iOS XCTest client is the one that shows up - so the JVM
-    // never reaches the end on its own once the work is done. The failing exit codes go out through
-    // ProgramResult, which the CLI framework turns into its own exit, but a successful replay would
-    // hang here and never hand its exit code back to the caller, which is the whole contract of the
-    // command. RunCommand exits explicitly for the same reason.
+    // join - on iOS the scheduled executor its local device opens for the view-hierarchy timeout
+    // warning outlives close() - so the JVM never reaches the end on its own once the work is done.
+    // The failing exit codes go out through ProgramResult, which the CLI framework turns into its
+    // own exit, but a successful replay would hang here and never hand its exit code back to the
+    // caller, which is the whole contract of the command. RunCommand exits explicitly for the same
+    // reason.
     exitProcess(exitCode)
   }
 }
