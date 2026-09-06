@@ -227,13 +227,19 @@ internal class ArbigentReplayScriptWriter(
             java.nio.file.StandardCopyOption.REPLACE_EXISTING,
             java.nio.file.StandardCopyOption.ATOMIC_MOVE,
           )
-        } catch (e: java.io.IOException) {
+        } catch (atomicFailure: java.io.IOException) {
           // Filesystems that cannot rename atomically, or cannot replace an existing file that way,
           // still get the finished content in one step; only the replacement is no longer atomic.
-          java.nio.file.Files.move(
-            temp.toPath(), target.toPath(),
-            java.nio.file.StandardCopyOption.REPLACE_EXISTING,
-          )
+          try {
+            java.nio.file.Files.move(
+              temp.toPath(), target.toPath(),
+              java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+            )
+          } catch (fallbackFailure: java.io.IOException) {
+            // Why the atomic move failed is what explains the fallback's failure, so keep both.
+            fallbackFailure.addSuppressed(atomicFailure)
+            throw fallbackFailure
+          }
         }
       } finally {
         // A failed write or move must not leave staging files next to the logs CI uploads.

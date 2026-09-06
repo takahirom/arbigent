@@ -283,6 +283,11 @@ class ArbigentReplayScriptWriterTest {
     val failed = runCatching { ArbigentReplayScriptWriter.writeAtomically(target, "content") }
     assertTrue(failed.isFailure, "replacing a directory should not succeed")
     assertEquals(listOf("blocked.jsonl"), dir.list().orEmpty().toList(), "the staging file must be cleaned up")
+    // The atomic attempt is what a reader of the stack trace needs to understand the fallback.
+    assertTrue(
+      failed.exceptionOrNull()?.suppressed?.isNotEmpty() == true,
+      "the atomic move failure must survive as a suppressed exception",
+    )
   }
 
   @Test
