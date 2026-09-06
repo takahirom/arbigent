@@ -284,6 +284,32 @@ brew tap takahirom/homebrew-repo
 brew install takahirom/repo/arbigent
 ```
 
+#### Wrapper
+
+If you would rather pin a version in your repository than ask everyone to install the
+CLI, generate a wrapper. It works like `gradlew`: the script downloads the pinned
+arbigent release on first use, verifies its SHA-256 checksum and runs it.
+
+```bash
+arbigent wrapper --version 0.80.0
+```
+
+That writes two files you commit alongside your project:
+
+- `arbigentw`, a POSIX shell script.
+- `.arbigent/wrapper/arbigent-wrapper.properties`, holding the version, the distribution
+  URL and its SHA-256 checksum.
+
+Anyone with Java 17 or later can then run arbigent without installing anything:
+
+```bash
+./arbigentw run --scenario-ids="open-model-page"
+```
+
+The distribution is cached in `~/.arbigent/wrapper/dists`, so only the first run downloads
+it. Set `ARBIGENT_USER_HOME` to cache it somewhere else. The wrapper refuses to run a
+distribution whose checksum does not match the one recorded in the properties file.
+
 ```
 Usage: arbigent [<options>] <command> [<args>]...
 
@@ -296,6 +322,7 @@ Commands:
   tags
   graph
   guide      Print guides for AI agents working with arbigent projects
+  wrapper    Generate the arbigentw wrapper script that downloads and runs a pinned arbigent release
 
 Guides for AI agents (print one with `arbigent guide <topic>`):
 setup: How to set up a repository: settings files, AI API keys, gitignore
