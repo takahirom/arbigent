@@ -63,7 +63,7 @@ Exit codes:
 
 Exit code 2 is the signal for an agent to stop replaying and drive the app itself from the current screen. The output names the step it stopped on and prints the `--from` command that resumes from there, and the `.md` says what that step expected to see.
 
-Known gaps: a command that cannot be reproduced faithfully is recorded as `unsupported`, and a selection containing one is refused before anything is sent (exit code 1) rather than being replayed as a different interaction. Screen hints are advisory: when none of them shows up in time the replay says so and sends the step anyway, because a hint describes the screen the decision looked at, not what it acted on, and a Compose screen can expose none of them to the hierarchy dump. Nothing selects between several attached Android devices yet; the replay uses the same device the device layer would pick for a run.
+Known gaps: a command that cannot be reproduced faithfully is recorded as `unsupported`, and a selection containing one is refused before anything is sent (exit code 1) rather than being replayed as a different interaction. Screen hints are advisory: when none of them shows up in time the replay says so and sends the step anyway, because a hint describes the screen the decision looked at, not what it acted on, and a Compose screen can expose none of them to the hierarchy dump. Text a scenario typed through a variable is recorded as the text that was actually sent, so a `${...}` expression is replayed with the value the recorded run used rather than being evaluated again. Nothing selects between several attached Android devices yet; the replay uses the same device the device layer would pick for a run.
 
 ## Getting arbigent to replay with
 
