@@ -36,14 +36,16 @@ public sealed interface ArbigentDeviceEvent {
    * A tap on an element Maestro located by text or resource id at the time. The selector is kept
    * so a replay can find the element again in the current hierarchy and press its center, since the
    * pixel it landed on in the recorded run is only right while the layout has not moved. [index] is
-   * the zero-based position among the matches, as Maestro counts them.
+   * the zero-based position among the matches, as Maestro counts them; null means the recorded
+   * command carried no index, which is Maestro's "first clickable match" selection rather than the
+   * first match, so the two must stay distinguishable.
    */
   @Serializable
   @SerialName("tap_element")
   public data class TapElement(
     val textRegex: String? = null,
     val idRegex: String? = null,
-    val index: Int = 0,
+    val index: Int? = null,
     override val timestamp: Long = TimeProvider.get().currentTimeMillis(),
   ) : ArbigentDeviceEvent
 
@@ -146,9 +148,8 @@ public fun interface ArbigentDeviceEventListener {
  *
  * Gestures Maestro expresses relative to the screen (scroll, directional swipe) are resolved into
  * absolute coordinates here using [screenWidth]/[screenHeight], so that a recorded event says where
- * it landed rather than what it was named. The fractions mirror Maestro's own AndroidDriver
- * (verified against the pinned Maestro release), so a replayed swipe covers the same distance the
- * recorded run did.
+ * it landed rather than what it was named. The fractions are taken from the driver [os] selects in
+ * the pinned Maestro release, so a replayed swipe covers the same distance the recorded run did.
  *
  * [screenWidth]/[screenHeight] are grid units — the space the drivers compute coordinates in and the
  * space [ArbigentElementList] reports bounds in — because replay scales the recorded coordinates
@@ -157,6 +158,7 @@ public fun interface ArbigentDeviceEventListener {
 internal fun MaestroCommand.toArbigentDeviceEvents(
   screenWidth: Int,
   screenHeight: Int,
+  os: ArbigentDeviceOs,
   timestamp: Long = TimeProvider.get().currentTimeMillis(),
 ): List<ArbigentDeviceEvent> {
   tapOnPointV2Command?.let { command ->
@@ -197,7 +199,7 @@ internal fun MaestroCommand.toArbigentDeviceEvents(
       ArbigentDeviceEvent.TapElement(
         textRegex = selector.textRegex,
         idRegex = selector.idRegex,
-        index = selector.index?.toIntOrNull() ?: 0,
+        index = selector.index?.toDoubleOrNull()?.toInt(),
         timestamp = timestamp,
       )
     )
@@ -230,7 +232,7 @@ internal fun MaestroCommand.toArbigentDeviceEvents(
   clearStateCommand?.let { return listOf(ArbigentDeviceEvent.ClearState(it.appId, timestamp)) }
   openLinkCommand?.let { return listOf(ArbigentDeviceEvent.OpenLink(it.link, timestamp)) }
   scrollCommand?.let {
-    return listOf(swipeEvent(SwipeDirection.UP, SCROLL_DURATION_MS, screenWidth, screenHeight, timestamp))
+    return listOf(scrollEvent(screenWidth, screenHeight, timestamp))
   }
   swipeCommand?.let { command ->
     // A swipe that starts on an element depends on where that element is at replay time.
@@ -263,7 +265,7 @@ internal fun MaestroCommand.toArbigentDeviceEvents(
     }
     val direction = command.direction
       ?: return listOf(ArbigentDeviceEvent.Unsupported("swipe $command", timestamp))
-    return listOf(swipeEvent(direction, command.duration, screenWidth, screenHeight, timestamp))
+    return listOf(swipeEvent(direction, command.duration, screenWidth, screenHeight, os, timestamp))
   }
   waitForAnimationToEndCommand?.let { command ->
     val millis = command.timeout?.toLongOrNull() ?: DEFAULT_ANIMATION_WAIT_MS
@@ -280,39 +282,57 @@ private const val DEFAULT_CHARACTERS_TO_ERASE = 50
 /** Maestro's own default when `waitForAnimationToEnd` carries no timeout. */
 private const val DEFAULT_ANIMATION_WAIT_MS = 5000L
 
-/** Maestro's AndroidDriver scrolls with a fixed-duration directional swipe. */
+/** Maestro's drivers scroll with a fixed-duration directional swipe. */
 private const val SCROLL_DURATION_MS = 400L
 
 private fun MaestroCommand.describeUnknown(): String =
   runCatching { description() }.getOrNull() ?: toString()
 
 /**
- * The start and end points Maestro's AndroidDriver uses for each swipe direction, as fractions of
- * the screen. Taken from the pinned Maestro release rather than assumed, because a swipe that
- * starts in the wrong half scrolls the wrong list.
+ * Both drivers scroll with the same gesture: `AndroidDriver.scrollVertical` delegates to its own
+ * upward swipe and `IOSDriver.scrollVertical` uses these fractions directly, so scrolling stays
+ * platform independent even though an upward *swipe* does not.
+ */
+private fun scrollEvent(screenWidth: Int, screenHeight: Int, timestamp: Long): ArbigentDeviceEvent =
+  swipeEvent(listOf(0.5f, 0.5f, 0.5f, 0.1f), SCROLL_DURATION_MS, screenWidth, screenHeight, timestamp)
+
+/**
+ * The start and end points the driver for [os] uses for each swipe direction, as fractions of the
+ * screen. Taken from the pinned Maestro release rather than assumed, because a swipe that starts in
+ * the wrong half scrolls the wrong list: the iOS driver starts an upward swipe near the bottom of
+ * the screen while the Android one starts at the middle.
  */
 private fun swipeEvent(
   direction: SwipeDirection,
   durationMs: Long,
   screenWidth: Int,
   screenHeight: Int,
+  os: ArbigentDeviceOs,
   timestamp: Long,
 ): ArbigentDeviceEvent {
   val fractions = when (direction) {
-    SwipeDirection.UP -> listOf(0.5f, 0.5f, 0.5f, 0.1f)
+    SwipeDirection.UP -> if (os.isIos()) listOf(0.5f, 0.9f, 0.5f, 0.1f) else listOf(0.5f, 0.5f, 0.5f, 0.1f)
     SwipeDirection.DOWN -> listOf(0.5f, 0.2f, 0.5f, 0.9f)
     SwipeDirection.RIGHT -> listOf(0.1f, 0.5f, 0.9f, 0.5f)
     SwipeDirection.LEFT -> listOf(0.9f, 0.5f, 0.1f, 0.5f)
   }
-  return ArbigentDeviceEvent.Swipe(
-    startX = (screenWidth * fractions[0]).toInt(),
-    startY = (screenHeight * fractions[1]).toInt(),
-    endX = (screenWidth * fractions[2]).toInt(),
-    endY = (screenHeight * fractions[3]).toInt(),
-    durationMs = durationMs,
-    timestamp = timestamp,
-  )
+  return swipeEvent(fractions, durationMs, screenWidth, screenHeight, timestamp)
 }
+
+private fun swipeEvent(
+  fractions: List<Float>,
+  durationMs: Long,
+  screenWidth: Int,
+  screenHeight: Int,
+  timestamp: Long,
+): ArbigentDeviceEvent = ArbigentDeviceEvent.Swipe(
+  startX = (screenWidth * fractions[0]).toInt(),
+  startY = (screenHeight * fractions[1]).toInt(),
+  endX = (screenWidth * fractions[2]).toInt(),
+  endY = (screenHeight * fractions[3]).toInt(),
+  durationMs = durationMs,
+  timestamp = timestamp,
+)
 
 private fun parseRelativePoint(
   relative: String,

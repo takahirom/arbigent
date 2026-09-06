@@ -291,7 +291,7 @@ public class MaestroDevice(
       // (the iOS driver reads widthGrid/heightGrid), and the space ArbigentElementList reports, so
       // recording in it keeps the events, the recorded screen size and the element bounds
       // comparable. On Android the two are the same number.
-      emitDeviceEvents(command.toArbigentDeviceEvents(deviceInfo.widthGrid, deviceInfo.heightGrid))
+      emitDeviceEvents(command.toArbigentDeviceEvents(deviceInfo.widthGrid, deviceInfo.heightGrid, os()))
     }.onFailure { arbigentDebugLog("Failed to record device events: ${it.message}") }
   }
 

@@ -1,6 +1,7 @@
 package io.github.takahirom.arbigent.sample.test
 
 import io.github.takahirom.arbigent.ArbigentDeviceEvent
+import io.github.takahirom.arbigent.ArbigentDeviceOs
 import io.github.takahirom.arbigent.KeyPressAgentAction
 import io.github.takahirom.arbigent.toArbigentDeviceEvents
 import kotlin.test.Test
@@ -33,8 +34,8 @@ private const val WIDTH = 1080
 private const val HEIGHT = 1920
 private const val TS = 42L
 
-private fun MaestroCommand.events(): List<ArbigentDeviceEvent> =
-  toArbigentDeviceEvents(WIDTH, HEIGHT, TS)
+private fun MaestroCommand.events(os: ArbigentDeviceOs = ArbigentDeviceOs.Android): List<ArbigentDeviceEvent> =
+  toArbigentDeviceEvents(WIDTH, HEIGHT, os, TS)
 
 class ArbigentDeviceEventsTest {
   @Test
@@ -55,6 +56,13 @@ class ArbigentDeviceEventsTest {
       listOf(ArbigentDeviceEvent.TapElement(idRegex = ".*button", timestamp = TS)),
       MaestroCommand(
         tapOnElement = TapOnElementCommand(selector = ElementSelector(idRegex = ".*button"))
+      ).events(),
+    )
+    // An explicit index of 0 is not the same selection as no index at all, so it has to survive.
+    assertEquals(
+      listOf(ArbigentDeviceEvent.TapElement(textRegex = "Play", index = 0, timestamp = TS)),
+      MaestroCommand(
+        tapOnElement = TapOnElementCommand(selector = ElementSelector(textRegex = "Play", index = "0"))
       ).events(),
     )
     assertTrue(
@@ -164,24 +172,34 @@ class ArbigentDeviceEventsTest {
   }
 
   @Test
-  fun `a scroll is the same upward swipe maestro performs`() {
-    val events = MaestroCommand(scrollCommand = ScrollCommand()).events()
-    assertEquals(
-      listOf(ArbigentDeviceEvent.Swipe(540, 960, 540, 192, 400L, TS)),
-      events,
-    )
+  fun `a scroll is the same upward swipe maestro performs on both platforms`() {
+    val expected = listOf(ArbigentDeviceEvent.Swipe(540, 960, 540, 192, 400L, TS))
+    assertEquals(expected, MaestroCommand(scrollCommand = ScrollCommand()).events())
+    assertEquals(expected, MaestroCommand(scrollCommand = ScrollCommand()).events(ArbigentDeviceOs.Ios))
   }
 
   @Test
   fun `each swipe direction keeps maestro's own start and end points`() {
-    fun swipe(direction: SwipeDirection): ArbigentDeviceEvent.Swipe {
+    fun swipe(
+      direction: SwipeDirection,
+      os: ArbigentDeviceOs = ArbigentDeviceOs.Android,
+    ): ArbigentDeviceEvent.Swipe {
       val command = MaestroCommand(swipeCommand = SwipeCommand(direction = direction, duration = 500L))
-      return command.events().single() as ArbigentDeviceEvent.Swipe
+      return command.events(os).single() as ArbigentDeviceEvent.Swipe
     }
     assertEquals(ArbigentDeviceEvent.Swipe(540, 960, 540, 192, 500L, TS), swipe(SwipeDirection.UP))
     assertEquals(ArbigentDeviceEvent.Swipe(540, 384, 540, 1728, 500L, TS), swipe(SwipeDirection.DOWN))
     assertEquals(ArbigentDeviceEvent.Swipe(108, 960, 972, 960, 500L, TS), swipe(SwipeDirection.RIGHT))
     assertEquals(ArbigentDeviceEvent.Swipe(972, 960, 108, 960, 500L, TS), swipe(SwipeDirection.LEFT))
+    // Only the upward swipe differs between the drivers: iOS starts it near the bottom edge.
+    assertEquals(
+      ArbigentDeviceEvent.Swipe(540, 1728, 540, 192, 500L, TS),
+      swipe(SwipeDirection.UP, ArbigentDeviceOs.Ios),
+    )
+    assertEquals(
+      ArbigentDeviceEvent.Swipe(540, 384, 540, 1728, 500L, TS),
+      swipe(SwipeDirection.DOWN, ArbigentDeviceOs.Ios),
+    )
   }
 
   @Test
