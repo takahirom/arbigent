@@ -13,7 +13,7 @@ After a scenario **succeeds** and recorded at least one device event, Arbigent w
 
 A failed scenario writes nothing and leaves the previous files untouched, because a half-finished log would replay to a screen the scenario never reached. Files are written through a temporary sibling and renamed into place, so a reader never sees a partial one. A scenario id that is not a plain file name (`open settings/main`) is sanitized and gets a short hash appended (`open_settings_main-3f9a1c`), so two ids that sanitize alike do not overwrite each other.
 
-A log records which kind of device it was recorded on and replays only on that kind. Replaying is driven through the same device layer a scenario run uses, so an Android log needs an Android device and an iOS log an iOS one.
+A log records which kind of device it was recorded on and replays only on that kind. Replaying is driven through the same device layer a scenario run uses, so an Android log needs an Android device and an iOS log an iOS one. Nothing in the recording is written against one platform: it listens to the commands the device layer sends, so it works wherever that layer drives a device. Android and iOS have been run end to end; the other platforms arbigent drives should work the same way but have not been exercised yet.
 
 ## Turning it on
 
