@@ -8,6 +8,9 @@
 #
 #   arbigent wrapper --version <version>
 #
+# Without an installed arbigent, run this script once with ARBIGENT_VERSION set to pin
+# that release, then commit the properties file it writes.
+#
 set -eu
 
 APP_NAME=arbigentw
@@ -20,11 +23,57 @@ die() {
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 PROPERTIES_FILE="$SCRIPT_DIR/.arbigent/wrapper/arbigent-wrapper.properties"
 
-[ -f "$PROPERTIES_FILE" ] || die "cannot read $PROPERTIES_FILE. Run 'arbigent wrapper --version <version>' to create it."
-
 read_property() {
   sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$PROPERTIES_FILE" | tr -d '\r' | tail -n 1
 }
+
+download() {
+  if command -v curl >/dev/null 2>&1; then
+    # Keep the progress meter interactive only, so CI logs stay readable.
+    if [ -t 2 ]; then
+      curl -fL --retry 3 -o "$2" "$1"
+    else
+      curl -sSfL --retry 3 -o "$2" "$1"
+    fi
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q -O "$2" "$1"
+  else
+    die "neither curl nor wget is available to download $1"
+  fi
+}
+
+bootstrap_properties() {
+  # Bootstrapping without an installed arbigent: ARBIGENT_VERSION names the release to pin,
+  # and the checksum comes from the '.sha256' file GitHub publishes beside the archive.
+  version=$1
+  base_url=${ARBIGENT_RELEASE_BASE_URL:-https://github.com/takahirom/arbigent/releases/download}
+  url="$base_url/$version/arbigent-$version.tar.gz"
+  checksum_file=$(mktemp)
+  echo "$APP_NAME: pinning arbigent $version" >&2
+  download "$url.sha256" "$checksum_file" || {
+    rm -f "$checksum_file"
+    die "cannot read $url.sha256. Check that arbigent $version has been released."
+  }
+  checksum=$(tr -d '\r\n' < "$checksum_file" | cut -d' ' -f1)
+  rm -f "$checksum_file"
+  mkdir -p "$(dirname "$PROPERTIES_FILE")"
+  {
+    echo "distributionVersion=$version"
+    echo "distributionUrl=$url"
+    echo "distributionSha256Sum=$checksum"
+  } > "$PROPERTIES_FILE"
+  echo "$APP_NAME: wrote $PROPERTIES_FILE. Commit it together with this script." >&2
+}
+
+if [ ! -f "$PROPERTIES_FILE" ]; then
+  if [ -n "${ARBIGENT_VERSION:-}" ]; then
+    bootstrap_properties "$ARBIGENT_VERSION"
+  else
+    die "cannot read $PROPERTIES_FILE.
+Create it with 'arbigent wrapper --version <version>', or run this script once with
+ARBIGENT_VERSION=<version> to pin that release without installing arbigent first."
+  fi
+fi
 
 DISTRIBUTION_URL=$(read_property distributionUrl)
 DISTRIBUTION_SHA256=$(read_property distributionSha256Sum)
@@ -62,21 +111,6 @@ require_java() {
   java_version=$("$JAVACMD" -version 2>&1 | sed -n 's/.*version "\([0-9][0-9]*\).*/\1/p' | head -n 1)
   if [ -n "$java_version" ] && [ "$java_version" -lt 17 ]; then
     die "Java 17 or later is required, but $JAVACMD reports major version $java_version."
-  fi
-}
-
-download() {
-  if command -v curl >/dev/null 2>&1; then
-    # Keep the progress meter interactive only, so CI logs stay readable.
-    if [ -t 2 ]; then
-      curl -fL --retry 3 -o "$2" "$1"
-    else
-      curl -sSfL --retry 3 -o "$2" "$1"
-    fi
-  elif command -v wget >/dev/null 2>&1; then
-    wget -q -O "$2" "$1"
-  else
-    die "neither curl nor wget is available to download $1"
   fi
 }
 

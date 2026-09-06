@@ -35,6 +35,16 @@ class WrapperCommandTest {
     archive = buildFakeDistribution()
     servedSha256 = sha256Of(archive)
     server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0).apply {
+      createContext("/0.0.0/arbigent-0.0.0.tar.gz") { exchange ->
+        val bytes = archive.readBytes()
+        exchange.sendResponseHeaders(200, bytes.size.toLong())
+        exchange.responseBody.use { it.write(bytes) }
+      }
+      createContext("/0.0.0/arbigent-0.0.0.tar.gz.sha256") { exchange ->
+        val bytes = "$servedSha256\n".toByteArray()
+        exchange.sendResponseHeaders(200, bytes.size.toLong())
+        exchange.responseBody.use { it.write(bytes) }
+      }
       createContext("/arbigent-0.0.0.tar.gz") { exchange ->
         val bytes = archive.readBytes()
         exchange.sendResponseHeaders(200, bytes.size.toLong())
@@ -148,6 +158,36 @@ class WrapperCommandTest {
     assertContains(result.output, "no Java found")
   }
 
+  @Test
+  fun `the wrapper can pin a release without an installed arbigent`() {
+    generateWrapper()
+    File(workDir, ".arbigent/wrapper/arbigent-wrapper.properties").delete()
+
+    val result = runWrapper(
+      listOf("bootstrapped"),
+      extraEnvironment = mapOf(
+        "ARBIGENT_VERSION" to "0.0.0",
+        "ARBIGENT_RELEASE_BASE_URL" to baseUrl,
+      ),
+    )
+
+    assertEquals(0, result.exitCode, result.output)
+    assertContains(result.output, "fake-arbigent bootstrapped")
+    val properties = File(workDir, ".arbigent/wrapper/arbigent-wrapper.properties").readText()
+    assertContains(properties, "distributionSha256Sum=$servedSha256")
+  }
+
+  @Test
+  fun `a missing properties file without a version is reported`() {
+    generateWrapper()
+    File(workDir, ".arbigent/wrapper/arbigent-wrapper.properties").delete()
+
+    val result = runWrapper(listOf("run"))
+
+    assertEquals(1, result.exitCode, result.output)
+    assertContains(result.output, "ARBIGENT_VERSION")
+  }
+
   private fun generateWrapper() {
     val result = ArbigentWrapperCommand().test(
       listOf("--version", "0.0.0", "--distribution-url", distributionUrl, "--dir", workDir.absolutePath)
@@ -159,6 +199,7 @@ class WrapperCommandTest {
     args: List<String>,
     path: String? = null,
     extraPath: String? = null,
+    extraEnvironment: Map<String, String> = emptyMap(),
   ): ProcessResult {
     val resolvedPath = path ?: listOfNotNull(extraPath, System.getenv("PATH")).joinToString(":")
     val environment = mutableMapOf(
@@ -166,6 +207,7 @@ class WrapperCommandTest {
       "HOME" to userHome.absolutePath,
       "PATH" to resolvedPath,
     )
+    environment.putAll(extraEnvironment)
     return runProcess(
       listOf("sh", File(workDir, "arbigentw").absolutePath) + args,
       workDir,

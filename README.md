@@ -294,7 +294,20 @@ arbigent release on first use, verifies its SHA-256 checksum and runs it.
 arbigent wrapper --version 0.80.0
 ```
 
-That writes two files you commit alongside your project:
+If nobody on the team has arbigent installed yet, you can skip that step: download the
+script and let it pin a release itself.
+
+```bash
+curl -fsSLo arbigentw https://raw.githubusercontent.com/takahirom/arbigent/main/arbigent-cli/src/main/resources/arbigentw
+chmod +x arbigentw
+ARBIGENT_VERSION=0.80.0 ./arbigentw --help
+```
+
+The first run with `ARBIGENT_VERSION` set writes the properties file from the checksum
+published beside the release, then behaves like any other run. Later runs read the pinned
+version from the committed file and ignore the variable.
+
+Either way you commit two files alongside your project:
 
 - `arbigentw`, a POSIX shell script.
 - `.arbigent/wrapper/arbigent-wrapper.properties`, holding the version, the distribution
@@ -305,6 +318,8 @@ Anyone with Java 17 or later can then run arbigent without installing anything:
 ```bash
 ./arbigentw run --scenario-ids="open-model-page"
 ```
+
+`ARBIGENT_RELEASE_BASE_URL` points the pinning step at a mirror.
 
 The distribution is cached in `~/.arbigent/wrapper/dists`, so only the first run downloads
 it. Set `ARBIGENT_USER_HOME` to cache it somewhere else. The wrapper refuses to run a
