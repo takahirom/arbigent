@@ -135,65 +135,100 @@ class ArbigentReplayTraceTest {
 
   @Test
   fun `a replayed step waits until its recorded target is present`() = runTest {
-    val absent = ArbigentElementList(emptyList(), screenWidth = 1000)
-    val present = ArbigentElementList(listOf(element("target", "id", "desc")), screenWidth = 1000)
-    val device = ScriptedDevice(listOf(absent, absent, present))
-    var proceeded = false
+    withVirtualClock {
+      val absent = ArbigentElementList(emptyList(), screenWidth = 1000)
+      val present = ArbigentElementList(listOf(element("target", "id", "desc")), screenWidth = 1000)
+      val device = ScriptedDevice(listOf(absent, absent, present))
+      var proceeded = false
 
-    ArbigentReplayPacingStepInterceptor(traceWithTarget()).intercept(
-      stepInput(device),
-    ) {
-      proceeded = true
-      ArbigentAgent.StepResult.Continue
+      ArbigentReplayPacingStepInterceptor(traceWithTarget()).intercept(
+        stepInput(device),
+      ) {
+        proceeded = true
+        ArbigentAgent.StepResult.Continue
+      }
+
+      assertTrue(proceeded, "the step should have been captured once the target appeared")
+      assertEquals(
+        3,
+        device.elementsCallCount,
+        "the wait should end on the poll that found the target, not one later",
+      )
+      assertEquals(1000, currentTime, "each poll is one interval apart")
     }
-
-    assertTrue(proceeded, "the step should have been captured once the target appeared")
-    assertEquals(
-      3,
-      device.elementsCallCount,
-      "the wait should end on the poll that found the target, not one later",
-    )
-    assertEquals(1000, currentTime, "each poll is one interval apart")
   }
 
   @Test
   fun `a target that is present but still moving is not waited on`() = runTest {
-    // Same text, same id, different place: the element is animating into position. Waiting for it
-    // to stop was deliberately dropped — a screen with anything animating or ticking never stops
-    // changing, and the recorded interval, not stability, is what bounds the wait.
-    val moving = ArbigentElementList(listOf(element("target", "id", "desc", y = 100)), screenWidth = 1000)
-    val stopped = ArbigentElementList(listOf(element("target", "id", "desc", y = 0)), screenWidth = 1000)
-    val device = ScriptedDevice(listOf(moving, stopped, stopped))
-    var proceeded = false
+    withVirtualClock {
+      // Same text, same id, different place: the element is animating into position. Waiting for it
+      // to stop was deliberately dropped — a screen with anything animating or ticking never stops
+      // changing, and the recorded interval, not stability, is what bounds the wait.
+      val moving = ArbigentElementList(listOf(element("target", "id", "desc", y = 100)), screenWidth = 1000)
+      val stopped = ArbigentElementList(listOf(element("target", "id", "desc", y = 0)), screenWidth = 1000)
+      val device = ScriptedDevice(listOf(moving, stopped, stopped))
+      var proceeded = false
 
-    ArbigentReplayPacingStepInterceptor(traceWithTarget()).intercept(stepInput(device)) {
-      proceeded = true
-      ArbigentAgent.StepResult.Continue
+      ArbigentReplayPacingStepInterceptor(traceWithTarget()).intercept(stepInput(device)) {
+        proceeded = true
+        ArbigentAgent.StepResult.Continue
+      }
+
+      assertTrue(proceeded)
+      assertEquals(1, device.elementsCallCount, "a present target is enough to capture the step")
+      assertEquals(0, currentTime)
     }
-
-    assertTrue(proceeded)
-    assertEquals(1, device.elementsCallCount, "a present target is enough to capture the step")
-    assertEquals(0, currentTime)
   }
 
   @Test
   fun `a replayed step whose target never appears is captured once the deadline passes`() = runTest {
+    withVirtualClock {
+      val absent = ArbigentElementList(emptyList(), screenWidth = 1000)
+      val device = ScriptedDevice(listOf(absent))
+      var proceeded = false
+
+      ArbigentReplayPacingStepInterceptor(traceWithTarget()).intercept(stepInput(device)) {
+        proceeded = true
+        ArbigentAgent.StepResult.Continue
+      }
+
+      assertTrue(proceeded, "a target that never appears is divergence to detect later, not here")
+      assertEquals(
+        10_000,
+        currentTime,
+        "with no recorded interval to derive a budget from, the wait should last the minimum",
+      )
+      assertTrue(device.elementsCallCount >= 2, "the budget should have been polled towards")
+    }
+  }
+
+  @Test
+  fun `a slow hierarchy read is charged to the wait budget`() = runTest {
     val absent = ArbigentElementList(emptyList(), screenWidth = 1000)
     val device = ScriptedDevice(listOf(absent))
-    var proceeded = false
-
-    ArbigentReplayPacingStepInterceptor(traceWithTarget()).intercept(stepInput(device)) {
-      proceeded = true
-      ArbigentAgent.StepResult.Continue
+    val scheduler = testScheduler
+    val previous = TimeProvider.get()
+    // Every read appears to take 200ms. Only this provider can express that: a read is synchronous,
+    // so it cannot advance the test scheduler the way `delay` does.
+    TimeProvider.set(
+      object : TimeProvider {
+        override fun currentTimeMillis(): Long =
+          scheduler.currentTime + ReadCostMillis * device.elementsCallCount
+      },
+    )
+    try {
+      ArbigentReplayPacingStepInterceptor(traceWithTarget()).intercept(stepInput(device)) {
+        ArbigentAgent.StepResult.Continue
+      }
+    } finally {
+      TimeProvider.set(previous)
     }
 
-    assertTrue(proceeded, "a target that never appears is divergence to detect later, not here")
-    assertEquals(
-      10_000,
-      currentTime,
-      "with no recorded interval to derive a budget from, the wait should last the minimum",
-    )
-    assertTrue(device.elementsCallCount >= 2, "the budget should have been polled towards")
+    // Each poll now costs 200ms of reading plus a 500ms delay, so the 10s budget buys 15 reads and
+    // 14 delays instead of 20 delays. Without charging the read the wait would have slept the whole
+    // 10s and spent 20 reads on top, overrunning the interval it is meant to fit inside by 4s.
+    assertEquals(15, device.elementsCallCount, "the read time should shorten the poll count")
+    assertEquals(7_000, currentTime, "only the delays are time the wait actually slept")
   }
 
   @Test
@@ -302,6 +337,14 @@ class ArbigentReplayTraceTest {
    * Runs [block] with the clock the interceptor measures elapsed time against driven by the test
    * scheduler, so time the test spends in [delay] counts as time the replayed action took.
    */
+  /**
+   * Runs [block] with the clock the wait measures against pointed at the test scheduler.
+   *
+   * The wait reads [TimeProvider] twice — for the time already spent since the previous step, and
+   * for how long each hierarchy read took — while `delay` moves only the virtual clock. Left on
+   * real time those two readings are a few stray milliseconds of whatever the machine was doing,
+   * which is enough to make an exact assertion on `currentTime` fail on a slow CI runner.
+   */
   private suspend fun TestScope.withVirtualClock(block: suspend () -> Unit) {
     val scheduler = testScheduler
     val previous = TimeProvider.get()
@@ -315,6 +358,10 @@ class ArbigentReplayTraceTest {
     } finally {
       TimeProvider.set(previous)
     }
+  }
+
+  private companion object {
+    private const val ReadCostMillis = 200L
   }
 
   /** Hands out a scripted screen per [elements] call, repeating the last one once exhausted. */
