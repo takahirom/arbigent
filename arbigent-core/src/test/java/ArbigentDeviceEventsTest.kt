@@ -1,6 +1,7 @@
 package io.github.takahirom.arbigent.sample.test
 
 import io.github.takahirom.arbigent.ArbigentDeviceEvent
+import io.github.takahirom.arbigent.KeyPressAgentAction
 import io.github.takahirom.arbigent.toArbigentDeviceEvents
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -70,24 +71,33 @@ class ArbigentDeviceEventsTest {
   }
 
   @Test
-  fun `maestro keys become android keyevent names`() {
+  fun `maestro keys are recorded under their maestro name`() {
     fun keyName(code: KeyCode): String {
       val event = MaestroCommand(pressKeyCommand = PressKeyCommand(code)).events().single()
       return (event as ArbigentDeviceEvent.KeyPress).keyName
     }
-    assertEquals("KEYCODE_DPAD_UP", keyName(KeyCode.REMOTE_UP))
-    assertEquals("KEYCODE_DPAD_CENTER", keyName(KeyCode.REMOTE_CENTER))
-    assertEquals("KEYCODE_DEL", keyName(KeyCode.BACKSPACE))
-    assertEquals("KEYCODE_POWER", keyName(KeyCode.LOCK))
-    assertEquals("KEYCODE_MEDIA_PLAY_PAUSE", keyName(KeyCode.REMOTE_PLAY_PAUSE))
-    assertEquals("KEYCODE_MENU", keyName(KeyCode.REMOTE_MENU))
-    assertEquals("KEYCODE_ENTER", keyName(KeyCode.ENTER))
+    assertEquals("REMOTE_UP", keyName(KeyCode.REMOTE_UP))
+    assertEquals("REMOTE_CENTER", keyName(KeyCode.REMOTE_CENTER))
+    assertEquals("BACKSPACE", keyName(KeyCode.BACKSPACE))
+    assertEquals("LOCK", keyName(KeyCode.LOCK))
+    assertEquals("REMOTE_PLAY_PAUSE", keyName(KeyCode.REMOTE_PLAY_PAUSE))
+    assertEquals("REMOTE_MENU", keyName(KeyCode.REMOTE_MENU))
+    assertEquals("ENTER", keyName(KeyCode.ENTER))
+  }
+
+  @Test
+  fun `every recorded key name resolves back to its key`() {
+    KeyCode.entries.forEach { code ->
+      val event = MaestroCommand(pressKeyCommand = PressKeyCommand(code)).events().single()
+      val recorded = (event as ArbigentDeviceEvent.KeyPress).keyName
+      assertEquals(code, KeyPressAgentAction.resolveKeyCode(recorded), "key $code")
+    }
   }
 
   @Test
   fun `back press becomes the back key`() {
     val events = MaestroCommand(backPressCommand = BackPressCommand()).events()
-    assertEquals(listOf(ArbigentDeviceEvent.KeyPress("KEYCODE_BACK", TS)), events)
+    assertEquals(listOf(ArbigentDeviceEvent.KeyPress("BACK", TS)), events)
   }
 
   @Test
@@ -99,7 +109,7 @@ class ArbigentDeviceEventsTest {
   @Test
   fun `erase text becomes one delete per character`() {
     val events = MaestroCommand(eraseTextCommand = EraseTextCommand(charactersToErase = 3)).events()
-    assertEquals(List(3) { ArbigentDeviceEvent.KeyPress("KEYCODE_DEL", TS) }, events)
+    assertEquals(List(3) { ArbigentDeviceEvent.KeyPress("BACKSPACE", TS) }, events)
   }
 
   @Test

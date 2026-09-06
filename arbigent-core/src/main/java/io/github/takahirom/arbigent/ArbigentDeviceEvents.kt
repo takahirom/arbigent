@@ -47,7 +47,10 @@ public sealed interface ArbigentDeviceEvent {
     override val timestamp: Long = TimeProvider.get().currentTimeMillis(),
   ) : ArbigentDeviceEvent
 
-  /** [keyName] is an Android `KEYCODE_*` name, ready for `adb shell input keyevent`. */
+  /**
+   * [keyName] is a Maestro `KeyCode` name such as `BACK`, `BACKSPACE` or `REMOTE_UP`.
+   * `KeyPressAgentAction.resolveKeyCode` turns it back into a `KeyCode` on replay.
+   */
   @Serializable
   @SerialName("key_press")
   public data class KeyPress(
@@ -195,16 +198,14 @@ internal fun MaestroCommand.toArbigentDeviceEvents(
       )
     )
   }
-  backPressCommand?.let { return listOf(ArbigentDeviceEvent.KeyPress("KEYCODE_BACK", timestamp)) }
+  backPressCommand?.let { return listOf(ArbigentDeviceEvent.KeyPress(KeyCode.BACK.name, timestamp)) }
   pressKeyCommand?.let { command ->
-    val keyName = command.code.toAndroidKeyName()
-      ?: return listOf(ArbigentDeviceEvent.Unsupported("pressKey ${command.code}", timestamp))
-    return listOf(ArbigentDeviceEvent.KeyPress(keyName, timestamp))
+    return listOf(ArbigentDeviceEvent.KeyPress(command.code.name, timestamp))
   }
   inputTextCommand?.let { return listOf(ArbigentDeviceEvent.InputText(it.text, timestamp)) }
   eraseTextCommand?.let { command ->
     val count = command.charactersToErase ?: DEFAULT_CHARACTERS_TO_ERASE
-    return List(count) { ArbigentDeviceEvent.KeyPress("KEYCODE_DEL", timestamp) }
+    return List(count) { ArbigentDeviceEvent.KeyPress(KeyCode.BACKSPACE.name, timestamp) }
   }
   launchAppCommand?.let { command ->
     return listOf(
@@ -328,44 +329,8 @@ private fun parseRelativePoint(
 internal fun arbigentKeyPressEvent(
   code: KeyCode,
   timestamp: Long = TimeProvider.get().currentTimeMillis(),
-): ArbigentDeviceEvent = code.toAndroidKeyName()
-  ?.let { ArbigentDeviceEvent.KeyPress(it, timestamp) }
-  ?: ArbigentDeviceEvent.Unsupported("pressKey $code", timestamp)
+): ArbigentDeviceEvent = ArbigentDeviceEvent.KeyPress(code.name, timestamp)
 
-/** Android `KEYCODE_*` name for a Maestro key, or null when Android has no equivalent. */
-private fun KeyCode.toAndroidKeyName(): String? = when (this) {
-  KeyCode.ENTER -> "KEYCODE_ENTER"
-  KeyCode.BACKSPACE -> "KEYCODE_DEL"
-  KeyCode.BACK -> "KEYCODE_BACK"
-  KeyCode.HOME -> "KEYCODE_HOME"
-  KeyCode.LOCK -> "KEYCODE_POWER"
-  KeyCode.POWER -> "KEYCODE_POWER"
-  KeyCode.VOLUME_UP -> "KEYCODE_VOLUME_UP"
-  KeyCode.VOLUME_DOWN -> "KEYCODE_VOLUME_DOWN"
-  KeyCode.ESCAPE -> "KEYCODE_ESCAPE"
-  KeyCode.TAB -> "KEYCODE_TAB"
-  KeyCode.REMOTE_UP -> "KEYCODE_DPAD_UP"
-  KeyCode.REMOTE_DOWN -> "KEYCODE_DPAD_DOWN"
-  KeyCode.REMOTE_LEFT -> "KEYCODE_DPAD_LEFT"
-  KeyCode.REMOTE_RIGHT -> "KEYCODE_DPAD_RIGHT"
-  KeyCode.REMOTE_CENTER -> "KEYCODE_DPAD_CENTER"
-  KeyCode.REMOTE_PLAY_PAUSE -> "KEYCODE_MEDIA_PLAY_PAUSE"
-  KeyCode.REMOTE_STOP -> "KEYCODE_MEDIA_STOP"
-  KeyCode.REMOTE_NEXT -> "KEYCODE_MEDIA_NEXT"
-  KeyCode.REMOTE_PREVIOUS -> "KEYCODE_MEDIA_PREVIOUS"
-  KeyCode.REMOTE_REWIND -> "KEYCODE_MEDIA_REWIND"
-  KeyCode.REMOTE_FAST_FORWARD -> "KEYCODE_MEDIA_FAST_FORWARD"
-  KeyCode.REMOTE_SYSTEM_NAVIGATION_UP -> "KEYCODE_SYSTEM_NAVIGATION_UP"
-  KeyCode.REMOTE_SYSTEM_NAVIGATION_DOWN -> "KEYCODE_SYSTEM_NAVIGATION_DOWN"
-  KeyCode.REMOTE_BUTTON_A -> "KEYCODE_BUTTON_A"
-  KeyCode.REMOTE_BUTTON_B -> "KEYCODE_BUTTON_B"
-  KeyCode.REMOTE_MENU -> "KEYCODE_MENU"
-  KeyCode.TV_INPUT -> "KEYCODE_TV_INPUT"
-  KeyCode.TV_INPUT_HDMI_1 -> "KEYCODE_TV_INPUT_HDMI_1"
-  KeyCode.TV_INPUT_HDMI_2 -> "KEYCODE_TV_INPUT_HDMI_2"
-  KeyCode.TV_INPUT_HDMI_3 -> "KEYCODE_TV_INPUT_HDMI_3"
-  else -> null
-}
 
 /**
  * Maestro types launch arguments loosely as `Any`; the runner needs the kind to pick an `am start`
