@@ -200,6 +200,18 @@ class ArbigentReplayScriptWriterTest {
         ArbigentAgent.ExecuteActionsOutput()
       },
     )
+    // A second numbered step: with only one, a renderer that names every step "1", or that stops
+    // after the first, would still pass.
+    recorder.intercept(
+      executeActionsInput(
+        ArbigentContextHolder("Open the settings screen", 10),
+        ArbigentElementIdentity(text = "text", occurrence = 2),
+      ),
+      ArbigentExecuteActionsInterceptor.Chain {
+        recorder.onDeviceEvent(ArbigentDeviceEvent.KeyPress("KEYCODE_BACK", timestamp = 3))
+        ArbigentAgent.ExecuteActionsOutput()
+      },
+    )
     return recorder.recordedTasks()
   }
 
@@ -387,10 +399,16 @@ class ArbigentReplayScriptWriterTest {
       platform = ArbigentDeviceOs.Android,
     )
     val markdown = File(dir, "open-settings.md").readText()
-    assertTrue(
-      markdown.contains("- replay: `./arbigentw replay open-settings.jsonl --step 1`"),
-      "an agent driving one step at a time copies this instead of working the number out:\n$markdown",
-    )
+    listOf(
+      "device: KEYCODE_DPAD_CENTER" to 1,
+      "device: KEYCODE_BACK" to 2,
+    ).forEach { (command, step) ->
+      assertTrue(markdown.contains(command), "step $step is missing from the summary:\n$markdown")
+      assertTrue(
+        markdown.contains("- replay: `./arbigentw replay open-settings.jsonl --step $step`"),
+        "an agent driving one step at a time copies this instead of working the number out:\n$markdown",
+      )
+    }
   }
 
   private fun lineType(line: String): String =
