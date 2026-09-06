@@ -100,7 +100,13 @@ internal object ArbigentReplayWait {
     var readAtLeastOnce = false
     var waitedMillis = 0L
     while (true) {
+      val readStartedAtMillis = TimeProvider.get().currentTimeMillis()
       val elements = readElements(device)
+      // Reading the hierarchy is synchronous and can take a while on a busy device. Charge it to
+      // the budget as well, or a slow read adds itself to every poll and the wait outlasts the
+      // budget it is supposed to fit inside.
+      waitedMillis += (TimeProvider.get().currentTimeMillis() - readStartedAtMillis)
+        .coerceAtLeast(0)
       if (elements != null) {
         readAtLeastOnce = true
         if (isReady(elements)) return WaitResult.Ready(waitedMillis)
