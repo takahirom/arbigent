@@ -80,6 +80,19 @@ class ReplayCommandTest {
     assertContains(result.output, "is not a file")
   }
 
+  @Test
+  fun `a log that cannot be read is rejected the same way as an unparsable one`() {
+    val file = logFile()
+    file.setReadable(false, false)
+    // A user that reads anything anyway (root in some containers) leaves nothing to test here.
+    if (file.canRead()) return
+
+    val result = arbigentCli().test("replay ${file.path} --show")
+
+    assertEquals(1, result.statusCode, result.output)
+    assertContains(result.output, "cannot be read")
+  }
+
   private fun logFile(): File {
     val file = File.createTempFile("replay", ".jsonl")
     file.deleteOnExit()

@@ -15,7 +15,10 @@ import java.io.File
  * because every caller has to stop: half of a log replays to a screen the scenario never reached.
  */
 @ArbigentInternalApi
-public class ArbigentReplayLogException(message: String) : Exception(message)
+public class ArbigentReplayLogException(
+  message: String,
+  cause: Throwable? = null,
+) : Exception(message, cause)
 
 /** One step of a replay log, with the device events it sent, in the order they were sent. */
 @ArbigentInternalApi
@@ -145,7 +148,14 @@ public data class ArbigentReplayLog(
 
     public fun read(file: File): ArbigentReplayLog {
       if (!file.isFile) throw ArbigentReplayLogException("${file.path} is not a file")
-      return parse(file.readText(), file.path)
+      // An unreadable file is as useless to a replay as an unparsable one, and the caller reports
+      // both the same way, so it must not reach it as a different kind of failure.
+      val text = try {
+        file.readText()
+      } catch (failure: Exception) {
+        throw ArbigentReplayLogException("${file.path} cannot be read (${failure.message})", failure)
+      }
+      return parse(text, file.path)
     }
 
     public fun parse(text: String, source: String): ArbigentReplayLog {
