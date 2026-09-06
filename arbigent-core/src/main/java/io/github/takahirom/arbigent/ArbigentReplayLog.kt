@@ -262,6 +262,8 @@ public data class ArbigentReplayLog(
           }
 
           "target" -> {
+            // An element with no text, resource id or accessibility id is unidentifiable rather
+            // than corrupt, and only weakens the divergence check, so it is skipped, not refused.
             val identity = record.toIdentityOrNull() ?: return@forEach
             val center = record["center"]?.jsonObject
             step.target = ArbigentReplayLogTarget(
@@ -272,7 +274,12 @@ public data class ArbigentReplayLog(
           }
 
           "device", "init" -> {
-            val event = record["event"] ?: return@forEach
+            // The writer emits `event` on every device record, so a record without one is a
+            // truncated or hand-edited log. Dropping it would replay the surrounding steps with a
+            // gap in the middle and still report success, so the whole log is refused instead.
+            val event = record["event"] ?: throw ArbigentReplayLogException(
+              "$source step $number has a ${record.string("type")} record without an event",
+            )
             step.events += runCatching {
               json.decodeFromJsonElement(ArbigentDeviceEvent.serializer(), event)
             }.getOrElse {

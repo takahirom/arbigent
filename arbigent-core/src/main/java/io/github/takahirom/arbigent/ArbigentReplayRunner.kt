@@ -216,7 +216,7 @@ public class ArbigentReplayRunner(
         selector = ElementSelector(
           textRegex = event.textRegex,
           idRegex = event.idRegex,
-          index = event.index.takeIf { it > 0 }?.toString(),
+          index = event.index?.toString(),
         ),
       ),
     )
@@ -430,7 +430,8 @@ private fun describeEvent(event: ArbigentDeviceEvent): String = when (event) {
   is ArbigentDeviceEvent.TapElement -> "tap on " + listOfNotNull(
     event.textRegex?.let { "text='$it'" },
     event.idRegex?.let { "id='$it'" },
-    event.index.takeIf { it > 0 }?.let { "index=$it" },
+    // Only a later match is worth naming: index 0 and no index both read as the first one.
+    event.index?.takeIf { it > 0 }?.let { "index=$it" },
   ).joinToString()
 
   is ArbigentDeviceEvent.KeyPress -> "press ${event.keyName}"

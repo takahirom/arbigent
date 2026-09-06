@@ -60,6 +60,43 @@ class ArbigentReplayRunnerTest {
   }
 
   @Test
+  fun `a recorded tap index reaches the device exactly as it was recorded`() = runTest {
+    val log = readLog(
+      steps = listOf(
+        TestStep(
+          number = 1,
+          target = Attributes(text = "Play"),
+          events = listOf(ArbigentDeviceEvent.TapElement(textRegex = "Play", index = 0, timestamp = 2)),
+        ),
+        TestStep(
+          number = 2,
+          target = Attributes(text = "Play"),
+          events = listOf(ArbigentDeviceEvent.TapElement(textRegex = "Play", index = 2, timestamp = 3)),
+        ),
+        TestStep(
+          number = 3,
+          target = Attributes(text = "Play"),
+          events = listOf(ArbigentDeviceEvent.TapElement(textRegex = "Play", timestamp = 4)),
+        ),
+      ),
+      signature = listOf("player"),
+    )
+    val device = FakeReplayDevice(
+      listOf(screen(Attributes(text = "Play"), Attributes(resourceId = "player"))),
+    )
+
+    val exitCode = runner(log, device).run(log.select(withInit = true))
+
+    assertEquals(ArbigentReplayRunner.EXIT_OK, exitCode)
+    // Maestro reads a missing index as "the first clickable match" and any explicit index as a
+    // plain position, so an index of 0 must not be dropped on the way to the device.
+    assertEquals(
+      listOf("0", "2", null),
+      device.commands.map { it.tapOnElement!!.selector.index },
+    )
+  }
+
+  @Test
   fun `a target that appears late is waited for`() = runTest {
     val log = readLog(
       steps = listOf(
@@ -791,6 +828,22 @@ class ArbigentReplayLogTest {
     ).replace("\"signature\":[\"expected-id\"]", "\"signature\":{}")
 
     assertRefused(text, "is not a replay log this arbigent can read")
+  }
+
+  @Test
+  fun `a device record without an event is refused`() {
+    val lines = replayLogText(
+      steps = listOf(
+        TestStep(number = 1, events = listOf(ArbigentDeviceEvent.KeyPress("BACK", timestamp = 2))),
+        TestStep(number = 2, events = listOf(ArbigentDeviceEvent.KeyPress("BACK", timestamp = 3))),
+      ),
+    ).trim().lines().toMutableList()
+    val deviceLine = lines.indexOfLast { it.contains("\"type\":\"device\"") }
+    lines[deviceLine] = lines[deviceLine].substringBefore(",\"event\":") + "}"
+
+    // Replaying the surrounding steps and reporting success would leave a hole in the middle of
+    // the run, so the log is refused before anything reaches the device.
+    assertRefused(lines.joinToString(separator = "\n", postfix = "\n"), "step 2 has a device record without an event")
   }
 
   @Test
