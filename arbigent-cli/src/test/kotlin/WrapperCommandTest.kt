@@ -55,6 +55,12 @@ class WrapperCommandTest {
         exchange.sendResponseHeaders(200, bytes.size.toLong())
         exchange.responseBody.use { it.write(bytes) }
       }
+      // Serves the checksum through a redirect that leaves the encrypted connection.
+      createContext("/redirect/") { exchange ->
+        exchange.responseHeaders.add("Location", "http://example.invalid/arbigent-0.0.0.tar.gz.sha256")
+        exchange.sendResponseHeaders(302, -1)
+        exchange.close()
+      }
       start()
     }
   }
@@ -231,6 +237,106 @@ class WrapperCommandTest {
     // The properties file is written through a temp file in the same directory and renamed, so the
     // only file left is the finished one.
     assertEquals(listOf("arbigent-wrapper.properties"), propertiesDir.list()?.sorted())
+  }
+
+  @Test
+  fun `a checksum served over plain HTTP is refused`() {
+    val result = ArbigentWrapperCommand().test(
+      listOf(
+        "--version", "0.0.0",
+        "--distribution-url", "http://example.invalid/arbigent-0.0.0.tar.gz",
+        "--dir", workDir.absolutePath,
+      )
+    )
+
+    assertFalse(result.statusCode == 0, result.output)
+    assertContains(result.stderr, "must be served over HTTPS")
+    assertEquals(emptyList(), workDir.list()?.sorted())
+  }
+
+  @Test
+  fun `a checksum redirected off HTTPS is refused`() {
+    val result = ArbigentWrapperCommand().test(
+      listOf(
+        "--version", "0.0.0",
+        "--distribution-url", "$baseUrl/redirect/arbigent-0.0.0.tar.gz",
+        "--dir", workDir.absolutePath,
+      )
+    )
+
+    assertFalse(result.statusCode == 0, result.output)
+    assertContains(result.stderr, "must be served over HTTPS")
+  }
+
+  @Test
+  fun `a symbolic link in the wrapper directory is refused`() {
+    val elsewhere = File(workDir, "elsewhere").apply { mkdirs() }
+    java.nio.file.Files.createSymbolicLink(File(workDir, ".arbigent").toPath(), elsewhere.toPath())
+
+    val result = ArbigentWrapperCommand().test(
+      listOf(
+        "--version", "0.0.0",
+        "--distribution-url", distributionUrl,
+        "--sha256", servedSha256,
+        "--dir", workDir.absolutePath,
+      )
+    )
+
+    assertFalse(result.statusCode == 0, result.output)
+    assertContains(result.stderr, "is a symbolic link")
+    assertEquals(emptyList(), elsewhere.list()?.sorted(), "nothing may be written through the link")
+    assertEquals(listOf(".arbigent", "elsewhere"), workDir.list()?.sorted())
+  }
+
+  @Test
+  fun `generating the wrapper leaves no staged files behind`() {
+    generateWrapper()
+
+    assertEquals(listOf(".arbigent", "arbigentw"), workDir.list()?.sorted())
+    assertEquals(
+      listOf("arbigent-wrapper.properties"),
+      File(workDir, ".arbigent/wrapper").list()?.sorted(),
+    )
+  }
+
+  @Test
+  fun `pinning a release through a redirect off HTTPS is refused`() {
+    generateWrapper()
+    File(workDir, ".arbigent/wrapper/arbigent-wrapper.properties").delete()
+
+    val result = runWrapper(
+      listOf("bootstrapped"),
+      extraEnvironment = mapOf(
+        "ARBIGENT_VERSION" to "0.0.0",
+        "ARBIGENT_RELEASE_BASE_URL" to "$baseUrl/redirect",
+      ),
+    )
+
+    assertEquals(1, result.exitCode, result.output)
+    // curl refuses the downgrade itself: 'Protocol "http" disabled (in redirect)'.
+    assertContains(result.output, "in redirect")
+    assertContains(result.output, "cannot read")
+    assertFalse(
+      File(workDir, ".arbigent/wrapper/arbigent-wrapper.properties").exists(),
+      "an unverifiable digest must not be pinned",
+    )
+  }
+
+  @Test
+  fun `pinning a release over plain HTTP is refused`() {
+    generateWrapper()
+    File(workDir, ".arbigent/wrapper/arbigent-wrapper.properties").delete()
+
+    val result = runWrapper(
+      listOf("bootstrapped"),
+      extraEnvironment = mapOf(
+        "ARBIGENT_VERSION" to "0.0.0",
+        "ARBIGENT_RELEASE_BASE_URL" to "http://example.invalid",
+      ),
+    )
+
+    assertEquals(1, result.exitCode, result.output)
+    assertContains(result.output, "unencrypted connection")
   }
 
   private fun generateWrapper() {

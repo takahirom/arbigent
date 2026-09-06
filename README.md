@@ -319,7 +319,10 @@ Anyone with Java 17 or later can then run arbigent without installing anything:
 ./arbigentw run --scenario-ids="open-model-page"
 ```
 
-`ARBIGENT_RELEASE_BASE_URL` points the pinning step at a mirror.
+`ARBIGENT_RELEASE_BASE_URL` points the pinning step at a mirror. The checksum that the
+pinning step reads is what decides which bytes may be installed, so it is fetched over
+HTTPS only and a redirect that leaves HTTPS is refused; the pinning step therefore needs
+`curl`. Pass `--sha256 <digest>` to `arbigent wrapper` to supply the digest yourself.
 
 The distribution is cached in `~/.arbigent/wrapper/dists`, so only the first run downloads
 it. Set `ARBIGENT_USER_HOME` to cache it somewhere else. The wrapper refuses to run a

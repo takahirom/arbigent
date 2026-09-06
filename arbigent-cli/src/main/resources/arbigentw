@@ -27,19 +27,46 @@ read_property() {
   sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$PROPERTIES_FILE" | tr -d '\r' | tail -n 1
 }
 
+# A stalled transfer must not hang a CI job forever. The limit is on throughput rather than on
+# total time because the distribution is large and a slow link is not a failure.
+CURL_TIMEOUTS="--connect-timeout 30 --speed-limit 1024 --speed-time 60"
+
 download() {
   if command -v curl >/dev/null 2>&1; then
     # Keep the progress meter interactive only, so CI logs stay readable.
     if [ -t 2 ]; then
-      curl -fL --retry 3 -o "$2" "$1"
+      curl -fL --retry 3 $CURL_TIMEOUTS -o "$2" "$1"
     else
-      curl -sSfL --retry 3 -o "$2" "$1"
+      curl -sSfL --retry 3 $CURL_TIMEOUTS -o "$2" "$1"
     fi
   elif command -v wget >/dev/null 2>&1; then
-    wget -q -O "$2" "$1"
+    wget -q --timeout=30 --tries=3 -O "$2" "$1"
   else
     die "neither curl nor wget is available to download $1"
   fi
+}
+
+download_checksum() {
+  # The digest is the only thing that says which bytes may be installed, so an attacker who can
+  # rewrite it can replace the whole distribution: it is read over HTTPS only, and curl is told to
+  # refuse a redirect that leaves HTTPS. Plain HTTP is accepted against the loopback interface,
+  # where there is nothing in between.
+  # --proto-redir applies to redirects only, so it is passed whatever the first hop is.
+  proto_args="--proto-redir =https"
+  case "$1" in
+    https://*) proto_args="--proto =https $proto_args" ;;
+    http://127.0.0.1[:/]*|http://localhost[:/]*|http://\[::1\][:/]*) ;;
+    *) die "refusing to read $1 over an unencrypted connection. Pin the release with
+'arbigent wrapper --version <version>' instead." ;;
+  esac
+  if ! command -v curl >/dev/null 2>&1; then
+    # wget cannot be told to refuse a redirect from HTTPS to HTTP (--https-only only applies to
+    # recursive downloads), and a digest read over such a redirect would verify an attacker's
+    # archive just as happily as the real one.
+    die "curl is required to pin a release. Install curl, or generate
+.arbigent/wrapper/arbigent-wrapper.properties with 'arbigent wrapper --version <version>'."
+  fi
+  curl -sSfL --retry 3 $CURL_TIMEOUTS $proto_args -o "$2" "$1"
 }
 
 bootstrap_properties() {
@@ -50,7 +77,7 @@ bootstrap_properties() {
   url="$base_url/$version/arbigent-$version.tar.gz"
   checksum_file=$(mktemp)
   echo "$APP_NAME: pinning arbigent $version" >&2
-  download "$url.sha256" "$checksum_file" || {
+  download_checksum "$url.sha256" "$checksum_file" || {
     rm -f "$checksum_file"
     die "cannot read $url.sha256. Check that arbigent $version has been released."
   }
