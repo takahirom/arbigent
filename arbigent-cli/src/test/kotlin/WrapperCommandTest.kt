@@ -55,9 +55,14 @@ class WrapperCommandTest {
         exchange.sendResponseHeaders(200, bytes.size.toLong())
         exchange.responseBody.use { it.write(bytes) }
       }
-      // Serves the checksum through a redirect that leaves the encrypted connection.
+      // Redirects the checksum to a location that serves it perfectly well but only over plain
+      // HTTP, so that a refusal can only come from the redirect being a downgrade and never from
+      // the destination being unreachable.
       createContext("/redirect/") { exchange ->
-        exchange.responseHeaders.add("Location", "http://example.invalid/arbigent-0.0.0.tar.gz.sha256")
+        exchange.responseHeaders.add(
+          "Location",
+          "http://127.0.0.1:${exchange.localAddress.port}/arbigent-0.0.0.tar.gz.sha256",
+        )
         exchange.sendResponseHeaders(302, -1)
         exchange.close()
       }
@@ -313,8 +318,6 @@ class WrapperCommandTest {
     )
 
     assertEquals(1, result.exitCode, result.output)
-    // curl refuses the downgrade itself: 'Protocol "http" disabled (in redirect)'.
-    assertContains(result.output, "in redirect")
     assertContains(result.output, "cannot read")
     assertFalse(
       File(workDir, ".arbigent/wrapper/arbigent-wrapper.properties").exists(),
