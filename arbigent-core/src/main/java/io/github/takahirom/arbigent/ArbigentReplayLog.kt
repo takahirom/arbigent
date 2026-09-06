@@ -113,6 +113,22 @@ public data class ArbigentReplayLog(
       seenStep = true
     }
     if (pending.isNotEmpty() && (lastWanted || !seenStep)) selected += pending
+    // Setup alone is not a replay: with --with-init it would clear state, launch the app and report
+    // success without ever reaching the step that was asked for.
+    if (selected.none { !it.isInit }) {
+      val requested = when {
+        step != null -> "--step $step"
+        from != null && until != null -> "--from $from --until $until"
+        from != null -> "--from $from"
+        until != null -> "--until $until"
+        else -> "this log"
+      }
+      val numbers = steps.filter { !it.isInit }.map { it.number }
+      throw ArbigentReplayLogException(
+        if (numbers.isEmpty()) "$requested selects no step: this log records no replayable step"
+        else "$requested selects no step: steps run ${numbers.min()}..${numbers.max()}",
+      )
+    }
     return selected
   }
 
@@ -143,7 +159,16 @@ public data class ArbigentReplayLog(
         }
         .toList()
       requireOneFinishedRun(records, source)
-      return build(records, source)
+      return try {
+        build(records, source)
+      } catch (exception: ArbigentReplayLogException) {
+        throw exception
+      } catch (exception: Exception) {
+        // A field of the wrong shape ("signature": {}) reaches kotlinx.serialization as a raw
+        // IllegalArgumentException, which callers would report as a crash rather than as the
+        // unreadable log it is.
+        throw ArbigentReplayLogException("$source is not a replay log this arbigent can read: $exception")
+      }
     }
 
     /**

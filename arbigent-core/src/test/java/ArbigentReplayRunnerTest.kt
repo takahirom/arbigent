@@ -183,16 +183,75 @@ class ArbigentReplayRunnerTest {
   }
 
   @Test
-  fun `a range that selects nothing is refused`() = runTest {
+  fun `an empty selection is refused before anything is sent`() = runTest {
     val log = readLog(
       steps = listOf(
         TestStep(number = 1, events = listOf(ArbigentDeviceEvent.KeyPress(KeyCode.BACK.name, timestamp = 2))),
       ),
     )
 
-    val reason = runner(log, FakeReplayDevice(listOf(screen()))).verifyReplayable(log.select(step = 9))
+    val reason = runner(log, FakeReplayDevice(listOf(screen()))).verifyReplayable(emptyList())
 
     assertEquals("nothing to replay for the given range", reason)
+  }
+
+  @Test
+  fun `a key this Maestro does not know is refused before anything is sent`() = runTest {
+    val log = readLog(
+      steps = listOf(
+        TestStep(number = 1, events = listOf(ArbigentDeviceEvent.KeyPress(KeyCode.BACK.name, timestamp = 2))),
+        TestStep(number = 2, events = listOf(ArbigentDeviceEvent.KeyPress("NOT_A_KEY", timestamp = 3))),
+      ),
+    )
+    val device = FakeReplayDevice(listOf(screen()))
+
+    val reason = runner(log, device).verifyReplayable(log.select())
+
+    assertNotNull(reason)
+    assertTrue(reason.contains("step 2: the recorded key 'NOT_A_KEY'"), reason)
+    assertEquals(emptyList<String>(), device.commands.map { it.describeForTest() })
+  }
+
+  @Test
+  fun `a screen that can never be read while waiting is a device failure`() = runTest {
+    val log = readLog(
+      steps = listOf(
+        TestStep(
+          number = 1,
+          target = Attributes(text = "Sign in"),
+          events = listOf(ArbigentDeviceEvent.TapElement(textRegex = "Sign in", timestamp = 2)),
+        ),
+      ),
+    )
+    // Every read throws, so nothing is known about the screen: that is a broken device, not the
+    // recorded target being absent.
+    val device = FakeReplayDevice(listOf(screen()), failElementsAfter = 0)
+
+    val exitCode = runner(log, device).run(log.select())
+
+    assertEquals(ArbigentReplayRunner.EXIT_DEVICE, exitCode)
+    assertEquals(emptyList<String>(), device.commands.map { it.describeForTest() })
+  }
+
+  @Test
+  fun `an end screen that appears late is waited for`() = runTest {
+    val log = readLog(
+      steps = listOf(
+        TestStep(number = 1, events = listOf(ArbigentDeviceEvent.KeyPress(KeyCode.BACK.name, timestamp = 2))),
+      ),
+      signature = listOf("expected-id"),
+    )
+    val device = FakeReplayDevice(
+      listOf(
+        screen(Attributes(resourceId = "somewhere-else")),
+        screen(Attributes(resourceId = "somewhere-else")),
+        screen(Attributes(resourceId = "expected-id")),
+      ),
+    )
+
+    val exitCode = runner(log, device).run(log.select())
+
+    assertEquals(ArbigentReplayRunner.EXIT_OK, exitCode)
   }
 
   @Test
@@ -711,6 +770,27 @@ class ArbigentReplayLogTest {
 
     assertTrue(failure is ArbigentReplayLogException, "$failure")
     assertTrue(failure.message!!.contains("--from 2 is after --until 1"), failure.message!!)
+  }
+
+  @Test
+  fun `a range that selects only setup is refused`() {
+    val log = readLog(steps = threeStepsWithTwoSetups())
+
+    val failure = runCatching { log.select(step = 9, withInit = true) }.exceptionOrNull()
+
+    assertTrue(failure is ArbigentReplayLogException, "$failure")
+    assertTrue(failure.message!!.contains("--step 9 selects no step"), failure.message!!)
+    assertTrue(failure.message!!.contains("steps run 1..3"), failure.message!!)
+  }
+
+  @Test
+  fun `a field of the wrong shape is reported as an unreadable log`() {
+    val text = replayLogText(
+      signature = listOf("expected-id"),
+      steps = listOf(TestStep(number = 1, events = listOf(ArbigentDeviceEvent.KeyPress("BACK", timestamp = 2)))),
+    ).replace("\"signature\":[\"expected-id\"]", "\"signature\":{}")
+
+    assertRefused(text, "is not a replay log this arbigent can read")
   }
 
   @Test

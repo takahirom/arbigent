@@ -64,26 +64,40 @@ public class ArbigentReplayRunner(
         val target = step.target
         val deadline = ArbigentReplayWait.deadlineMillis(recordedGapMillis(steps, position))
         if (target != null) {
-          val waited = ArbigentReplayWait.awaitSettled(device, deadline) { elements ->
+          val result = ArbigentReplayWait.awaitSettled(device, deadline) { elements ->
             target.identity.findMatch(elements) != null
           }
-          if (waited == null) {
-            reportDivergence(
-              step = step,
-              remaining = steps.drop(position + 1),
-              reason = "the target never appeared within ${deadline}ms",
-            )
-            return EXIT_DIVERGED
+          when (result) {
+            is ArbigentReplayWait.WaitResult.Settled -> Unit
+            ArbigentReplayWait.WaitResult.TimedOut -> {
+              reportDivergence(
+                step = step,
+                remaining = steps.drop(position + 1),
+                reason = "the target never appeared within ${deadline}ms",
+              )
+              return EXIT_DIVERGED
+            }
+
+            ArbigentReplayWait.WaitResult.Unreadable -> {
+              err.append("\nstep ${step.number}: the screen could not be read while waiting\n")
+              writeResumeHint(step, steps.drop(position + 1))
+              return EXIT_DEVICE
+            }
           }
         } else if (step.screen.isNotEmpty()) {
           // The hints say which screen the decision was looking at, not what it acted on, so
-          // running out of time is reported and the step still goes ahead.
-          val waited = ArbigentReplayWait.awaitSettled(device, deadline) { elements ->
+          // neither running out of time nor an unreadable screen stops the step; a device that
+          // really is broken fails on the next event with a reason worth printing.
+          when (ArbigentReplayWait.awaitSettled(device, deadline) { elements ->
             step.screen.any { hint -> hint.findMatch(elements) != null }
-          }
-          if (waited == null) {
-            err.append(
+          }) {
+            is ArbigentReplayWait.WaitResult.Settled -> Unit
+            ArbigentReplayWait.WaitResult.TimedOut -> err.append(
               "  wait: none of the recorded screen hints appeared within ${deadline}ms, continuing\n",
+            )
+
+            ArbigentReplayWait.WaitResult.Unreadable -> err.append(
+              "  wait: the screen could not be read within ${deadline}ms, continuing\n",
             )
           }
         }
@@ -113,10 +127,24 @@ public class ArbigentReplayRunner(
    * Only asked when the selection ran to the recorded end: a partial replay stops somewhere in the
    * middle by design, and the recorded end screen says nothing about where it stopped.
    */
-  private fun checkArrival(steps: List<ArbigentReplayLogStep>): Int {
+  private suspend fun checkArrival(steps: List<ArbigentReplayLogStep>): Int {
     val lastNumber = log.lastStepNumber() ?: return EXIT_OK
     if (steps.none { !it.isInit && it.number == lastNumber }) return EXIT_OK
     if (log.signature.isEmpty()) return EXIT_OK
+    if (waitForScreens) {
+      // The last event has only just been sent, so the end screen is usually still arriving. Wait
+      // for it the same way every other step is waited for, then look regardless of how the wait
+      // ended: an end screen that keeps animating is still the right screen.
+      val result = ArbigentReplayWait.awaitSettled(device, ArbigentReplayWait.deadlineMillis(null)) { elements ->
+        log.signature.any { resourceId ->
+          ArbigentElementIdentity(resourceId = resourceId).findMatch(elements) != null
+        }
+      }
+      if (result == ArbigentReplayWait.WaitResult.Unreadable) {
+        err.append("\ncould not read the screen to check where the replay arrived\n")
+        return EXIT_DEVICE
+      }
+    }
     val elements = try {
       device.elements()
     } catch (exception: Exception) {
@@ -194,8 +222,9 @@ public class ArbigentReplayRunner(
     )
 
     is ArbigentDeviceEvent.KeyPress -> {
+      // Refused by verifySelection before anything is sent; reaching here means a caller skipped it.
       val code = KeyPressAgentAction.resolveKeyCode(event.keyName)
-        ?: throw ArbigentReplayLogException("the recorded key '${event.keyName}' is not a key this Maestro knows")
+        ?: throw ArbigentReplayLogException(unknownKeyReason(event.keyName))
       MaestroCommand(pressKeyCommand = PressKeyCommand(code))
     }
 
@@ -359,8 +388,24 @@ public class ArbigentReplayRunner(
         return "the recorded run used commands this replay cannot reproduce: " +
           unsupported.joinToString(separator = "; ") { (number, command) -> "step $number: $command" }
       }
+      // A key this Maestro cannot resolve would otherwise only be noticed as the event is sent,
+      // half way through the selection, leaving the device on a screen nobody asked for.
+      val unknownKeys = steps.flatMap { step ->
+        step.events.filterIsInstance<ArbigentDeviceEvent.KeyPress>()
+          .filter { KeyPressAgentAction.resolveKeyCode(it.keyName) == null }
+          .map { step.number to it.keyName }
+      }
+      if (unknownKeys.isNotEmpty()) {
+        return unknownKeys.joinToString(separator = "; ") { (number, keyName) ->
+          "step $number: ${unknownKeyReason(keyName)}"
+        }
+      }
       return null
     }
+
+    /** Said the same way whether a key is refused up front or, impossibly, as it is sent. */
+    private fun unknownKeyReason(keyName: String): String =
+      "the recorded key '$keyName' is not a key this Maestro knows"
 
     public fun show(log: ArbigentReplayLog, steps: List<ArbigentReplayLogStep>, out: Appendable) {
       out.append("scenario: ${log.scenarioId}\n")

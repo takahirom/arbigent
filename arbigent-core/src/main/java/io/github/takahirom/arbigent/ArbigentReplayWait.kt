@@ -26,10 +26,25 @@ internal object ArbigentReplayWait {
     return recordedGap.coerceAtMost(MAX_WAIT_MILLIS).coerceAtLeast(MIN_WAIT_MILLIS)
   }
 
+  /** How a wait ended. */
+  sealed interface WaitResult {
+    /** [isReady] held and the screen stopped changing, after [waitedMillis]. */
+    data class Settled(val waitedMillis: Long) : WaitResult
+
+    /** The screen was readable throughout but never settled on what was asked for. */
+    object TimedOut : WaitResult
+
+    /**
+     * The hierarchy could not be read even once. A screen that is merely mid-transition answers at
+     * least one poll, so this says the device could not be driven rather than that the target is
+     * absent, and callers report it as a device failure instead of a divergence.
+     */
+    object Unreadable : WaitResult
+  }
+
   /**
    * Waits until [isReady] holds for the element list and that list stops changing, which is what
-   * "the screen has settled on the recorded target" means without asking the AI. Returns how long
-   * it waited, or null when [deadlineMillis] passed first.
+   * "the screen has settled on the recorded target" means without asking the AI.
    *
    * Elapsed time is counted in poll intervals rather than read from the clock, so the loop advances
    * with the suspending [delay] instead of spinning against a clock that the caller may be
@@ -44,45 +59,56 @@ internal object ArbigentReplayWait {
     device: ArbigentDevice,
     deadlineMillis: Long,
     isReady: (ArbigentElementList) -> Boolean,
-  ): Long? = withTimeoutOrNull(deadlineMillis) {
-    var previousSignature: String? = null
-    var waited = 0L
-    while (true) {
-      val signature = readySignature(device, isReady)
-      if (signature != null && signature == previousSignature) break
-      previousSignature = signature
-      delay(POLL_INTERVAL_MILLIS)
-      waited += POLL_INTERVAL_MILLIS
+  ): WaitResult {
+    var readAtLeastOnce = false
+    val waited = withTimeoutOrNull(deadlineMillis) {
+      var previousSignature: String? = null
+      var waited = 0L
+      while (true) {
+        val elements = readElements(device)
+        if (elements != null) {
+          readAtLeastOnce = true
+          val signature = if (isReady(elements)) signatureOf(elements) else null
+          if (signature != null && signature == previousSignature) break
+          previousSignature = signature
+        } else {
+          // An unreadable poll says nothing about the screen, so the next match has to repeat again.
+          previousSignature = null
+        }
+        delay(POLL_INTERVAL_MILLIS)
+        waited += POLL_INTERVAL_MILLIS
+      }
+      waited
     }
-    waited
+    return when {
+      waited != null -> WaitResult.Settled(waited)
+      readAtLeastOnce -> WaitResult.TimedOut
+      else -> WaitResult.Unreadable
+    }
+  }
+
+  private fun readElements(device: ArbigentDevice): ArbigentElementList? = try {
+    device.elements()
+  } catch (exception: Exception) {
+    // Reading the hierarchy can fail while the screen is mid-transition, which is exactly the state
+    // this waits out. Only a wait in which every single poll failed is treated as a broken device.
+    arbigentDebugLog("Replay wait: could not read elements: $exception")
+    null
   }
 
   /**
-   * A cheap stand-in for the current screen, or null while [isReady] does not hold. Built from the
-   * same element snapshot the readiness check is made against, because the UI tree string is
-   * expensive enough that polling it would itself slow replay down.
+   * A cheap stand-in for the current screen. Built from the same element snapshot the readiness
+   * check is made against, because the UI tree string is expensive enough that polling it would
+   * itself slow replay down.
    *
    * It covers what an action resolves against: order, text (which Arbigent already reads from the
    * descendants), resource id, bounds and visibility. A list in which the same elements are still
    * sliding into place therefore reads as unsettled, while a repaint that changes nothing an action
    * could see does not hold the replay up.
    */
-  private fun readySignature(
-    device: ArbigentDevice,
-    isReady: (ArbigentElementList) -> Boolean,
-  ): String? {
-    val elements = try {
-      device.elements()
-    } catch (exception: Exception) {
-      // Reading the hierarchy can fail while the screen is mid-transition, which is exactly the
-      // state this waits out. Treat it as "not there yet".
-      arbigentDebugLog("Replay wait: could not read elements: $exception")
-      return null
-    }
-    if (!isReady(elements)) return null
-    return elements.elements.joinToString(separator = "|", prefix = "${elements.elements.size}#") {
+  private fun signatureOf(elements: ArbigentElementList): String =
+    elements.elements.joinToString(separator = "|", prefix = "${elements.elements.size}#") {
       "${it.rawText}/${it.treeNode.attributes["resource-id"].orEmpty()}" +
         "@${it.x},${it.y},${it.width},${it.height},${it.isVisible}"
     }
-  }
 }

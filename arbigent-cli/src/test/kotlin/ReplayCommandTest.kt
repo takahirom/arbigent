@@ -52,6 +52,15 @@ class ReplayCommandTest {
   }
 
   @Test
+  fun `a range that selects only setup is rejected`() {
+    // Otherwise --with-init would launch the app, report success and never reach step 99.
+    val result = arbigentCli().test("replay ${logFile().path} --show --step 99 --with-init")
+
+    assertEquals(1, result.statusCode, result.output)
+    assertContains(result.output, "--step 99 selects no step")
+  }
+
+  @Test
   fun `a log that is not one finished run is rejected`() {
     val file = File.createTempFile("replay-truncated", ".jsonl")
     file.deleteOnExit()

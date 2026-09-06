@@ -103,12 +103,20 @@ class ArbigentReplayCommand : CliktCommand(name = "replay") {
     ArbigentReplayRunner.verifySelection(selected)?.let { reason -> throw CliktError(reason) }
     // The log says which kind of device it was recorded on, and a log only replays on that kind, so
     // the platform is read from the log rather than asked for again.
-    val device = connectDevice(
-      os = log.platform.name.lowercase(),
-      iosAppleTeamId = iosAppleTeamId,
-      iosRealDeviceId = iosRealDeviceId,
-      iosRealDevicePort = parseIosRealDevicePort(iosRealDevicePort),
-    )
+    val resolvedIosRealDevicePort = parseIosRealDevicePort(iosRealDevicePort)
+    val device = try {
+      connectDevice(
+        os = log.platform.name.lowercase(),
+        iosAppleTeamId = iosAppleTeamId,
+        iosRealDeviceId = iosRealDeviceId,
+        iosRealDevicePort = resolvedIosRealDevicePort,
+      )
+    } catch (exception: Exception) {
+      // No device to drive is a device failure, not a broken log: the caller can retry the same
+      // command once a device is attached.
+      System.err.println("could not connect to a ${log.platform.name.lowercase()} device: $exception")
+      throw ProgramResult(ArbigentReplayRunner.EXIT_DEVICE)
+    }
     try {
       val runner = ArbigentReplayRunner(
         log = log,
