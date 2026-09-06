@@ -25,13 +25,13 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
+      # Temurin 17 is in the runner's tool cache, so this resolves locally instead of
+      # downloading a JDK. Nothing built here bundles a runtime, so it does not need the
+      # JetBrains Runtime that arbigent-ui packages with jpackage.
       - uses: actions/setup-java@v4
         with:
-          distribution: 'jetbrains'
+          distribution: 'temurin'
           java-version: '17'
-          java-package: 'jdk'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
