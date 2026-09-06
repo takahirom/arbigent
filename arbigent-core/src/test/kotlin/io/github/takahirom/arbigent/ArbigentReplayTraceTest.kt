@@ -203,57 +203,67 @@ class ArbigentReplayTraceTest {
     val contextHolder = ArbigentContextHolder("goal", 10)
     val interceptor = ArbigentReplayPacingStepInterceptor(trace)
 
-    // The first call has nothing to pace against; it is what records when replay reached step one.
-    interceptor.intercept(stepInput(device, contextHolder)) { ArbigentAgent.StepResult.Continue }
-    val action = GoalAchievedAgentAction()
-    contextHolder.addStep(
-      ArbigentContextHolder.Step(
-        stepId = "step-1",
-        agentAction = action,
-        cacheKey = "cache-key",
-        screenshotFilePath = "screenshot.png",
-      ),
-    )
-    interceptor.intercept(stepInput(device, contextHolder)) { ArbigentAgent.StepResult.Continue }
+    withVirtualClock {
+      // The first call has nothing to pace against; it is what records when replay reached step one.
+      interceptor.intercept(stepInput(device, contextHolder)) { ArbigentAgent.StepResult.Continue }
+      val action = GoalAchievedAgentAction()
+      contextHolder.addStep(
+        ArbigentContextHolder.Step(
+          stepId = "step-1",
+          agentAction = action,
+          cacheKey = "cache-key",
+          screenshotFilePath = "screenshot.png",
+        ),
+      )
+      interceptor.intercept(stepInput(device, contextHolder)) { ArbigentAgent.StepResult.Continue }
 
-    assertEquals(
-      10_000L + 3_000L,
-      currentTime,
-      "the first step has no recorded interval so it waits the minimum, and the second waits out " +
-        "the 3000ms recorded between them",
-    )
-    assertEquals(0, device.elementsCallCount, "pacing should not read the screen")
+      assertEquals(
+        10_000L + 3_000L,
+        currentTime,
+        "the first step has no recorded interval so it waits the minimum, and the second waits " +
+          "out the 3000ms recorded between them",
+      )
+      assertEquals(0, device.elementsCallCount, "pacing should not read the screen")
+    }
   }
 
   @Test
   fun `a step whose budget is already spent still reads the screen once`() = runTest {
-    val present = ArbigentElementList(listOf(element("target", "id", "desc")), screenWidth = 1000)
-    val device = ScriptedDevice(listOf(present))
+    val absent = ArbigentElementList(emptyList(), screenWidth = 1000)
+    val device = ScriptedDevice(listOf(absent))
     val trace = traceWithTarget(secondTimestamp = 1_000)
     val contextHolder = ArbigentContextHolder("goal", 10)
     val interceptor = ArbigentReplayPacingStepInterceptor(trace)
+    var proceeded = false
 
-    interceptor.intercept(stepInput(device, contextHolder)) { ArbigentAgent.StepResult.Continue }
-    val action = ClickWithTextAgentAction("target")
-    contextHolder.addStep(
-      ArbigentContextHolder.Step(
-        stepId = "step-1",
-        agentAction = action,
-        cacheKey = "cache-key",
-        screenshotFilePath = "screenshot.png",
-      ),
-    )
-    // The replayed action took longer than the whole recorded interval, so nothing is left of it.
-    delay(2_000)
-    val startedAt = currentTime
-    interceptor.intercept(stepInput(device, contextHolder)) { ArbigentAgent.StepResult.Continue }
+    withVirtualClock {
+      interceptor.intercept(stepInput(device, contextHolder)) { ArbigentAgent.StepResult.Continue }
+      val action = ClickWithTextAgentAction("target")
+      contextHolder.addStep(
+        ArbigentContextHolder.Step(
+          stepId = "step-1",
+          agentAction = action,
+          cacheKey = "cache-key",
+          screenshotFilePath = "screenshot.png",
+        ),
+      )
+      // The replayed action took longer than the whole recorded interval, so nothing is left of it.
+      delay(2_000)
+      val readsBefore = device.elementsCallCount
+      val startedAt = currentTime
+      interceptor.intercept(stepInput(device, contextHolder)) {
+        proceeded = true
+        ArbigentAgent.StepResult.Continue
+      }
 
-    assertEquals(
-      startedAt,
-      currentTime,
-      "a target found on the first read must not cost the step any wait",
-    )
-    assertEquals(2, device.elementsCallCount, "each step reads the screen at least once")
+      assertTrue(proceeded, "a spent budget must not stop the step from being captured")
+      assertEquals(startedAt, currentTime, "there was nothing left of the interval to wait out")
+      assertEquals(
+        1,
+        device.elementsCallCount - readsBefore,
+        "the screen should be read exactly once: before the spent budget is consulted",
+      )
+    }
   }
 
   @Test
