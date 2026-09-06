@@ -78,6 +78,7 @@ fun arbigentCli(): ArbigentCli = ArbigentCli()
     ArbigentTagsCommand(),
     ArbigentGraphCommand(),
     ArbigentInstructionCommand(),
+    ArbigentReplayCommand(),
     ArbigentGuideCommand(),
     ArbigentWrapperCommand(),
   )

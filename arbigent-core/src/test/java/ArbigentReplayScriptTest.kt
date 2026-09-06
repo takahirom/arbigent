@@ -8,6 +8,7 @@ import io.github.takahirom.arbigent.ArbigentDeviceOs
 import io.github.takahirom.arbigent.ArbigentElement
 import io.github.takahirom.arbigent.ArbigentElementIdentity
 import io.github.takahirom.arbigent.ArbigentExecuteActionsInterceptor
+import io.github.takahirom.arbigent.ArbigentReplayLog
 import io.github.takahirom.arbigent.ArbigentReplayScriptRecorder
 import io.github.takahirom.arbigent.ArbigentReplayScriptWriter
 import io.github.takahirom.arbigent.GoalAchievedAgentAction
@@ -463,5 +464,70 @@ class ArbigentReplayScriptExecutorTest {
     override fun decideAgentActions(
       decisionInput: ArbigentAi.DecisionInput,
     ): ArbigentAi.DecisionOutput = createDecisionOutput()
+  }
+}
+
+/**
+ * The recorder writes the jsonl log and `arbigent replay` reads it back, so the two sides agreeing
+ * about key names and nesting is the only thing that makes a recorded run replayable at all. These
+ * drive the real writer and parse its file with the real reader, so a rename on either side fails
+ * here rather than on a device.
+ */
+class ArbigentReplayLogRoundTripTest {
+  @Test
+  fun `a written log reads back with its setup, target and end screen`() = runTest {
+    val recorder = ArbigentReplayScriptRecorder()
+    recorder.beginTask(taskIndex = 0, goal = "Open the settings screen", discardPrevious = true)
+    recorder.onDeviceEvent(ArbigentDeviceEvent.LaunchApp("app.id", timestamp = 1))
+    recorder.intercept(
+      executeActionsInput(
+        ArbigentContextHolder("Open the settings screen", 10),
+        ArbigentElementIdentity(text = "text", occurrence = 2),
+      ),
+      ArbigentExecuteActionsInterceptor.Chain {
+        recorder.onDeviceEvent(
+          ArbigentDeviceEvent.TapElement(textRegex = "text", index = 2, timestamp = 2),
+        )
+        ArbigentAgent.ExecuteActionsOutput()
+      },
+    )
+    recorder.intercept(
+      executeActionsInput(ArbigentContextHolder("Open the settings screen", 10), null),
+      ArbigentExecuteActionsInterceptor.Chain {
+        recorder.onDeviceEvent(ArbigentDeviceEvent.KeyPress("KEYCODE_BACK", timestamp = 3))
+        ArbigentAgent.ExecuteActionsOutput()
+      },
+    )
+    val dir = Files.createTempDirectory("replay-round-trip").toFile()
+    ArbigentReplayScriptWriter(dir).write(
+      scenarioId = "open-settings",
+      goals = listOf("Open the settings screen"),
+      tasks = recorder.recordedTasks(),
+      signature = listOf("settings_root"),
+      platform = ArbigentDeviceOs.Android,
+      screenWidth = 1000,
+      screenHeight = 2000,
+    )
+
+    val log = ArbigentReplayLog.read(File(dir, "open-settings.jsonl"))
+
+    assertEquals(ArbigentDeviceOs.Android, log.platform)
+    assertEquals(1000, log.screenWidth)
+    assertEquals(2000, log.screenHeight)
+    assertEquals(listOf("settings_root"), log.signature)
+    assertEquals("app.id", log.appId)
+    assertEquals(2, log.lastStepNumber())
+
+    val steps = log.select(withInit = true)
+    assertEquals(listOf(0, 1, 2), steps.map { it.number })
+    assertTrue(steps[0].isInit)
+    assertEquals("app.id", (steps[0].events.single() as ArbigentDeviceEvent.LaunchApp).appId)
+    assertEquals("text", steps[1].target?.identity?.text)
+    assertEquals(2, steps[1].target?.identity?.occurrence)
+    assertEquals(50, steps[1].target?.centerX)
+    assertEquals(50, steps[1].target?.centerY)
+    assertTrue(steps[1].screen.isNotEmpty(), "the recorded screen hints should survive the round trip")
+    assertEquals("text", (steps[1].events.single() as ArbigentDeviceEvent.TapElement).textRegex)
+    assertEquals("KEYCODE_BACK", (steps[2].events.single() as ArbigentDeviceEvent.KeyPress).keyName)
   }
 }
