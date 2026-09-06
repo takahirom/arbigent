@@ -14,6 +14,7 @@ import io.github.takahirom.arbigent.ArbigentReplayLogException
 import io.github.takahirom.arbigent.ArbigentReplayRunner
 import kotlinx.coroutines.runBlocking
 import java.io.File
+import kotlin.system.exitProcess
 
 /**
  * Replays a recorded scenario log against a device without asking an AI anything.
@@ -117,7 +118,7 @@ class ArbigentReplayCommand : CliktCommand(name = "replay") {
       System.err.println("could not connect to a ${log.platform.name.lowercase()} device: $exception")
       throw ProgramResult(ArbigentReplayRunner.EXIT_DEVICE)
     }
-    try {
+    val exitCode = try {
       val runner = ArbigentReplayRunner(
         log = log,
         device = device,
@@ -126,10 +127,16 @@ class ArbigentReplayCommand : CliktCommand(name = "replay") {
         waitForScreens = !noWait,
       )
       runner.verifyReplayable(selected)?.let { reason -> throw CliktError(reason) }
-      val exitCode = runBlocking { runner.run(selected) }
-      if (exitCode != ArbigentReplayRunner.EXIT_OK) throw ProgramResult(exitCode)
+      runBlocking { runner.run(selected) }
     } finally {
       device.close()
     }
+    // The drivers Maestro starts leave non-daemon threads behind that closing the device does not
+    // join - a scheduled executor from the iOS XCTest client is the one that shows up - so the JVM
+    // never reaches the end on its own once the work is done. The failing exit codes go out through
+    // ProgramResult, which the CLI framework turns into its own exit, but a successful replay would
+    // hang here and never hand its exit code back to the caller, which is the whole contract of the
+    // command. RunCommand exits explicitly for the same reason.
+    exitProcess(exitCode)
   }
 }
