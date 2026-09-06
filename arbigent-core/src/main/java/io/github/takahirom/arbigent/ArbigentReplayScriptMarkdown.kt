@@ -122,7 +122,8 @@ private fun ArbigentDeviceEvent.describe(): String = when (this) {
     val parts = listOfNotNull(
       textRegex?.let { "text='$it'" },
       idRegex?.let { "id='$it'" },
-      index.takeIf { it > 0 }?.let { "index=$it" },
+      // Only a later match is worth naming: index 0 and no index both read as the first one.
+      index?.takeIf { it > 0 }?.let { "index=$it" },
     )
     append(parts.joinToString(", ").ifEmpty { "element" })
     append(')')
