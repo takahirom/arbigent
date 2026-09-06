@@ -115,7 +115,6 @@ internal class ArbigentReplayPacingStepInterceptor(
     )
     delay(budgetMillis)
   }
-
 }
 
 internal class ArbigentReplayDecisionInterceptor(
