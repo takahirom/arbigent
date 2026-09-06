@@ -351,7 +351,7 @@ private class RecordingFakeDevice(
   override fun executeActions(actions: List<maestro.orchestra.MaestroCommand>) {
     delegate.executeActions(actions)
     actions.forEach { command ->
-      command.toArbigentDeviceEvents(1080, 1920).forEach { event ->
+      command.toArbigentDeviceEvents(1080, 1920, os()).forEach { event ->
         listeners.toList().forEach { it.onDeviceEvent(event) }
       }
     }
