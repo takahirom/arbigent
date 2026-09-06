@@ -28,7 +28,7 @@ settings:
 
 ## Replaying
 
-```
+```sh
 arbigent replay open-settings.jsonl                  # replay every step
 arbigent replay open-settings.jsonl --with-init      # also clear state and launch the app first
 arbigent replay open-settings.jsonl --step 3         # replay one step
@@ -69,7 +69,7 @@ Known gaps: a command that cannot be reproduced faithfully is recorded as `unsup
 
 An arbigent that is already installed replays a log directly with `arbigent replay`. A repository that would rather pin a version commits the wrapper instead:
 
-```
+```sh
 arbigent wrapper --version 0.80.0
 ./arbigentw replay open-settings.jsonl --with-init
 ```
