@@ -56,12 +56,23 @@ bootstrap_properties() {
   }
   checksum=$(tr -d '\r\n' < "$checksum_file" | cut -d' ' -f1)
   rm -f "$checksum_file"
-  mkdir -p "$(dirname "$PROPERTIES_FILE")"
+  properties_dir=$(dirname "$PROPERTIES_FILE")
+  mkdir -p "$properties_dir"
+  # Write through a temp file in the same directory so an interrupted or failing write never
+  # leaves a half-written properties file that a later run would read as a valid pin.
+  properties_tmp=$(mktemp "$properties_dir/.arbigent-wrapper.properties.XXXXXX")
   {
     echo "distributionVersion=$version"
     echo "distributionUrl=$url"
     echo "distributionSha256Sum=$checksum"
-  } > "$PROPERTIES_FILE"
+  } > "$properties_tmp" || {
+    rm -f "$properties_tmp"
+    die "cannot write $PROPERTIES_FILE"
+  }
+  mv "$properties_tmp" "$PROPERTIES_FILE" || {
+    rm -f "$properties_tmp"
+    die "cannot write $PROPERTIES_FILE"
+  }
   echo "$APP_NAME: wrote $PROPERTIES_FILE. Commit it together with this script." >&2
 }
 
@@ -88,7 +99,9 @@ esac
 ARBIGENT_USER_HOME=${ARBIGENT_USER_HOME:-"$HOME/.arbigent"}
 ARCHIVE_NAME=$(basename "$DISTRIBUTION_URL")
 DIST_NAME=${ARCHIVE_NAME%.tar.gz}
-INSTALL_DIR="$ARBIGENT_USER_HOME/wrapper/dists/$DIST_NAME/$(echo "$DISTRIBUTION_SHA256" | cut -c1-12)"
+# The whole digest names the directory: a prefix would let two distributions that share it share
+# an install, and the digest is the only thing that says which bytes were verified.
+INSTALL_DIR="$ARBIGENT_USER_HOME/wrapper/dists/$DIST_NAME/$DISTRIBUTION_SHA256"
 
 find_launcher() {
   for candidate in "$INSTALL_DIR"/*/bin/arbigent; do
@@ -101,7 +114,11 @@ find_launcher() {
 }
 
 require_java() {
-  if [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/java" ]; then
+  # A set but broken JAVA_HOME is a misconfiguration worth reporting, not something to work around
+  # silently: falling back to the PATH java would run a different JDK than the one asked for.
+  if [ -n "${JAVA_HOME:-}" ]; then
+    [ -x "$JAVA_HOME/bin/java" ] || die "JAVA_HOME is set to an invalid directory: $JAVA_HOME
+Set JAVA_HOME to the root of a Java 17 installation, or unset it to use the java on PATH."
     JAVACMD="$JAVA_HOME/bin/java"
   elif command -v java >/dev/null 2>&1; then
     JAVACMD=java

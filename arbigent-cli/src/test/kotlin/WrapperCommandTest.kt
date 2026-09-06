@@ -188,6 +188,51 @@ class WrapperCommandTest {
     assertContains(result.output, "ARBIGENT_VERSION")
   }
 
+  @Test
+  fun `the install directory is named by the whole digest`() {
+    generateWrapper()
+
+    assertEquals(0, runWrapper(listOf("run")).exitCode)
+
+    // A truncated digest would let two distributions that share the prefix share one install, so
+    // the directory carries all 64 characters.
+    val distRoot = File(userHome, "wrapper/dists/arbigent-0.0.0")
+    assertEquals(listOf(servedSha256), distRoot.list()?.sorted())
+  }
+
+  @Test
+  fun `an invalid JAVA_HOME is reported instead of silently using another Java`() {
+    generateWrapper()
+
+    val result = runWrapper(
+      listOf("run"),
+      extraEnvironment = mapOf("JAVA_HOME" to File(workDir, "no-such-jdk").absolutePath),
+    )
+
+    assertEquals(1, result.exitCode, result.output)
+    assertContains(result.output, "JAVA_HOME is set to an invalid directory")
+  }
+
+  @Test
+  fun `pinning a release leaves no partial properties file behind`() {
+    generateWrapper()
+    val propertiesDir = File(workDir, ".arbigent/wrapper")
+    File(propertiesDir, "arbigent-wrapper.properties").delete()
+
+    val result = runWrapper(
+      listOf("bootstrapped"),
+      extraEnvironment = mapOf(
+        "ARBIGENT_VERSION" to "0.0.0",
+        "ARBIGENT_RELEASE_BASE_URL" to baseUrl,
+      ),
+    )
+
+    assertEquals(0, result.exitCode, result.output)
+    // The properties file is written through a temp file in the same directory and renamed, so the
+    // only file left is the finished one.
+    assertEquals(listOf("arbigent-wrapper.properties"), propertiesDir.list()?.sorted())
+  }
+
   private fun generateWrapper() {
     val result = ArbigentWrapperCommand().test(
       listOf("--version", "0.0.0", "--distribution-url", distributionUrl, "--dir", workDir.absolutePath)
