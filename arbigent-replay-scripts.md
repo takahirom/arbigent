@@ -43,12 +43,12 @@ Options:
 - `--with-init` also replays the setup phase (app launch with its recorded extras, state clear). Without it the replay assumes the app is already on the first screen. A setup block that ran in the middle of a scenario (a relaunch before a later task) is replayed only when the step after it is in the selected range; the block before the first step is always replayed, since it is what launches the app.
 - `--step N` replays a single step; `--from N` and `--until N` bound a range.
 - `--show` prints what would be sent and exits without connecting to a device.
-- `--no-wait` sends the events without waiting for anything. Useful when the waiting is what is going wrong.
+- `--no-wait` skips the readiness waits: the wait for the step's target, the wait for the screen hints and the wait for the end screen. A `wait` the recording itself sent is still sent, because it is part of the interaction rather than a guess about readiness. Useful when the waiting is what is going wrong.
 - `--ios-xctest-apple-team-id`, `--ios-real-device-id` and `--ios-real-device-port` are the same physical-iPhone options `arbigent run` takes.
 
 Before each step, the replay waits for the element the step acted on (`target`) to appear, matching text, resource id and accessibility id, and for the screen to stop changing. A step that pressed a bare key with no target, such as a "next" on a splash screen, instead waits for any of the `screen` hints recorded for it: up to five identities of elements the AI saw on that screen. How long it waits comes from the gap the recording itself had between the steps, never below 10 seconds nor above a minute, because a short recorded gap says the recording run was fast, not that the replayed screen will be.
 
-Taps and swipes recorded as coordinates are scaled from the screen size in the log to the size of the connected device, in pixels. They are not sent as percentages, because Maestro rounds a percentage to a whole percent, which is about 11 px on a 1080 px-wide screen.
+Taps and swipes recorded as coordinates are scaled from the screen size in the log to the size of the connected device. They are not sent as percentages, because Maestro rounds a percentage to a whole percent, which is about 11 px on a 1080 px-wide screen. When either size is missing from the log or cannot be read from the device, the recorded coordinates are sent unchanged: a scale guessed from one known size would move a tap further from its element than leaving it where it was recorded.
 
 At the end, when the selection reached the last recorded step, the resource ids recorded on the final screen are compared with what is on the device.
 
@@ -56,7 +56,7 @@ Exit codes:
 
 | Code | Meaning |
 |---|---|
-| 0 | Every step was sent and the end screen carries at least one of the recorded ids. |
+| 0 | Every selected step was sent. The end screen is checked against the recorded ids only when the selection reached the recorded final step and the log carries a signature; a partial selection has no recorded end screen to be at, and a log recorded without one has nothing to compare. |
 | 1 | The log or the range cannot be replayed at all: an unreadable log, one that is not a single finished successful run (no successful `scenario_end` as its last line, a second `scenario_start`, or lines from another scenario), a schema version this arbigent does not read, a platform it does not know, a step number below 1, `--from` after `--until`, an empty step range, or a recorded command the replay cannot reproduce. Nothing was sent. |
 | 2 | A recorded target never appeared, an element the recording tapped is not on screen, or none of the recorded end-screen ids is present. The app has diverged from the recording. |
 | 3 | The device rejected a command, or the hierarchy could not be read at all. Nothing after it was sent. |
@@ -87,11 +87,13 @@ Every line has `type`, `task`, `taskIndex`, `step` and `ts`. The line types are:
 - `device`: an event sent during a step (`tap`, `tap_element`, `key_press`, `input_text`, `swipe`, `wait`, `open_link`, `stop_app`). A `tap_element` keeps the text or id pattern the agent clicked by, and the replay finds that element in the current hierarchy before tapping, so a layout that moved still gets the right tap. Anything the replay cannot reproduce faithfully is recorded as `unsupported` with the command name, so the gap is visible instead of silent: a long press, a repeated tap, a tap at a relative point, a selector narrowed by position, traits or state, a swipe anchored on an element, and `killApp` all fall back to the agent rather than being replayed as a different interaction.
 - `scenario_end`: `status` and the resource-id `signature` of the final screen.
 
-Coordinates are device pixels, in the space the recorded `width`/`height` describe.
+Coordinates are in the coordinate space the recorded `width`/`height` describe, which is the one the device layer works in: Maestro's grid, whose units happen to be pixels on Android but not necessarily on iOS.
 
 ## Using the scripts from CI
 
-The scripts are only generated; nothing in CI replays them. A typical setup runs Arbigent on a schedule, uploads the directory, and lets whoever needs a screen download it:
+The scripts are only generated; nothing in CI replays them. A typical setup runs Arbigent on a schedule, uploads the directory, and lets whoever needs a screen download it.
+
+A log records what the run actually typed and how it launched the app, so `input_text` values and `launchArguments` appear in it verbatim. Treat the artifact as being as readable as the accounts and arguments the recorded run used: record with a throwaway account rather than a real one, keep passwords, tokens and personal data out of the scenarios that are recorded, and restrict who can download the artifact when a recording cannot avoid them.
 
 ```yaml
 name: record-replay-scripts
