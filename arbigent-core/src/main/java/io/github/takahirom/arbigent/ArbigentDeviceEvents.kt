@@ -145,10 +145,14 @@ public fun interface ArbigentDeviceEventListener {
  * Translates one Maestro command into the device events it will actually perform.
  *
  * Gestures Maestro expresses relative to the screen (scroll, directional swipe) are resolved into
- * absolute pixels here using [screenWidth]/[screenHeight], because the replay script only has
- * `adb shell input swipe`, which takes pixels. The fractions mirror Maestro's own AndroidDriver
+ * absolute coordinates here using [screenWidth]/[screenHeight], so that a recorded event says where
+ * it landed rather than what it was named. The fractions mirror Maestro's own AndroidDriver
  * (verified against the pinned Maestro release), so a replayed swipe covers the same distance the
  * recorded run did.
+ *
+ * [screenWidth]/[screenHeight] are grid units — the space the drivers compute coordinates in and the
+ * space [ArbigentElementList] reports bounds in — because replay scales the recorded coordinates
+ * against the screen size of whatever device it is replaying on.
  */
 internal fun MaestroCommand.toArbigentDeviceEvents(
   screenWidth: Int,

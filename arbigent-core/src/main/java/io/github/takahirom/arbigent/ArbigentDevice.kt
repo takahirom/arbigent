@@ -287,7 +287,11 @@ public class MaestroDevice(
     if (deviceEventListeners.isEmpty()) return
     runCatching {
       val deviceInfo = maestro.cachedDeviceInfo
-      emitDeviceEvents(command.toArbigentDeviceEvents(deviceInfo.widthPixels, deviceInfo.heightPixels))
+      // Grid units, not pixels: this is the space Maestro's own drivers do their coordinate work in
+      // (the iOS driver reads widthGrid/heightGrid), and the space ArbigentElementList reports, so
+      // recording in it keeps the events, the recorded screen size and the element bounds
+      // comparable. On Android the two are the same number.
+      emitDeviceEvents(command.toArbigentDeviceEvents(deviceInfo.widthGrid, deviceInfo.heightGrid))
     }.onFailure { arbigentDebugLog("Failed to record device events: ${it.message}") }
   }
 
@@ -359,8 +363,9 @@ public class MaestroDevice(
     }
     return ArbigentElementList(
       emptyList(),
-      maestro.cachedDeviceInfo.widthPixels,
-      maestro.cachedDeviceInfo.heightPixels
+      // Grid units, like the list [ArbigentElementList.from] builds when the hierarchy can be read.
+      maestro.cachedDeviceInfo.widthGrid,
+      maestro.cachedDeviceInfo.heightGrid
     )
   }
 
