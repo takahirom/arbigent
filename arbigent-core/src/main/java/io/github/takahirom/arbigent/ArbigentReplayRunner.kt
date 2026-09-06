@@ -21,7 +21,9 @@ import maestro.orchestra.TapOnPointV2Command
  * The point is reachability: the recorded run already proved these events reach the screen, so the
  * events are sent again in order and the only judgement made is "is the screen the recording acted
  * on here yet". That judgement is the same one the in-run trace replay makes, and it lives in
- * [ArbigentReplayWait] so the two cannot drift apart.
+ * [ArbigentReplayWait] so the two cannot drift apart. Only the budget differs: with no AI to take
+ * over from a screen this stopped on, waits here keep a floor under them
+ * ([ArbigentReplayWait.standaloneBudgetMillis]).
  *
  * Nothing is sent until the whole selection has been checked ([verifyReplayable]): a log that stops
  * halfway leaves the device on a screen nobody asked for, which is worse than refusing up front.
@@ -62,18 +64,18 @@ public class ArbigentReplayRunner(
       out.append("step ${step.number}: ${step.label()}\n")
       if (waitForScreens && !step.isInit) {
         val target = step.target
-        val deadline = ArbigentReplayWait.deadlineMillis(recordedGapMillis(steps, position))
+        val budget = ArbigentReplayWait.standaloneBudgetMillis(recordedGapMillis(steps, position))
         if (target != null) {
-          val result = ArbigentReplayWait.awaitSettled(device, deadline) { elements ->
+          val result = ArbigentReplayWait.awaitReady(device, budget) { elements ->
             target.identity.findMatch(elements) != null
           }
           when (result) {
-            is ArbigentReplayWait.WaitResult.Settled -> Unit
-            ArbigentReplayWait.WaitResult.TimedOut -> {
+            is ArbigentReplayWait.WaitResult.Ready -> Unit
+            ArbigentReplayWait.WaitResult.Exhausted -> {
               reportDivergence(
                 step = step,
                 remaining = steps.drop(position + 1),
-                reason = "the target never appeared within ${deadline}ms",
+                reason = "the target never appeared within ${budget}ms",
               )
               return EXIT_DIVERGED
             }
@@ -88,16 +90,16 @@ public class ArbigentReplayRunner(
           // The hints say which screen the decision was looking at, not what it acted on, so
           // neither running out of time nor an unreadable screen stops the step; a device that
           // really is broken fails on the next event with a reason worth printing.
-          when (ArbigentReplayWait.awaitSettled(device, deadline) { elements ->
+          when (ArbigentReplayWait.awaitReady(device, budget) { elements ->
             step.screen.any { hint -> hint.findMatch(elements) != null }
           }) {
-            is ArbigentReplayWait.WaitResult.Settled -> Unit
-            ArbigentReplayWait.WaitResult.TimedOut -> err.append(
-              "  wait: none of the recorded screen hints appeared within ${deadline}ms, continuing\n",
+            is ArbigentReplayWait.WaitResult.Ready -> Unit
+            ArbigentReplayWait.WaitResult.Exhausted -> err.append(
+              "  wait: none of the recorded screen hints appeared within ${budget}ms, continuing\n",
             )
 
             ArbigentReplayWait.WaitResult.Unreadable -> err.append(
-              "  wait: the screen could not be read within ${deadline}ms, continuing\n",
+              "  wait: the screen could not be read within ${budget}ms, continuing\n",
             )
           }
         }
@@ -135,7 +137,8 @@ public class ArbigentReplayRunner(
       // The last event has only just been sent, so the end screen is usually still arriving. Wait
       // for it the same way every other step is waited for, then look regardless of how the wait
       // ended: an end screen that keeps animating is still the right screen.
-      val result = ArbigentReplayWait.awaitSettled(device, ArbigentReplayWait.deadlineMillis(null)) { elements ->
+      val budget = ArbigentReplayWait.standaloneBudgetMillis(null)
+      val result = ArbigentReplayWait.awaitReady(device, budget) { elements ->
         log.signature.any { resourceId ->
           ArbigentElementIdentity(resourceId = resourceId).findMatch(elements) != null
         }

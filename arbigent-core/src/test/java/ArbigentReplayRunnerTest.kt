@@ -112,7 +112,6 @@ class ArbigentReplayRunnerTest {
         screen(),
         screen(),
         screen(Attributes(text = "Later")),
-        screen(Attributes(text = "Later")),
       ),
     )
 
@@ -120,7 +119,7 @@ class ArbigentReplayRunnerTest {
 
     assertEquals(ArbigentReplayRunner.EXIT_OK, exitCode)
     assertEquals(listOf("tap Later"), device.commands.map { it.describeForTest() })
-    assertTrue(device.elementReads >= 4, "expected the runner to poll the screen, read ${device.elementReads} times")
+    assertTrue(device.elementReads >= 3, "expected the runner to poll the screen, read ${device.elementReads} times")
   }
 
   @Test

@@ -24,21 +24,15 @@ internal class ReplayDivergenceException(
  * and UI tree: replay makes no AI call, so without it the next screen is snapshotted before it has
  * settled and an index-based action resolves against a half-built element list.
  *
- * How long a step may wait is the interval recorded between it and the step before it, minus what
- * replay has already spent executing the previous action. That interval is the recording run's own
- * time from one capture to the next, so it already contains everything the app was given then,
- * including the AI latency the recording paid and any `Wait` the AI itself decided on; replay is
- * therefore never slower than the recording, and never faster than the app needs. A step with no
- * recorded interval — the first step of a task, which has no predecessor in the trace — gets
- * [MIN_WAIT_MILLIS] instead, because there is nothing to derive a budget from and a task that
- * starts by launching an app must not be stepped on at once.
+ * How long a step may wait is [ArbigentReplayWait.inRunBudgetMillis]: the interval recorded between
+ * this step and the one before it, minus what replay has already spent executing the previous
+ * action. A step with no recorded interval — the first step of a task, which has no predecessor in
+ * the trace — gets [ArbigentReplayWait.MIN_WAIT_MILLIS] instead, because there is nothing to derive
+ * a budget from and a task that starts by launching an app must not be stepped on at once.
  *
- * Within that budget a step with a recorded target polls the elements until the target is present,
- * and proceeds the moment it is. Waiting further for the element list to stop changing was tried
- * and dropped: a screen with anything animating or ticking never stops changing, so the wait ran to
- * the budget every time and a screen that was in fact ready was reported as one the target never
- * reached. A step with no target to wait for (reaching the goal, back, scroll, wait, and text
- * actions recorded without an identity) waits its budget out.
+ * Within that budget a step with a recorded target polls the elements until the target is present
+ * and proceeds the moment it is. A step with no target to wait for (reaching the goal, back,
+ * scroll, wait, and text actions recorded without an identity) waits its budget out.
  */
 internal class ArbigentReplayPacingStepInterceptor(
   private val trace: ArbigentReplayTrace,
@@ -65,19 +59,14 @@ internal class ArbigentReplayPacingStepInterceptor(
     return chain.proceed(stepInput)
   }
 
-  /**
-   * How long this step may still wait: what is left of the recorded interval after the time replay
-   * has already spent since the previous step began. The cap is applied to the recorded interval
-   * itself, so a pathological recording does not become a minute of waiting plus whatever the
-   * previous action took.
-   */
   private fun remainingBudgetMillis(replayIndex: Int): Long {
-    val recordedGap = recordedGapMillis(replayIndex) ?: return MIN_WAIT_MILLIS
-    val budget = recordedGap.coerceAtMost(MAX_WAIT_MILLIS)
-    // Nothing measured to subtract: this is the budget in full rather than a guess at what is left.
-    val previousStartedAt = previousStepStartedAtMillis ?: return budget
-    val alreadySpent = TimeProvider.get().currentTimeMillis() - previousStartedAt
-    return (budget - alreadySpent).coerceAtLeast(0)
+    val previousStartedAt = previousStepStartedAtMillis
+    return ArbigentReplayWait.inRunBudgetMillis(
+      recordedGapMillis = recordedGapMillis(replayIndex),
+      alreadySpentMillis = previousStartedAt?.let {
+        TimeProvider.get().currentTimeMillis() - it
+      },
+    )
   }
 
   private fun recordedGapMillis(replayIndex: Int): Long? {
@@ -88,55 +77,35 @@ internal class ArbigentReplayPacingStepInterceptor(
     return (recordedAt - previousRecordedAt).takeIf { it > 0 }
   }
 
-  /**
-   * Polls until the recorded target is present, or until [budgetMillis] is spent. The screen is
-   * read once before the budget is consulted, so a step whose budget is already gone still gets the
-   * chance to find its target on a screen that is in fact ready — and a target that never appears
-   * is left for the decision interceptor to report as a divergence, which is what it is.
-   */
   private suspend fun awaitTarget(
     replayIndex: Int,
     identity: ArbigentElementIdentity,
     device: ArbigentDevice,
     budgetMillis: Long,
   ) {
-    var waitedMillis = 0L
-    while (true) {
-      val readStartedAtMillis = TimeProvider.get().currentTimeMillis()
-      val present = isPresent(device, identity)
-      // Reading the hierarchy is synchronous and can take a while on a busy device. Charge it to
-      // the budget as well, or a slow read adds itself to every poll and the wait outlasts the
-      // recorded interval it is supposed to fit inside.
-      waitedMillis += (TimeProvider.get().currentTimeMillis() - readStartedAtMillis)
-        .coerceAtLeast(0)
-      if (present) {
-        arbigentInfoLog(
-          "Replay wait: target ${identity.description()} found after ${waitedMillis}ms " +
-            "before capturing step ${replayIndex + 1}",
-        )
-        return
-      }
-      if (waitedMillis >= budgetMillis) break
-      val pollMillis = POLL_INTERVAL_MILLIS.coerceAtMost(budgetMillis - waitedMillis)
-      delay(pollMillis)
-      waitedMillis += pollMillis
+    val result = ArbigentReplayWait.awaitReady(device, budgetMillis) { elements ->
+      identity.findMatch(elements) != null
     }
-    arbigentInfoLog(
-      "Replay wait: budget ${budgetMillis}ms spent waiting for target ${identity.description()} " +
-        "before capturing step ${replayIndex + 1}; capturing anyway",
-    )
-  }
+    // Capturing the step anyway is the point of this interceptor: it only paces the run, and the AI
+    // that follows decides what the screen actually is, so neither an exhausted budget nor an
+    // unreadable screen is fatal here. A target that never appears is a divergence, and
+    // [ArbigentReplayDecisionInterceptor] is what reports it as one.
+    when (result) {
+      is ArbigentReplayWait.WaitResult.Ready -> arbigentInfoLog(
+        "Replay wait: target ${identity.description()} found after ${result.waitedMillis}ms " +
+          "before capturing step ${replayIndex + 1}",
+      )
 
-  private fun isPresent(device: ArbigentDevice, identity: ArbigentElementIdentity): Boolean {
-    val elements = try {
-      device.elements()
-    } catch (exception: Exception) {
-      // Reading the hierarchy can fail while the screen is mid-transition, which is exactly the
-      // state this waits out. Treat it as "not there yet".
-      arbigentDebugLog("Replay wait: could not read elements: $exception")
-      return false
+      ArbigentReplayWait.WaitResult.Exhausted -> arbigentInfoLog(
+        "Replay wait: budget ${budgetMillis}ms spent waiting for target " +
+          "${identity.description()} before capturing step ${replayIndex + 1}; capturing anyway",
+      )
+
+      ArbigentReplayWait.WaitResult.Unreadable -> arbigentInfoLog(
+        "Replay wait: the screen could not be read while waiting for target " +
+          "${identity.description()} before capturing step ${replayIndex + 1}; capturing anyway",
+      )
     }
-    return identity.findMatch(elements) != null
   }
 
   private suspend fun waitOutBudget(replayIndex: Int, budgetMillis: Long) {
@@ -147,15 +116,6 @@ internal class ArbigentReplayPacingStepInterceptor(
     delay(budgetMillis)
   }
 
-  private companion object {
-    // A recorded gap can be pathological (a hiccup while recording); do not inherit it unbounded.
-    const val MAX_WAIT_MILLIS = 60_000L
-
-    // Without a recorded interval there is nothing to derive a budget from, and the step this
-    // happens on is the one that starts a task — the launch replay must not step on.
-    const val MIN_WAIT_MILLIS = 10_000L
-    const val POLL_INTERVAL_MILLIS = 500L
-  }
 }
 
 internal class ArbigentReplayDecisionInterceptor(
