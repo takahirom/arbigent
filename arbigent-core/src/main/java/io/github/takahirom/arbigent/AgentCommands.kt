@@ -665,8 +665,13 @@ public class WaitAgentAction(private val timeMs: Int) : ArbigentAgentAction {
     return "Wait for $timeMs ms"
   }
 
+  @OptIn(ArbigentInternalApi::class)
   override fun runDeviceAction(runInput: ArbigentAgentAction.RunInput) {
     Thread.sleep(timeMs.toLong())
+    // A wait sends no command, so it is recorded here or not at all. The step is what made the
+    // next screen the one the recorded run acted on: a replay that dropped it would act on a
+    // screen still loading. Recorded after the wait so its own duration is not waited twice.
+    runInput.device.recordDeviceEvent(ArbigentDeviceEvent.Wait(timeMs.toLong()))
   }
 
   public companion object : AgentActionType {

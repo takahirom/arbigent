@@ -76,6 +76,18 @@ public interface ArbigentDevice {
   @ArbigentInternalApi
   public fun removeDeviceEventListener(listener: ArbigentDeviceEventListener) {
   }
+
+  /**
+   * Records an interaction the caller performed itself, without going through [executeActions].
+   *
+   * Waiting is the one such interaction: it changes nothing on the device but is what made the
+   * next step's screen the screen the recorded run acted on, so a replay that skipped it would
+   * act too early. A step that only waited has no Maestro command behind it and would otherwise
+   * leave no event at all.
+   */
+  @ArbigentInternalApi
+  public fun recordDeviceEvent(event: ArbigentDeviceEvent) {
+  }
 }
 
 public data class ArbigentElement(
@@ -281,6 +293,11 @@ public class MaestroDevice(
   @ArbigentInternalApi
   override fun removeDeviceEventListener(listener: ArbigentDeviceEventListener) {
     deviceEventListeners.remove(listener)
+  }
+
+  @ArbigentInternalApi
+  override fun recordDeviceEvent(event: ArbigentDeviceEvent) {
+    emitDeviceEvents(listOf(event))
   }
 
   private fun recordDeviceEvents(command: MaestroCommand) {

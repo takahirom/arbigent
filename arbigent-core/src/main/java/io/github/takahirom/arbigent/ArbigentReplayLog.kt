@@ -118,7 +118,20 @@ public data class ArbigentReplayLog(
     if (pending.isNotEmpty() && (lastWanted || !seenStep)) selected += pending
     // Setup alone is not a replay: with --with-init it would clear state, launch the app and report
     // success without ever reaching the step that was asked for.
+    //
+    // The exception is a run whose setup was the whole run -- the app launched straight onto the
+    // goal screen and the AI declared success without acting -- which records init steps and
+    // nothing else. Replaying all of that log is then exactly what was asked for, so refusing it
+    // would refuse the command the log's own markdown prints.
+    val recordsOnlyInit = steps.isNotEmpty() && steps.none { !it.isInit }
+    val wholeLogRequested = step == null && from == null && until == null
+    if (recordsOnlyInit && wholeLogRequested && withInit) return selected
     if (selected.none { !it.isInit }) {
+      if (recordsOnlyInit && wholeLogRequested) {
+        throw ArbigentReplayLogException(
+          "this log records only setup, which is replayed with --with-init",
+        )
+      }
       val requested = when {
         step != null -> "--step $step"
         from != null && until != null -> "--from $from --until $until"
