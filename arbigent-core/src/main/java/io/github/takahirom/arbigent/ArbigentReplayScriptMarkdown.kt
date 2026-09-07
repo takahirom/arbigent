@@ -20,7 +20,7 @@ internal fun renderReplayScriptMarkdown(
   appendLine("## Goal")
   appendLine()
   if (goals.size == 1) {
-    appendLine(goals.single())
+    appendLine(goals.single().collapsedToOneLine())
   } else {
     goals.forEachIndexed { index, goal -> appendLine("${index + 1}. ${goal.collapsedToOneLine()}") }
   }
@@ -175,6 +175,10 @@ private fun String.escapedForOneLine(): String = replace("\\", "\\\\")
 
 /**
  * A value rendered inside `'…'` also has to keep its own quotes from closing the field. `\'` is a
- * legal escape in a regex too, so a reader who copies the value out gets the same matching.
+ * legal escape in a regex too, so a reader who copies the value out gets the same matching. The
+ * backslashes already in the value are left alone rather than doubled: a selector is often a regex,
+ * and `\d+` doubled into `\\d+` stops matching digits the moment it is copied back out.
  */
-private fun String.escapedForSingleQuotedOneLine(): String = escapedForOneLine().replace("'", "\\'")
+private fun String.escapedForSingleQuotedOneLine(): String = replace("\r", "\\r")
+  .replace("\n", "\\n")
+  .replace("'", "\\'")
