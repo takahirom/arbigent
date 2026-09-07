@@ -220,7 +220,12 @@ public class ArbigentReplayRunner(
   private fun toMaestroCommand(event: ArbigentDeviceEvent): MaestroCommand = when (event) {
     is ArbigentDeviceEvent.Tap -> {
       val (x, y) = scale(event.x, event.y)
-      MaestroCommand(tapOnPointV2Command = TapOnPointV2Command(point = "$x,$y"))
+      MaestroCommand(
+        tapOnPointV2Command = TapOnPointV2Command(
+          point = "$x,$y",
+          retryIfNoChange = event.retryIfNoChange,
+        ),
+      )
     }
 
     is ArbigentDeviceEvent.TapElement -> MaestroCommand(
@@ -230,6 +235,7 @@ public class ArbigentReplayRunner(
           idRegex = event.idRegex,
           index = event.index?.toString(),
         ),
+        retryIfNoChange = event.retryIfNoChange,
       ),
     )
 
