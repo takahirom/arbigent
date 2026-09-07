@@ -107,7 +107,8 @@ public class ArbigentReplayRunner(
           // screen (a canvas, a video surface) records. The recorded gap is still the time the app
           // was given before this action, so it is waited out rather than skipped -- otherwise this
           // one step, of all steps, gets no pacing at all and acts on a screen that is still
-          // loading. This is what the in-run replay does for a step with no target.
+          // loading. The in-run replay waits out its budget the same way for a step with no target;
+          // the difference here is only that the standalone floor applies to it.
           out.append("  wait: nothing recorded to wait for, pacing ${budget}ms\n")
           delay(budget)
         }
