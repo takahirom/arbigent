@@ -428,16 +428,53 @@ class ArbigentReplayScriptWriterTest {
       platform = ArbigentDeviceOs.Android,
     )
     val markdown = File(dir, "open-settings.md").readText()
+    // Each step's own block, so a command printed under the wrong step is caught: searching the
+    // whole document would pass just as happily with the two numbers swapped.
+    val blocks = markdown.split("\n\n").associateBy { it.trimStart().substringBefore(". ") }
     listOf(
       "device: KEYCODE_DPAD_CENTER" to 1,
       "device: KEYCODE_BACK" to 2,
     ).forEach { (command, step) ->
-      assertTrue(markdown.contains(command), "step $step is missing from the summary:\n$markdown")
+      val block = blocks["$step"]
+      assertTrue(block != null, "step $step is missing from the summary:\n$markdown")
+      assertTrue(block!!.contains(command), "step $step acted on something else:\n$block")
       assertTrue(
-        markdown.contains("- replay: `./arbigentw replay open-settings.jsonl --step $step`"),
-        "an agent driving one step at a time copies this instead of working the number out:\n$markdown",
+        block.contains("- replay: `./arbigentw replay open-settings.jsonl --step $step`"),
+        "an agent driving one step at a time copies this instead of working the number out:\n$block",
       )
     }
+  }
+
+  @Test
+  fun `typed text with its own newline stays on the event's line`() = runTest {
+    val dir = Files.createTempDirectory("replay-scripts-typed-text").toFile()
+    val recorder = ArbigentReplayScriptRecorder()
+    recorder.beginTask(taskIndex = 0, goal = "Write a note", discardPrevious = true)
+    recorder.intercept(
+      executeActionsInput(
+        ArbigentContextHolder("Write a note", 10),
+        ArbigentElementIdentity(text = "note", occurrence = 1),
+      ),
+      ArbigentExecuteActionsInterceptor.Chain {
+        recorder.onDeviceEvent(ArbigentDeviceEvent.InputText("first\nsecond \"quoted\"", timestamp = 2))
+        ArbigentAgent.ExecuteActionsOutput()
+      },
+    )
+    ArbigentReplayScriptWriter(dir).write(
+      scenarioId = "write-note",
+      goals = listOf("Write a note"),
+      tasks = recorder.recordedTasks(),
+      signature = emptyList(),
+      platform = ArbigentDeviceOs.Android,
+    )
+
+    val markdown = File(dir, "write-note.md").readText()
+    // The summary is read a line at a time, so a newline the app was told to type must not end the
+    // event's line and leave the rest of the typed text standing as prose.
+    assertTrue(
+      markdown.lines().any { it.contains("""device: text("first\nsecond \"quoted\"")""") },
+      "typed text has to survive as one line:\n$markdown",
+    )
   }
 
   private fun lineType(line: String): String =
