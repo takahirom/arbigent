@@ -481,6 +481,76 @@ class ArbigentReplayScriptWriterTest {
   }
 
   @Test
+  fun `a single goal carrying a newline stays on its own line`() {
+    val dir = Files.createTempDirectory("replay-scripts-single-goal").toFile()
+    ArbigentReplayScriptWriter(dir).write(
+      scenarioId = "open-settings",
+      goals = listOf("Open the settings screen\nand read the version"),
+      tasks = listOf(
+        ArbigentReplayScriptRecorder.RecordedTask(
+          taskIndex = 0,
+          goal = "Open the settings screen",
+          steps = mutableListOf(
+            ArbigentReplayScriptRecorder.RecordedStep(
+              isInit = false,
+              actionLog = "Tapped settings",
+              events = mutableListOf(ArbigentDeviceEvent.KeyPress("KEYCODE_DPAD_CENTER", timestamp = 1)),
+            ),
+          ),
+        ),
+      ),
+      signature = emptyList(),
+      platform = ArbigentDeviceOs.Android,
+    )
+
+    val markdown = File(dir, "open-settings.md").readText()
+    // The lone goal is rendered without a number, which is no reason to leave its newline in: the
+    // second half would read as a paragraph of the document rather than as part of the goal.
+    assertTrue(
+      markdown.lines().contains("Open the settings screen and read the version"),
+      "expected the folded goal in:\n$markdown",
+    )
+  }
+
+  @Test
+  fun `a selector regex keeps the backslashes it was recorded with`() {
+    val dir = Files.createTempDirectory("replay-scripts-regex").toFile()
+    val identity = ArbigentElementIdentity(text = """Episode \d+""", occurrence = 0)
+    ArbigentReplayScriptWriter(dir).write(
+      scenarioId = "open-settings",
+      goals = listOf("Open the settings screen"),
+      tasks = listOf(
+        ArbigentReplayScriptRecorder.RecordedTask(
+          taskIndex = 0,
+          goal = "Open the settings screen",
+          steps = mutableListOf(
+            ArbigentReplayScriptRecorder.RecordedStep(
+              isInit = false,
+              actionLog = "Tapped an episode",
+              target = identity,
+              events = mutableListOf(
+                ArbigentDeviceEvent.TapElement(textRegex = """Episode \d+""", timestamp = 1),
+              ),
+            ),
+          ),
+        ),
+      ),
+      signature = emptyList(),
+      platform = ArbigentDeviceOs.Android,
+    )
+
+    val markdown = File(dir, "open-settings.md").readText()
+    // A selector is often a regex, and a doubled backslash stops matching digits the moment the
+    // value is copied back out of the document.
+    listOf(
+      """   - target: text='Episode \d+' (occurrence 0)""",
+      """   - device: tap(text='Episode \d+')""",
+    ).forEach { line ->
+      assertTrue(markdown.lines().contains(line), "expected the line `$line` in:\n$markdown")
+    }
+  }
+
+  @Test
   fun `each numbered step in the markdown carries its own single-step replay command`() = runTest {
     val dir = Files.createTempDirectory("replay-scripts-step-command").toFile()
     ArbigentReplayScriptWriter(dir).write(
