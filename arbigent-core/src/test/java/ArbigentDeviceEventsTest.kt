@@ -41,7 +41,7 @@ class ArbigentDeviceEventsTest {
   @Test
   fun `tap on point becomes a tap`() {
     val events = MaestroCommand(tapOnPointV2Command = TapOnPointV2Command(point = "120,340")).events()
-    assertEquals(listOf(ArbigentDeviceEvent.Tap(120, 340, TS)), events)
+    assertEquals(listOf(ArbigentDeviceEvent.Tap(120, 340, timestamp = TS)), events)
   }
 
   @Test
@@ -69,6 +69,33 @@ class ArbigentDeviceEventsTest {
       MaestroCommand(tapOnElement = TapOnElementCommand(selector = ElementSelector(enabled = true)))
         .events().single() is ArbigentDeviceEvent.Unsupported,
       "a selector with nothing to search the hierarchy for cannot be replayed",
+    )
+  }
+
+  @Test
+  fun `a tap keeps maestro's own retry so the replay gets the same attempts`() {
+    // Arbigent's taps leave retryIfNoChange unset, but a Maestro flow used as an initializer runs
+    // through this recorder, and dropping the flag would give the replayed tap one attempt where
+    // the recorded one had two.
+    assertEquals(
+      listOf(ArbigentDeviceEvent.Tap(10, 20, retryIfNoChange = true, timestamp = TS)),
+      MaestroCommand(tapOnPointV2Command = TapOnPointV2Command(point = "10,20", retryIfNoChange = true)).events(),
+    )
+    assertEquals(
+      listOf(ArbigentDeviceEvent.TapElement(textRegex = "Settings", retryIfNoChange = true, timestamp = TS)),
+      MaestroCommand(
+        tapOnElement = TapOnElementCommand(
+          selector = ElementSelector(textRegex = "Settings"),
+          retryIfNoChange = true,
+        )
+      ).events(),
+    )
+    // Unset stays unset: Maestro reads null as false, and writing false into the log would freeze
+    // today's default instead of recording that the command asked for nothing.
+    assertEquals(
+      null,
+      (MaestroCommand(tapOnPointV2Command = TapOnPointV2Command(point = "10,20")).events().single()
+        as ArbigentDeviceEvent.Tap).retryIfNoChange,
     )
   }
 
