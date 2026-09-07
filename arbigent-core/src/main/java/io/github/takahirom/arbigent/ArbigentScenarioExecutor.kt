@@ -271,6 +271,9 @@ public class ArbigentScenarioExecutor internal constructor(
             // falls back the same way. Restarting the whole scenario instead would throw away
             // every task already replayed, which is the entire saving the mode exists for.
             if (attemptMode == ArbigentAttemptMode.ReplayWithFallback &&
+              // An initializer that failed left the device wherever the failure did, and the
+              // replacement skips initializers, so there is no state for it to carry on from.
+              agent.initializerCompleted &&
               fellBackTaskIndexes.add(index)
             ) {
               arbigentInfoLog(
@@ -278,13 +281,10 @@ public class ArbigentScenarioExecutor internal constructor(
                   "${replayFailureReason(agent)}. Re-running this task in normal mode and keeping the " +
                   "tasks before it.",
               )
-              // A task that starts by resetting the device resets again when it is re-run here, so
-              // the AI ran from the same place a replay of this task would start from and its steps
-              // stand alone as a trace. Only a task that carries on from the previous one needs the
-              // actions it had already replayed put back in front of them.
-              if (!task.resetsDeviceState()) {
-                replayedPrefixes[index] = agent.latestArbigentContext()?.steps().orEmpty()
-              }
+              // The replacement carries on from the device state the replayed actions produced, so
+              // its own steps do not stand alone: the actions already replayed go back in front of
+              // them, or the trace would not be replayable from the start of the task.
+              replayedPrefixes[index] = agent.latestArbigentContext()?.steps().orEmpty()
               agent.cancel()
               _taskAssignmentsStateFlow.value = taskAssignments().toMutableList().also {
                 it[index] = ArbigentTaskAssignment(
@@ -293,6 +293,7 @@ public class ArbigentScenarioExecutor internal constructor(
                     agentConfig = task.agentConfig,
                     dispatcher = dispatcher,
                     replayTrace = null,
+                    runInitializers = false,
                   ),
                 )
               }

@@ -39,6 +39,10 @@ public class ArbigentAgent internal constructor(
   // degrade to normal execution, and the failed attempt would then purge the AI-decision cache as
   // if it were an ordinary failure. Null means normal AI-driven execution.
   private val replayTrace: ArbigentReplayTrace?,
+  // False for the agent that replaces a task which fell back from replay: that task's initializers
+  // already ran for the replay attempt, and running them again would undo the device state the
+  // replayed actions produced, which is exactly what the replacement carries on from.
+  private val runInitializers: Boolean = true,
 ) {
   private val attemptMode: ArbigentAttemptMode = if (replayTrace != null) {
     ArbigentAttemptMode.ReplayWithFallback
@@ -81,6 +85,11 @@ public class ArbigentAgent internal constructor(
       }
     }
   )
+  // Whether this agent's initializers got through. A task whose initializer failed left the device
+  // wherever the failure did, so there is nothing for a replacement agent to carry on from.
+  internal var initializerCompleted: Boolean = false
+    private set
+
   private val stepInterceptors: List<ArbigentStepInterceptor> = buildList {
     if (replayTrace != null) {
       add(ArbigentReplayPacingStepInterceptor(replayTrace))
@@ -253,6 +262,8 @@ public class ArbigentAgent internal constructor(
       updateIsRunning = { value -> _isRunningStateFlow.value = value },
       updateCurrentGoal = { value -> currentGoalStateFlow.value = value },
       initializerChain = initializerChain,
+      runInitializers = runInitializers,
+      updateInitializerCompleted = { value -> initializerCompleted = value },
       stepChain = stepChain,
       decisionChain = decisionChain,
       imageAssertionChain = imageAssertionChain,
@@ -291,6 +302,8 @@ public class ArbigentAgent internal constructor(
     val executeActionChain: suspend (ExecuteActionsInput) -> ExecuteActionsOutput,
     val mcpClient: MCPClient? = null,
     val mcpOptions: ArbigentMcpOptions? = null,
+    val runInitializers: Boolean = true,
+    val updateInitializerCompleted: (Boolean) -> Unit = {},
   )
 
   public sealed interface ExecutionResult {
@@ -702,8 +715,6 @@ public fun AgentConfigBuilder(
 
       is ArbigentScenarioContent.InitializationMethod.LaunchApp -> {
         addInterceptor(object : ArbigentInitializerInterceptor {
-          override val resetsDeviceState: Boolean = true
-
           override fun intercept(
             device: ArbigentDevice,
             chain: ArbigentInitializerInterceptor.Chain
@@ -728,8 +739,6 @@ public fun AgentConfigBuilder(
 
       is ArbigentScenarioContent.InitializationMethod.CleanupData -> {
         addInterceptor(object : ArbigentInitializerInterceptor {
-          override val resetsDeviceState: Boolean = true
-
           override fun intercept(
             device: ArbigentDevice,
             chain: ArbigentInitializerInterceptor.Chain
@@ -750,8 +759,6 @@ public fun AgentConfigBuilder(
 
       is ArbigentScenarioContent.InitializationMethod.OpenLink -> {
         addInterceptor(object : ArbigentInitializerInterceptor {
-          override val resetsDeviceState: Boolean = true
-
           override fun intercept(
             device: ArbigentDevice,
             chain: ArbigentInitializerInterceptor.Chain
@@ -775,8 +782,6 @@ public fun AgentConfigBuilder(
           // A flow can do anything, so it is read as resetting: taking a trace from the wrong
           // starting point costs a diverged replay, replaying actions the flow already undid can
           // repeat them for real.
-          override val resetsDeviceState: Boolean = true
-
           override fun intercept(
             device: ArbigentDevice,
             chain: ArbigentInitializerInterceptor.Chain
@@ -859,18 +864,6 @@ public interface ArbigentInterceptor
 public interface ArbigentInitializerInterceptor : ArbigentInterceptor {
   public fun intercept(device: ArbigentDevice, chain: Chain)
 
-  /**
-   * Whether this initializer puts the device somewhere known regardless of where it was, the way
-   * launching an app or clearing its data does. Backing out or waiting does not.
-   *
-   * A recorded trace only replays correctly from the state it was recorded from. Initializers run
-   * again at the start of every run of their task, so a task that resets is back at the same place
-   * each time and what the AI did after the reset is a trace on its own. A task that does not reset
-   * starts wherever the previous task left off, so a run that fell back mid-task only makes sense
-   * as a trace together with the actions it had already replayed.
-   */
-  public val resetsDeviceState: Boolean
-    get() = false
   public fun interface Chain {
     public fun proceed(device: ArbigentDevice)
   }
@@ -1212,24 +1205,28 @@ private suspend fun executeDefault(input: ExecuteInput): ExecutionResult {
     val contextHolder = input.createContextHolder(input.goal, input.maxStep)
     input.addContextHolder(contextHolder)
 
-    try {
-      ArbigentGlobalStatus.onInitializing {
-        input.initializerChain(input.device)
-      }
-    } catch (e: MaestroException.AssertionFailure) {
-      arbigentInfoLog { "Initialization failed: ${e.stackTraceToString()}" }
-      val stepId = contextHolder.generateStepId()
-      contextHolder.addStep(
-        ArbigentContextHolder.Step(
-          stepId = stepId,
-          feedback = "Failed to assert in initialization: ${e.message}",
-          cacheKey = "init-failure $stepId",
-          screenshotFilePath = ""
+    input.updateInitializerCompleted(false)
+    if (input.runInitializers) {
+      try {
+        ArbigentGlobalStatus.onInitializing {
+          input.initializerChain(input.device)
+        }
+      } catch (e: MaestroException.AssertionFailure) {
+        arbigentInfoLog { "Initialization failed: ${e.stackTraceToString()}" }
+        val stepId = contextHolder.generateStepId()
+        contextHolder.addStep(
+          ArbigentContextHolder.Step(
+            stepId = stepId,
+            feedback = "Failed to assert in initialization: ${e.message}",
+            cacheKey = "init-failure $stepId",
+            screenshotFilePath = ""
+          )
         )
-      )
-      ArbigentGlobalStatus.onFinished()
-      return ExecutionResult.Failed(contextHolder)
+        ArbigentGlobalStatus.onFinished()
+        return ExecutionResult.Failed(contextHolder)
+      }
     }
+    input.updateInitializerCompleted(true)
 
     var stepRemain = input.maxStep
     while (stepRemain-- > 0 && !contextHolder.isGoalAchieved()) {

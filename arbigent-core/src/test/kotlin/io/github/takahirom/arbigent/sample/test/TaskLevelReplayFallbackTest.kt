@@ -4,10 +4,13 @@ import io.github.takahirom.arbigent.*
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import maestro.MaestroException
+import maestro.TreeNode
 import java.nio.file.Files
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * A replayed task that fails costs only itself: the tasks before it keep what they replayed, and
@@ -73,16 +76,7 @@ class TaskLevelReplayFallbackTest {
           ): ArbigentAi.ImageAssertionOutput {
             if (!failNextAssertion) return chain.proceed(imageAssertionInput)
             failNextAssertion = false
-            return ArbigentAi.ImageAssertionOutput(
-              listOf(
-                ArbigentAi.ImageAssertionResult(
-                  assertionPrompt = "prompt",
-                  isPassed = false,
-                  fulfillmentPercent = 0,
-                  explanation = "explanation",
-                ),
-              ),
-            )
+            return failedAssertion()
           }
         })
       }
@@ -138,17 +132,17 @@ class TaskLevelReplayFallbackTest {
     }
 
   /**
-   * A task that begins by resetting the device begins the same way when it is re-run, so what the
-   * AI did after the reset is a trace on its own. Keeping the actions replayed before the reset
-   * would have the next run replay them again on top of it.
+   * The replacement agent carries on from where the replay left the device, so re-running the
+   * task's initializers would undo exactly the state it is meant to continue from.
    */
   @Test
-  fun `a task that resets the device records only what it did after the reset`() = runTest {
+  fun `the agent replacing a task that fell back does not run the initializers again`() = runTest {
     ArbigentFiles.traceDir =
-      Files.createTempDirectory("arbigent-task-level-fallback-reset").toFile()
+      Files.createTempDirectory("arbigent-task-level-fallback-initializer").toFile()
     val testDispatcher = coroutineContext[CoroutineDispatcher]!!
 
     var failNextAssertion = false
+    var secondTaskInitializations = 0
     val firstTaskConfig = AgentConfig {
       deviceFactory { FakeDevice() }
       aiFactory { FakeAi() }
@@ -163,9 +157,8 @@ class TaskLevelReplayFallbackTest {
       deviceFactory { FakeDevice() }
       aiFactory { FakeAi() }
       addInterceptor(object : ArbigentInitializerInterceptor {
-        override val resetsDeviceState: Boolean = true
-
         override fun intercept(device: ArbigentDevice, chain: ArbigentInitializerInterceptor.Chain) {
+          secondTaskInitializations++
           chain.proceed(device)
         }
       })
@@ -182,16 +175,7 @@ class TaskLevelReplayFallbackTest {
         ): ArbigentAi.ImageAssertionOutput {
           if (!failNextAssertion) return chain.proceed(imageAssertionInput)
           failNextAssertion = false
-          return ArbigentAi.ImageAssertionOutput(
-            listOf(
-              ArbigentAi.ImageAssertionResult(
-                assertionPrompt = "prompt",
-                isPassed = false,
-                fulfillmentPercent = 0,
-                explanation = "explanation",
-              ),
-            ),
-          )
+          return failedAssertion()
         }
       })
     }
@@ -211,16 +195,121 @@ class TaskLevelReplayFallbackTest {
     ArbigentScenarioExecutor(testDispatcher).execute(scenario(), MCPClient())
     advanceUntilIdle()
 
+    secondTaskInitializations = 0
     failNextAssertion = true
     ArbigentScenarioExecutor(testDispatcher).execute(scenario(), MCPClient())
     advanceUntilIdle()
 
     assertEquals(
-      3,
+      1,
+      secondTaskInitializations,
+      "the initializers should run for the replay attempt only, not again for the replacement",
+    )
+    // Two replayed actions plus the three the replacement decided: the count says the task really
+    // did fall back, and that a task with an initializer keeps what it replayed all the same.
+    assertEquals(
+      5,
       secondTaskTraceStepCount(),
-      "a task that resets should record its re-run alone, without the replayed prefix",
+      "the fallback trace should keep what the task replayed before it fell back",
     )
   }
+
+  /**
+   * An initializer that failed left the device wherever the failure did, so there is no replayed
+   * state for a replacement to carry on from. Such a task is not given a task-level fallback: the
+   * whole scenario restarts in normal mode, initializers included.
+   */
+  @Test
+  fun `a task whose initializer fails while replaying restarts the whole scenario`() = runTest {
+    ArbigentFiles.traceDir =
+      Files.createTempDirectory("arbigent-task-level-fallback-init-failure").toFile()
+    val testDispatcher = coroutineContext[CoroutineDispatcher]!!
+
+    var failNextInitialization = false
+    var firstTaskDecisions = 0
+    var secondTaskInitializations = 0
+    val firstTaskConfig = AgentConfig {
+      deviceFactory { FakeDevice() }
+      aiFactory { FakeAi() }
+      addInterceptor(object : ArbigentDecisionInterceptor {
+        override suspend fun intercept(
+          decisionInput: ArbigentAi.DecisionInput,
+          chain: ArbigentDecisionInterceptor.Chain,
+        ): ArbigentAi.DecisionOutput {
+          firstTaskDecisions++
+          return chain.proceed(decisionInput).withStepIdOf(decisionInput)
+        }
+      })
+    }
+    val secondTaskConfig = AgentConfig {
+      deviceFactory { FakeDevice() }
+      aiFactory { FakeAi() }
+      addInterceptor(object : ArbigentInitializerInterceptor {
+        override fun intercept(device: ArbigentDevice, chain: ArbigentInitializerInterceptor.Chain) {
+          secondTaskInitializations++
+          if (failNextInitialization) {
+            failNextInitialization = false
+            throw MaestroException.AssertionFailure(
+              "initializer failed",
+              TreeNode(),
+              "initializer failed",
+            )
+          }
+          chain.proceed(device)
+        }
+      })
+      addInterceptor(object : ArbigentDecisionInterceptor {
+        override suspend fun intercept(
+          decisionInput: ArbigentAi.DecisionInput,
+          chain: ArbigentDecisionInterceptor.Chain,
+        ): ArbigentAi.DecisionOutput = chain.proceed(decisionInput).withStepIdOf(decisionInput)
+      })
+    }
+
+    fun scenario() = ArbigentScenario(
+      id = "scenario",
+      agentTasks = listOf(
+        ArbigentAgentTask("task-1", "goal1", firstTaskConfig),
+        ArbigentAgentTask("task-2", "goal2", secondTaskConfig),
+      ),
+      maxStepCount = 10,
+      maxRetry = 0,
+      tags = setOf(),
+      isLeaf = true,
+      replayWithFallback = true,
+    )
+
+    ArbigentScenarioExecutor(testDispatcher).execute(scenario(), MCPClient())
+    advanceUntilIdle()
+
+    firstTaskDecisions = 0
+    secondTaskInitializations = 0
+    failNextInitialization = true
+    ArbigentScenarioExecutor(testDispatcher).execute(scenario(), MCPClient())
+    advanceUntilIdle()
+
+    assertTrue(
+      firstTaskDecisions > 0,
+      "the scenario should restart under the AI; a task-level fallback would have kept the first " +
+        "task replayed",
+    )
+    assertEquals(
+      2,
+      secondTaskInitializations,
+      "the initializers should run for the failed replay attempt and again for the restart",
+    )
+  }
+
+  private fun failedAssertion(): ArbigentAi.ImageAssertionOutput = ArbigentAi.ImageAssertionOutput(
+    listOf(
+      ArbigentAi.ImageAssertionResult(
+        assertionPrompt = "prompt",
+        isPassed = false,
+        fulfillmentPercent = 0,
+        explanation = "explanation",
+      ),
+    ),
+  )
 
   private fun secondTaskTraceStepCount(): Int {
     val trace = ArbigentFiles.traceDir.listFiles().orEmpty()
