@@ -22,7 +22,7 @@ internal fun renderReplayScriptMarkdown(
   if (goals.size == 1) {
     appendLine(goals.single())
   } else {
-    goals.forEachIndexed { index, goal -> appendLine("${index + 1}. $goal") }
+    goals.forEachIndexed { index, goal -> appendLine("${index + 1}. ${goal.escapedForOneLine()}") }
   }
   appendLine()
   appendLine("## Steps")
@@ -31,15 +31,16 @@ internal fun renderReplayScriptMarkdown(
   steps.forEach { step ->
     if (goals.size > 1 && step.taskIndex != lastTaskIndex) {
       lastTaskIndex = step.taskIndex
-      appendLine("### Task ${step.taskIndex + 1}: ${tasks.firstOrNull { it.taskIndex == step.taskIndex }?.goal.orEmpty()}")
+      val goal = tasks.firstOrNull { it.taskIndex == step.taskIndex }?.goal.orEmpty()
+      appendLine("### Task ${step.taskIndex + 1}: ${goal.escapedForOneLine()}")
       appendLine()
     }
     if (step.isInit) {
       appendLine("0. setup")
     } else {
-      appendLine("${step.number}. ${step.actionLog ?: step.actionName ?: "step"}")
+      appendLine("${step.number}. ${(step.actionLog ?: step.actionName ?: "step").escapedForOneLine()}")
     }
-    step.target?.let { appendLine("   - target: ${it.description()}") }
+    step.target?.let { appendLine("   - target: ${it.oneLineDescription()}") }
     // Maestro sees attributes an adb-side dump may miss, so the coordinates are spelled out for a
     // reader who has to tap by hand.
     step.targetBounds?.let {
@@ -48,11 +49,11 @@ internal fun renderReplayScriptMarkdown(
     if (step.screen.isNotEmpty()) {
       appendLine("   - screen: ${step.screen.joinToString(", ") { it.label() }}")
     }
-    step.memo?.takeIf { it.isNotBlank() }?.let { appendLine("   - memo: ${it.replace("\n", " ")}") }
+    step.memo?.takeIf { it.isNotBlank() }?.let { appendLine("   - memo: ${it.escapedForOneLine()}") }
     appendLine("   - device: ${summarizeEvents(step.events)}")
     step.target?.let { target ->
       val fallback = step.targetBounds?.let { " (or tap ${it.centerX},${it.centerY})" }.orEmpty()
-      appendLine("   - wait for: ${target.description()}$fallback")
+      appendLine("   - wait for: ${target.oneLineDescription()}$fallback")
     }
     // The exact command for this one step, so an agent driving the app a step at a time can copy it
     // instead of working the number out from the option list.
@@ -91,6 +92,13 @@ internal fun renderReplayScriptMarkdown(
   appendLine("`./arbigentw` downloads the matching arbigent on first use; `arbigent replay` is the")
   appendLine("same command for an arbigent that is already installed.")
 }
+
+/**
+ * `description()` writes the attributes raw, which is right for a log line but not for a bullet a
+ * reader scans: a value carrying a newline would end the bullet and leave its remainder as prose.
+ */
+private fun ArbigentElementIdentity.oneLineDescription(): String =
+  label() + " (occurrence $occurrence)"
 
 /** The identity without its occurrence, which means nothing for a screen-level hint. */
 private fun ArbigentElementIdentity.label(): String = listOfNotNull(
