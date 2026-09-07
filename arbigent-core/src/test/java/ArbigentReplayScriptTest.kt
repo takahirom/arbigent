@@ -348,6 +348,10 @@ private class RecordingFakeDevice(
     listeners.remove(listener)
   }
 
+  override fun recordDeviceEvent(event: ArbigentDeviceEvent) {
+    listeners.toList().forEach { it.onDeviceEvent(event) }
+  }
+
   override fun executeActions(actions: List<maestro.orchestra.MaestroCommand>) {
     delegate.executeActions(actions)
     actions.forEach { command ->
@@ -463,5 +467,54 @@ class ArbigentReplayScriptExecutorTest {
     override fun decideAgentActions(
       decisionInput: ArbigentAi.DecisionInput,
     ): ArbigentAi.DecisionOutput = createDecisionOutput()
+  }
+}
+
+/**
+ * A wait sends no command, so unless the wait itself is recorded the step leaves no event and is
+ * dropped from the log. The steps after it were recorded against the screen the wait produced.
+ */
+class ArbigentRecordedWaitTest {
+  @Test
+  fun `a wait the AI decided is recorded`() {
+    val device = RecordingFakeDevice()
+    val recorded = mutableListOf<ArbigentDeviceEvent>()
+    device.addDeviceEventListener { recorded += it }
+
+    io.github.takahirom.arbigent.WaitAgentAction(5).runDeviceAction(
+      io.github.takahirom.arbigent.ArbigentAgentAction.RunInput(device, device.elements()),
+    )
+
+    assertEquals(listOf(5L), recorded.map { (it as ArbigentDeviceEvent.Wait).millis })
+  }
+
+  @Test
+  fun `a wait an initializer performs is recorded`() {
+    val config = io.github.takahirom.arbigent.AgentConfigBuilder(
+      prompt = io.github.takahirom.arbigent.ArbigentPrompt(),
+      scenarioType = io.github.takahirom.arbigent.ArbigentScenarioType.Scenario,
+      deviceFormFactor = io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor.Mobile,
+      initializationMethods = listOf(
+        io.github.takahirom.arbigent.ArbigentScenarioContent.InitializationMethod.Wait(durationMs = 5),
+      ),
+      imageAssertions = io.github.takahirom.arbigent.ArbigentImageAssertions(),
+      cacheOptions = io.github.takahirom.arbigent.ArbigentScenarioCacheOptions(),
+    ).apply {
+      deviceFactory { FakeDevice() }
+      aiFactory { FakeAi() }
+    }.build()
+    val initializer = config.interceptors
+      .filterIsInstance<io.github.takahirom.arbigent.ArbigentInitializerInterceptor>()
+      .single()
+
+    val device = RecordingFakeDevice()
+    val recorded = mutableListOf<ArbigentDeviceEvent>()
+    device.addDeviceEventListener { recorded += it }
+    initializer.intercept(device, object : io.github.takahirom.arbigent.ArbigentInitializerInterceptor.Chain {
+      override fun proceed(device: io.github.takahirom.arbigent.ArbigentDevice) {
+      }
+    })
+
+    assertEquals(listOf(5L), recorded.map { (it as ArbigentDeviceEvent.Wait).millis })
   }
 }
