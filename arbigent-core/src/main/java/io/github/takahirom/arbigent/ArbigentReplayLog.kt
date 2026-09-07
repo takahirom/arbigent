@@ -251,6 +251,17 @@ public data class ArbigentReplayLog(
       var previousKey: Pair<Int, Int>? = null
       var signature = emptyList<String>()
       records.forEach { record ->
+        // The writer stamps both on every line, including the two framing ones, so a line without
+        // them is a truncated or hand-made log rather than an older one, and defaulting to 0 would
+        // file it as a setup step. A negative step is the same kind of damage: it is not step 0, so
+        // it would replay as a normal step of a task that never had one.
+        val number = record.int("step")
+          ?: throw ArbigentReplayLogException("$source has a record without a step")
+        if (number < 0) {
+          throw ArbigentReplayLogException("$source has a record with a negative step $number")
+        }
+        val taskIndex = record.int("taskIndex")
+          ?: throw ArbigentReplayLogException("$source step $number has a record without a taskIndex")
         when (record.string("type")) {
           "scenario_start" -> return@forEach
           "scenario_end" -> {
@@ -259,12 +270,6 @@ public data class ArbigentReplayLog(
             return@forEach
           }
         }
-        // The writer stamps both on every line, so a line without them is a truncated or hand-made
-        // log rather than an older one, and defaulting to 0 would file it as a setup step.
-        val number = record.int("step")
-          ?: throw ArbigentReplayLogException("$source has a record without a step")
-        val taskIndex = record.int("taskIndex")
-          ?: throw ArbigentReplayLogException("$source step $number has a record without a taskIndex")
         val key = taskIndex to number
         // Groups are consecutive runs of the same key, not one group per key: a task that fell back
         // to the AI launches the app again after the steps it had already replayed, and that second
