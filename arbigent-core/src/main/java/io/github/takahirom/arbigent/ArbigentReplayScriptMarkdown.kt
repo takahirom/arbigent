@@ -120,8 +120,8 @@ private fun ArbigentDeviceEvent.describe(): String = when (this) {
   is ArbigentDeviceEvent.TapElement -> buildString {
     append("tap(")
     val parts = listOfNotNull(
-      textRegex?.let { "text='$it'" },
-      idRegex?.let { "id='$it'" },
+      textRegex?.let { "text='${it.escapedForOneLine()}'" },
+      idRegex?.let { "id='${it.escapedForOneLine()}'" },
       // Only a later match is worth naming: index 0 and no index both read as the first one.
       index?.takeIf { it > 0 }?.let { "index=$it" },
     )
@@ -129,7 +129,7 @@ private fun ArbigentDeviceEvent.describe(): String = when (this) {
     append(')')
   }
   is ArbigentDeviceEvent.KeyPress -> keyName
-  is ArbigentDeviceEvent.InputText -> "text(\"$text\")"
+  is ArbigentDeviceEvent.InputText -> "text(\"${text.escapedForOneLine().replace("\"", "\\\"")}\")"
   is ArbigentDeviceEvent.Swipe -> "swipe($startX,$startY -> $endX,$endY, ${durationMs}ms)"
   is ArbigentDeviceEvent.LaunchApp -> buildString {
     append("launch(").append(appId)
@@ -148,3 +148,12 @@ private fun ArbigentDeviceEvent.describe(): String = when (this) {
   is ArbigentDeviceEvent.OpenLink -> "openLink($url)"
   is ArbigentDeviceEvent.Unsupported -> "unsupported($command)"
 }
+
+/**
+ * The summary gives every event a line of its own, so a recorded value carrying its own newline
+ * would split that line and turn the rest of the event into prose. Backslashes go first, so an
+ * escape this writes cannot be mistaken for one that was already in the value.
+ */
+private fun String.escapedForOneLine(): String = replace("\\", "\\\\")
+  .replace("\r", "\\r")
+  .replace("\n", "\\n")
