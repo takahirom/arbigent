@@ -440,6 +440,46 @@ class ArbigentReplayScriptWriterTest {
   }
 
   @Test
+  fun `a value carrying a newline stays inside the field it is written in`() {
+    val dir = Files.createTempDirectory("replay-scripts-one-line").toFile()
+    val identity = ArbigentElementIdentity(text = "O'Reilly\nBooks", occurrence = 0)
+    val task = ArbigentReplayScriptRecorder.RecordedTask(
+      taskIndex = 0,
+      goal = "Open the settings screen",
+      steps = mutableListOf(
+        ArbigentReplayScriptRecorder.RecordedStep(
+          isInit = false,
+          actionLog = "Tapped O'Reilly\nBooks",
+          memo = "noted\nsomething",
+          target = identity,
+          screen = listOf(identity),
+          events = mutableListOf(ArbigentDeviceEvent.KeyPress("KEYCODE_DPAD_CENTER", timestamp = 1)),
+        ),
+      ),
+    )
+    ArbigentReplayScriptWriter(dir).write(
+      scenarioId = "open-settings",
+      goals = listOf("Open the settings screen"),
+      tasks = listOf(task),
+      signature = emptyList(),
+      platform = ArbigentDeviceOs.Android,
+    )
+
+    val markdown = File(dir, "open-settings.md").readText()
+    // Every field the app or the AI supplies text to, since a raw newline in any of them ends the
+    // bullet and leaves the rest of the value as prose under the step.
+    listOf(
+      """1. Tapped O'Reilly\nBooks""",
+      """   - target: text='O\'Reilly\nBooks' (occurrence 0)""",
+      """   - screen: text='O\'Reilly\nBooks'""",
+      """   - memo: noted\nsomething""",
+      """   - wait for: text='O\'Reilly\nBooks' (occurrence 0)""",
+    ).forEach { line ->
+      assertTrue(markdown.lines().contains(line), "expected the line `$line` in:\n$markdown")
+    }
+  }
+
+  @Test
   fun `each numbered step in the markdown carries its own single-step replay command`() = runTest {
     val dir = Files.createTempDirectory("replay-scripts-step-command").toFile()
     ArbigentReplayScriptWriter(dir).write(
