@@ -253,8 +253,9 @@ public data class ArbigentReplayLog(
       records.forEach { record ->
         // The writer stamps both on every line, including the two framing ones, so a line without
         // them is a truncated or hand-made log rather than an older one, and defaulting to 0 would
-        // file it as a setup step. A negative step is the same kind of damage: it is not step 0, so
-        // it would replay as a normal step of a task that never had one.
+        // file it as a setup step. A negative step or task index is the same kind of damage: neither
+        // is 0, so the record would replay as a normal step of a task that never had one, and the
+        // pair of them is the grouping key, so a negative index also splits a task off on its own.
         val number = record.int("step")
           ?: throw ArbigentReplayLogException("$source has a record without a step")
         if (number < 0) {
@@ -262,6 +263,11 @@ public data class ArbigentReplayLog(
         }
         val taskIndex = record.int("taskIndex")
           ?: throw ArbigentReplayLogException("$source step $number has a record without a taskIndex")
+        if (taskIndex < 0) {
+          throw ArbigentReplayLogException(
+            "$source step $number has a record with a negative taskIndex $taskIndex",
+          )
+        }
         when (record.string("type")) {
           "scenario_start" -> return@forEach
           "scenario_end" -> {
