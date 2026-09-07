@@ -109,6 +109,17 @@ class ArbigentDeviceEventsTest {
   }
 
   @Test
+  fun `back on web cannot be replayed as a key press`() {
+    val events = MaestroCommand(backPressCommand = BackPressCommand()).events(ArbigentDeviceOs.Web)
+    assertEquals(
+      listOf(ArbigentDeviceEvent.Unsupported("back on web", TS)),
+      events,
+      "the web driver navigates history instead and rejects the BACK key, so a key press would " +
+        "fail the replay at this step",
+    )
+  }
+
+  @Test
   fun `input text is carried through`() {
     val events = MaestroCommand(inputTextCommand = InputTextCommand("hello world")).events()
     assertEquals(listOf(ArbigentDeviceEvent.InputText("hello world", TS)), events)
@@ -166,6 +177,34 @@ class ArbigentDeviceEventsTest {
   }
 
   @Test
+  fun `a launch keeps the permissions and keychain reset it asked for`() {
+    assertEquals(
+      listOf(
+        ArbigentDeviceEvent.LaunchApp(
+          "com.example.app",
+          permissions = mapOf("all" to "deny"),
+          clearKeychain = true,
+          timestamp = TS,
+        )
+      ),
+      MaestroCommand(
+        launchAppCommand = LaunchAppCommand(
+          appId = "com.example.app",
+          permissions = mapOf("all" to "deny"),
+          clearKeychain = true,
+        )
+      ).events(),
+      "a launch that denies a permission or resets the keychain starts the app in a state a " +
+        "replay cannot reach by launching with maestro's defaults",
+    )
+    val defaults = MaestroCommand(launchAppCommand = LaunchAppCommand(appId = "com.example.app"))
+      .events()
+      .single() as ArbigentDeviceEvent.LaunchApp
+    assertEquals(null, defaults.permissions, "maestro fills in its own default for an omitted value")
+    assertEquals(null, defaults.clearKeychain)
+  }
+
+  @Test
   fun `open link carries the url`() {
     val events = MaestroCommand(openLinkCommand = OpenLinkCommand(link = "https://example.com")).events()
     assertEquals(listOf(ArbigentDeviceEvent.OpenLink("https://example.com", TS)), events)
@@ -176,6 +215,16 @@ class ArbigentDeviceEventsTest {
     val expected = listOf(ArbigentDeviceEvent.Swipe(540, 960, 540, 192, 400L, TS))
     assertEquals(expected, MaestroCommand(scrollCommand = ScrollCommand()).events())
     assertEquals(expected, MaestroCommand(scrollCommand = ScrollCommand()).events(ArbigentDeviceOs.Ios))
+  }
+
+  @Test
+  fun `a scroll on web is not the swipe the other platforms perform`() {
+    assertEquals(
+      listOf(ArbigentDeviceEvent.Unsupported("scroll on web", TS)),
+      MaestroCommand(scrollCommand = ScrollCommand()).events(ArbigentDeviceOs.Web),
+      "the web driver scrolls the document with JavaScript, so a page that swallows touch " +
+        "gestures would not move at all for a replayed swipe",
+    )
   }
 
   @Test

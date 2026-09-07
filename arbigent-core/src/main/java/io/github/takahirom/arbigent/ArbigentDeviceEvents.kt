@@ -86,6 +86,13 @@ public sealed interface ArbigentDeviceEvent {
    *
    * [stopApp] mirrors Maestro's default of force-stopping the app before starting it, so a replay
    * starts a fresh process the way the recorded run did instead of resuming whatever was left.
+   *
+   * [permissions] and [clearKeychain] stay null when the recorded launch did not set them, because
+   * Maestro fills in its own defaults for a launch that omits them (`{all: allow}` for permissions)
+   * and a replay has to leave that to Maestro rather than freeze today's default into the log. A
+   * recorded run that did set them asked for something other than the default -- a denied
+   * permission the flow depends on, an iOS keychain reset -- and a replay that dropped it would
+   * start the app in a different state.
    */
   @Serializable
   @SerialName("launch_app")
@@ -94,6 +101,8 @@ public sealed interface ArbigentDeviceEvent {
     val clearState: Boolean = false,
     val stopApp: Boolean = true,
     val launchArguments: Map<String, JsonPrimitive> = emptyMap(),
+    val permissions: Map<String, String>? = null,
+    val clearKeychain: Boolean? = null,
     override val timestamp: Long = TimeProvider.get().currentTimeMillis(),
   ) : ArbigentDeviceEvent
 
@@ -204,7 +213,13 @@ internal fun MaestroCommand.toArbigentDeviceEvents(
       )
     )
   }
-  backPressCommand?.let { return listOf(ArbigentDeviceEvent.KeyPress(KeyCode.BACK.name, timestamp)) }
+  backPressCommand?.let {
+    // Android and iOS drivers press the platform back key, which a replayed key press reproduces.
+    // The web driver navigates the browser history instead and its key mapper rejects BACK
+    // outright, so recording a key press there would fail the replay at this step.
+    if (os.isWeb()) return listOf(ArbigentDeviceEvent.Unsupported("back on web", timestamp))
+    return listOf(ArbigentDeviceEvent.KeyPress(KeyCode.BACK.name, timestamp))
+  }
   pressKeyCommand?.let { command ->
     return listOf(ArbigentDeviceEvent.KeyPress(command.code.name, timestamp))
   }
@@ -221,6 +236,8 @@ internal fun MaestroCommand.toArbigentDeviceEvents(
         // Maestro treats a missing stopApp as true.
         stopApp = command.stopApp != false,
         launchArguments = command.launchArguments.orEmpty().mapValues { (_, value) -> value.toJsonPrimitive() },
+        permissions = command.permissions,
+        clearKeychain = command.clearKeychain,
         timestamp = timestamp,
       )
     )
@@ -232,6 +249,9 @@ internal fun MaestroCommand.toArbigentDeviceEvents(
   clearStateCommand?.let { return listOf(ArbigentDeviceEvent.ClearState(it.appId, timestamp)) }
   openLinkCommand?.let { return listOf(ArbigentDeviceEvent.OpenLink(it.link, timestamp)) }
   scrollCommand?.let {
+    // The web driver scrolls the document with JavaScript rather than with a gesture, so a swipe
+    // does not stand in for it: a page that swallows touch gestures does not move at all.
+    if (os.isWeb()) return listOf(ArbigentDeviceEvent.Unsupported("scroll on web", timestamp))
     return listOf(scrollEvent(screenWidth, screenHeight, timestamp))
   }
   swipeCommand?.let { command ->
@@ -289,9 +309,11 @@ private fun MaestroCommand.describeUnknown(): String =
   runCatching { description() }.getOrNull() ?: toString()
 
 /**
- * Both drivers scroll with the same gesture: `AndroidDriver.scrollVertical` delegates to its own
- * upward swipe and `IOSDriver.scrollVertical` uses these fractions directly, so scrolling stays
- * platform independent even though an upward *swipe* does not.
+ * The Android and iOS drivers scroll with the same gesture: `AndroidDriver.scrollVertical` delegates
+ * to its own upward swipe and `IOSDriver.scrollVertical` uses these fractions directly, so scrolling
+ * stays the same across those two even though an upward *swipe* does not. The web driver is the
+ * exception -- it scrolls with JavaScript -- which is why a web scroll is recorded as unsupported
+ * rather than sent through here.
  */
 private fun scrollEvent(screenWidth: Int, screenHeight: Int, timestamp: Long): ArbigentDeviceEvent =
   swipeEvent(listOf(0.5f, 0.5f, 0.5f, 0.1f), SCROLL_DURATION_MS, screenWidth, screenHeight, timestamp)

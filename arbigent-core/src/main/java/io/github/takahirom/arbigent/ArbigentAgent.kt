@@ -693,6 +693,10 @@ public fun AgentConfigBuilder(
           ) {
             try {
               Thread.sleep(initializeMethod.durationMs)
+              // Recorded so `replay --with-init` waits here too: an initializer that waits does so
+              // because the app is not ready yet, and the steps after it were recorded against the
+              // screen that wait produced.
+              device.recordDeviceEvent(ArbigentDeviceEvent.Wait(initializeMethod.durationMs))
             } catch (e: Exception) {
               arbigentDebugLog("Failed to wait: $e")
             }
