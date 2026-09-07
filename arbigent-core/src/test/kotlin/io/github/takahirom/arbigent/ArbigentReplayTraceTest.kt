@@ -28,6 +28,7 @@ class ArbigentReplayTraceTest {
       taskIndex = 0,
       taskIdentity = "open-model-page",
       goal = "Open the model page",
+      maxStep = 10,
     )
     val action = ClickWithIndex(2)
     val trace = ArbigentReplayTrace(
@@ -100,6 +101,7 @@ class ArbigentReplayTraceTest {
       taskIndex = 3,
       taskIdentity = "\u3042".repeat(400),
       goal = "\u3042".repeat(30),
+      maxStep = 10,
     )
 
     store.write(key, minimalTrace(key))
@@ -122,6 +124,7 @@ class ArbigentReplayTraceTest {
       taskIndex = 0,
       taskIdentity = "identity",
       goal = "Goal",
+      maxStep = 10,
     )
     val second = first.copy(taskIndex = 1)
 
@@ -450,6 +453,52 @@ class ArbigentReplayTraceTest {
   )
 
   /** The smallest trace [ArbigentReplayTrace.isValidFor] accepts: one step that reaches the goal. */
+  /**
+   * A replayed step costs an iteration just like one the AI decides, so a trace with more steps
+   * than the task allows would run out of steps before its goal on every run. Lowering the limit
+   * has to reject an already stored trace, which is why the limit is checked on read and is not
+   * part of the file name.
+   */
+  @Test
+  fun `a trace with more steps than the task allows is not replayed`() {
+    val directory = Files.createTempDirectory("arbigent-replay-trace-over-max-step").toFile()
+    val store = ArbigentReplayTraceStore { directory }
+    val key = ArbigentReplayTraceKey(
+      version = "1.2.3",
+      scenarioId = "scenario",
+      taskIndex = 0,
+      taskIdentity = "scenario",
+      goal = "Goal",
+      maxStep = 2,
+    )
+    val click = ClickWithIndex(0)
+    val trace = minimalTrace(key).let { goalOnly ->
+      goalOnly.copy(
+        steps = listOf(
+          ArbigentReplayTraceStep(
+            decisionOutput = ArbigentAi.DecisionOutput(
+              agentActions = listOf(click),
+              step = ArbigentContextHolder.Step(
+                stepId = "step-0",
+                agentAction = click,
+                cacheKey = "cache-key",
+                screenshotFilePath = "screenshot.png",
+              ),
+            ),
+          ),
+        ) + goalOnly.steps,
+      )
+    }
+
+    store.write(key, trace)
+
+    assertNotNull(store.read(key), "a trace that fits the limit should be replayed")
+    assertNull(
+      store.read(key.copy(maxStep = 1)),
+      "a trace that cannot finish within the limit should not be replayed",
+    )
+  }
+
   private fun minimalTrace(key: ArbigentReplayTraceKey): ArbigentReplayTrace {
     val action = GoalAchievedAgentAction()
     return ArbigentReplayTrace(
@@ -484,6 +533,7 @@ class ArbigentReplayTraceTest {
       taskIndex = 0,
       taskIdentity = "scenario",
       goal = "Goal",
+      maxStep = 10,
     )
     val action = GoalAchievedAgentAction()
     val trace = ArbigentReplayTrace(

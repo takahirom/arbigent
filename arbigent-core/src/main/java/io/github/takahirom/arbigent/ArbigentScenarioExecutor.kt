@@ -448,6 +448,7 @@ private fun ArbigentScenario.replayTraceKeys(): List<ArbigentReplayTraceKey> =
         }
       },
       goal = task.agentConfig.resolveGoal(task.goal),
+      maxStep = task.maxStep,
     )
   }
 

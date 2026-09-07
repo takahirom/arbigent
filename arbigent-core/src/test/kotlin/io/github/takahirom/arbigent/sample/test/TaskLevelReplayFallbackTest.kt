@@ -300,6 +300,80 @@ class TaskLevelReplayFallbackTest {
     )
   }
 
+  /**
+   * A replayed step costs an iteration just like one the AI decides, so the concatenated trace a
+   * fallback would record can be longer than the task's own step limit. Storing it would make the
+   * task fall back, and pay for the AI, on every run from then on.
+   */
+  @Test
+  fun `a fallback does not store a trace longer than the task allows`() = runTest {
+    ArbigentFiles.traceDir =
+      Files.createTempDirectory("arbigent-task-level-fallback-max-step").toFile()
+    val testDispatcher = coroutineContext[CoroutineDispatcher]!!
+
+    var failNextAssertion = false
+    val taskConfig = AgentConfig {
+      deviceFactory { FakeDevice() }
+      aiFactory { FakeAi() }
+      addInterceptor(object : ArbigentDecisionInterceptor {
+        override suspend fun intercept(
+          decisionInput: ArbigentAi.DecisionInput,
+          chain: ArbigentDecisionInterceptor.Chain,
+        ): ArbigentAi.DecisionOutput = chain.proceed(decisionInput).withStepIdOf(decisionInput)
+      })
+      addInterceptor(object : ArbigentImageAssertionInterceptor {
+        override fun intercept(
+          imageAssertionInput: ArbigentAi.ImageAssertionInput,
+          chain: ArbigentImageAssertionInterceptor.Chain,
+        ): ArbigentAi.ImageAssertionOutput {
+          if (!failNextAssertion) return chain.proceed(imageAssertionInput)
+          failNextAssertion = false
+          return failedAssertion()
+        }
+      })
+    }
+
+    // The Fake AI decides two actions and then the goal, which is exactly the limit: a fallback
+    // would concatenate the two it replayed with the three the replacement decided.
+    fun scenario() = ArbigentScenario(
+      id = "scenario",
+      agentTasks = listOf(
+        ArbigentAgentTask("task-1", "goal1", taskConfig, maxStep = 3),
+      ),
+      maxStepCount = 3,
+      tags = setOf(),
+      isLeaf = true,
+      replayWithFallback = true,
+    )
+
+    ArbigentScenarioExecutor(testDispatcher).execute(scenario(), MCPClient())
+    advanceUntilIdle()
+    assertEquals(
+      3,
+      taskTraceStepCount(),
+      "the recording run should have written the three steps the AI decided",
+    )
+
+    failNextAssertion = true
+    ArbigentScenarioExecutor(testDispatcher).execute(scenario(), MCPClient())
+    advanceUntilIdle()
+
+    assertEquals(
+      0,
+      ArbigentFiles.traceDir.listFiles().orEmpty().size,
+      "a trace that could never replay within the step limit should have been discarded",
+    )
+
+    // The next run has no trace, so it runs under the AI and records one that fits again.
+    ArbigentScenarioExecutor(testDispatcher).execute(scenario(), MCPClient())
+    advanceUntilIdle()
+    assertEquals(
+      3,
+      taskTraceStepCount(),
+      "the run after the discard should have recorded a replayable trace again",
+    )
+  }
+
   private fun failedAssertion(): ArbigentAi.ImageAssertionOutput = ArbigentAi.ImageAssertionOutput(
     listOf(
       ArbigentAi.ImageAssertionResult(
@@ -310,6 +384,11 @@ class TaskLevelReplayFallbackTest {
       ),
     ),
   )
+
+  private fun taskTraceStepCount(): Int {
+    val trace = ArbigentFiles.traceDir.listFiles().orEmpty().single().readText()
+    return """"decisionOutput"""".toRegex().findAll(trace).count()
+  }
 
   private fun secondTaskTraceStepCount(): Int {
     val trace = ArbigentFiles.traceDir.listFiles().orEmpty()
