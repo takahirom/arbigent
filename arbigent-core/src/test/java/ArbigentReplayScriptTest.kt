@@ -389,6 +389,35 @@ class ArbigentReplayScriptWriterTest {
   }
 
   @Test
+  fun `the markdown names the permissions and keychain reset a launch asked for`() {
+    val dir = Files.createTempDirectory("replay-scripts-permissions").toFile()
+    val recorder = ArbigentReplayScriptRecorder()
+    recorder.beginTask(taskIndex = 0, goal = "Open the settings screen", discardPrevious = true)
+    recorder.onDeviceEvent(
+      ArbigentDeviceEvent.LaunchApp(
+        "com.example.app",
+        permissions = mapOf("all" to "deny"),
+        clearKeychain = true,
+        timestamp = 1,
+      ),
+    )
+    ArbigentReplayScriptWriter(dir).write(
+      scenarioId = "open-settings",
+      goals = listOf("Open the settings screen"),
+      tasks = recorder.recordedTasks(),
+      signature = emptyList(),
+      platform = ArbigentDeviceOs.Android,
+    )
+
+    val markdown = File(dir, "open-settings.md").readText()
+    assertTrue(
+      markdown.contains("launch(com.example.app, clearKeychain, all=deny)"),
+      "a launch that denies a permission starts the app in a different state, so the summary has " +
+        "to say so: $markdown",
+    )
+  }
+
+  @Test
   fun `each numbered step in the markdown carries its own single-step replay command`() = runTest {
     val dir = Files.createTempDirectory("replay-scripts-step-command").toFile()
     ArbigentReplayScriptWriter(dir).write(

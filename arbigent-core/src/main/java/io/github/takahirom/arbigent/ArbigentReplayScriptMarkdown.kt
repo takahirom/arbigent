@@ -135,6 +135,10 @@ private fun ArbigentDeviceEvent.describe(): String = when (this) {
     append("launch(").append(appId)
     if (clearState) append(", clearState")
     if (!stopApp) append(", keepRunning")
+    if (clearKeychain == true) append(", clearKeychain")
+    // Only when the recording asked for something other than maestro's own default, which is what
+    // a launch that recorded no permissions replays with.
+    permissions?.forEach { (name, mode) -> append(", ").append(name).append('=').append(mode) }
     launchArguments.forEach { (key, value) -> append(", ").append(key).append('=').append(value.toString()) }
     append(')')
   }
