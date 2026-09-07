@@ -418,6 +418,28 @@ class ArbigentReplayScriptWriterTest {
   }
 
   @Test
+  fun `a quoted selector value keeps the field it is written in`() {
+    val dir = Files.createTempDirectory("replay-scripts-quotes").toFile()
+    val recorder = ArbigentReplayScriptRecorder()
+    recorder.beginTask(taskIndex = 0, goal = "Open the settings screen", discardPrevious = true)
+    recorder.onDeviceEvent(ArbigentDeviceEvent.TapElement(textRegex = "O'Reilly\nBooks", timestamp = 1))
+    ArbigentReplayScriptWriter(dir).write(
+      scenarioId = "open-settings",
+      goals = listOf("Open the settings screen"),
+      tasks = recorder.recordedTasks(),
+      signature = emptyList(),
+      platform = ArbigentDeviceOs.Android,
+    )
+
+    val markdown = File(dir, "open-settings.md").readText()
+    assertTrue(
+      markdown.contains("""tap(text='O\'Reilly\nBooks')"""),
+      "a quote of its own would end the field early and leave the rest of the value as prose: " +
+        markdown,
+    )
+  }
+
+  @Test
   fun `each numbered step in the markdown carries its own single-step replay command`() = runTest {
     val dir = Files.createTempDirectory("replay-scripts-step-command").toFile()
     ArbigentReplayScriptWriter(dir).write(

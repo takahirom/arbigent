@@ -259,8 +259,12 @@ public data class ArbigentReplayLog(
             return@forEach
           }
         }
-        val number = record.int("step") ?: 0
-        val taskIndex = record.int("taskIndex") ?: 0
+        // The writer stamps both on every line, so a line without them is a truncated or hand-made
+        // log rather than an older one, and defaulting to 0 would file it as a setup step.
+        val number = record.int("step")
+          ?: throw ArbigentReplayLogException("$source has a record without a step")
+        val taskIndex = record.int("taskIndex")
+          ?: throw ArbigentReplayLogException("$source step $number has a record without a taskIndex")
         val key = taskIndex to number
         // Groups are consecutive runs of the same key, not one group per key: a task that fell back
         // to the AI launches the app again after the steps it had already replayed, and that second

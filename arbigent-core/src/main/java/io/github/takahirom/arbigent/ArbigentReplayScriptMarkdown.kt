@@ -94,9 +94,9 @@ internal fun renderReplayScriptMarkdown(
 
 /** The identity without its occurrence, which means nothing for a screen-level hint. */
 private fun ArbigentElementIdentity.label(): String = listOfNotNull(
-  text?.let { "text='$it'" },
-  resourceId?.let { "resourceId='$it'" },
-  accessibilityId?.let { "accessibilityId='$it'" },
+  text?.let { "text='${it.escapedForSingleQuotedOneLine()}'" },
+  resourceId?.let { "resourceId='${it.escapedForSingleQuotedOneLine()}'" },
+  accessibilityId?.let { "accessibilityId='${it.escapedForSingleQuotedOneLine()}'" },
 ).joinToString(", ")
 
 /** `KEYCODE_DPAD_DOWN x3, tap(120,340)`: consecutive identical events collapse into a count. */
@@ -120,8 +120,8 @@ private fun ArbigentDeviceEvent.describe(): String = when (this) {
   is ArbigentDeviceEvent.TapElement -> buildString {
     append("tap(")
     val parts = listOfNotNull(
-      textRegex?.let { "text='${it.escapedForOneLine()}'" },
-      idRegex?.let { "id='${it.escapedForOneLine()}'" },
+      textRegex?.let { "text='${it.escapedForSingleQuotedOneLine()}'" },
+      idRegex?.let { "id='${it.escapedForSingleQuotedOneLine()}'" },
       // Only a later match is worth naming: index 0 and no index both read as the first one.
       index?.takeIf { it > 0 }?.let { "index=$it" },
     )
@@ -157,3 +157,9 @@ private fun ArbigentDeviceEvent.describe(): String = when (this) {
 private fun String.escapedForOneLine(): String = replace("\\", "\\\\")
   .replace("\r", "\\r")
   .replace("\n", "\\n")
+
+/**
+ * A value rendered inside `'…'` also has to keep its own quotes from closing the field. `\'` is a
+ * legal escape in a regex too, so a reader who copies the value out gets the same matching.
+ */
+private fun String.escapedForSingleQuotedOneLine(): String = escapedForOneLine().replace("'", "\\'")

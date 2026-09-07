@@ -908,6 +908,24 @@ class ArbigentReplayLogTest {
   }
 
   @Test
+  fun `a record without a step is refused`() {
+    val text = replayLogText(
+      steps = listOf(TestStep(number = 1, events = listOf(ArbigentDeviceEvent.KeyPress("BACK", timestamp = 2)))),
+    ).replace("\"type\":\"device\",\"task\":\"scenario\",\"taskIndex\":0,\"step\":1,", "\"type\":\"device\",\"task\":\"scenario\",\"taskIndex\":0,")
+
+    assertRefused(text, "has a record without a step")
+  }
+
+  @Test
+  fun `a record without a task index is refused`() {
+    val text = replayLogText(
+      steps = listOf(TestStep(number = 1, events = listOf(ArbigentDeviceEvent.KeyPress("BACK", timestamp = 2)))),
+    ).replace("\"type\":\"device\",\"task\":\"scenario\",\"taskIndex\":0,", "\"type\":\"device\",\"task\":\"scenario\",")
+
+    assertRefused(text, "step 1 has a record without a taskIndex")
+  }
+
+  @Test
   fun `an inverted range is refused`() {
     val log = readLog(
       steps = listOf(
