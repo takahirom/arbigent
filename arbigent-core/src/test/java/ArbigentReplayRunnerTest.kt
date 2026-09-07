@@ -99,6 +99,40 @@ class ArbigentReplayRunnerTest {
   }
 
   @Test
+  fun `a recorded tap retry reaches the device exactly as it was recorded`() = runTest {
+    val log = readLog(
+      steps = listOf(
+        TestStep(
+          number = 1,
+          target = Attributes(text = "Play"),
+          events = listOf(
+            ArbigentDeviceEvent.TapElement(textRegex = "Play", retryIfNoChange = true, timestamp = 2),
+          ),
+        ),
+        TestStep(
+          number = 2,
+          target = Attributes(text = "Play"),
+          events = listOf(ArbigentDeviceEvent.TapElement(textRegex = "Play", timestamp = 3)),
+        ),
+      ),
+      signature = listOf("player"),
+    )
+    val device = FakeReplayDevice(
+      listOf(screen(Attributes(text = "Play"), Attributes(resourceId = "player"))),
+    )
+
+    val exitCode = runner(log, device).run(log.select(withInit = true))
+
+    assertEquals(ArbigentReplayRunner.EXIT_OK, exitCode)
+    // A tap the recording gave two attempts must get two here too, and one that asked for nothing
+    // must stay unset so Maestro applies its own default rather than a frozen copy of it.
+    assertEquals(
+      listOf(true, null),
+      device.commands.map { it.tapOnElement!!.retryIfNoChange },
+    )
+  }
+
+  @Test
   fun `a target that appears late is waited for`() = runTest {
     val log = readLog(
       steps = listOf(
