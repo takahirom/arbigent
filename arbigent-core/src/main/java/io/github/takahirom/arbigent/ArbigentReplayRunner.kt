@@ -102,6 +102,14 @@ public class ArbigentReplayRunner(
               "  wait: the screen could not be read within ${budget}ms, continuing\n",
             )
           }
+        } else {
+          // Nothing recorded to wait *for*: no target and no screen hints, which is what an opaque
+          // screen (a canvas, a video surface) records. The recorded gap is still the time the app
+          // was given before this action, so it is waited out rather than skipped -- otherwise this
+          // one step, of all steps, gets no pacing at all and acts on a screen that is still
+          // loading. This is what the in-run replay does for a step with no target.
+          out.append("  wait: nothing recorded to wait for, pacing ${budget}ms\n")
+          delay(budget)
         }
       }
       step.events.forEach { event ->
@@ -255,6 +263,10 @@ public class ArbigentReplayRunner(
         launchArguments = event.launchArguments
           .mapValues { (_, value) -> value.launchArgumentValue() }
           .takeIf { it.isNotEmpty() },
+        // Left null when the recording did not set them, so Maestro applies its own defaults here
+        // exactly as it did for the recorded launch.
+        permissions = event.permissions,
+        clearKeychain = event.clearKeychain,
       ),
     )
 

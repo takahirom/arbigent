@@ -17,6 +17,8 @@ import kotlinx.serialization.json.put
 import maestro.KeyCode
 import maestro.TreeNode
 import maestro.orchestra.MaestroCommand
+import kotlin.test.assertFailsWith
+import io.github.takahirom.arbigent.ArbigentReplayWait
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -450,6 +452,84 @@ class ArbigentReplayRunnerTest {
     runner(log, device).run(log.select())
 
     assertEquals(listOf("press BACK"), device.commands.map { it.describeForTest() })
+  }
+
+  @Test
+  fun `a step with neither a target nor a screen hint is still paced`() = runTest {
+    val scheduler = testScheduler
+    val log = readLog(
+      steps = listOf(
+        TestStep(
+          number = 1,
+          events = listOf(ArbigentDeviceEvent.KeyPress(KeyCode.ENTER.name, timestamp = 2)),
+        ),
+      ),
+    )
+    val device = FakeReplayDevice(listOf(screen()))
+    val out = StringBuilder()
+    val startedAt = scheduler.currentTime
+
+    val exitCode = runner(log, device, out = out).run(log.select())
+
+    assertEquals(ArbigentReplayRunner.EXIT_OK, exitCode)
+    // An opaque screen records no target and no hints, and without pacing this one step would be
+    // the only one sent the instant the previous action returned.
+    assertEquals(0, device.elementReads, "there is nothing on the screen to poll for")
+    assertTrue(
+      scheduler.currentTime - startedAt >= ArbigentReplayWait.MIN_WAIT_MILLIS,
+      "the step should have waited out its budget, waited ${scheduler.currentTime - startedAt}ms",
+    )
+    assertTrue(out.contains("nothing recorded to wait for"), out.toString())
+  }
+
+  @Test
+  fun `a launch replays the permissions and keychain reset it recorded`() = runTest {
+    val log = readLog(
+      steps = listOf(
+        TestStep(
+          number = 0,
+          events = listOf(
+            ArbigentDeviceEvent.LaunchApp(
+              appId = "app.id",
+              permissions = mapOf("all" to "deny"),
+              clearKeychain = true,
+              timestamp = 1,
+            ),
+          ),
+        ),
+        TestStep(
+          number = 1,
+          target = Attributes(resourceId = "home"),
+          events = listOf(ArbigentDeviceEvent.KeyPress(KeyCode.ENTER.name, timestamp = 2)),
+        ),
+      ),
+    )
+    val device = FakeReplayDevice(listOf(screen(Attributes(resourceId = "home"))))
+
+    runner(log, device).run(log.select(withInit = true))
+
+    val launch = device.commands.first().launchAppCommand
+    assertEquals(mapOf("all" to "deny"), launch?.permissions)
+    assertEquals(true, launch?.clearKeychain)
+  }
+
+  @Test
+  fun `a log whose setup was the whole run replays that setup`() = runTest {
+    val log = readLog(
+      steps = listOf(
+        TestStep(number = 0, events = listOf(ArbigentDeviceEvent.LaunchApp("app.id", timestamp = 1))),
+      ),
+    )
+    val device = FakeReplayDevice(listOf(screen()))
+
+    // The app launched straight onto the goal screen, so the run recorded setup and nothing else.
+    // Its own markdown prints `replay <log> --with-init`, which has to work.
+    val exitCode = runner(log, device).run(log.select(withInit = true))
+
+    assertEquals(ArbigentReplayRunner.EXIT_OK, exitCode)
+    assertEquals(listOf("launch app.id"), device.commands.map { it.describeForTest() })
+    val failure = assertFailsWith<ArbigentReplayLogException> { log.select() }
+    assertTrue(failure.message!!.contains("--with-init"), failure.message!!)
   }
 
   @Test
