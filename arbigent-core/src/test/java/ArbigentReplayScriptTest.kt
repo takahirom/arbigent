@@ -467,12 +467,13 @@ class ArbigentReplayScriptWriterTest {
 
     val markdown = File(dir, "open-settings.md").readText()
     // Every field the app or the AI supplies text to, since a raw newline in any of them ends the
-    // bullet and leaves the rest of the value as prose under the step.
+    // bullet and leaves the rest of the value as prose under the step. Prose folds into a space; a
+    // selector value is escaped, because a reader copies that one back out.
     listOf(
-      """1. Tapped O'Reilly\nBooks""",
+      """1. Tapped O'Reilly Books""",
       """   - target: text='O\'Reilly\nBooks' (occurrence 0)""",
       """   - screen: text='O\'Reilly\nBooks'""",
-      """   - memo: noted\nsomething""",
+      """   - memo: noted something""",
       """   - wait for: text='O\'Reilly\nBooks' (occurrence 0)""",
     ).forEach { line ->
       assertTrue(markdown.lines().contains(line), "expected the line `$line` in:\n$markdown")
