@@ -22,7 +22,7 @@ internal fun renderReplayScriptMarkdown(
   if (goals.size == 1) {
     appendLine(goals.single())
   } else {
-    goals.forEachIndexed { index, goal -> appendLine("${index + 1}. ${goal.escapedForOneLine()}") }
+    goals.forEachIndexed { index, goal -> appendLine("${index + 1}. ${goal.collapsedToOneLine()}") }
   }
   appendLine()
   appendLine("## Steps")
@@ -32,13 +32,13 @@ internal fun renderReplayScriptMarkdown(
     if (goals.size > 1 && step.taskIndex != lastTaskIndex) {
       lastTaskIndex = step.taskIndex
       val goal = tasks.firstOrNull { it.taskIndex == step.taskIndex }?.goal.orEmpty()
-      appendLine("### Task ${step.taskIndex + 1}: ${goal.escapedForOneLine()}")
+      appendLine("### Task ${step.taskIndex + 1}: ${goal.collapsedToOneLine()}")
       appendLine()
     }
     if (step.isInit) {
       appendLine("0. setup")
     } else {
-      appendLine("${step.number}. ${(step.actionLog ?: step.actionName ?: "step").escapedForOneLine()}")
+      appendLine("${step.number}. ${(step.actionLog ?: step.actionName ?: "step").collapsedToOneLine()}")
     }
     step.target?.let { appendLine("   - target: ${it.oneLineDescription()}") }
     // Maestro sees attributes an adb-side dump may miss, so the coordinates are spelled out for a
@@ -49,7 +49,7 @@ internal fun renderReplayScriptMarkdown(
     if (step.screen.isNotEmpty()) {
       appendLine("   - screen: ${step.screen.joinToString(", ") { it.label() }}")
     }
-    step.memo?.takeIf { it.isNotBlank() }?.let { appendLine("   - memo: ${it.escapedForOneLine()}") }
+    step.memo?.takeIf { it.isNotBlank() }?.let { appendLine("   - memo: ${it.collapsedToOneLine()}") }
     appendLine("   - device: ${summarizeEvents(step.events)}")
     step.target?.let { target ->
       val fallback = step.targetBounds?.let { " (or tap ${it.centerX},${it.centerY})" }.orEmpty()
@@ -92,6 +92,13 @@ internal fun renderReplayScriptMarkdown(
   appendLine("`./arbigentw` downloads the matching arbigent on first use; `arbigent replay` is the")
   appendLine("same command for an arbigent that is already installed.")
 }
+
+/**
+ * A goal, an action log or a memo is prose, so a line break in it is worth nothing to keep: folding
+ * it into a space reads as written, where an escape would show a `\n` and double every backslash the
+ * text happened to contain. A selector value is the opposite — it has to survive being copied out.
+ */
+private fun String.collapsedToOneLine(): String = replace(Regex("""\s*\R\s*"""), " ").trim()
 
 /**
  * `description()` writes the attributes raw, which is right for a log line but not for a bullet a
