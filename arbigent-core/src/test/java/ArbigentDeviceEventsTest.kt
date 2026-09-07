@@ -238,10 +238,16 @@ class ArbigentDeviceEventsTest {
   }
 
   @Test
-  fun `a scroll is the same upward swipe maestro performs on both platforms`() {
-    val expected = listOf(ArbigentDeviceEvent.Swipe(540, 960, 540, 192, 400L, TS))
-    assertEquals(expected, MaestroCommand(scrollCommand = ScrollCommand()).events())
-    assertEquals(expected, MaestroCommand(scrollCommand = ScrollCommand()).events(ArbigentDeviceOs.Ios))
+  fun `a scroll is the upward swipe maestro performs, over each platform's own duration`() {
+    assertEquals(
+      listOf(ArbigentDeviceEvent.Swipe(540, 960, 540, 192, 400L, TS)),
+      MaestroCommand(scrollCommand = ScrollCommand()).events(),
+    )
+    assertEquals(
+      listOf(ArbigentDeviceEvent.Swipe(540, 960, 540, 192, 333L, TS)),
+      MaestroCommand(scrollCommand = ScrollCommand()).events(ArbigentDeviceOs.Ios),
+      "the iOS driver scrolls in 333 ms, and the same gesture over 400 ms travels further",
+    )
   }
 
   @Test
