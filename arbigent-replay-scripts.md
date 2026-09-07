@@ -74,7 +74,7 @@ arbigent wrapper --version 0.80.0
 ./arbigentw replay open-settings.jsonl --with-init
 ```
 
-`./arbigentw` downloads the pinned release on first use, verifies its SHA-256 against the digest recorded in `.arbigent/wrapper/arbigent-wrapper.properties`, unpacks it under `~/.arbigent/wrapper/` and runs it. Later runs use the unpacked copy and never touch the network. The checksum is mandatory: the wrapper refuses to install a distribution it cannot verify. Generating the wrapper needs an arbigent once, so one person in a team runs `arbigent wrapper` and commits the two files; everyone else, and CI, only needs `./arbigentw`. The commands the `.md` summary prints use `./arbigentw`, which is what a downloaded artifact can rely on.
+`./arbigentw` downloads the pinned release on first use, verifies its SHA-256 against the digest recorded in `.arbigent/wrapper/arbigent-wrapper.properties`, unpacks it under `~/.arbigent/wrapper/` and runs it. Later runs use the unpacked copy and never touch the network. The checksum is mandatory: the wrapper refuses to install a distribution it cannot verify. Generating the wrapper needs an arbigent once, so one person in a team runs `arbigent wrapper` and commits the two files; everyone else, and CI, only needs `./arbigentw`. The commands the `.md` summary prints use `./arbigentw`, so they run as written from a checkout that has the wrapper and its properties file committed; the artifact holds only the logs and summaries, so an agent replaying somewhere else runs `arbigent replay` with an installed arbigent, or copies the two wrapper files in.
 
 ## The event log
 
@@ -124,4 +124,4 @@ jobs:
           path: build/replay-scripts   # the outputDir from the project file above; without outputDir it is arbigent-result/replay-scripts
 ```
 
-A coding agent that needs to see, say, the settings screen then downloads the artifact, reads `open-settings.md`, and runs `./arbigentw replay open-settings.jsonl --with-init` against its own emulator. If it exits 2, the agent continues by hand from the step named in the output.
+A coding agent that needs to see, say, the settings screen then downloads the artifact, reads `open-settings.md`, and runs `./arbigentw replay open-settings.jsonl --with-init` from the checkout it is working in, against its own emulator. If it exits 2, the agent continues by hand from the step named in the output.
