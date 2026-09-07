@@ -24,11 +24,19 @@ public sealed interface ArbigentDeviceEvent {
   /** Epoch milliseconds, from [TimeProvider], so tests can pin it. */
   public val timestamp: Long
 
+  /**
+   * [retryIfNoChange] is Maestro's own retry on a tap: with it set the driver taps a second time
+   * when the first tap left the hierarchy unchanged. It is kept exactly as the command carried it,
+   * null included, so the replayed tap is given the same number of attempts as the recorded one.
+   * Arbigent's own taps leave it unset, but a Maestro flow used as an initializer is free to set
+   * it, and those commands go through this recorder too.
+   */
   @Serializable
   @SerialName("tap")
   public data class Tap(
     val x: Int,
     val y: Int,
+    val retryIfNoChange: Boolean? = null,
     override val timestamp: Long = TimeProvider.get().currentTimeMillis(),
   ) : ArbigentDeviceEvent
 
@@ -46,6 +54,7 @@ public sealed interface ArbigentDeviceEvent {
     val textRegex: String? = null,
     val idRegex: String? = null,
     val index: Int? = null,
+    val retryIfNoChange: Boolean? = null,
     override val timestamp: Long = TimeProvider.get().currentTimeMillis(),
   ) : ArbigentDeviceEvent
 
@@ -183,10 +192,10 @@ internal fun MaestroCommand.toArbigentDeviceEvents(
     if (x == null || y == null) {
       return listOf(ArbigentDeviceEvent.Unsupported("tapOnPointV2 $point", timestamp))
     }
-    return listOf(ArbigentDeviceEvent.Tap(x, y, timestamp))
+    return listOf(ArbigentDeviceEvent.Tap(x, y, command.retryIfNoChange, timestamp))
   }
   tapOnPoint?.let { command ->
-    return listOf(ArbigentDeviceEvent.Tap(command.x, command.y, timestamp))
+    return listOf(ArbigentDeviceEvent.Tap(command.x, command.y, command.retryIfNoChange, timestamp))
   }
   // Element taps are how the agent clicks by text or id, so they are the common case on phones.
   // Only a selector with something a hierarchy dump can be searched for is replayable.
@@ -209,6 +218,7 @@ internal fun MaestroCommand.toArbigentDeviceEvents(
         textRegex = selector.textRegex,
         idRegex = selector.idRegex,
         index = selector.index?.toDoubleOrNull()?.toInt(),
+        retryIfNoChange = command.retryIfNoChange,
         timestamp = timestamp,
       )
     )
