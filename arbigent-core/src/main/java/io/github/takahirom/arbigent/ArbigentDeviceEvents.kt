@@ -262,7 +262,7 @@ internal fun MaestroCommand.toArbigentDeviceEvents(
     // The web driver scrolls the document with JavaScript rather than with a gesture, so a swipe
     // does not stand in for it: a page that swallows touch gestures does not move at all.
     if (os.isWeb()) return listOf(ArbigentDeviceEvent.Unsupported("scroll on web", timestamp))
-    return listOf(scrollEvent(screenWidth, screenHeight, timestamp))
+    return listOf(scrollEvent(screenWidth, screenHeight, os, timestamp))
   }
   swipeCommand?.let { command ->
     // A swipe that starts on an element depends on where that element is at replay time.
@@ -314,19 +314,32 @@ private const val DEFAULT_ANIMATION_WAIT_MS = 5000L
 
 /** Maestro's drivers scroll with a fixed-duration directional swipe. */
 private const val SCROLL_DURATION_MS = 400L
+private const val IOS_SCROLL_DURATION_MS = 333L
 
 private fun MaestroCommand.describeUnknown(): String =
   runCatching { description() }.getOrNull() ?: toString()
 
 /**
- * The Android and iOS drivers scroll with the same gesture: `AndroidDriver.scrollVertical` delegates
- * to its own upward swipe and `IOSDriver.scrollVertical` uses these fractions directly, so scrolling
- * stays the same across those two even though an upward *swipe* does not. The web driver is the
- * exception -- it scrolls with JavaScript -- which is why a web scroll is recorded as unsupported
- * rather than sent through here.
+ * The Android and iOS drivers scroll over the same fractions of the screen: `AndroidDriver
+ * .scrollVertical` delegates to its own upward swipe and `IOSDriver.scrollVertical` uses these
+ * fractions directly, so scrolling stays the same across those two even though an upward *swipe*
+ * does not. Only the duration differs -- the pinned Maestro scrolls in 400 ms on Android and 333 ms
+ * on iOS -- and a scroll sent over the wrong duration travels a different distance. The web driver
+ * is the exception -- it scrolls with JavaScript -- which is why a web scroll is recorded as
+ * unsupported rather than sent through here.
  */
-private fun scrollEvent(screenWidth: Int, screenHeight: Int, timestamp: Long): ArbigentDeviceEvent =
-  swipeEvent(listOf(0.5f, 0.5f, 0.5f, 0.1f), SCROLL_DURATION_MS, screenWidth, screenHeight, timestamp)
+private fun scrollEvent(
+  screenWidth: Int,
+  screenHeight: Int,
+  os: ArbigentDeviceOs,
+  timestamp: Long,
+): ArbigentDeviceEvent = swipeEvent(
+  listOf(0.5f, 0.5f, 0.5f, 0.1f),
+  if (os.isIos()) IOS_SCROLL_DURATION_MS else SCROLL_DURATION_MS,
+  screenWidth,
+  screenHeight,
+  timestamp,
+)
 
 /**
  * The start and end points the driver for [os] uses for each swipe direction, as fractions of the
