@@ -153,7 +153,8 @@ field name does not fail the load — it just does nothing. After editing, verif
   - `type: "OpenLink"` — `link` (required)
   - `type: "MaestroYaml"` — `scenarioId` referencing an entry in `fixedScenarios`
 - `tags`: list of `- name: "TagName"` entries; used by `run --tags`.
-- `maxStep` (default 10): max AI steps per attempt. `maxRetry` (default 3): retries on failure.
+- `maxStep` (default 10): max AI steps per attempt. `maxRetry`: retries on failure,
+  falling back to `settings.maxRetry` and then to 3.
 - `deviceFormFactor`: `type: "Mobile"` or `type: "Tv"` (default Mobile).
 - `imageAssertions`: list of `assertionPrompt` (required) +
   `requiredFulfillmentPercent` (default 80). Checked against the final screenshot by the AI.
@@ -385,8 +386,8 @@ you suspect the wrong scenarios were selected.
   `Back`) so each attempt starts from a known state.
 - Image assertion failed — check the final screenshot in the report, then reword
   `assertionPrompt` or adjust `requiredFulfillmentPercent`.
-- Flakiness — `maxRetry` (default 3) already retries; prefer fixing the goal or
-  initialization over raising it.
+- Flakiness — `maxRetry` (default 3, or `settings.maxRetry` project-wide) already
+  retries; prefer fixing the goal or initialization over raising it.
 
 Done when: you can state the root cause (selection, environment, starting state, goal
 wording, or assertion), not just that the run went red.

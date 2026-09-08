@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -280,6 +282,32 @@ fun ProjectSettingsDialog(appStateHolder: ArbigentAppStateHolder, onCloseRequest
               .testTag("mcp_json"),
             placeholder = { Text("MCP JSON Configuration") },
             decorationBoxModifier = Modifier.padding(horizontal = 8.dp),
+          )
+
+          GroupHeader("Max Retry")
+          val maxRetry: TextFieldState = remember {
+            TextFieldState(appStateHolder.projectMaxRetryFlow.value?.toString() ?: "")
+          }
+          LaunchedEffect(Unit) {
+            snapshotFlow { maxRetry.text }.collect { text ->
+              val input = text.toString()
+              // Only an empty field means "unset". Text that is not a number keeps the last
+              // valid value, so a typo cannot silently drop the setting.
+              if (input.isBlank()) {
+                appStateHolder.onProjectMaxRetryChanged(null)
+              } else {
+                input.toIntOrNull()?.let { appStateHolder.onProjectMaxRetryChanged(it) }
+              }
+            }
+          }
+          TextField(
+            state = maxRetry,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier
+              .padding(8.dp)
+              .testTag("project_max_retry"),
+            // Empty falls back to the built-in default for scenarios that do not set their own.
+            placeholder = { Text("Default (3)") },
           )
 
           GroupHeader("Additional Actions")

@@ -337,6 +337,103 @@ Previous steps:
     )
   }
 
+  private val projectWithMaxRetry = ArbigentProjectSerializer().load(
+    """
+    settings:
+      maxRetry: 1
+    scenarios:
+    - id: "using-project-max-retry"
+      goal: "Test project max retry"
+    - id: "own-max-retry"
+      goal: "Test scenario max retry"
+      maxRetry: 5
+    """
+  )
+
+  private val projectWithoutMaxRetry = ArbigentProjectSerializer().load(
+    """
+    scenarios:
+    - id: "no-max-retry-anywhere"
+      goal: "Test built-in default"
+    """
+  )
+
+  @Test
+  fun testProjectMaxRetry() {
+    assertEquals(1, projectWithMaxRetry.settings.maxRetry)
+
+    val usingProjectDefault = projectWithMaxRetry.scenarioContents.createArbigentScenario(
+      projectSettings = projectWithMaxRetry.settings,
+      scenario = projectWithMaxRetry.scenarioContents[0],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
+    )
+    assertEquals(
+      1,
+      usingProjectDefault.maxRetry,
+      "Scenario without maxRetry should use the project setting"
+    )
+
+    val withOwnValue = projectWithMaxRetry.scenarioContents.createArbigentScenario(
+      projectSettings = projectWithMaxRetry.settings,
+      scenario = projectWithMaxRetry.scenarioContents[1],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
+    )
+    assertEquals(
+      5,
+      withOwnValue.maxRetry,
+      "Scenario maxRetry should override the project setting"
+    )
+  }
+
+  @Test
+  fun testMaxRetryRoundTrip() {
+    val serializer = ArbigentProjectSerializer()
+    val reloaded = serializer.load(serializer.encodeToString(projectWithMaxRetry))
+    assertEquals(1, reloaded.settings.maxRetry, "Project maxRetry should survive a round trip")
+    assertNull(
+      reloaded.scenarioContents[0].maxRetry,
+      "A scenario without its own value should stay unset"
+    )
+    assertEquals(
+      5,
+      reloaded.scenarioContents[1].maxRetry,
+      "An explicit scenario maxRetry should survive a round trip"
+    )
+  }
+
+  @Test
+  fun testUnsetMaxRetryIsNotSerialized() {
+    val serializer = ArbigentProjectSerializer()
+    val saved = serializer.encodeToString(projectWithoutMaxRetry)
+    assertFalse(
+      saved.contains("maxRetry"),
+      "An unset maxRetry must not be written back, otherwise saving would pin the scenario"
+    )
+  }
+
+  @Test
+  fun testDefaultMaxRetryWhenUnset() {
+    assertNull(projectWithoutMaxRetry.settings.maxRetry)
+    assertNull(projectWithoutMaxRetry.scenarioContents[0].maxRetry)
+
+    val scenario = projectWithoutMaxRetry.scenarioContents.createArbigentScenario(
+      projectSettings = projectWithoutMaxRetry.settings,
+      scenario = projectWithoutMaxRetry.scenarioContents[0],
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      aiDecisionCache = AiDecisionCacheStrategy.InMemory().toCache()
+    )
+    assertEquals(
+      ArbigentProjectSettings.DefaultMaxRetry,
+      scenario.maxRetry,
+      "Scenario should fall back to the built-in default"
+    )
+  }
+
   private val projectWithAdditionalActions = ArbigentProjectSerializer().load(
     """
     settings:

@@ -313,6 +313,8 @@ class ArbigentAppStateHolder(
   val defaultDeviceFormFactorFlow =
     MutableStateFlow<ArbigentScenarioDeviceFormFactor>(ArbigentScenarioDeviceFormFactor.Unspecified)
   val additionalActionsFlow = MutableStateFlow<List<String>?>(null)
+  // Null means "not set": scenarios without their own maxRetry use the built-in default.
+  val projectMaxRetryFlow = MutableStateFlow<Int?>(null)
   val decisionCache = cacheStrategyFlow
     .map {
       val decisionCacheStrategy = it.aiDecisionCacheStrategy
@@ -423,7 +425,8 @@ class ArbigentAppStateHolder(
         aiOptions = aiOptionsFlow.value,
         mcpJson = mcpJsonFlow.value,
         deviceFormFactor = defaultDeviceFormFactorFlow.value,
-        additionalActions = additionalActionsFlow.value
+        additionalActions = additionalActionsFlow.value,
+        maxRetry = projectMaxRetryFlow.value
       ),
       initialScenarios = allScenarioStateHoldersStateFlow.value.map { scenario ->
         scenario.createScenario(allScenarioStateHoldersStateFlow.value)
@@ -453,7 +456,8 @@ class ArbigentAppStateHolder(
           aiOptions = this@ArbigentAppStateHolder.aiOptionsFlow.value,
           mcpJson = this@ArbigentAppStateHolder.mcpJsonFlow.value,
           deviceFormFactor = this@ArbigentAppStateHolder.defaultDeviceFormFactorFlow.value,
-          additionalActions = this@ArbigentAppStateHolder.additionalActionsFlow.value
+          additionalActions = this@ArbigentAppStateHolder.additionalActionsFlow.value,
+          maxRetry = this@ArbigentAppStateHolder.projectMaxRetryFlow.value
         ),
         scenario = createArbigentScenarioContent(),
         aiFactory = aiFactory,
@@ -529,7 +533,8 @@ class ArbigentAppStateHolder(
         aiOptions = aiOptionsFlow.value,
         mcpJson = mcpJsonFlow.value,
         deviceFormFactor = defaultDeviceFormFactorFlow.value,
-        additionalActions = additionalActionsFlow.value
+        additionalActions = additionalActionsFlow.value,
+        maxRetry = projectMaxRetryFlow.value
       ),
       scenarioContents = sortedScenarios.map { it.createArbigentScenarioContent() },
       reusableScenarios = _reusableScenariosFlow.value,
@@ -602,6 +607,7 @@ class ArbigentAppStateHolder(
     mcpJsonFlow.value = projectFile.settings.mcpJson
     defaultDeviceFormFactorFlow.value = projectFile.settings.deviceFormFactor
     additionalActionsFlow.value = projectFile.settings.additionalActions
+    projectMaxRetryFlow.value = projectFile.settings.maxRetry
     _fixedScenariosFlow.value = projectFile.fixedScenarios
     _reusableScenariosFlow.value = projectFile.reusableScenarios
     projectStateFlow.value = ArbigentProject(
@@ -712,6 +718,10 @@ class ArbigentAppStateHolder(
 
   fun onAdditionalActionsChanged(actions: List<String>?) {
     additionalActionsFlow.value = actions
+  }
+
+  fun onProjectMaxRetryChanged(maxRetry: Int?) {
+    projectMaxRetryFlow.value = maxRetry
   }
 
   fun scenarioCountById(newScenarioId: String): Int {

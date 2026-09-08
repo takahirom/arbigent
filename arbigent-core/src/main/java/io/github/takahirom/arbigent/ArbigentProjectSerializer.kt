@@ -261,9 +261,12 @@ public data class ArbigentProjectSettings(
   public val mcpJson: String = DefaultMcpJson,
   public val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Unspecified,
   public val additionalActions: List<String>? = null,
+  // Retry count for scenarios that do not declare their own. Absent means DefaultMaxRetry.
+  public val maxRetry: Int? = null,
 ) {
   public companion object {
     public const val DefaultMcpJson: String = "{}"
+    public const val DefaultMaxRetry: Int = 3
   }
 }
 
@@ -493,7 +496,7 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
   return ArbigentScenario(
     id = scenario.id,
     agentTasks = result,
-    maxRetry = scenario.maxRetry,
+    maxRetry = scenario.maxRetry ?: projectSettings.maxRetry ?: ArbigentProjectSettings.DefaultMaxRetry,
     replayWithFallback = replayWithFallback,
     maxStepCount = scenario.maxStep,
     tags = scenario.tags,
@@ -538,7 +541,8 @@ public class ArbigentScenarioContent @OptIn(ExperimentalUuidApi::class) construc
   public val initializeMethods: InitializationMethod = InitializationMethod.Noop,
   @YamlMultiLineStringStyle(MultiLineStringStyle.Literal)
   public val noteForHumans: String = "",
-  public val maxRetry: Int = 3,
+  // Absent means the project setting, and DefaultMaxRetry when that is absent too.
+  public val maxRetry: Int? = null,
   public val maxStep: Int = 10,
   public val tags: ArbigentContentTags = setOf(),
   public val deviceFormFactor: ArbigentScenarioDeviceFormFactor = ArbigentScenarioDeviceFormFactor.Unspecified,

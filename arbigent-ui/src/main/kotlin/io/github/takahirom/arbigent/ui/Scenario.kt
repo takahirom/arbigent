@@ -503,6 +503,8 @@ internal fun ScenarioFundamentalOptions(
         TextField(
           state = updatedScenarioStateHolder.maxRetryState,
           keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+          // Empty falls back to the project setting, then to the built-in default.
+          placeholder = { Text("Project") },
           modifier = Modifier
             .padding(4.dp),
         )
