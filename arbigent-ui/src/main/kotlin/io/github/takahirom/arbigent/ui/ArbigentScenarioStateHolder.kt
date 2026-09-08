@@ -46,7 +46,8 @@ constructor(
   val goal get() = goalState.text.toString()
   val noteForHumans = TextFieldState("")
   val userUserPromptTemplateState = TextFieldState(UserPromptTemplate.DEFAULT_TEMPLATE)
-  val maxRetryState: TextFieldState = TextFieldState("3")
+  // Empty means "not set": the project setting decides, or the built-in default.
+  val maxRetryState: TextFieldState = TextFieldState("")
   val maxStepState: TextFieldState = TextFieldState("10")
   private val cleanupDataStateFlow: MutableStateFlow<ArbigentScenarioContent.CleanupData> =
     MutableStateFlow(
@@ -254,7 +255,7 @@ constructor(
         withValues = steps.singleOrNull()?.withValues ?: emptyMap(),
         steps = if (steps.size == 1) emptyList() else steps,
         noteForHumans = noteForHumans.text.toString(),
-        maxRetry = maxRetryState.text.toString().toIntOrNull() ?: 3,
+        maxRetry = maxRetryState.text.toString().toIntOrNull(),
         tags = tagManager.tagsForScenario(this),
         deviceFormFactor = deviceFormFactorStateFlow.value,
         inputs = reusableInputsStateFlow.value.filter { it.first.isNotBlank() }.toMap(),
@@ -268,7 +269,7 @@ constructor(
       initializationMethods = initializationMethodStateFlow.value
         .filter { it !is ArbigentScenarioContent.InitializationMethod.Noop },
       noteForHumans = noteForHumans.text.toString(),
-      maxRetry = maxRetryState.text.toString().toIntOrNull() ?: 3,
+      maxRetry = maxRetryState.text.toString().toIntOrNull(),
       maxStep = maxStepState.text.toString().toIntOrNull() ?: 10,
       tags = tagManager.tagsForScenario(this),
       deviceFormFactor = deviceFormFactorStateFlow.value,
@@ -293,7 +294,7 @@ constructor(
     reusableInputsStateFlow.value = scenarioContent.inputs.toList()
     onGoalChanged(scenarioContent.goal)
     maxRetryState.edit {
-      replace(0, length, scenarioContent.maxRetry.toString())
+      replace(0, length, scenarioContent.maxRetry?.toString() ?: "")
     }
     maxStepState.edit {
       replace(0, length, scenarioContent.maxStep.toString())

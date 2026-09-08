@@ -51,7 +51,7 @@ Used both in `scenarios` and `reusableScenarios`.
 | `initializationMethods` | list of [InitializationMethod](#initializationmethod) | `[]` | Setup actions run before the goal. |
 | `initializeMethods` | [InitializationMethod](#initializationmethod) | `Noop` | **Deprecated**; use `initializationMethods`. |
 | `noteForHumans` | String (multiline) | `""` | Free-form note; not sent to the AI. |
-| `maxRetry` | Int | `3` | Retries on failure. |
+| `maxRetry` | Int? | `null` | Retries on failure. Unset falls back to `settings.maxRetry`, then to `3`. |
 | `maxStep` | Int | `10` | Max AI steps per attempt. |
 | `tags` | Set of [Tag](#tag) | `[]` | Tags for `run --tags` (serialized as a sequence). |
 | `deviceFormFactor` | [DeviceFormFactor](#deviceformfactor) | `Unspecified` | Target form factor. |
@@ -102,6 +102,7 @@ Legacy scenario-level field, tagged by `type:`. Distinct from the `CleanupData`
 | `mcpJson` | String (multiline) | `"{}"` | MCP server configuration as a JSON string. |
 | `deviceFormFactor` | [DeviceFormFactor](#deviceformfactor) | `Unspecified` | Default form factor for all scenarios. |
 | `additionalActions` | `List<String>?` | `null` | Project-wide extra actions. |
+| `maxRetry` | Int? | `null` | Default retry count for scenarios that do not set their own. Unset means `3`. |
 
 ### Prompt
 
