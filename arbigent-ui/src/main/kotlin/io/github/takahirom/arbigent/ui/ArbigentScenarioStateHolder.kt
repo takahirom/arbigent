@@ -48,6 +48,21 @@ constructor(
   val userUserPromptTemplateState = TextFieldState(UserPromptTemplate.DEFAULT_TEMPLATE)
   // Empty means "not set": the project setting decides, or the built-in default.
   val maxRetryState: TextFieldState = TextFieldState("")
+  private var lastValidMaxRetry: Int? = null
+
+  /**
+   * Only a blank field means "not set". Text that is not a number is a partial edit, so it keeps
+   * the last valid value instead of dropping the scenario's override.
+   */
+  private fun currentMaxRetry(): Int? {
+    val input = maxRetryState.text.toString()
+    if (input.isBlank()) {
+      lastValidMaxRetry = null
+      return null
+    }
+    input.toIntOrNull()?.let { lastValidMaxRetry = it }
+    return lastValidMaxRetry
+  }
   val maxStepState: TextFieldState = TextFieldState("10")
   private val cleanupDataStateFlow: MutableStateFlow<ArbigentScenarioContent.CleanupData> =
     MutableStateFlow(
@@ -255,7 +270,7 @@ constructor(
         withValues = steps.singleOrNull()?.withValues ?: emptyMap(),
         steps = if (steps.size == 1) emptyList() else steps,
         noteForHumans = noteForHumans.text.toString(),
-        maxRetry = maxRetryState.text.toString().toIntOrNull(),
+        maxRetry = currentMaxRetry(),
         tags = tagManager.tagsForScenario(this),
         deviceFormFactor = deviceFormFactorStateFlow.value,
         inputs = reusableInputsStateFlow.value.filter { it.first.isNotBlank() }.toMap(),
@@ -269,7 +284,7 @@ constructor(
       initializationMethods = initializationMethodStateFlow.value
         .filter { it !is ArbigentScenarioContent.InitializationMethod.Noop },
       noteForHumans = noteForHumans.text.toString(),
-      maxRetry = maxRetryState.text.toString().toIntOrNull(),
+      maxRetry = currentMaxRetry(),
       maxStep = maxStepState.text.toString().toIntOrNull() ?: 10,
       tags = tagManager.tagsForScenario(this),
       deviceFormFactor = deviceFormFactorStateFlow.value,
@@ -293,6 +308,7 @@ constructor(
     reusableStepsStateFlow.value = scenarioContent.callSteps()
     reusableInputsStateFlow.value = scenarioContent.inputs.toList()
     onGoalChanged(scenarioContent.goal)
+    lastValidMaxRetry = scenarioContent.maxRetry
     maxRetryState.edit {
       replace(0, length, scenarioContent.maxRetry?.toString() ?: "")
     }

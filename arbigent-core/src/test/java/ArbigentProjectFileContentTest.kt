@@ -390,6 +390,22 @@ Previous steps:
   }
 
   @Test
+  fun testMaxRetryRoundTrip() {
+    val serializer = ArbigentProjectSerializer()
+    val reloaded = serializer.load(serializer.encodeToString(projectWithMaxRetry))
+    assertEquals(1, reloaded.settings.maxRetry, "Project maxRetry should survive a round trip")
+    assertNull(
+      reloaded.scenarioContents[0].maxRetry,
+      "A scenario without its own value should stay unset"
+    )
+    assertEquals(
+      5,
+      reloaded.scenarioContents[1].maxRetry,
+      "An explicit scenario maxRetry should survive a round trip"
+    )
+  }
+
+  @Test
   fun testUnsetMaxRetryIsNotSerialized() {
     val serializer = ArbigentProjectSerializer()
     val saved = serializer.encodeToString(projectWithoutMaxRetry)
