@@ -21,9 +21,12 @@ public const val arbigentReportHtml: String = """
     <title>Report</title>
 </head>
 <body>
-<pre id="result">
+<details style="margin:12px 0; padding:12px 16px; border:1px solid #e2e8f0; border-radius:8px; background:#f8fafc; color:#1e293b; font-family:system-ui, sans-serif; font-size:13px;">
+<summary style="cursor:pointer; font-weight:600;">Report YAML</summary>
+<pre id="result" style="margin:12px 0 0; white-space:pre-wrap; overflow-wrap:anywhere;">
 $arbigentReportTemplateString
 </pre>
+</details>
 <div id="container" style="padding-top:20px;"></div>
 <script type="application/javascript" src="arbigent-core-web-report.js"></script>
 <script type="application/javascript">
