@@ -291,7 +291,7 @@ CLI, generate a wrapper. It works like `gradlew`: the script downloads the pinne
 arbigent release on first use, verifies its SHA-256 checksum and runs it.
 
 ```bash
-arbigent wrapper --version 0.80.0
+arbigent wrapper --version 0.81.1
 ```
 
 If nobody on the team has arbigent installed yet, you can skip that step: download the
@@ -300,23 +300,51 @@ script and let it pin a release itself.
 ```bash
 curl -fsSLo arbigentw https://raw.githubusercontent.com/takahirom/arbigent/main/arbigent-cli/src/main/resources/arbigentw
 chmod +x arbigentw
-ARBIGENT_VERSION=0.80.0 ./arbigentw --help
+ARBIGENT_VERSION=0.81.1 ./arbigentw --help
 ```
 
 The first run with `ARBIGENT_VERSION` set writes the properties file from the checksum
 published beside the release, then behaves like any other run. Later runs read the pinned
 version from the committed file and ignore the variable.
 
-Either way you commit two files alongside your project:
+Either way you commit two files side by side:
 
 - `arbigentw`, a POSIX shell script.
-- `.arbigent/wrapper/arbigent-wrapper.properties`, holding the version, the distribution
-  URL and its SHA-256 checksum.
+- `arbigentw.properties`, holding the version, the distribution URL and its SHA-256
+  checksum.
 
+The wrapper reads `arbigentw.properties` from its own directory, leaves the current
+directory alone and keeps everything it downloads in the user cache, so the two files can
+live at the repository root or in a subdirectory and be invoked from anywhere. Project
+settings such as `.arbigent/settings.local.yml` are still read from the current directory.
 Anyone with Java 17 or later can then run arbigent without installing anything:
 
 ```bash
 ./arbigentw run --scenario-ids="open-model-page"
+```
+
+To move to another release, run the wrapper's own `wrapper` command; it rewrites both
+files with the new URL and checksum. Pass `--dir` when the wrapper is not at the
+repository root.
+
+```bash
+./arbigentw wrapper --version 0.81.1
+./tools/arbigentw wrapper --version 0.81.1 --dir tools
+```
+
+`distributionVersion` in the properties file is metadata: the URL and the checksum decide
+what runs. An update bot such as Renovate can bump the version with a regex manager, but it
+cannot compute the checksum of the new archive, so the wrapper refuses to run when the
+version no longer matches the URL until someone runs the command above.
+
+```json5
+customManagers: [{
+  customType: "regex",
+  managerFilePatterns: ["/(^|/)arbigentw\\.properties$/"],
+  matchStrings: ["distributionVersion=(?<currentValue>\\S+)"],
+  depNameTemplate: "takahirom/arbigent",
+  datasourceTemplate: "github-releases",
+}]
 ```
 
 `ARBIGENT_RELEASE_BASE_URL` points the pinning step at a mirror. The checksum that the

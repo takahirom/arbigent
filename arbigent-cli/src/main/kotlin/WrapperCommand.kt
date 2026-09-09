@@ -14,7 +14,10 @@ import java.nio.file.StandardCopyOption
 import java.util.Properties
 
 private const val WRAPPER_SCRIPT_NAME = "arbigentw"
-private const val WRAPPER_PROPERTIES_PATH = ".arbigent/wrapper/arbigent-wrapper.properties"
+/** Read by the script from its own directory, so the two files always travel together. */
+private const val WRAPPER_PROPERTIES_PATH = "arbigentw.properties"
+/** Where arbigent 0.81.0 wrote the properties. Removed when the wrapper is regenerated. */
+private const val LEGACY_WRAPPER_PROPERTIES_PATH = ".arbigent/wrapper/arbigent-wrapper.properties"
 private const val RELEASE_BASE_URL = "https://github.com/takahirom/arbigent/releases/download"
 
 private val SHA256_PATTERN = Regex("^[0-9a-f]{64}$")
@@ -91,9 +94,6 @@ class ArbigentWrapperCommand : CliktCommand(name = "wrapper") {
     // toRealPath resolves the symlinks the caller chose to point at; the components below are the
     // ones nobody asked for.
     val root = Files.createDirectories(File(directory ?: ".").toPath()).toRealPath()
-    // Both directories are checked before either file is written, so a refused link does not leave
-    // half a wrapper behind.
-    createRealDirectories(root, root.resolve(WRAPPER_PROPERTIES_PATH).parent)
     writeInto(root, WRAPPER_SCRIPT_NAME, wrapperScript(), executable = true)
     writeInto(
       root,
@@ -105,6 +105,33 @@ class ArbigentWrapperCommand : CliktCommand(name = "wrapper") {
       }.toByteArray(),
       executable = false,
     )
+    removeLegacyProperties(root)
+  }
+
+  /**
+   * Deletes the properties file an earlier release wrote under `.arbigent/wrapper`, since the
+   * script no longer reads it and a stale copy would only mislead. The directories are removed
+   * only when the file was the last thing in them: `.arbigent` also holds project settings.
+   */
+  private fun removeLegacyProperties(root: Path) {
+    val legacy = root.resolve(LEGACY_WRAPPER_PROPERTIES_PATH)
+    val components = generateSequence(legacy) { it.parent }.takeWhile { it != root }.toList()
+    // A link among the components would make the delete reach outside the wrapper directory,
+    // so the file is reported instead of removed.
+    if (components.any { Files.isSymbolicLink(it) }) {
+      if (Files.exists(legacy)) {
+        echo("$legacy is no longer read; it is reached through a symbolic link, so remove it yourself.", err = true)
+      }
+      return
+    }
+    if (!Files.deleteIfExists(legacy)) return
+    echo("Removed $legacy, which the wrapper no longer reads")
+    for (directory in components.drop(1)) {
+      val empty = Files.list(directory).use { it.findAny().isEmpty }
+      if (!empty) break
+      Files.delete(directory)
+      echo("Removed empty $directory")
+    }
   }
 
   private fun fetchChecksum(url: String): String {
