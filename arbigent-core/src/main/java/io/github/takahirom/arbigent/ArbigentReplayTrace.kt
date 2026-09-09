@@ -26,12 +26,13 @@ internal class ReplayDivergenceException(
  *
  * How long a step may wait is the interval recorded between it and the step before it, minus what
  * replay has already spent executing the previous action. That interval is the recording run's own
- * time from one capture to the next, so it already contains everything the app was given then,
- * including the AI latency the recording paid and any `Wait` the AI itself decided on; replay is
- * therefore never slower than the recording, and never faster than the app needs. A step with no
- * recorded interval — the first step of a task, which has no predecessor in the trace — gets
- * [MIN_WAIT_MILLIS] instead, because there is nothing to derive a budget from and a task that
- * starts by launching an app must not be stepped on at once.
+ * time from one decision to the next, so it already contains everything the app was given then,
+ * including the AI latency the recording paid and any `Wait` the AI itself decided on; within a
+ * task, replay therefore waits no longer than the recording did, and no less than the app needs.
+ * A step with no recorded interval — the first step of a task, which has no predecessor in the
+ * trace — gets [MIN_WAIT_MILLIS] instead, because there is nothing to derive a budget from and a
+ * task that starts by launching an app must not be stepped on at once; a task the recording got
+ * through faster than that does wait longer here.
  *
  * Within that budget a step with a recorded target polls the elements until the target is present,
  * and proceeds the moment it is. Waiting further for the element list to stop changing was tried
@@ -100,15 +101,16 @@ internal class ArbigentReplayPacingStepInterceptor(
     device: ArbigentDevice,
     budgetMillis: Long,
   ) {
+    // Everything between here and the return is charged to the budget, measured on the clock
+    // rather than summed from what was asked for: reading the hierarchy is synchronous and can
+    // take a while on a busy device, and a delay can resume well after the interval it requested.
+    // Adding up only the requested delays would let either one push the wait past the recorded
+    // interval it is supposed to fit inside.
+    val startedAtMillis = TimeProvider.get().currentTimeMillis()
     var waitedMillis = 0L
     while (true) {
-      val readStartedAtMillis = TimeProvider.get().currentTimeMillis()
       val present = isPresent(device, identity)
-      // Reading the hierarchy is synchronous and can take a while on a busy device. Charge it to
-      // the budget as well, or a slow read adds itself to every poll and the wait outlasts the
-      // recorded interval it is supposed to fit inside.
-      waitedMillis += (TimeProvider.get().currentTimeMillis() - readStartedAtMillis)
-        .coerceAtLeast(0)
+      waitedMillis = (TimeProvider.get().currentTimeMillis() - startedAtMillis).coerceAtLeast(0)
       if (present) {
         arbigentInfoLog(
           "Replay wait: target ${identity.description()} found after ${waitedMillis}ms " +
@@ -117,9 +119,7 @@ internal class ArbigentReplayPacingStepInterceptor(
         return
       }
       if (waitedMillis >= budgetMillis) break
-      val pollMillis = POLL_INTERVAL_MILLIS.coerceAtMost(budgetMillis - waitedMillis)
-      delay(pollMillis)
-      waitedMillis += pollMillis
+      delay(POLL_INTERVAL_MILLIS.coerceAtMost(budgetMillis - waitedMillis))
     }
     arbigentInfoLog(
       "Replay wait: budget ${budgetMillis}ms spent waiting for target ${identity.description()} " +
