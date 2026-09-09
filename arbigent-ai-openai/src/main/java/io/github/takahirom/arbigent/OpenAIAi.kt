@@ -382,7 +382,8 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     val elements = decisionInput.elements
     val agentActionList = decisionInput.agentActionTypes
     arbigentInfoLog {
-      "AI usage: ${chatCompletionResponse.usage}"
+      val usage = chatCompletionResponse.usage
+      "AI usage: $usage (prompt cache: ${usage?.promptTokensDetails?.cachedTokens ?: 0}/${usage?.promptTokens ?: 0} cached)"
     }
 
     return try {
@@ -815,7 +816,9 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
         Usage(
           completionTokens = it["output_tokens"]?.jsonPrimitive?.intOrNull,
           promptTokens = it["input_tokens"]?.jsonPrimitive?.intOrNull,
-          totalTokens = it["total_tokens"]?.jsonPrimitive?.intOrNull
+          totalTokens = it["total_tokens"]?.jsonPrimitive?.intOrNull,
+          promptTokensDetails = it["input_tokens_details"]?.jsonObject?.get("cached_tokens")?.jsonPrimitive?.intOrNull
+            ?.let { cached -> PromptTokensDetails(cachedTokens = cached) },
         )
       }
     )

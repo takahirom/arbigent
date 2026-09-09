@@ -94,7 +94,15 @@ public data class ImageUrl(
 public data class Usage(
   @SerialName("completion_tokens") val completionTokens: Int? = null,
   @SerialName("prompt_tokens") val promptTokens: Int? = null,
-  @SerialName("total_tokens") val totalTokens: Int? = null
+  @SerialName("total_tokens") val totalTokens: Int? = null,
+  /** Prefix cache details. Absent from providers that do not report caching. */
+  @SerialName("prompt_tokens_details") val promptTokensDetails: PromptTokensDetails? = null,
+)
+
+@Serializable
+public data class PromptTokensDetails(
+  /** Part of `prompt_tokens` served from the prefix cache. */
+  @SerialName("cached_tokens") val cachedTokens: Int? = null,
 )
 
 @Serializable
