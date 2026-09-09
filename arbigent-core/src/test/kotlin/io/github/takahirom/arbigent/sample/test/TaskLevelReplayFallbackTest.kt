@@ -155,7 +155,9 @@ class TaskLevelReplayFallbackTest {
         id = "scenario",
         agentTasks = listOf(
           ArbigentAgentTask("task-1", "goal1", firstTaskConfig),
-          ArbigentAgentTask("task-2", "goal2", secondTaskConfig, maxStep = 3),
+          // Wide enough for the replayed and the replacement actions together, so the trace written
+          // after the fallback stays within what the task allows.
+          ArbigentAgentTask("task-2", "goal2", secondTaskConfig, maxStep = 5),
         ),
         maxStepCount = 10,
         tags = setOf(),
@@ -211,7 +213,7 @@ class TaskLevelReplayFallbackTest {
       replayFeedback.forEach { assertTrue(replacementPrompt.contains(it.feedback!!)) }
       assertTrue(replacementPrompt.contains("Current step: 1\n"))
       assertEquals(listOf(0, 1, 2), replacementActionCounts,
-        "the replacement should retain all three actions of its maxStep budget")
+        "the replayed history must not count toward the replacement's step number")
       val replacement = executor.taskAssignments()[1].agent
       assertTrue(replacement.isGoalAchieved())
       val replacementActions = replacement.latestArbigentContext()!!.steps()
