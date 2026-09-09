@@ -579,7 +579,6 @@ class ArbigentReplayTraceTest {
     },
   )
 
-  /** The smallest trace [ArbigentReplayTrace.isValidFor] accepts: one step that reaches the goal. */
   /**
    * A replayed step costs an iteration just like one the AI decides, so a trace with more steps
    * than the task allows would run out of steps before its goal on every run. Lowering the limit
@@ -626,6 +625,7 @@ class ArbigentReplayTraceTest {
     )
   }
 
+  /** The smallest trace [ArbigentReplayTrace.isValidFor] accepts: one step that reaches the goal. */
   private fun minimalTrace(key: ArbigentReplayTraceKey): ArbigentReplayTrace {
     val action = GoalAchievedAgentAction()
     return ArbigentReplayTrace(

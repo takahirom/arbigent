@@ -494,7 +494,7 @@ class TaskLevelReplayFallbackTest {
 
   private fun taskTraceStepCount(): Int {
     val trace = ArbigentFiles.traceDir.listFiles().orEmpty().single().readText()
-    return """"decisionOutput"""".toRegex().findAll(trace).count()
+    return Json { useArrayPolymorphism = true }.decodeFromString<ArbigentReplayTrace>(trace).steps.size
   }
 
   private fun secondTaskTraceStepCount(): Int {
