@@ -288,10 +288,12 @@ brew install takahirom/repo/arbigent
 
 If you would rather pin a version in your repository than ask everyone to install the
 CLI, generate a wrapper. It works like `gradlew`: the script downloads the pinned
-arbigent release on first use, verifies its SHA-256 checksum and runs it.
+arbigent release on first use, verifies its SHA-256 checksum and runs it. Without
+`--version` it pins the release of the CLI that runs it; pass `--version <version>` to
+pin another one.
 
 ```bash
-arbigent wrapper --version 0.81.1
+arbigent wrapper
 ```
 
 If nobody on the team has arbigent installed yet, you can skip that step: download the
@@ -300,8 +302,11 @@ script and let it pin a release itself.
 ```bash
 curl -fsSLo arbigentw https://raw.githubusercontent.com/takahirom/arbigent/main/arbigent-cli/src/main/resources/arbigentw
 chmod +x arbigentw
-ARBIGENT_VERSION=0.81.1 ./arbigentw --help
+ARBIGENT_VERSION=<version> ./arbigentw --help
 ```
+
+`<version>` is any release listed on the
+[releases page](https://github.com/takahirom/arbigent/releases).
 
 The first run with `ARBIGENT_VERSION` set writes the properties file from the checksum
 published beside the release, then behaves like any other run. Later runs read the pinned
@@ -329,8 +334,8 @@ the current directory. The script itself comes from the release that is running,
 the command once more after the pin changed if the new release ships a newer script.
 
 ```bash
-./arbigentw wrapper --version 0.81.1
-./tools/arbigentw wrapper --version 0.81.1 --dir tools
+./arbigentw wrapper --version <version>
+./tools/arbigentw wrapper --version <version> --dir tools
 ```
 
 `distributionVersion` in the properties file is metadata: the URL and the checksum decide
