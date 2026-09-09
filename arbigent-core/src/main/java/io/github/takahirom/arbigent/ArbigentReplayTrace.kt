@@ -419,6 +419,14 @@ internal data class ArbigentReplayTrace(
     if (steps.last().decisionOutput.agentActions.none { it is GoalAchievedAgentAction }) {
       return "it does not end by reaching the goal"
     }
+    // A replayed step costs an iteration just like a step the AI decides, so a trace longer than
+    // the task allows can never replay to its goal: it would run out of steps every time, fall
+    // back to the AI every time, and pay for the AI every time. A task that fell back records
+    // what it replayed plus what the replacement decided, which is how a trace grows past the
+    // limit. Rejecting it lets the next run record one that fits.
+    if (steps.size > key.maxStep) {
+      return "it has ${steps.size} steps, more than the ${key.maxStep} the task allows"
+    }
     return null
   }
 
@@ -492,6 +500,7 @@ internal data class ArbigentReplayTraceKey(
   val taskIndex: Int,
   val taskIdentity: String,
   val goal: String,
+  val maxStep: Int,
 ) {
   val goalHash: String = goal.sha256()
 
@@ -502,6 +511,9 @@ internal data class ArbigentReplayTraceKey(
    * component has on ext4 and APFS, and every write failed with FileNotFoundException so no
    * scenario could ever replay. Nothing is lost by not naming the parts: the trace file itself
    * carries the scenario id, task index and goal hash, and reading one validates them again.
+   *
+   * [maxStep] is left out on purpose: it is a limit the trace is checked against, not part of
+   * which trace this is. Lowering it has to reject the stored trace, not look past it for another.
    */
   val storageKey: String = listOf(
     version,
@@ -525,8 +537,14 @@ internal class ArbigentReplayTraceStore(
     val file = fileFor(key)
     if (!file.isFile) return null
     return try {
-      json.decodeFromString<ArbigentReplayTrace>(file.readText())
-        .takeIf { it.isValidFor(key) }
+      val trace = json.decodeFromString<ArbigentReplayTrace>(file.readText())
+      val reason = trace.invalidReasonFor(key)
+      if (reason != null) {
+        arbigentInfoLog("Not replaying the stored trace for task ${key.taskIndex + 1}: $reason")
+        null
+      } else {
+        trace
+      }
     } catch (exception: Exception) {
       arbigentErrorLog("Failed to read replay trace ${key.storageKey}: $exception")
       null
