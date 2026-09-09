@@ -90,7 +90,7 @@ class WrapperCommandTest {
   fun `generating the wrapper pins the served checksum`() {
     generateWrapper()
 
-    val properties = File(workDir, ".arbigent/wrapper/arbigent-wrapper.properties").readText()
+    val properties = File(workDir, "arbigentw.properties").readText()
     assertContains(properties, "distributionVersion=0.0.0")
     assertContains(properties, "distributionUrl=$distributionUrl")
     assertContains(properties, "distributionSha256Sum=$servedSha256")
@@ -122,7 +122,7 @@ class WrapperCommandTest {
   @Test
   fun `a checksum mismatch fails and installs nothing`() {
     generateWrapper()
-    val propertiesFile = File(workDir, ".arbigent/wrapper/arbigent-wrapper.properties")
+    val propertiesFile = File(workDir, "arbigentw.properties")
     propertiesFile.writeText(
       propertiesFile.readText().replace(servedSha256, "0".repeat(64))
     )
@@ -172,7 +172,7 @@ class WrapperCommandTest {
   @Test
   fun `the wrapper can pin a release without an installed arbigent`() {
     generateWrapper()
-    File(workDir, ".arbigent/wrapper/arbigent-wrapper.properties").delete()
+    File(workDir, "arbigentw.properties").delete()
 
     val result = runWrapper(
       listOf("bootstrapped"),
@@ -184,14 +184,14 @@ class WrapperCommandTest {
 
     assertEquals(0, result.exitCode, result.output)
     assertContains(result.output, "fake-arbigent bootstrapped")
-    val properties = File(workDir, ".arbigent/wrapper/arbigent-wrapper.properties").readText()
+    val properties = File(workDir, "arbigentw.properties").readText()
     assertContains(properties, "distributionSha256Sum=$servedSha256")
   }
 
   @Test
   fun `a missing properties file without a version is reported`() {
     generateWrapper()
-    File(workDir, ".arbigent/wrapper/arbigent-wrapper.properties").delete()
+    File(workDir, "arbigentw.properties").delete()
 
     val result = runWrapper(listOf("run"))
 
@@ -227,8 +227,7 @@ class WrapperCommandTest {
   @Test
   fun `pinning a release leaves no partial properties file behind`() {
     generateWrapper()
-    val propertiesDir = File(workDir, ".arbigent/wrapper")
-    File(propertiesDir, "arbigent-wrapper.properties").delete()
+    File(workDir, "arbigentw.properties").delete()
 
     val result = runWrapper(
       listOf("bootstrapped"),
@@ -241,7 +240,7 @@ class WrapperCommandTest {
     assertEquals(0, result.exitCode, result.output)
     // The properties file is written through a temp file in the same directory and renamed, so the
     // only file left is the finished one.
-    assertEquals(listOf("arbigent-wrapper.properties"), propertiesDir.list()?.sorted())
+    assertEquals(listOf("arbigentw", "arbigentw.properties"), workDir.list()?.sorted())
   }
 
   @Test
@@ -274,9 +273,12 @@ class WrapperCommandTest {
   }
 
   @Test
-  fun `a symbolic link in the wrapper directory is refused`() {
+  fun `a symbolic link in place of the properties file is refused`() {
     val elsewhere = File(workDir, "elsewhere").apply { mkdirs() }
-    java.nio.file.Files.createSymbolicLink(File(workDir, ".arbigent").toPath(), elsewhere.toPath())
+    java.nio.file.Files.createSymbolicLink(
+      File(workDir, "arbigentw.properties").toPath(),
+      File(elsewhere, "arbigentw.properties").toPath(),
+    )
 
     val result = ArbigentWrapperCommand().test(
       listOf(
@@ -290,24 +292,203 @@ class WrapperCommandTest {
     assertFalse(result.statusCode == 0, result.output)
     assertContains(result.stderr, "is a symbolic link")
     assertEquals(emptyList(), elsewhere.list()?.sorted(), "nothing may be written through the link")
-    assertEquals(listOf(".arbigent", "elsewhere"), workDir.list()?.sorted())
+    assertEquals(listOf("arbigentw.properties", "elsewhere"), workDir.list()?.sorted(), "no script without a pin")
+  }
+
+  @Test
+  fun `a refused regeneration keeps the wrapper that was there`() {
+    generateWrapper()
+    val script = File(workDir, "arbigentw")
+    script.appendText("# local marker\n")
+    val propertiesFile = File(workDir, "arbigentw.properties")
+    val pinned = propertiesFile.readText()
+    propertiesFile.delete()
+    val elsewhere = File(workDir, "elsewhere").apply { mkdirs() }
+    File(elsewhere, "arbigentw.properties").writeText(pinned)
+    java.nio.file.Files.createSymbolicLink(propertiesFile.toPath(), File(elsewhere, "arbigentw.properties").toPath())
+
+    val result = ArbigentWrapperCommand().test(
+      listOf("--version", "0.0.0", "--distribution-url", distributionUrl, "--dir", workDir.absolutePath)
+    )
+
+    assertFalse(result.statusCode == 0, result.output)
+    assertContains(result.stderr, "is a symbolic link")
+    assertTrue(script.readText().contains("# local marker"), "the script must not be replaced when the pin cannot be")
+    assertEquals(listOf("arbigentw", "arbigentw.properties", "elsewhere"), workDir.list()?.sorted())
   }
 
   @Test
   fun `generating the wrapper leaves no staged files behind`() {
     generateWrapper()
 
-    assertEquals(listOf(".arbigent", "arbigentw"), workDir.list()?.sorted())
-    assertEquals(
-      listOf("arbigent-wrapper.properties"),
-      File(workDir, ".arbigent/wrapper").list()?.sorted(),
+    assertEquals(listOf("arbigentw", "arbigentw.properties"), workDir.list()?.sorted())
+  }
+
+  @Test
+  fun `regenerating the wrapper removes the properties file of an earlier release`() {
+    val legacyDir = File(workDir, ".arbigent/wrapper").apply { mkdirs() }
+    File(legacyDir, "arbigent-wrapper.properties").writeText("distributionVersion=0.81.0\n")
+
+    generateWrapper()
+
+    assertEquals(listOf("arbigentw", "arbigentw.properties"), workDir.list()?.sorted())
+  }
+
+  @Test
+  fun `removing the earlier properties file keeps a settings directory that is still in use`() {
+    val legacyDir = File(workDir, ".arbigent/wrapper").apply { mkdirs() }
+    File(legacyDir, "arbigent-wrapper.properties").writeText("distributionVersion=0.81.0\n")
+    File(workDir, ".arbigent/settings.yml").writeText("os: android\n")
+
+    generateWrapper()
+
+    assertEquals(listOf(".arbigent", "arbigentw", "arbigentw.properties"), workDir.list()?.sorted())
+    assertEquals(listOf("settings.yml"), File(workDir, ".arbigent").list()?.sorted())
+  }
+
+  @Test
+  fun `the earlier properties file is not removed through a symbolic link`() {
+    val elsewhere = File(workDir, "elsewhere/wrapper").apply { mkdirs() }
+    File(elsewhere, "arbigent-wrapper.properties").writeText("distributionVersion=0.81.0\n")
+    java.nio.file.Files.createSymbolicLink(
+      File(workDir, ".arbigent").toPath(),
+      File(workDir, "elsewhere").toPath(),
     )
+
+    val result = ArbigentWrapperCommand().test(
+      listOf("--version", "0.0.0", "--distribution-url", distributionUrl, "--dir", workDir.absolutePath)
+    )
+
+    assertEquals(0, result.statusCode, result.output + result.stderr)
+    assertContains(result.stderr, "remove it yourself")
+    assertTrue(File(elsewhere, "arbigent-wrapper.properties").exists(), "nothing may be deleted through the link")
+  }
+
+  @Test
+  fun `the current script with only the earlier properties file is told to move it`() {
+    generateWrapper()
+    val legacyDir = File(workDir, ".arbigent/wrapper").apply { mkdirs() }
+    File(workDir, "arbigentw.properties").renameTo(File(legacyDir, "arbigent-wrapper.properties"))
+
+    // ARBIGENT_VERSION must not paper over the stale file by pinning a second release.
+    val result = runWrapper(
+      listOf("run"),
+      extraEnvironment = mapOf(
+        "ARBIGENT_VERSION" to "0.0.0",
+        "ARBIGENT_RELEASE_BASE_URL" to baseUrl,
+      ),
+    )
+
+    assertEquals(1, result.exitCode, result.output)
+    assertContains(result.output, "the wrapper properties moved from .arbigent/wrapper/arbigent-wrapper.properties")
+    assertContains(result.output, "git mv .arbigent/wrapper/arbigent-wrapper.properties arbigentw.properties")
+    assertFalse(File(workDir, "arbigentw.properties").exists(), "no second pin may be written")
+  }
+
+  @Test
+  fun `a version that disagrees with the distribution URL is reported`() {
+    generateWrapper()
+    val propertiesFile = File(workDir, "arbigentw.properties")
+    propertiesFile.writeText(
+      propertiesFile.readText().replace("distributionVersion=0.0.0", "distributionVersion=0.0.1")
+    )
+
+    val result = runWrapper(listOf("run"))
+
+    assertEquals(1, result.exitCode, result.output)
+    assertContains(result.output, "distributionVersion is 0.0.1 but distributionUrl points at arbigent-0.0.0.tar.gz")
+    assertContains(result.output, "wrapper --version 0.0.1 --dir \"${workDir.canonicalPath}\"")
+  }
+
+  @Test
+  fun `the wrapper command still runs while the version disagrees with the URL`() {
+    generateWrapper()
+    val propertiesFile = File(workDir, "arbigentw.properties")
+    propertiesFile.writeText(
+      propertiesFile.readText().replace("distributionVersion=0.0.0", "distributionVersion=0.0.1")
+    )
+
+    // This is the command that repairs the file, so refusing it would leave no way out.
+    val result = runWrapper(listOf("wrapper", "--version", "0.0.1"))
+
+    assertEquals(0, result.exitCode, result.output)
+    assertContains(result.output, "fake-arbigent wrapper --version 0.0.1")
+  }
+
+  @Test
+  fun `a wrapper in a subdirectory reads its own properties and keeps the working directory`() {
+    val tools = File(workDir, "tools")
+    val generated = ArbigentWrapperCommand().test(
+      listOf("--version", "0.0.0", "--distribution-url", distributionUrl, "--dir", tools.absolutePath)
+    )
+    assertEquals(0, generated.statusCode, generated.output + generated.stderr)
+    assertEquals(listOf("arbigentw", "arbigentw.properties"), tools.list()?.sorted())
+
+    val result = runWrapper(listOf("run"), script = File(tools, "arbigentw"))
+
+    assertEquals(0, result.exitCode, result.output)
+    assertContains(result.output, "fake-arbigent run")
+    assertContains(result.output, "cwd=${workDir.canonicalPath}")
+  }
+
+  @Test
+  fun `a mirror with its own archive name is not checked against the version`() {
+    val mirrorUrl = "$baseUrl/mirror/cli.tar.gz"
+    server.createContext("/mirror/cli.tar.gz") { exchange ->
+      val bytes = archive.readBytes()
+      exchange.sendResponseHeaders(200, bytes.size.toLong())
+      exchange.responseBody.use { it.write(bytes) }
+    }
+    val generated = ArbigentWrapperCommand().test(
+      listOf(
+        "--version", "0.0.0",
+        "--distribution-url", mirrorUrl,
+        "--sha256", servedSha256,
+        "--dir", workDir.absolutePath,
+      )
+    )
+    assertEquals(0, generated.statusCode, generated.output + generated.stderr)
+
+    val result = runWrapper(listOf("mirrored"))
+
+    assertEquals(0, result.exitCode, result.output)
+    assertContains(result.output, "fake-arbigent mirrored")
+  }
+
+  @Test
+  fun `a Java whose version cannot be read is reported`() {
+    generateWrapper()
+    val fakeBin = File(workDir, "fake-bin").apply { mkdirs() }
+    File(fakeBin, "java").apply {
+      writeText("#!/bin/sh\necho 'Picked up JAVA_TOOL_OPTIONS: -Dfoo=bar' >&2\n")
+      setExecutable(true)
+    }
+
+    val result = runWrapper(listOf("run"), extraPath = fakeBin.absolutePath)
+
+    assertEquals(1, result.exitCode, result.output)
+    assertContains(result.output, "cannot determine the Java version")
+  }
+
+  @Test
+  fun `a Java that fails while printing a version is reported`() {
+    generateWrapper()
+    val fakeBin = File(workDir, "fake-bin").apply { mkdirs() }
+    File(fakeBin, "java").apply {
+      writeText("#!/bin/sh\necho 'openjdk version \"21.0.8\" 2025-07-15' >&2\nexit 1\n")
+      setExecutable(true)
+    }
+
+    val result = runWrapper(listOf("run"), extraPath = fakeBin.absolutePath)
+
+    assertEquals(1, result.exitCode, result.output)
+    assertContains(result.output, "-version' failed")
   }
 
   @Test
   fun `pinning a release through a redirect off HTTPS is refused`() {
     generateWrapper()
-    File(workDir, ".arbigent/wrapper/arbigent-wrapper.properties").delete()
+    File(workDir, "arbigentw.properties").delete()
 
     val result = runWrapper(
       listOf("bootstrapped"),
@@ -320,7 +501,7 @@ class WrapperCommandTest {
     assertEquals(1, result.exitCode, result.output)
     assertContains(result.output, "cannot read")
     assertFalse(
-      File(workDir, ".arbigent/wrapper/arbigent-wrapper.properties").exists(),
+      File(workDir, "arbigentw.properties").exists(),
       "an unverifiable digest must not be pinned",
     )
   }
@@ -328,7 +509,7 @@ class WrapperCommandTest {
   @Test
   fun `pinning a release over plain HTTP is refused`() {
     generateWrapper()
-    File(workDir, ".arbigent/wrapper/arbigent-wrapper.properties").delete()
+    File(workDir, "arbigentw.properties").delete()
 
     val result = runWrapper(
       listOf("bootstrapped"),
@@ -354,6 +535,7 @@ class WrapperCommandTest {
     path: String? = null,
     extraPath: String? = null,
     extraEnvironment: Map<String, String> = emptyMap(),
+    script: File = File(workDir, "arbigentw"),
   ): ProcessResult {
     val resolvedPath = path ?: listOfNotNull(extraPath, System.getenv("PATH")).joinToString(":")
     val environment = mutableMapOf(
@@ -363,7 +545,7 @@ class WrapperCommandTest {
     )
     environment.putAll(extraEnvironment)
     return runProcess(
-      listOf("sh", File(workDir, "arbigentw").absolutePath) + args,
+      listOf("sh", script.absolutePath) + args,
       workDir,
       environment,
       clearEnvironment = true,
@@ -374,7 +556,7 @@ class WrapperCommandTest {
     val stagingDir = createTempDir("arbigentw-dist")
     val binDir = File(stagingDir, "arbigent-0.0.0/bin").apply { mkdirs() }
     File(binDir, "arbigent").apply {
-      writeText("#!/bin/sh\necho \"fake-arbigent $*\"\n")
+      writeText("#!/bin/sh\necho \"fake-arbigent $*\"\necho \"cwd=$(pwd -P)\"\n")
       setExecutable(true)
     }
     val tarball = File(stagingDir, "arbigent-0.0.0.tar.gz")
