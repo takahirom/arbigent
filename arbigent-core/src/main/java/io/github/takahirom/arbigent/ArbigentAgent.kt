@@ -779,9 +779,6 @@ public fun AgentConfigBuilder(
 
       is ArbigentScenarioContent.InitializationMethod.MaestroYaml -> {
         addInterceptor(object : ArbigentInitializerInterceptor {
-          // A flow can do anything, so it is read as resetting: taking a trace from the wrong
-          // starting point costs a diverged replay, replaying actions the flow already undid can
-          // repeat them for real.
           override fun intercept(
             device: ArbigentDevice,
             chain: ArbigentInitializerInterceptor.Chain
