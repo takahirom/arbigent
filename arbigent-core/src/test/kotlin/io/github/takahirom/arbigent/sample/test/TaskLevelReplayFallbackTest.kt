@@ -1,9 +1,11 @@
 package io.github.takahirom.arbigent.sample.test
 
 import io.github.takahirom.arbigent.*
+import io.github.takahirom.arbigent.result.ArbigentStepSource
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import maestro.MaestroException
 import maestro.TreeNode
 import java.nio.file.Files
@@ -23,6 +25,60 @@ class TaskLevelReplayFallbackTest {
   @AfterTest
   fun restoreTraceDir() {
     ArbigentFiles.traceDir = originalTraceDir
+  }
+
+  @Test
+  fun `preceding actions are deduplicated while feedback and history metadata are preserved`() = runTest {
+    val action = ArbigentContextHolder.Step(
+      stepId = "replayed-action",
+      agentAction = ClickWithTextAgentAction("text"),
+      memo = "Opened the menu",
+      imageDescription = "The menu button is visible",
+      cacheKey = "replayed-cache",
+      screenshotFilePath = "replayed-screenshot.png",
+      timestamp = 123L,
+      stepSource = ArbigentStepSource.Replay,
+    )
+    val assertionFeedback = action.copy(agentAction = null, feedback = "Image assertion failed.")
+    val divergence = action.copy(agentAction = null, feedback = "Replay diverged: the target is absent")
+    var firstPrompt = ""
+    var seeds = emptyList<ArbigentContextHolder.Step>()
+    val config = AgentConfig {
+      deviceFactory { FakeDevice() }
+      aiFactory { FakeAi() }
+      addInterceptor(object : ArbigentDecisionInterceptor {
+        override suspend fun intercept(
+          decisionInput: ArbigentAi.DecisionInput,
+          chain: ArbigentDecisionInterceptor.Chain,
+        ): ArbigentAi.DecisionOutput {
+          if (firstPrompt.isEmpty()) {
+            seeds = decisionInput.contextHolder.steps()
+            firstPrompt = decisionInput.contextHolder.prompt("", "", ArbigentAiOptions())
+          }
+          return chain.proceed(decisionInput).withStepIdOf(decisionInput)
+        }
+      })
+    }
+    val agent = ArbigentAgent(
+      config,
+      coroutineContext[CoroutineDispatcher]!!,
+      replayTrace = null,
+      runInitializers = false,
+      precedingSteps = listOf(action, assertionFeedback, action, divergence),
+    )
+    agent.execute("scenario", "goal", maxStep = 3, mcpClient = MCPClient())
+    advanceUntilIdle()
+
+    assertEquals(3, seeds.size)
+    assertEquals(action.copy(
+      agentAction = null,
+      feedback = "This action was already performed before this attempt, replayed from a recording: ${action.agentAction!!.stepLogText()}",
+    ), seeds.first())
+    assertEquals(listOf(assertionFeedback, divergence), seeds.drop(1))
+    assertTrue(firstPrompt.contains(divergence.feedback!!))
+    assertTrue(firstPrompt.contains("Current step: 1\n"))
+    assertTrue(agent.isGoalAchieved())
+    assertEquals(3, agent.latestArbigentContext()!!.countMeaningfulActions())
   }
 
   @Test
@@ -60,6 +116,10 @@ class TaskLevelReplayFallbackTest {
       // Fails the assertion once, which is what a replayed task that ends on the wrong screen
       // looks like. The re-run under the AI then passes.
       var failNextAssertion = false
+      var captureReplacement = false
+      val replacementActionCounts = mutableListOf<Int>()
+      var replacementPrompt = ""
+      var replacementSeeds = emptyList<ArbigentContextHolder.Step>()
       val secondTaskConfig = AgentConfig {
         deviceFactory { FakeDevice() }
         aiFactory { FakeAi() }
@@ -67,7 +127,17 @@ class TaskLevelReplayFallbackTest {
           override suspend fun intercept(
             decisionInput: ArbigentAi.DecisionInput,
             chain: ArbigentDecisionInterceptor.Chain,
-          ): ArbigentAi.DecisionOutput = chain.proceed(decisionInput).withStepIdOf(decisionInput)
+          ): ArbigentAi.DecisionOutput {
+            if (captureReplacement) {
+              val holder = decisionInput.contextHolder
+              if (replacementActionCounts.isEmpty()) {
+                replacementSeeds = holder.steps()
+                replacementPrompt = holder.prompt("", "", ArbigentAiOptions())
+              }
+              replacementActionCounts += holder.countMeaningfulActions()
+            }
+            return chain.proceed(decisionInput).withStepIdOf(decisionInput)
+          }
         })
         addInterceptor(object : ArbigentImageAssertionInterceptor {
           override fun intercept(
@@ -85,7 +155,7 @@ class TaskLevelReplayFallbackTest {
         id = "scenario",
         agentTasks = listOf(
           ArbigentAgentTask("task-1", "goal1", firstTaskConfig),
-          ArbigentAgentTask("task-2", "goal2", secondTaskConfig),
+          ArbigentAgentTask("task-2", "goal2", secondTaskConfig, maxStep = 3),
         ),
         maxStepCount = 10,
         tags = setOf(),
@@ -105,8 +175,10 @@ class TaskLevelReplayFallbackTest {
       firstTaskExecutions = 0
       firstTaskDecisions = 0
       failNextAssertion = true
+      captureReplacement = true
 
-      ArbigentScenarioExecutor(testDispatcher).execute(scenario(), MCPClient())
+      val executor = ArbigentScenarioExecutor(testDispatcher)
+      executor.execute(scenario(), MCPClient())
       advanceUntilIdle()
 
       assertEquals(
@@ -118,6 +190,39 @@ class TaskLevelReplayFallbackTest {
         0,
         firstTaskDecisions,
         "the first task should have replayed without asking the AI anything",
+      )
+
+      val replayedSteps = executor.taskAssignmentsHistory().first()[1].agent
+        .latestArbigentContext()!!.steps()
+      val replayedActions = replayedSteps.filter { it.agentAction != null }.distinctBy { it.stepId }
+      assertEquals(2, replayedActions.size)
+      assertTrue(replacementSeeds.all { it.agentAction == null })
+      assertEquals(replayedSteps.map { it.stepId }, replacementSeeds.map { it.stepId })
+      replayedActions.forEach { step ->
+        assertTrue(replacementPrompt.contains(
+          "This action was already performed before this attempt, replayed from a recording: ${step.agentAction!!.stepLogText()}",
+        ))
+      }
+      val replayFeedback = replayedSteps.filter { it.agentAction == null }
+      assertTrue(replayFeedback.any { it.feedback!!.startsWith("Failed replay image assertion") })
+      replayedSteps.zip(replacementSeeds).forEach { (original, seed) ->
+        if (original.agentAction == null) assertEquals(original, seed)
+      }
+      replayFeedback.forEach { assertTrue(replacementPrompt.contains(it.feedback!!)) }
+      assertTrue(replacementPrompt.contains("Current step: 1\n"))
+      assertEquals(listOf(0, 1, 2), replacementActionCounts,
+        "the replacement should retain all three actions of its maxStep budget")
+      val replacement = executor.taskAssignments()[1].agent
+      assertTrue(replacement.isGoalAchieved())
+      val replacementActions = replacement.latestArbigentContext()!!.steps()
+        .filter { it.agentAction != null }.distinctBy { it.stepId }
+      assertEquals(3, replacementActions.size)
+      val traceSteps = secondTaskTrace().steps.map { it.decisionOutput.step }
+      assertEquals((replayedActions + replacementActions).map { it.stepId }, traceSteps.map { it.stepId })
+      assertEquals(traceSteps.size, traceSteps.distinctBy { it.stepId }.size)
+      assertEquals(
+        (replayedActions + replacementActions).map { it.agentAction!!.stepLogText() },
+        traceSteps.map { it.agentAction!!.stepLogText() },
       )
 
       // The replacement agent starts from the device state the replayed actions left behind, so
@@ -312,10 +417,14 @@ class TaskLevelReplayFallbackTest {
   )
 
   private fun secondTaskTraceStepCount(): Int {
+    return secondTaskTrace().steps.size
+  }
+
+  private fun secondTaskTrace(): ArbigentReplayTrace {
     val trace = ArbigentFiles.traceDir.listFiles().orEmpty()
       .map { it.readText() }
       .single { """"taskIndex"\s*:\s*1""".toRegex().containsMatchIn(it) }
-    return """"decisionOutput"""".toRegex().findAll(trace).count()
+    return Json { useArrayPolymorphism = true }.decodeFromString<ArbigentReplayTrace>(trace)
   }
 
   /**

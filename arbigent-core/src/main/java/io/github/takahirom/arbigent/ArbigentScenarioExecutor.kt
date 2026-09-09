@@ -294,6 +294,7 @@ public class ArbigentScenarioExecutor internal constructor(
                     dispatcher = dispatcher,
                     replayTrace = null,
                     runInitializers = false,
+                    precedingSteps = replayedPrefixes[index].orEmpty(),
                   ),
                 )
               }

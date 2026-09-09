@@ -43,6 +43,7 @@ public class ArbigentAgent internal constructor(
   // already ran for the replay attempt, and running them again would undo the device state the
   // replayed actions produced, which is exactly what the replacement carries on from.
   private val runInitializers: Boolean = true,
+  private val precedingSteps: List<ArbigentContextHolder.Step> = emptyList(),
 ) {
   private val attemptMode: ArbigentAttemptMode = if (replayTrace != null) {
     ArbigentAttemptMode.ReplayWithFallback
@@ -62,7 +63,9 @@ public class ArbigentAgent internal constructor(
     .filterIsInstance<ArbigentExecutionInterceptor>()
 
   private val executeChain: suspend (ExecuteInput) -> ExecutionResult = { input ->
-    var chain: suspend (ExecuteInput) -> ExecutionResult = { executeInput -> executeDefault(executeInput) }
+    var chain: suspend (ExecuteInput) -> ExecutionResult = { executeInput ->
+      executeDefault(executeInput, precedingSteps)
+    }
     executeInterceptors.reversed().forEach { interceptor ->
       val previousChain = chain
       chain = { currentInput ->
@@ -1194,13 +1197,42 @@ private suspend fun executeActions(
   return ExecuteActionsOutput()
 }
 
-private suspend fun executeDefault(input: ExecuteInput): ExecutionResult {
+private fun ArbigentContextHolder.Step.asPrecedingFeedback(): ArbigentContextHolder.Step {
+  val action = agentAction ?: return this
+  return ArbigentContextHolder.Step(
+    stepId = stepId,
+    agentAction = null,
+    feedback = "This action was already performed before this attempt, replayed from a recording: ${action.stepLogText()}",
+    memo = memo,
+    imageDescription = imageDescription,
+    cacheKey = cacheKey,
+    screenshotFilePath = screenshotFilePath,
+    timestamp = timestamp,
+    stepSource = stepSource,
+  )
+}
+
+private suspend fun executeDefault(
+  input: ExecuteInput,
+  precedingSteps: List<ArbigentContextHolder.Step>,
+): ExecutionResult {
   val nullableContextHolder: ArbigentContextHolder? = null
   try {
     input.updateIsRunning(true)
     input.updateCurrentGoal(input.goal)
     val contextHolder = input.createContextHolder(input.goal, input.maxStep)
     input.addContextHolder(contextHolder)
+
+    // A replacement after a replay fallback continues from the screen the replayed actions left,
+    // and with an empty context the AI would take that screen for the start of the task and repeat
+    // them. The history goes in as feedback: a step without an action is shown to the AI but is not
+    // counted against this attempt's action budget and is not written to the trace a second time.
+    val seededActionStepIds = mutableSetOf<String>()
+    precedingSteps.forEach { step ->
+      if (step.agentAction == null || seededActionStepIds.add(step.stepId)) {
+        contextHolder.addStep(step.asPrecedingFeedback())
+      }
+    }
 
     input.updateInitializerCompleted(false)
     if (input.runInitializers) {
