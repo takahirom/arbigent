@@ -294,6 +294,7 @@ public class ArbigentScenarioExecutor internal constructor(
                     dispatcher = dispatcher,
                     replayTrace = null,
                     runInitializers = false,
+                    precedingSteps = replayedPrefixes[index].orEmpty(),
                   ),
                 )
               }
@@ -359,6 +360,7 @@ public class ArbigentScenarioExecutor internal constructor(
                 key = key,
                 contextHolder = it,
                 precedingSteps = replayedPrefixes[index].orEmpty(),
+                recordedTrace = replayTraces?.get(index),
               )
             }
           val reason = if (candidate == null) {

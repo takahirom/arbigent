@@ -439,22 +439,46 @@ internal data class ArbigentReplayTrace(
       key: ArbigentReplayTraceKey,
       contextHolder: ArbigentContextHolder,
       precedingSteps: List<ArbigentContextHolder.Step> = emptyList(),
+      recordedTrace: ArbigentReplayTrace? = null,
     ): ArbigentReplayTrace {
+      val prefix = precedingSteps.replayable()
+      val steps = prefix + contextHolder.steps().replayable()
+      // Replayed steps carry the time the replay reached them, which is faster than the AI was. Writing
+      // that back would make the next replay's budget the pace of this one instead of the AI's, and
+      // every clean replay would tighten it further. The recorded intervals are kept instead, anchored
+      // on the last replayed step so the gap to the replacement agent's first AI decision stays the
+      // real one; anchoring on the first could leave that gap non-positive.
+      val recordedTimestamps = recordedTrace?.steps?.map { it.decisionOutput.step.timestamp }.orEmpty()
+      val replayedCount = if (recordedTrace == null) 0 else {
+        prefix.size + steps.drop(prefix.size).takeWhile { it.stepSource == ArbigentStepSource.Replay }.size
+      }
+      require(steps.take(replayedCount).all { it.stepSource == ArbigentStepSource.Replay }) {
+        "Every step in the replayed prefix must come from replay"
+      }
+      require(replayedCount <= recordedTimestamps.size) {
+        "The replayed prefix cannot be longer than its recorded trace"
+      }
+      val shift = if (replayedCount == 0) 0L else {
+        steps[replayedCount - 1].timestamp - recordedTimestamps[replayedCount - 1]
+      }
       return ArbigentReplayTrace(
         version = key.version,
         scenarioId = key.scenarioId,
         taskIndex = key.taskIndex,
         taskIdentity = key.taskIdentity,
         goalHash = key.goalHash,
-        steps = (precedingSteps.replayable() + contextHolder.steps().replayable())
-          .map { step ->
-            ArbigentReplayTraceStep(
-              decisionOutput = ArbigentAi.DecisionOutput(
-                agentActions = listOf(requireNotNull(step.agentAction)),
-                step = step,
-              ),
-            )
-          },
+        steps = steps.mapIndexed { index, step ->
+          ArbigentReplayTraceStep(
+            decisionOutput = ArbigentAi.DecisionOutput(
+              agentActions = listOf(requireNotNull(step.agentAction)),
+              step = if (index < replayedCount) {
+                step.copy(timestamp = recordedTimestamps[index] + shift)
+              } else {
+                step
+              },
+            ),
+          )
+        },
       )
     }
 
