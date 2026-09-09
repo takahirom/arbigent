@@ -94,17 +94,22 @@ class ArbigentWrapperCommand : CliktCommand(name = "wrapper") {
     // toRealPath resolves the symlinks the caller chose to point at; the components below are the
     // ones nobody asked for.
     val root = Files.createDirectories(File(directory ?: ".").toPath()).toRealPath()
-    writeInto(root, WRAPPER_SCRIPT_NAME, wrapperScript(), executable = true)
-    writeInto(
-      root,
-      WRAPPER_PROPERTIES_PATH,
-      buildString {
-        appendLine("distributionVersion=$resolvedVersion")
-        appendLine("distributionUrl=$url")
-        appendLine("distributionSha256Sum=$checksum")
-      }.toByteArray(),
-      executable = false,
-    )
+    val properties = buildString {
+      appendLine("distributionVersion=$resolvedVersion")
+      appendLine("distributionUrl=$url")
+      appendLine("distributionSha256Sum=$checksum")
+    }.toByteArray()
+    // Both files are staged before either is published, so a refused or failed write leaves the
+    // wrapper that was there untouched rather than a new script beside an old pin.
+    val staged = mutableListOf<StagedFile>()
+    try {
+      staged += stage(root, WRAPPER_SCRIPT_NAME, wrapperScript(), executable = true)
+      staged += stage(root, WRAPPER_PROPERTIES_PATH, properties, executable = false)
+      staged.forEach { publish(it.staged, it.target) }
+    } finally {
+      staged.forEach { Files.deleteIfExists(it.staged) }
+    }
+    staged.forEach { echo("Wrote ${it.target}") }
     removeLegacyProperties(root)
   }
 
@@ -195,11 +200,16 @@ class ArbigentWrapperCommand : CliktCommand(name = "wrapper") {
       ?.use { it.readBytes() }
       ?: throw CliktError("The $WRAPPER_SCRIPT_NAME template is missing from this distribution.")
 
-  private fun writeInto(root: Path, relative: String, bytes: ByteArray, executable: Boolean) {
+  private class StagedFile(val staged: Path, val target: Path)
+
+  private fun stage(root: Path, relative: String, bytes: ByteArray, executable: Boolean): StagedFile {
     val target = root.resolve(relative)
     createRealDirectories(root, target.parent)
     if (Files.isSymbolicLink(target)) {
       throw CliktError("$target is a symbolic link. Remove it and run this again.")
+    }
+    if (Files.isDirectory(target)) {
+      throw CliktError("$target is a directory. Remove it and run this again.")
     }
     val staged = Files.createTempFile(target.parent, ".${target.fileName}", ".tmp")
     try {
@@ -207,11 +217,11 @@ class ArbigentWrapperCommand : CliktCommand(name = "wrapper") {
       // The executable bit does not survive packaging into the jar, and it is set before the rename
       // so the published file is never briefly there without it.
       if (executable) staged.toFile().setExecutable(true, false)
-      publish(staged, target)
-    } finally {
+    } catch (failure: Exception) {
       Files.deleteIfExists(staged)
+      throw failure
     }
-    echo("Wrote $target")
+    return StagedFile(staged, target)
   }
 
   private fun publish(staged: Path, target: Path) {

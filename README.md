@@ -324,8 +324,9 @@ Anyone with Java 17 or later can then run arbigent without installing anything:
 ```
 
 To move to another release, run the wrapper's own `wrapper` command; it rewrites both
-files with the new URL and checksum. Pass `--dir` when the wrapper is not at the
-repository root.
+files with the new URL and checksum. Pass `--dir` whenever the wrapper's directory is not
+the current directory. The script itself comes from the release that is running, so run
+the command once more after the pin changed if the new release ships a newer script.
 
 ```bash
 ./arbigentw wrapper --version 0.81.1
@@ -333,18 +334,21 @@ repository root.
 ```
 
 `distributionVersion` in the properties file is metadata: the URL and the checksum decide
-what runs. An update bot such as Renovate can bump the version with a regex manager, but it
-cannot compute the checksum of the new archive, so the wrapper refuses to run when the
-version no longer matches the URL until someone runs the command above.
+what runs. An update bot such as Renovate can bump it with a regex manager like the one
+below, which changes only that line. Until someone runs the command above to update the URL
+and the checksum too, the wrapper refuses every command except `wrapper` while the version
+disagrees with the release archive named in the URL.
 
 ```json5
-customManagers: [{
-  customType: "regex",
-  managerFilePatterns: ["/(^|/)arbigentw\\.properties$/"],
-  matchStrings: ["distributionVersion=(?<currentValue>\\S+)"],
-  depNameTemplate: "takahirom/arbigent",
-  datasourceTemplate: "github-releases",
-}]
+{
+  customManagers: [{
+    customType: "regex",
+    managerFilePatterns: ["/(^|/)arbigentw\\.properties$/"],
+    matchStrings: ["distributionVersion=(?<currentValue>\\S+)"],
+    depNameTemplate: "takahirom/arbigent",
+    datasourceTemplate: "github-releases",
+  }],
+}
 ```
 
 `ARBIGENT_RELEASE_BASE_URL` points the pinning step at a mirror. The checksum that the

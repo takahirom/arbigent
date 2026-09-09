@@ -113,8 +113,8 @@ if [ ! -f "$PROPERTIES_FILE" ]; then
   if [ -e "$LEGACY_PROPERTIES_FILE" ]; then
     die "the wrapper properties moved from .arbigent/wrapper/arbigent-wrapper.properties to
 arbigentw.properties next to this script in arbigent 0.81.1. Move the file:
-  git mv .arbigent/wrapper/arbigent-wrapper.properties arbigentw.properties
-or regenerate both files with 'arbigent wrapper --version <version>'."
+  cd $SCRIPT_DIR && git mv .arbigent/wrapper/arbigent-wrapper.properties arbigentw.properties
+or regenerate both files with 'arbigent wrapper --version <version> --dir $SCRIPT_DIR'."
   fi
   if [ -n "${ARBIGENT_VERSION:-}" ]; then
     bootstrap_properties "$ARBIGENT_VERSION"
@@ -143,12 +143,14 @@ DIST_NAME=${ARCHIVE_NAME%.tar.gz}
 # distributionVersion is metadata for people and update bots; the URL and the checksum decide
 # what runs. A bot that bumps only the version would otherwise keep running the old release
 # while the file claims the new one, so the two are required to agree whenever the archive
-# follows the release naming. Mirrors with other archive names are not checked.
-if [ -n "$DISTRIBUTION_VERSION" ]; then
+# follows the release naming. Mirrors with other archive names are not checked. The 'wrapper'
+# command is let through because it is how the URL and the checksum get updated: it only needs
+# a working release, not the one the file names.
+if [ -n "$DISTRIBUTION_VERSION" ] && [ "${1:-}" != wrapper ]; then
   case "$ARCHIVE_NAME" in
     arbigent-*.tar.gz)
       [ "$ARCHIVE_NAME" = "arbigent-$DISTRIBUTION_VERSION.tar.gz" ] || die "distributionVersion is $DISTRIBUTION_VERSION but distributionUrl points at $ARCHIVE_NAME.
-Update the URL and the checksum together with 'arbigentw wrapper --version $DISTRIBUTION_VERSION'." ;;
+Update the URL and the checksum together with '$0 wrapper --version $DISTRIBUTION_VERSION --dir $SCRIPT_DIR'." ;;
   esac
 fi
 # The whole digest names the directory: a prefix would let two distributions that share it share
@@ -177,10 +179,15 @@ Set JAVA_HOME to the root of a Java 17 installation, or unset it to use the java
   else
     die "no Java found. Arbigent needs Java 17 or later. Install a JDK or set JAVA_HOME."
   fi
-  java_version=$("$JAVACMD" -version 2>&1 | sed -n 's/.*version "\([0-9][0-9]*\).*/\1/p' | head -n 1)
-  # A failing or unrecognisable 'java -version' leaves this empty. Letting that through would
-  # only move the failure to a worse place: the launcher starting on a Java that cannot run it.
-  [ -n "$java_version" ] || die "cannot determine the Java version from '$JAVACMD -version'.
+  # A pipeline would hide a failing java behind sed's exit status, so its output is captured on
+  # its own first. A failing or unrecognisable 'java -version' is reported here rather than let
+  # through to the launcher, where it would fail on a Java that cannot run it.
+  java_output=$("$JAVACMD" -version 2>&1) || die "'$JAVACMD -version' failed:
+$java_output
+Arbigent needs Java 17 or later. Set JAVA_HOME to a working JDK."
+  java_version=$(printf '%s\n' "$java_output" | sed -n 's/.*version "\([0-9][0-9]*\).*/\1/p' | head -n 1)
+  [ -n "$java_version" ] || die "cannot determine the Java version from '$JAVACMD -version':
+$java_output
 Arbigent needs Java 17 or later. Set JAVA_HOME to a working JDK."
   if [ "$java_version" -lt 17 ]; then
     die "Java 17 or later is required, but $JAVACMD reports major version $java_version."
