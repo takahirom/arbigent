@@ -397,7 +397,7 @@ class WrapperCommandTest {
 
     assertEquals(1, result.exitCode, result.output)
     assertContains(result.output, "distributionVersion is 0.0.1 but distributionUrl points at arbigent-0.0.0.tar.gz")
-    assertContains(result.output, "wrapper --version 0.0.1 --dir ${workDir.canonicalPath}")
+    assertContains(result.output, "wrapper --version 0.0.1 --dir \"${workDir.canonicalPath}\"")
   }
 
   @Test

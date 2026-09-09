@@ -113,8 +113,8 @@ if [ ! -f "$PROPERTIES_FILE" ]; then
   if [ -e "$LEGACY_PROPERTIES_FILE" ]; then
     die "the wrapper properties moved from .arbigent/wrapper/arbigent-wrapper.properties to
 arbigentw.properties next to this script in arbigent 0.81.1. Move the file:
-  cd $SCRIPT_DIR && git mv .arbigent/wrapper/arbigent-wrapper.properties arbigentw.properties
-or regenerate both files with 'arbigent wrapper --version <version> --dir $SCRIPT_DIR'."
+  cd \"$SCRIPT_DIR\" && git mv .arbigent/wrapper/arbigent-wrapper.properties arbigentw.properties
+or regenerate both files with: arbigent wrapper --version <version> --dir \"$SCRIPT_DIR\""
   fi
   if [ -n "${ARBIGENT_VERSION:-}" ]; then
     bootstrap_properties "$ARBIGENT_VERSION"
@@ -150,7 +150,7 @@ if [ -n "$DISTRIBUTION_VERSION" ] && [ "${1:-}" != wrapper ]; then
   case "$ARCHIVE_NAME" in
     arbigent-*.tar.gz)
       [ "$ARCHIVE_NAME" = "arbigent-$DISTRIBUTION_VERSION.tar.gz" ] || die "distributionVersion is $DISTRIBUTION_VERSION but distributionUrl points at $ARCHIVE_NAME.
-Update the URL and the checksum together with '$0 wrapper --version $DISTRIBUTION_VERSION --dir $SCRIPT_DIR'." ;;
+Update the URL and the checksum together with: \"$0\" wrapper --version $DISTRIBUTION_VERSION --dir \"$SCRIPT_DIR\"" ;;
   esac
 fi
 # The whole digest names the directory: a prefix would let two distributions that share it share
