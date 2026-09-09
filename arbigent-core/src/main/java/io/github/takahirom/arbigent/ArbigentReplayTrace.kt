@@ -19,10 +19,27 @@ internal class ReplayDivergenceException(
 ) : Exception(message)
 
 /**
- * Waits before a replayed step is captured, so the app is as far along as it was when the trace
- * was recorded. This must run before [step] reads the elements and UI tree: replay makes no AI
- * call, so without it the next screen is snapshotted before it has settled and an index-based
- * action resolves against a half-built element list.
+ * Waits before a replayed step is captured, so the screen the step is about to be resolved against
+ * is the screen the recorded action was decided on. This must run before [step] reads the elements
+ * and UI tree: replay makes no AI call, so without it the next screen is snapshotted before it has
+ * settled and an index-based action resolves against a half-built element list.
+ *
+ * How long a step may wait is the interval recorded between it and the step before it, minus what
+ * replay has already spent executing the previous action. That interval is the recording run's own
+ * time from one decision to the next, so it already contains everything the app was given then,
+ * including the AI latency the recording paid and any `Wait` the AI itself decided on; within a
+ * task, replay therefore waits no longer than the recording did, and no less than the app needs.
+ * A step with no recorded interval — the first step of a task, which has no predecessor in the
+ * trace — gets [MIN_WAIT_MILLIS] instead, because there is nothing to derive a budget from and a
+ * task that starts by launching an app must not be stepped on at once; a task the recording got
+ * through faster than that does wait longer here.
+ *
+ * Within that budget a step with a recorded target polls the elements until the target is present,
+ * and proceeds the moment it is. Waiting further for the element list to stop changing was tried
+ * and dropped: a screen with anything animating or ticking never stops changing, so the wait ran to
+ * the budget every time and a screen that was in fact ready was reported as one the target never
+ * reached. A step with no target to wait for (reaching the goal, back, scroll, wait, and text
+ * actions recorded without an identity) waits its budget out.
  */
 internal class ArbigentReplayPacingStepInterceptor(
   private val trace: ArbigentReplayTrace,
@@ -38,30 +55,106 @@ internal class ArbigentReplayPacingStepInterceptor(
       .filter { step -> step.agentAction != null }
       .distinctBy { step -> step.stepId }
       .count()
-    waitOutRecordedGap(replayIndex)
+    val budgetMillis = remainingBudgetMillis(replayIndex)
+    val identity = trace.steps.getOrNull(replayIndex)?.decisionOutput?.step?.targetElement
+    if (identity != null) {
+      awaitTarget(replayIndex, identity, stepInput.device, budgetMillis)
+    } else {
+      waitOutBudget(replayIndex, budgetMillis)
+    }
     previousStepStartedAtMillis = TimeProvider.get().currentTimeMillis()
     return chain.proceed(stepInput)
   }
 
-  private suspend fun waitOutRecordedGap(replayIndex: Int) {
-    val previousStartedAt = previousStepStartedAtMillis ?: return
-    val previousRecordedAt = trace.steps.getOrNull(replayIndex - 1)
-      ?.decisionOutput?.step?.timestamp ?: return
-    val recordedAt = trace.steps.getOrNull(replayIndex)?.decisionOutput?.step?.timestamp ?: return
-    val recordedGap = recordedAt - previousRecordedAt
-    if (recordedGap <= 0) return
+  /**
+   * How long this step may still wait: what is left of the recorded interval after the time replay
+   * has already spent since the previous step began. The cap is applied to the recorded interval
+   * itself, so a pathological recording does not become a minute of waiting plus whatever the
+   * previous action took.
+   */
+  private fun remainingBudgetMillis(replayIndex: Int): Long {
+    val recordedGap = recordedGapMillis(replayIndex) ?: return MIN_WAIT_MILLIS
+    val budget = recordedGap.coerceAtMost(MAX_WAIT_MILLIS)
+    // Nothing measured to subtract: this is the budget in full rather than a guess at what is left.
+    val previousStartedAt = previousStepStartedAtMillis ?: return budget
     val alreadySpent = TimeProvider.get().currentTimeMillis() - previousStartedAt
-    val remaining = (recordedGap - alreadySpent).coerceAtMost(MAX_PACING_WAIT_MILLIS)
-    if (remaining <= 0) return
+    return (budget - alreadySpent).coerceAtLeast(0)
+  }
+
+  private fun recordedGapMillis(replayIndex: Int): Long? {
+    val previousRecordedAt = trace.steps.getOrNull(replayIndex - 1)
+      ?.decisionOutput?.step?.timestamp ?: return null
+    val recordedAt = trace.steps.getOrNull(replayIndex)?.decisionOutput?.step?.timestamp
+      ?: return null
+    return (recordedAt - previousRecordedAt).takeIf { it > 0 }
+  }
+
+  /**
+   * Polls until the recorded target is present, or until [budgetMillis] is spent. The screen is
+   * read once before the budget is consulted, so a step whose budget is already gone still gets the
+   * chance to find its target on a screen that is in fact ready — and a target that never appears
+   * is left for the decision interceptor to report as a divergence, which is what it is.
+   */
+  private suspend fun awaitTarget(
+    replayIndex: Int,
+    identity: ArbigentElementIdentity,
+    device: ArbigentDevice,
+    budgetMillis: Long,
+  ) {
+    // Everything between here and the return is charged to the budget, measured on the clock
+    // rather than summed from what was asked for: reading the hierarchy is synchronous and can
+    // take a while on a busy device, and a delay can resume well after the interval it requested.
+    // Adding up only the requested delays would let either one push the wait past the recorded
+    // interval it is supposed to fit inside.
+    val startedAtMillis = TimeProvider.get().currentTimeMillis()
+    var waitedMillis = 0L
+    while (true) {
+      val present = isPresent(device, identity)
+      waitedMillis = (TimeProvider.get().currentTimeMillis() - startedAtMillis).coerceAtLeast(0)
+      if (present) {
+        arbigentInfoLog(
+          "Replay wait: target ${identity.description()} found after ${waitedMillis}ms " +
+            "before capturing step ${replayIndex + 1}",
+        )
+        return
+      }
+      if (waitedMillis >= budgetMillis) break
+      delay(POLL_INTERVAL_MILLIS.coerceAtMost(budgetMillis - waitedMillis))
+    }
     arbigentInfoLog(
-      "Replay pacing: waiting ${remaining}ms before capturing step ${replayIndex + 1}",
+      "Replay wait: budget ${budgetMillis}ms spent waiting for target ${identity.description()} " +
+        "before capturing step ${replayIndex + 1}; capturing anyway",
     )
-    delay(remaining)
+  }
+
+  private fun isPresent(device: ArbigentDevice, identity: ArbigentElementIdentity): Boolean {
+    val elements = try {
+      device.elements()
+    } catch (exception: Exception) {
+      // Reading the hierarchy can fail while the screen is mid-transition, which is exactly the
+      // state this waits out. Treat it as "not there yet".
+      arbigentDebugLog("Replay wait: could not read elements: $exception")
+      return false
+    }
+    return identity.findMatch(elements) != null
+  }
+
+  private suspend fun waitOutBudget(replayIndex: Int, budgetMillis: Long) {
+    if (budgetMillis <= 0) return
+    arbigentInfoLog(
+      "Replay pacing: waiting ${budgetMillis}ms before capturing step ${replayIndex + 1}",
+    )
+    delay(budgetMillis)
   }
 
   private companion object {
     // A recorded gap can be pathological (a hiccup while recording); do not inherit it unbounded.
-    const val MAX_PACING_WAIT_MILLIS = 60_000L
+    const val MAX_WAIT_MILLIS = 60_000L
+
+    // Without a recorded interval there is nothing to derive a budget from, and the step this
+    // happens on is the one that starts a task — the launch replay must not step on.
+    const val MIN_WAIT_MILLIS = 10_000L
+    const val POLL_INTERVAL_MILLIS = 500L
   }
 }
 
@@ -338,22 +431,46 @@ internal data class ArbigentReplayTrace(
       key: ArbigentReplayTraceKey,
       contextHolder: ArbigentContextHolder,
       precedingSteps: List<ArbigentContextHolder.Step> = emptyList(),
+      recordedTrace: ArbigentReplayTrace? = null,
     ): ArbigentReplayTrace {
+      val prefix = precedingSteps.replayable()
+      val steps = prefix + contextHolder.steps().replayable()
+      // Replayed steps carry the time the replay reached them, which is faster than the AI was. Writing
+      // that back would make the next replay's budget the pace of this one instead of the AI's, and
+      // every clean replay would tighten it further. The recorded intervals are kept instead, anchored
+      // on the last replayed step so the gap to the replacement agent's first AI decision stays the
+      // real one; anchoring on the first could leave that gap non-positive.
+      val recordedTimestamps = recordedTrace?.steps?.map { it.decisionOutput.step.timestamp }.orEmpty()
+      val replayedCount = if (recordedTrace == null) 0 else {
+        prefix.size + steps.drop(prefix.size).takeWhile { it.stepSource == ArbigentStepSource.Replay }.size
+      }
+      require(steps.take(replayedCount).all { it.stepSource == ArbigentStepSource.Replay }) {
+        "Every step in the replayed prefix must come from replay"
+      }
+      require(replayedCount <= recordedTimestamps.size) {
+        "The replayed prefix cannot be longer than its recorded trace"
+      }
+      val shift = if (replayedCount == 0) 0L else {
+        steps[replayedCount - 1].timestamp - recordedTimestamps[replayedCount - 1]
+      }
       return ArbigentReplayTrace(
         version = key.version,
         scenarioId = key.scenarioId,
         taskIndex = key.taskIndex,
         taskIdentity = key.taskIdentity,
         goalHash = key.goalHash,
-        steps = (precedingSteps.replayable() + contextHolder.steps().replayable())
-          .map { step ->
-            ArbigentReplayTraceStep(
-              decisionOutput = ArbigentAi.DecisionOutput(
-                agentActions = listOf(requireNotNull(step.agentAction)),
-                step = step,
-              ),
-            )
-          },
+        steps = steps.mapIndexed { index, step ->
+          ArbigentReplayTraceStep(
+            decisionOutput = ArbigentAi.DecisionOutput(
+              agentActions = listOf(requireNotNull(step.agentAction)),
+              step = if (index < replayedCount) {
+                step.copy(timestamp = recordedTimestamps[index] + shift)
+              } else {
+                step
+              },
+            ),
+          )
+        },
       )
     }
 

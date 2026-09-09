@@ -3,6 +3,10 @@ package io.github.takahirom.arbigent
 import io.github.takahirom.arbigent.sample.test.FakeAi
 import io.github.takahirom.arbigent.sample.test.FakeDevice
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
+import io.github.takahirom.arbigent.result.ArbigentStepSource
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
 import maestro.TreeNode
 import java.io.File
@@ -15,6 +19,104 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ArbigentReplayTraceTest {
+  @Test
+  fun `fallback candidate preserves recorded prefix intervals and fresh AI intervals`() {
+    val recordedSteps = timestampedSteps(listOf(1_000, 5_000, 12_000, 21_000))
+    val recordedTrace = trace(recordedSteps.map { it to requireNotNull(it.agentAction) })
+    val replayedSteps = recordedSteps.take(3).mapIndexed { index, step ->
+      step.copy(timestamp = 100_000L + index * 100L, stepSource = ArbigentStepSource.Replay)
+    }
+    val aiSteps = timestampedSteps(listOf(102_200, 105_200)).mapIndexed { index, step ->
+      step.copy(stepId = "ai-$index")
+    }
+
+    // Both sources of replayed steps share the recording's order, even when the prefix spans them.
+    for (precedingCount in 0..replayedSteps.size) {
+      val context = ArbigentContextHolder("goal", 10).apply {
+        (replayedSteps.drop(precedingCount) + aiSteps).forEach(::addStep)
+      }
+      val candidate = ArbigentReplayTrace.candidateFrom(
+        key = candidateKey(),
+        contextHolder = context,
+        precedingSteps = replayedSteps.take(precedingCount),
+        recordedTrace = recordedTrace,
+      )
+      val writtenSteps = candidate.steps.map { it.decisionOutput.step }
+
+      assertEquals(listOf(4_000L, 7_000L, 2_000L, 3_000L), writtenSteps.map { it.timestamp }.zipWithNext { a, b -> b - a })
+      assertEquals(replayedSteps.last().timestamp, writtenSteps[2].timestamp)
+      assertEquals(aiSteps, writtenSteps.drop(3))
+      assertEquals(replayedSteps.drop(precedingCount) + aiSteps, context.steps())
+    }
+  }
+
+  @Test
+  fun `clean replay candidate preserves all recorded intervals`() {
+    val recordedSteps = timestampedSteps(listOf(1_000, 5_000, 12_000, 21_000))
+    val recordedTrace = trace(recordedSteps.map { it to requireNotNull(it.agentAction) })
+    val freshSteps = recordedSteps.mapIndexed { index, step ->
+      step.copy(timestamp = 100_000L + index * 100L, stepSource = ArbigentStepSource.Replay)
+    }
+    val context = ArbigentContextHolder("goal", 10).apply { freshSteps.forEach(::addStep) }
+
+    val candidate = ArbigentReplayTrace.candidateFrom(candidateKey(), context, recordedTrace = recordedTrace)
+    val writtenTimestamps = candidate.steps.map { it.decisionOutput.step.timestamp }
+
+    assertEquals(listOf(4_000L, 7_000L, 9_000L), writtenTimestamps.zipWithNext { a, b -> b - a })
+    assertEquals(freshSteps.last().timestamp, writtenTimestamps.last())
+    assertEquals(freshSteps, context.steps())
+  }
+
+  @Test
+  fun `normal candidate keeps its own timestamps`() {
+    val freshSteps = timestampedSteps(listOf(100_000, 102_200, 105_200))
+    val context = ArbigentContextHolder("goal", 10).apply { freshSteps.forEach(::addStep) }
+
+    val candidate = ArbigentReplayTrace.candidateFrom(candidateKey(), context)
+
+    assertEquals(freshSteps, candidate.steps.map { it.decisionOutput.step })
+  }
+
+  @Test
+  fun `candidate rejects a replayed prefix longer than the recording`() {
+    val context = ArbigentContextHolder("goal", 10).apply {
+      timestampedSteps(listOf(100_000, 100_100)).forEach {
+        addStep(it.copy(stepSource = ArbigentStepSource.Replay))
+      }
+    }
+
+    assertFailsWith<IllegalArgumentException> {
+      ArbigentReplayTrace.candidateFrom(candidateKey(), context, recordedTrace = minimalTrace(candidateKey()))
+    }
+  }
+
+  @Test
+  fun `candidate rejects a preceding step that did not come from replay`() {
+    assertFailsWith<IllegalArgumentException> {
+      ArbigentReplayTrace.candidateFrom(
+        key = candidateKey(),
+        contextHolder = ArbigentContextHolder("goal", 10),
+        precedingSteps = timestampedSteps(listOf(100_000)),
+        recordedTrace = minimalTrace(candidateKey()),
+      )
+    }
+  }
+
+  private fun candidateKey(): ArbigentReplayTraceKey = ArbigentReplayTraceKey(
+    version = "1.2.3",
+    scenarioId = "scenario",
+    taskIndex = 0,
+    taskIdentity = "scenario",
+    goal = "goal",
+  )
+
+  private fun timestampedSteps(timestamps: List<Long>): List<ArbigentContextHolder.Step> {
+    val step = minimalTrace(candidateKey()).steps.single().decisionOutput.step
+    return timestamps.mapIndexed { index, timestamp ->
+      step.copy(stepId = "step-$index", timestamp = timestamp)
+    }
+  }
+
   @Test
   fun `trace round trip preserves actions and target identity`() {
     val directory = Files.createTempDirectory("arbigent-replay-trace-test").toFile()
@@ -129,6 +231,349 @@ class ArbigentReplayTraceTest {
     assertEquals(0, assertNotNull(store.read(first)).taskIndex)
     assertEquals(1, assertNotNull(store.read(second)).taskIndex)
   }
+
+  @Test
+  fun `a replayed step waits until its recorded target is present`() = runTest {
+    withVirtualClock {
+      val absent = ArbigentElementList(emptyList(), screenWidth = 1000)
+      val present = ArbigentElementList(listOf(element("target", "id", "desc")), screenWidth = 1000)
+      val device = ScriptedDevice(listOf(absent, absent, present))
+      var proceeded = false
+
+      ArbigentReplayPacingStepInterceptor(traceWithTarget()).intercept(
+        stepInput(device),
+      ) {
+        proceeded = true
+        ArbigentAgent.StepResult.Continue
+      }
+
+      assertTrue(proceeded, "the step should have been captured once the target appeared")
+      assertEquals(
+        3,
+        device.elementsCallCount,
+        "the wait should end on the poll that found the target, not one later",
+      )
+      assertEquals(1000, currentTime, "each poll is one interval apart")
+    }
+  }
+
+  @Test
+  fun `a target that is present but still moving is not waited on`() = runTest {
+    withVirtualClock {
+      // Same text, same id, different place: the element is animating into position. Waiting for it
+      // to stop was deliberately dropped — a screen with anything animating or ticking never stops
+      // changing, and the recorded interval, not stability, is what bounds the wait.
+      val moving = ArbigentElementList(listOf(element("target", "id", "desc", y = 100)), screenWidth = 1000)
+      val stopped = ArbigentElementList(listOf(element("target", "id", "desc", y = 0)), screenWidth = 1000)
+      val device = ScriptedDevice(listOf(moving, stopped, stopped))
+      var proceeded = false
+
+      ArbigentReplayPacingStepInterceptor(traceWithTarget()).intercept(stepInput(device)) {
+        proceeded = true
+        ArbigentAgent.StepResult.Continue
+      }
+
+      assertTrue(proceeded)
+      assertEquals(1, device.elementsCallCount, "a present target is enough to capture the step")
+      assertEquals(0, currentTime)
+    }
+  }
+
+  @Test
+  fun `a replayed step whose target never appears is captured once the deadline passes`() = runTest {
+    withVirtualClock {
+      val absent = ArbigentElementList(emptyList(), screenWidth = 1000)
+      val device = ScriptedDevice(listOf(absent))
+      var proceeded = false
+
+      ArbigentReplayPacingStepInterceptor(traceWithTarget()).intercept(stepInput(device)) {
+        proceeded = true
+        ArbigentAgent.StepResult.Continue
+      }
+
+      assertTrue(proceeded, "a target that never appears is divergence to detect later, not here")
+      assertEquals(
+        10_000,
+        currentTime,
+        "with no recorded interval to derive a budget from, the wait should last the minimum",
+      )
+      assertTrue(device.elementsCallCount >= 2, "the budget should have been polled towards")
+    }
+  }
+
+  @Test
+  fun `a slow hierarchy read is charged to the wait budget`() = runTest {
+    val absent = ArbigentElementList(emptyList(), screenWidth = 1000)
+    val device = ScriptedDevice(listOf(absent))
+    val scheduler = testScheduler
+    val previous = TimeProvider.get()
+    // Every read appears to take 200ms. Only this provider can express that: a read is synchronous,
+    // so it cannot advance the test scheduler the way `delay` does.
+    TimeProvider.set(
+      object : TimeProvider {
+        override fun currentTimeMillis(): Long =
+          scheduler.currentTime + ReadCostMillis * device.elementsCallCount
+      },
+    )
+    try {
+      ArbigentReplayPacingStepInterceptor(traceWithTarget()).intercept(stepInput(device)) {
+        ArbigentAgent.StepResult.Continue
+      }
+    } finally {
+      TimeProvider.set(previous)
+    }
+
+    // Each poll now costs 200ms of reading plus a 500ms delay, so the 10s budget buys 15 reads and
+    // 14 delays instead of 20 delays. Without charging the read the wait would have slept the whole
+    // 10s and spent 20 reads on top, overrunning the interval it is meant to fit inside by 4s.
+    assertEquals(15, device.elementsCallCount, "the read time should shorten the poll count")
+    assertEquals(7_000, currentTime, "only the delays are time the wait actually slept")
+  }
+
+  @Test
+  fun `a poll that resumes late is charged for the time it really took`() = runTest {
+    val absent = ArbigentElementList(emptyList(), screenWidth = 1000)
+    val device = ScriptedDevice(listOf(absent))
+    val scheduler = testScheduler
+    val previous = TimeProvider.get()
+    // The clock runs twice as fast as the scheduler: every delay resumes as late again as it asked
+    // for, the way a delay does on a loaded runtime.
+    TimeProvider.set(
+      object : TimeProvider {
+        override fun currentTimeMillis(): Long = scheduler.currentTime * 2
+      },
+    )
+    try {
+      ArbigentReplayPacingStepInterceptor(traceWithTarget()).intercept(stepInput(device)) {
+        ArbigentAgent.StepResult.Continue
+      }
+    } finally {
+      TimeProvider.set(previous)
+    }
+
+    // The 10s budget is used up after 5s of requested delays. Summing the requested delays instead
+    // would have kept polling for 10s of them, which is 20s on the clock the budget is measured on.
+    assertEquals(5_000, currentTime, "the wait should stop when the clock, not the sum of delays, reaches the budget")
+    assertEquals(11, device.elementsCallCount, "ten 500ms polls fit in the budget, plus the first read")
+  }
+
+  @Test
+  fun `a replayed step with no recorded target keeps the recorded pace`() = runTest {
+    val trace = traceWithoutTarget(firstTimestamp = 1_000, secondTimestamp = 4_000)
+    val device = ScriptedDevice(listOf(ArbigentElementList(emptyList(), screenWidth = 1000)))
+    val contextHolder = ArbigentContextHolder("goal", 10)
+    val interceptor = ArbigentReplayPacingStepInterceptor(trace)
+
+    withVirtualClock {
+      // The first call has nothing to pace against; it is what records when replay reached step one.
+      interceptor.intercept(stepInput(device, contextHolder)) { ArbigentAgent.StepResult.Continue }
+      val action = GoalAchievedAgentAction()
+      contextHolder.addStep(
+        ArbigentContextHolder.Step(
+          stepId = "step-1",
+          agentAction = action,
+          cacheKey = "cache-key",
+          screenshotFilePath = "screenshot.png",
+        ),
+      )
+      interceptor.intercept(stepInput(device, contextHolder)) { ArbigentAgent.StepResult.Continue }
+
+      assertEquals(
+        10_000L + 3_000L,
+        currentTime,
+        "the first step has no recorded interval so it waits the minimum, and the second waits " +
+          "out the 3000ms recorded between them",
+      )
+      assertEquals(0, device.elementsCallCount, "pacing should not read the screen")
+    }
+  }
+
+  @Test
+  fun `a step whose budget is already spent still reads the screen once`() = runTest {
+    val absent = ArbigentElementList(emptyList(), screenWidth = 1000)
+    val device = ScriptedDevice(listOf(absent))
+    val trace = traceWithTarget(secondTimestamp = 1_000)
+    val contextHolder = ArbigentContextHolder("goal", 10)
+    val interceptor = ArbigentReplayPacingStepInterceptor(trace)
+    var proceeded = false
+
+    withVirtualClock {
+      interceptor.intercept(stepInput(device, contextHolder)) { ArbigentAgent.StepResult.Continue }
+      val action = ClickWithTextAgentAction("target")
+      contextHolder.addStep(
+        ArbigentContextHolder.Step(
+          stepId = "step-1",
+          agentAction = action,
+          cacheKey = "cache-key",
+          screenshotFilePath = "screenshot.png",
+        ),
+      )
+      // The replayed action took longer than the whole recorded interval, so nothing is left of it.
+      delay(2_000)
+      val readsBefore = device.elementsCallCount
+      val startedAt = currentTime
+      interceptor.intercept(stepInput(device, contextHolder)) {
+        proceeded = true
+        ArbigentAgent.StepResult.Continue
+      }
+
+      assertTrue(proceeded, "a spent budget must not stop the step from being captured")
+      assertEquals(startedAt, currentTime, "there was nothing left of the interval to wait out")
+      assertEquals(
+        1,
+        device.elementsCallCount - readsBefore,
+        "the screen should be read exactly once: before the spent budget is consulted",
+      )
+    }
+  }
+
+  @Test
+  fun `a replayed step waits out only what is left of the recorded interval`() = runTest {
+    val absent = ArbigentElementList(emptyList(), screenWidth = 1000)
+    val device = ScriptedDevice(listOf(absent))
+    val trace = traceWithoutTarget(firstTimestamp = 1_000, secondTimestamp = 6_000)
+    val contextHolder = ArbigentContextHolder("goal", 10)
+    val interceptor = ArbigentReplayPacingStepInterceptor(trace)
+
+    withVirtualClock {
+      interceptor.intercept(stepInput(device, contextHolder)) { ArbigentAgent.StepResult.Continue }
+      val action = GoalAchievedAgentAction()
+      contextHolder.addStep(
+        ArbigentContextHolder.Step(
+          stepId = "step-1",
+          agentAction = action,
+          cacheKey = "cache-key",
+          screenshotFilePath = "screenshot.png",
+        ),
+      )
+      // The replayed action itself took 2000ms, which the recorded interval already covers.
+      delay(2_000)
+      val startedAt = currentTime
+      interceptor.intercept(stepInput(device, contextHolder)) { ArbigentAgent.StepResult.Continue }
+
+      assertEquals(
+        3_000L,
+        currentTime - startedAt,
+        "the time the action itself took should be subtracted from the recorded interval",
+      )
+    }
+  }
+
+  /**
+   * Runs [block] with the clock the interceptor measures elapsed time against driven by the test
+   * scheduler, so time the test spends in [delay] counts as time the replayed action took.
+   */
+  /**
+   * Runs [block] with the clock the wait measures against pointed at the test scheduler.
+   *
+   * The wait reads [TimeProvider] twice — for the time already spent since the previous step, and
+   * for how long each hierarchy read took — while `delay` moves only the virtual clock. Left on
+   * real time those two readings are a few stray milliseconds of whatever the machine was doing,
+   * which is enough to make an exact assertion on `currentTime` fail on a slow CI runner.
+   */
+  private suspend fun TestScope.withVirtualClock(block: suspend () -> Unit) {
+    val scheduler = testScheduler
+    val previous = TimeProvider.get()
+    TimeProvider.set(
+      object : TimeProvider {
+        override fun currentTimeMillis(): Long = scheduler.currentTime
+      },
+    )
+    try {
+      block()
+    } finally {
+      TimeProvider.set(previous)
+    }
+  }
+
+  private companion object {
+    private const val ReadCostMillis = 200L
+  }
+
+  /** Hands out a scripted screen per [elements] call, repeating the last one once exhausted. */
+  private class ScriptedDevice(
+    private val screens: List<ArbigentElementList>,
+  ) : ArbigentDevice by FakeDevice() {
+    var elementsCallCount: Int = 0
+      private set
+
+    override fun elements(): ArbigentElementList {
+      val screen = screens[elementsCallCount.coerceAtMost(screens.lastIndex)]
+      elementsCallCount++
+      return screen
+    }
+  }
+
+  private fun stepInput(
+    device: ArbigentDevice,
+    contextHolder: ArbigentContextHolder = ArbigentContextHolder("goal", 10),
+  ): ArbigentAgent.StepInput = ArbigentAgent.StepInput(
+    arbigentContextHolder = contextHolder,
+    agentActionTypes = defaultAgentActionTypesForVisualMode(),
+    device = device,
+    deviceFormFactor = ArbigentScenarioDeviceFormFactor.Mobile,
+    ai = FakeAi(),
+    decisionChain = { error("Decision chain should not run") },
+    imageAssertionChain = { ArbigentAi.ImageAssertionOutput(emptyList()) },
+    executeActionChain = { ArbigentAgent.ExecuteActionsOutput() },
+    prompt = ArbigentPrompt(),
+    aiOptions = null,
+    attemptMode = ArbigentAttemptMode.ReplayWithFallback,
+  )
+
+  /**
+   * A trace whose steps all act on the same target. With a [secondTimestamp] it has two steps
+   * recorded that far apart, so the second one has an interval to derive its budget from.
+   */
+  private fun traceWithTarget(secondTimestamp: Long? = null): ArbigentReplayTrace {
+    val action = ClickWithTextAgentAction("target")
+    val timestamps = listOfNotNull(0L.takeIf { secondTimestamp != null }, secondTimestamp)
+      .ifEmpty { listOf(null) }
+    return trace(
+      timestamps.mapIndexed { index, timestamp ->
+        ArbigentContextHolder.Step(
+          stepId = "step-${index + 1}",
+          agentAction = action,
+          cacheKey = "cache-key",
+          screenshotFilePath = "screenshot.png",
+          targetElement = ArbigentElementIdentity(text = "target"),
+        ).let { step -> if (timestamp == null) step else step.copy(timestamp = timestamp) } to action
+      },
+    )
+  }
+
+  private fun traceWithoutTarget(
+    firstTimestamp: Long,
+    secondTimestamp: Long,
+  ): ArbigentReplayTrace {
+    val action = GoalAchievedAgentAction()
+    return trace(
+      listOf(firstTimestamp, secondTimestamp).mapIndexed { index, timestamp ->
+        ArbigentContextHolder.Step(
+          stepId = "step-${index + 1}",
+          agentAction = action,
+          cacheKey = "cache-key",
+          screenshotFilePath = "screenshot.png",
+          timestamp = timestamp,
+        ) to action
+      },
+    )
+  }
+
+  private fun trace(
+    steps: List<Pair<ArbigentContextHolder.Step, ArbigentAgentAction>>,
+  ): ArbigentReplayTrace = ArbigentReplayTrace(
+    version = "1.2.3",
+    scenarioId = "scenario",
+    taskIndex = 0,
+    taskIdentity = "scenario",
+    goalHash = "goal-hash",
+    steps = steps.map { (step, action) ->
+      ArbigentReplayTraceStep(
+        decisionOutput = ArbigentAi.DecisionOutput(agentActions = listOf(action), step = step),
+      )
+    },
+  )
 
   /** The smallest trace [ArbigentReplayTrace.isValidFor] accepts: one step that reaches the goal. */
   private fun minimalTrace(key: ArbigentReplayTraceKey): ArbigentReplayTrace {
@@ -405,6 +850,7 @@ class ArbigentReplayTraceTest {
     text: String,
     resourceId: String,
     accessibilityId: String,
+    y: Int = 0,
   ): ArbigentElement = ArbigentElement(
     index = 0,
     textForAI = text,
@@ -419,7 +865,7 @@ class ArbigentReplayTraceTest {
       children = emptyList(),
     ),
     x = 0,
-    y = 0,
+    y = y,
     width = 10,
     height = 10,
     isVisible = true,
