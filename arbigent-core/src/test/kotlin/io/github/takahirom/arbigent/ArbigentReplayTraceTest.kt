@@ -232,6 +232,33 @@ class ArbigentReplayTraceTest {
   }
 
   @Test
+  fun `a poll that resumes late is charged for the time it really took`() = runTest {
+    val absent = ArbigentElementList(emptyList(), screenWidth = 1000)
+    val device = ScriptedDevice(listOf(absent))
+    val scheduler = testScheduler
+    val previous = TimeProvider.get()
+    // The clock runs twice as fast as the scheduler: every delay resumes as late again as it asked
+    // for, the way a delay does on a loaded runtime.
+    TimeProvider.set(
+      object : TimeProvider {
+        override fun currentTimeMillis(): Long = scheduler.currentTime * 2
+      },
+    )
+    try {
+      ArbigentReplayPacingStepInterceptor(traceWithTarget()).intercept(stepInput(device)) {
+        ArbigentAgent.StepResult.Continue
+      }
+    } finally {
+      TimeProvider.set(previous)
+    }
+
+    // The 10s budget is used up after 5s of requested delays. Summing the requested delays instead
+    // would have kept polling for 10s of them, which is 20s on the clock the budget is measured on.
+    assertEquals(5_000, currentTime, "the wait should stop when the clock, not the sum of delays, reaches the budget")
+    assertEquals(11, device.elementsCallCount, "ten 500ms polls fit in the budget, plus the first read")
+  }
+
+  @Test
   fun `a replayed step with no recorded target keeps the recorded pace`() = runTest {
     val trace = traceWithoutTarget(firstTimestamp = 1_000, secondTimestamp = 4_000)
     val device = ScriptedDevice(listOf(ArbigentElementList(emptyList(), screenWidth = 1000)))
