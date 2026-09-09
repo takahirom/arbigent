@@ -108,6 +108,7 @@ class ArbigentReplayTraceTest {
     taskIndex = 0,
     taskIdentity = "scenario",
     goal = "goal",
+    maxStep = 10,
   )
 
   private fun timestampedSteps(timestamps: List<Long>): List<ArbigentContextHolder.Step> {
