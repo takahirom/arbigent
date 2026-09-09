@@ -3,6 +3,7 @@ package io.github.takahirom.arbigent
 import io.github.takahirom.arbigent.sample.test.FakeAi
 import io.github.takahirom.arbigent.sample.test.FakeDevice
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
+import io.github.takahirom.arbigent.result.ArbigentStepSource
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.currentTime
@@ -18,6 +19,104 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ArbigentReplayTraceTest {
+  @Test
+  fun `fallback candidate preserves recorded prefix intervals and fresh AI intervals`() {
+    val recordedSteps = timestampedSteps(listOf(1_000, 5_000, 12_000, 21_000))
+    val recordedTrace = trace(recordedSteps.map { it to requireNotNull(it.agentAction) })
+    val replayedSteps = recordedSteps.take(3).mapIndexed { index, step ->
+      step.copy(timestamp = 100_000L + index * 100L, stepSource = ArbigentStepSource.Replay)
+    }
+    val aiSteps = timestampedSteps(listOf(102_200, 105_200)).mapIndexed { index, step ->
+      step.copy(stepId = "ai-$index")
+    }
+
+    // Both sources of replayed steps share the recording's order, even when the prefix spans them.
+    for (precedingCount in 0..replayedSteps.size) {
+      val context = ArbigentContextHolder("goal", 10).apply {
+        (replayedSteps.drop(precedingCount) + aiSteps).forEach(::addStep)
+      }
+      val candidate = ArbigentReplayTrace.candidateFrom(
+        key = candidateKey(),
+        contextHolder = context,
+        precedingSteps = replayedSteps.take(precedingCount),
+        recordedTrace = recordedTrace,
+      )
+      val writtenSteps = candidate.steps.map { it.decisionOutput.step }
+
+      assertEquals(listOf(4_000L, 7_000L, 2_000L, 3_000L), writtenSteps.map { it.timestamp }.zipWithNext { a, b -> b - a })
+      assertEquals(replayedSteps.last().timestamp, writtenSteps[2].timestamp)
+      assertEquals(aiSteps, writtenSteps.drop(3))
+      assertEquals(replayedSteps.drop(precedingCount) + aiSteps, context.steps())
+    }
+  }
+
+  @Test
+  fun `clean replay candidate preserves all recorded intervals`() {
+    val recordedSteps = timestampedSteps(listOf(1_000, 5_000, 12_000, 21_000))
+    val recordedTrace = trace(recordedSteps.map { it to requireNotNull(it.agentAction) })
+    val freshSteps = recordedSteps.mapIndexed { index, step ->
+      step.copy(timestamp = 100_000L + index * 100L, stepSource = ArbigentStepSource.Replay)
+    }
+    val context = ArbigentContextHolder("goal", 10).apply { freshSteps.forEach(::addStep) }
+
+    val candidate = ArbigentReplayTrace.candidateFrom(candidateKey(), context, recordedTrace = recordedTrace)
+    val writtenTimestamps = candidate.steps.map { it.decisionOutput.step.timestamp }
+
+    assertEquals(listOf(4_000L, 7_000L, 9_000L), writtenTimestamps.zipWithNext { a, b -> b - a })
+    assertEquals(freshSteps.last().timestamp, writtenTimestamps.last())
+    assertEquals(freshSteps, context.steps())
+  }
+
+  @Test
+  fun `normal candidate keeps its own timestamps`() {
+    val freshSteps = timestampedSteps(listOf(100_000, 102_200, 105_200))
+    val context = ArbigentContextHolder("goal", 10).apply { freshSteps.forEach(::addStep) }
+
+    val candidate = ArbigentReplayTrace.candidateFrom(candidateKey(), context)
+
+    assertEquals(freshSteps, candidate.steps.map { it.decisionOutput.step })
+  }
+
+  @Test
+  fun `candidate rejects a replayed prefix longer than the recording`() {
+    val context = ArbigentContextHolder("goal", 10).apply {
+      timestampedSteps(listOf(100_000, 100_100)).forEach {
+        addStep(it.copy(stepSource = ArbigentStepSource.Replay))
+      }
+    }
+
+    assertFailsWith<IllegalArgumentException> {
+      ArbigentReplayTrace.candidateFrom(candidateKey(), context, recordedTrace = minimalTrace(candidateKey()))
+    }
+  }
+
+  @Test
+  fun `candidate rejects a preceding step that did not come from replay`() {
+    assertFailsWith<IllegalArgumentException> {
+      ArbigentReplayTrace.candidateFrom(
+        key = candidateKey(),
+        contextHolder = ArbigentContextHolder("goal", 10),
+        precedingSteps = timestampedSteps(listOf(100_000)),
+        recordedTrace = minimalTrace(candidateKey()),
+      )
+    }
+  }
+
+  private fun candidateKey(): ArbigentReplayTraceKey = ArbigentReplayTraceKey(
+    version = "1.2.3",
+    scenarioId = "scenario",
+    taskIndex = 0,
+    taskIdentity = "scenario",
+    goal = "goal",
+  )
+
+  private fun timestampedSteps(timestamps: List<Long>): List<ArbigentContextHolder.Step> {
+    val step = minimalTrace(candidateKey()).steps.single().decisionOutput.step
+    return timestamps.mapIndexed { index, timestamp ->
+      step.copy(stepId = "step-$index", timestamp = timestamp)
+    }
+  }
+
   @Test
   fun `trace round trip preserves actions and target identity`() {
     val directory = Files.createTempDirectory("arbigent-replay-trace-test").toFile()
