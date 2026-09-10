@@ -8,29 +8,42 @@ package io.github.takahirom.arbigent
  *
  * ```yaml
  * scenarios:
- * # [depth 0] launch-app | children: complete-onboarding
+ * # The "# tree:" lines below are generated from `dependency` by `arbigent sort` ...
+ * # tree: launch-app | children: complete-onboarding
  * - id: launch-app
  *   ...
- * # [depth 2] launch-app > complete-onboarding > open-search | children: type-keyword
+ * # tree: launch-app > complete-onboarding > open-search | children: type-keyword
  * - id: open-search
  *   dependency: complete-onboarding
  * ```
  *
  * The comments are derived from `dependency` on every write and carry no information of their
  * own; `dependency` stays the single source of truth. They exist so that a reader — a person or a
- * coding agent looking at one scenario in a flat file — can see its depth, its ancestors and its
- * direct dependents without searching the rest of the file.
+ * coding agent looking at one scenario in a flat file — can see its ancestors (root first) and
+ * its direct dependents without searching the rest of the file. The header line under
+ * `scenarios:` tells a reader of the whole file that the lines are generated and how to refresh them.
  *
  * The rewrite works on the YAML *text*, not on a decode/encode round trip: each `- id:` item is
  * cut out as a block of lines and the blocks are reordered. Everything inside a block — quoting
  * style, comments, blank lines, keys the serializer does not know — is left byte-for-byte as it
- * was. Only lines matching [POSITION_COMMENT_MARKER] are regenerated. Roots and siblings keep
+ * was. Only lines matching [POSITION_COMMENT_MARKER] or [HEADER_COMMENT_MARKER] are regenerated. Roots and siblings keep
  * their declared order, so a hand-curated grouping of top-level flows survives.
  */
 public object ArbigentScenarioSorter {
 
-  /** A line that this sorter wrote and owns; any such line is replaced on the next sort. */
-  public val POSITION_COMMENT_MARKER: Regex = Regex("""^\s*#\s*\[depth \d+]""")
+  /**
+   * A position comment this sorter wrote and owns; any such line is replaced on the next sort.
+   * `# [depth N]` is the form an earlier build wrote and is recognised so it gets replaced too.
+   */
+  public val POSITION_COMMENT_MARKER: Regex = Regex("""^\s*#\s*(tree:|\[depth \d+])""")
+
+  /** The explanatory line written directly under `scenarios:`. */
+  public const val HEADER_COMMENT: String =
+    "# The \"# tree:\" lines below are generated from `dependency` by `arbigent sort` (and on UI save); " +
+      "do not edit them, rerun `arbigent sort`."
+
+  /** Recognises [HEADER_COMMENT] and earlier wordings of it. */
+  public val HEADER_COMMENT_MARKER: Regex = Regex("""^\s*#\s*The "# tree:" lines below are generated""")
 
   public class Result(
     /** The rewritten YAML. Equal to the input when nothing had to change. */
@@ -39,6 +52,8 @@ public object ArbigentScenarioSorter {
     public val movedScenarioIds: List<String>,
     /** Scenarios whose position comment was missing, outdated, or (when disabled) still present. */
     public val staleCommentScenarioIds: List<String>,
+    /** Whether the header line under `scenarios:` was missing, outdated, or (when disabled) still present. */
+    public val headerStale: Boolean,
   )
 
   /**
@@ -57,7 +72,7 @@ public object ArbigentScenarioSorter {
    */
   public fun sort(yamlText: String, content: ArbigentProjectFileContent, positionComments: Boolean): Result {
     val scenarios = content.scenarioContents
-    if (scenarios.isEmpty()) return Result(yamlText, emptyList(), emptyList())
+    if (scenarios.isEmpty()) return Result(yamlText, emptyList(), emptyList(), headerStale = false)
 
     val split = splitScenarioBlocks(yamlText)
     require(split.blocks.size == scenarios.size) {
@@ -74,18 +89,31 @@ public object ArbigentScenarioSorter {
     val moved = mutableListOf<String>()
     val stale = mutableListOf<String>()
     val out = StringBuilder()
-    split.header.forEach { out.appendLine(it) }
-    ordered.forEachIndexed { newIndex, (scenario, depth) ->
+    // Everything up to and including `scenarios:` stays; our header line goes directly under it.
+    // An existing header may sit in the split header or, when it touches the first item, in that
+    // item's leading comments; either way it is dropped there and rewritten here.
+    val top = split.header.subList(0, split.keyIndex + 1)
+    val afterKey = split.header.subList(split.keyIndex + 1, split.header.size)
+    val oldHeaderLines = (afterKey + split.blocks.flatMap { it.leadingComments })
+      .filter { HEADER_COMMENT_MARKER.containsMatchIn(it) }
+    val expectedHeader = if (positionComments) listOf(HEADER_COMMENT) else emptyList()
+    val headerStale = oldHeaderLines != expectedHeader
+    top.forEach { out.appendLine(it) }
+    expectedHeader.forEach { out.appendLine(it) }
+    afterKey.filterNot { HEADER_COMMENT_MARKER.containsMatchIn(it) }.forEach { out.appendLine(it) }
+    ordered.forEachIndexed { newIndex, (scenario, _) ->
       val oldIndex = scenarios.indexOf(scenario)
       val block = split.blocks[oldIndex]
       if (oldIndex != newIndex) moved += scenario.id
 
       val expected = if (positionComments) {
-        listOf(indent + positionComment(scenario, depth, scenarios, childrenOf))
+        listOf(indent + positionComment(scenario, scenarios, childrenOf))
       } else {
         emptyList()
       }
-      val (ownComments, otherComments) = block.leadingComments.partition { POSITION_COMMENT_MARKER.containsMatchIn(it) }
+      val (ownComments, otherComments) = block.leadingComments
+        .filterNot { HEADER_COMMENT_MARKER.containsMatchIn(it) }
+        .partition { POSITION_COMMENT_MARKER.containsMatchIn(it) }
       if (ownComments != expected) stale += scenario.id
 
       otherComments.forEach { out.appendLine(it) }
@@ -97,7 +125,7 @@ public object ArbigentScenarioSorter {
     out.setLength(out.length - 1)
     val yaml = out.toString()
     if (yaml != yamlText) requireSameProject(content, ordered.map { it.first }, yaml)
-    return Result(yaml, moved, stale)
+    return Result(yaml, moved, stale, headerStale)
   }
 
   /**
@@ -135,7 +163,6 @@ public object ArbigentScenarioSorter {
 
   private fun positionComment(
     scenario: ArbigentScenarioContent,
-    depth: Int,
     scenarios: List<ArbigentScenarioContent>,
     childrenOf: Map<String?, List<ArbigentScenarioContent>>,
   ): String {
@@ -150,7 +177,7 @@ public object ArbigentScenarioSorter {
     }
     val children = childrenOf[scenario.id].orEmpty().map { it.id }
     return buildString {
-      append("# [depth ").append(depth).append("] ").append(chain.joinToString(" > ") { it.singleLine() })
+      append("# tree: ").append(chain.joinToString(" > ") { it.singleLine() })
       if (children.isNotEmpty()) append(" | children: ").append(children.joinToString(", ") { it.singleLine() })
     }
   }
@@ -161,7 +188,9 @@ public object ArbigentScenarioSorter {
   private class Block(val leadingComments: List<String>, val body: List<String>)
 
   private class Split(
+    /** Lines up to and including `scenarios:` (index [keyIndex]), plus comments before the first item. */
     val header: List<String>,
+    val keyIndex: Int,
     val itemIndent: Int,
     val blocks: List<Block>,
     val footer: List<String>,
@@ -267,6 +296,6 @@ public object ArbigentScenarioSorter {
       i++
     }
     if (i >= lines.size) footer = endList(emptyList())
-    return Split(header, itemIndent, blocks, footer)
+    return Split(header, keyIndex, itemIndent, blocks, footer)
   }
 }

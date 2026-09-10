@@ -315,7 +315,7 @@ class ArbigentAppStateHolder(
   val additionalActionsFlow = MutableStateFlow<List<String>?>(null)
   // Null means "not set": scenarios without their own maxRetry use the built-in default.
   val projectMaxRetryFlow = MutableStateFlow<Int?>(null)
-  // Whether saving writes `# [depth N] ...` position comments above scenarios (settings.positionComments).
+  // Whether saving writes `# tree: ...` position comments above scenarios (settings.positionComments).
   val positionCommentsFlow = MutableStateFlow(true)
   val decisionCache = cacheStrategyFlow
     .map {

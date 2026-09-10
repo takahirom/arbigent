@@ -153,9 +153,9 @@ Takes a positional `goal` argument (required), the AI-provider group, `--os`,
 
 Rewrites the project file into depth-first dependency order: each scenario comes after the
 scenario it depends on, and its whole subtree comes before the next sibling (roots and siblings
-keep their declared order). It also refreshes the `# [depth N] root > ... > id | children: ...`
-position comment above each scenario. Only the scenario blocks move and only those comment
-lines change; the rest of the file is left byte for byte. Requires a YAML project file (not a
+keep their declared order). It also refreshes the `# tree: root > ... > id | children: ...`
+position comment above each scenario, plus one header line under `scenarios:` saying the comments
+are generated. Only the scenario blocks move and only those comment lines change; the rest of the file is left byte for byte. Requires a YAML project file (not a
 Journeys XML source) that passes validation.
 
 | Flag | Settings key | Notes |

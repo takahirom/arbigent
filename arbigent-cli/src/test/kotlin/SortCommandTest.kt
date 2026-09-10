@@ -44,26 +44,27 @@ scenarios:
     val result = ArbigentSortCommand().test("--project-file=${yaml.absolutePath}")
 
     assertEquals(0, result.statusCode, result.output)
-    assertContains(result.output, "Sorted ${yaml.absolutePath}: 3 scenarios out of place, 5 position comments stale.")
+    assertContains(result.output, "Sorted ${yaml.absolutePath}: 3 scenarios out of place, 5 position comments stale, header comment stale.")
     assertEquals(
       """
 scenarios:
-# [depth 0] launch-app | children: open-search, open-settings
+# The "# tree:" lines below are generated from `dependency` by `arbigent sort` (and on UI save); do not edit them, rerun `arbigent sort`.
+# tree: launch-app | children: open-search, open-settings
 - id: "launch-app"
   goal: "Launch the app"
-# [depth 1] launch-app > open-search | children: type-keyword
+# tree: launch-app > open-search | children: type-keyword
 - id: "open-search"
   goal: "Open search"
   dependency: "launch-app"
-# [depth 2] launch-app > open-search > type-keyword
+# tree: launch-app > open-search > type-keyword
 - id: "type-keyword"
   goal: "Type a keyword"
   dependency: "open-search"
-# [depth 1] launch-app > open-settings | children: toggle-dark-mode
+# tree: launch-app > open-settings | children: toggle-dark-mode
 - id: "open-settings"
   goal: "Open settings"
   dependency: "launch-app"
-# [depth 2] launch-app > open-settings > toggle-dark-mode
+# tree: launch-app > open-settings > toggle-dark-mode
 - id: "toggle-dark-mode"
   goal: "Toggle dark mode"
   dependency: "open-settings"
@@ -92,8 +93,8 @@ scenarios:
     assertEquals(unsorted, yaml.readText())
     assertContains(result.output, "--- ${yaml.absolutePath}")
     assertContains(result.output, "+++ ${yaml.absolutePath} (sorted)")
-    assertContains(result.output, "+# [depth 2] launch-app > open-search > type-keyword")
-    assertContains(result.output, "3 scenarios out of place, 5 position comments stale. Run `arbigent sort` to apply.")
+    assertContains(result.output, "+# tree: launch-app > open-search > type-keyword")
+    assertContains(result.output, "3 scenarios out of place, 5 position comments stale, header comment stale. Run `arbigent sort` to apply.")
   }
 
   @Test
@@ -109,13 +110,13 @@ scenarios:
   @Test
   fun `no-comments sorts without position comments and removes existing ones`() {
     ArbigentSortCommand().test("--project-file=${yaml.absolutePath}")
-    assertTrue(yaml.readText().contains("# [depth"))
+    assertTrue(yaml.readText().contains("# tree:"))
 
     val result = ArbigentSortCommand().test("--project-file=${yaml.absolutePath} --no-comments")
 
     assertEquals(0, result.statusCode, result.output)
-    assertFalse(yaml.readText().contains("# [depth"), yaml.readText())
-    assertContains(result.output, "0 scenarios out of place, 5 position comments stale.")
+    assertFalse(yaml.readText().contains("#"), yaml.readText())
+    assertContains(result.output, "0 scenarios out of place, 5 position comments stale, header comment stale.")
   }
 
   @Test
@@ -134,6 +135,6 @@ scenarios:
     assertEquals(1, result.statusCode, result.output)
     assertContains(result.output, "Invalid project configuration in ${yaml.absolutePath}")
     assertContains(result.output, "'missing'")
-    assertFalse(yaml.readText().contains("# [depth"))
+    assertFalse(yaml.readText().contains("#"))
   }
 }

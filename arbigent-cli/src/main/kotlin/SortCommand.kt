@@ -16,7 +16,7 @@ import java.io.File
 
 /**
  * Rewrites the project file so each scenario follows the scenario it depends on and carries a
- * position comment (`# [depth N] root > ... > id | children: ...`). Text outside the reordered
+ * position comment (`# tree: root > ... > id | children: ...`). Text outside the reordered
  * blocks is left untouched. `--diff` reports what would change instead of writing, for CI.
  */
 class ArbigentSortCommand : CliktCommand(name = "sort") {
@@ -71,7 +71,8 @@ class ArbigentSortCommand : CliktCommand(name = "sort") {
   private fun summarize(result: ArbigentScenarioSorter.Result): String {
     fun count(n: Int, noun: String) = "$n $noun" + if (n == 1) "" else "s"
     return count(result.movedScenarioIds.size, "scenario") + " out of place, " +
-      count(result.staleCommentScenarioIds.size, "position comment") + " stale."
+      count(result.staleCommentScenarioIds.size, "position comment") + " stale" +
+      (if (result.headerStale) ", header comment stale." else ".")
   }
 
   private fun unifiedDiff(path: String, original: String, revised: String): String {

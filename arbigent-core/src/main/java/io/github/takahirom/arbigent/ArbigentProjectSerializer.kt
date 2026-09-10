@@ -264,7 +264,7 @@ public data class ArbigentProjectSettings(
   // Retry count for scenarios that do not declare their own. Absent means DefaultMaxRetry.
   public val maxRetry: Int? = null,
   /**
-   * Whether saving writes a `# [depth N] root > ... > id | children: ...` comment above each
+   * Whether saving writes a `# tree: root > ... > id | children: ...` comment above each
    * scenario (see [ArbigentScenarioSorter]). Derived from `dependency` on every save; `false`
    * removes them.
    */

@@ -6,6 +6,7 @@ import io.github.takahirom.arbigent.ArbigentScenarioSorter
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ArbigentScenarioSorterTest {
@@ -33,18 +34,19 @@ scenarios:
     assertEquals(
       """
 scenarios:
-# [depth 0] launch-app | children: open-settings, open-search
+# The "# tree:" lines below are generated from `dependency` by `arbigent sort` (and on UI save); do not edit them, rerun `arbigent sort`.
+# tree: launch-app | children: open-settings, open-search
 - id: "launch-app"
   goal: "Launch the app"
-# [depth 1] launch-app > open-settings | children: toggle-dark-mode
+# tree: launch-app > open-settings | children: toggle-dark-mode
 - id: "open-settings"
   goal: "Open settings"
   dependency: "launch-app"
-# [depth 2] launch-app > open-settings > toggle-dark-mode
+# tree: launch-app > open-settings > toggle-dark-mode
 - id: "toggle-dark-mode"
   goal: "Toggle dark mode"
   dependency: "open-settings"
-# [depth 1] launch-app > open-search
+# tree: launch-app > open-search
 - id: "open-search"
   goal: "Open search"
   dependency: "launch-app"
@@ -66,6 +68,7 @@ scenarios:
     assertEquals(once, twice.yaml)
     assertEquals(emptyList(), twice.movedScenarioIds)
     assertEquals(emptyList(), twice.staleCommentScenarioIds)
+    assertFalse(twice.headerStale)
   }
 
   @Test
@@ -102,15 +105,16 @@ reusableScenarios: []
 settings:
   maxRetry: 2
 scenarios:
+# The "# tree:" lines below are generated from `dependency` by `arbigent sort` (and on UI save); do not edit them, rerun `arbigent sort`.
 
   # The entry point
-  # [depth 0] launch-app | children: open-settings
+  # tree: launch-app | children: open-settings
   - id: launch-app
     goal: >-
       Launch the app
       # not a comment, part of the goal
     unknownKey: kept
-  # [depth 1] launch-app > open-settings
+  # tree: launch-app > open-settings
   - id: open-settings
     # why: settings is the hub
     dependency: launch-app
@@ -166,8 +170,9 @@ scenarios:
 
     val result = ArbigentScenarioSorter.sort(commented, positionComments = false)
 
-    assertTrue(result.yaml.lines().none { ArbigentScenarioSorter.POSITION_COMMENT_MARKER.containsMatchIn(it) }, result.yaml)
+    assertTrue(result.yaml.lines().none { it.startsWith("#") }, result.yaml)
     assertEquals(4, result.staleCommentScenarioIds.size)
+    assertTrue(result.headerStale)
   }
 
   @Test
@@ -215,7 +220,10 @@ scenarios:
 
     assertEquals(
       encoded.lines(),
-      sorted.lines().filterNot { ArbigentScenarioSorter.POSITION_COMMENT_MARKER.containsMatchIn(it) }
+      sorted.lines().filterNot {
+        ArbigentScenarioSorter.POSITION_COMMENT_MARKER.containsMatchIn(it) ||
+          ArbigentScenarioSorter.HEADER_COMMENT_MARKER.containsMatchIn(it)
+      }
     )
     assertEquals(4, sorted.lines().count { ArbigentScenarioSorter.POSITION_COMMENT_MARKER.containsMatchIn(it) })
   }
@@ -243,14 +251,16 @@ scenarios:
     assertEquals(
       """
 scenarios:
+# The "# tree:" lines below are generated from `dependency` by `arbigent sort` (and on UI save); do not edit them, rerun `arbigent sort`.
 
-# [depth 0] launch-app
+# tree: launch-app
 - id: "launch-app"
   goal: "Launch the app"
 """.trimStart(),
       result.yaml
     )
     assertEquals(listOf("launch-app"), result.staleCommentScenarioIds)
+    assertTrue(result.headerStale)
     val removed = ArbigentScenarioSorter.sort(original, positionComments = false).yaml
     assertTrue(removed.lines().none { ArbigentScenarioSorter.POSITION_COMMENT_MARKER.containsMatchIn(it) }, removed)
   }
@@ -268,7 +278,8 @@ scenarios:
     assertEquals(
       """
 scenarios:
-# [depth 0] launch\napp
+# The "# tree:" lines below are generated from `dependency` by `arbigent sort` (and on UI save); do not edit them, rerun `arbigent sort`.
+# tree: launch\napp
 - id: "launch\napp"
   goal: "Launch the app"
 """.trimStart(),

@@ -103,7 +103,7 @@ Legacy scenario-level field, tagged by `type:`. Distinct from the `CleanupData`
 | `deviceFormFactor` | [DeviceFormFactor](#deviceformfactor) | `Unspecified` | Default form factor for all scenarios. |
 | `additionalActions` | `List<String>?` | `null` | Project-wide extra actions. |
 | `maxRetry` | Int? | `null` | Default retry count for scenarios that do not set their own. Unset means `3`. |
-| `positionComments` | Boolean | `true` | Whether saving (UI) and `arbigent sort` write a `# [depth N] root > ... > id \| children: ...` comment above each scenario. The comment is derived from `dependency` and regenerated on every write; `false` removes it. See [Scenario order and position comments](#scenario-order-and-position-comments). |
+| `positionComments` | Boolean | `true` | Whether saving (UI) and `arbigent sort` write a `# tree: root > ... > id \| children: ...` comment above each scenario. The comment is derived from `dependency` and regenerated on every write; `false` removes it. See [Scenario order and position comments](#scenario-order-and-position-comments). |
 
 ### Prompt
 
@@ -242,19 +242,21 @@ a file has drifted.
 Both also write a *position comment* above each scenario. It is not a field: it is a
 YAML comment derived from `dependency`, rewritten on every save or sort, and safe to
 delete (set `settings.positionComments: false` to stop writing it). It exists so that a
-reader of one scenario can see its depth, its ancestors and its direct dependents without
-searching the file:
+reader of one scenario can see its ancestors and its direct dependents without
+searching the file. One header line directly under `scenarios:` says that these lines are
+generated and how to refresh them:
 
 ```yaml
 scenarios:
-# [depth 0] launch-app | children: open-search
+# The "# tree:" lines below are generated from `dependency` by `arbigent sort` (and on UI save); do not edit them, rerun `arbigent sort`.
+# tree: launch-app | children: open-search
 - id: "launch-app"
   goal: "Launch the app"
-# [depth 1] launch-app > open-search | children: type-keyword
+# tree: launch-app > open-search | children: type-keyword
 - id: "open-search"
   goal: "Open the search screen"
   dependency: "launch-app"
-# [depth 2] launch-app > open-search > type-keyword
+# tree: launch-app > open-search > type-keyword
 - id: "type-keyword"
   goal: "Type a keyword into the search box"
   dependency: "open-search"

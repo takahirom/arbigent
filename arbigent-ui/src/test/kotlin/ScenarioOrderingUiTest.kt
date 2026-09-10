@@ -123,7 +123,8 @@ class ScenarioOrderingUiTest {
     app.saveProjectContents(file)
 
     val commentLines = file.readLines().filter { ArbigentScenarioSorter.POSITION_COMMENT_MARKER.containsMatchIn(it) }
-    assertEquals(listOf("# [depth 0] root | children: child", "# [depth 1] root > child"), commentLines)
+    assertEquals(listOf("# tree: root | children: child", "# tree: root > child"), commentLines)
+    assertTrue(file.readLines().any { ArbigentScenarioSorter.HEADER_COMMENT_MARKER.containsMatchIn(it) }, file.readText())
     // The comments are not part of what the app tracks as content, so a fresh save is not "dirty".
     assertFalse(app.hasUnsavedChanges())
 
@@ -134,7 +135,7 @@ class ScenarioOrderingUiTest {
     app.loadProjectContents(file)
     app.saveProjectContents(file)
 
-    assertFalse(file.readLines().any { ArbigentScenarioSorter.POSITION_COMMENT_MARKER.containsMatchIn(it) }, file.readText())
+    assertFalse(file.readLines().any { it.startsWith("#") }, file.readText())
     assertTrue(file.readText().contains("positionComments: false"), file.readText())
     file.delete()
   }
