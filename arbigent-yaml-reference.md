@@ -233,8 +233,9 @@ Tagged by `type:`: `Mobile`, `Tv`, or `Unspecified` (default). No other fields.
 ## Scenario order and position comments
 
 The order of `scenarios` is the order `arbigent run` runs them in and the order `--shard`
-splits them by. The UI saves scenarios in dependency order: each scenario directly after
-the scenario it depends on, roots and siblings in their declared order. `arbigent sort`
+splits them by. The UI saves scenarios in dependency order (depth-first): a scenario comes after the
+scenario it depends on, and its whole subtree comes before the next sibling. Roots and
+siblings keep their declared order. `arbigent sort`
 brings a hand-edited file back to that order and `arbigent sort --diff` fails in CI when
 a file has drifted.
 

@@ -144,7 +144,7 @@ field name does not fail the load — it just does nothing. After editing, verif
 - `goal`: string. Natural-language goal the AI agent tries to achieve. Be specific and
   add guardrails ("Be careful not to open other pages").
 - `dependency`: id of another scenario that must run first (its steps are executed
-  before this scenario's goal). Place a new scenario right after its dependency and run
+  before this scenario's goal). Place a new scenario after its dependency (after any earlier siblings and their subtrees) and run
   `arbigent sort` afterwards: it fixes the order and rewrites the `# [depth N] ...`
   position comments above each scenario (see `arbigent guide inspecting-project`).
 - `initializationMethods`: list of setup actions, each with a `type` field:
@@ -259,7 +259,7 @@ as Mermaid text, ready to embed in Markdown.
     arbigent sort --project-file=path/to/project.yaml
     arbigent sort --diff --project-file=path/to/project.yaml   # CI check, exit 1 if not sorted
 
-`sort` moves each scenario directly after the scenario it depends on and writes a
+`sort` puts the scenarios in depth-first dependency order (each scenario after the scenario it depends on, its subtree before the next sibling) and writes a
 position comment above it, e.g. `# [depth 2] launch-app > log-in > open-search | children: type-keyword`.
 The comment is derived from `dependency` and regenerated on every sort or UI save, so it
 tells you a scenario's depth, ancestors and dependents without searching the file. After

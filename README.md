@@ -556,7 +556,7 @@ arbigent tags
 arbigent graph
 ```
 
-**Keep the project file in dependency order** (each scenario directly after the scenario it depends on, roots and siblings in their declared order). `sort` also writes a *position comment* above every scenario so that anyone reading one scenario in the flat YAML — including a coding agent — can see its depth, ancestors and dependents without searching the file. Only the scenario blocks are reordered and only these comments are rewritten; quoting, other comments and unknown keys are left as they are. The UI writes the same comments on save; set `settings.positionComments: false` in the project file to turn them off.
+**Keep the project file in dependency order** (depth-first: each scenario after the scenario it depends on, together with everything that depends on it, before the next sibling; roots and siblings in their declared order). `sort` also writes a *position comment* above every scenario so that anyone reading one scenario in the flat YAML — including a coding agent — can see its depth, ancestors and dependents without searching the file. Only the scenario blocks are reordered and only these comments are rewritten; quoting, other comments and unknown keys are left as they are. The UI writes the same comments on save; set `settings.positionComments: false` in the project file to turn them off.
 ```bash
 arbigent sort            # rewrite the project file
 arbigent sort --diff     # CI check: print what would change, exit 1 if anything

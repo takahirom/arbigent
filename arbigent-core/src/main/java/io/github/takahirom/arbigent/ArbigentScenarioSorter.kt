@@ -1,8 +1,9 @@
 package io.github.takahirom.arbigent
 
 /**
- * Rewrites the `scenarios:` section of a project YAML so that every scenario sits directly after
- * the scenario it depends on (the same order the UI saves in), and puts a *position comment*
+ * Rewrites the `scenarios:` section of a project YAML into depth-first dependency order: every
+ * scenario comes after the scenario it depends on, and its whole subtree comes before the next
+ * sibling (the same order the UI saves in), and puts a *position comment*
  * above each scenario that spells out where it sits in the dependency tree:
  *
  * ```yaml
