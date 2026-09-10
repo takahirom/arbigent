@@ -31,11 +31,8 @@ package io.github.takahirom.arbigent
  */
 public object ArbigentScenarioSorter {
 
-  /**
-   * A position comment this sorter wrote and owns; any such line is replaced on the next sort.
-   * `# [depth N]` is the form an earlier build wrote and is recognised so it gets replaced too.
-   */
-  public val POSITION_COMMENT_MARKER: Regex = Regex("""^\s*#\s*(tree:|\[depth \d+])""")
+  /** A position comment this sorter wrote and owns; any such line is replaced on the next sort. */
+  public val POSITION_COMMENT_MARKER: Regex = Regex("""^\s*#\s*tree:""")
 
   /** The explanatory line written directly under `scenarios:`. */
   public const val HEADER_COMMENT: String =

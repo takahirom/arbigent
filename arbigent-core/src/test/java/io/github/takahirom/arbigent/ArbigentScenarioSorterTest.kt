@@ -83,7 +83,7 @@ settings:
 scenarios:
 
   # The entry point
-  # [depth 7] stale > chain
+  # tree: stale > chain
   - id: launch-app
     goal: >-
       Launch the app
@@ -239,11 +239,11 @@ scenarios:
   fun `a stale position comment separated from its scenario by a blank line is still replaced`() {
     val original = """
 scenarios:
-# [depth 99] stale
+# tree: stale
 
 - id: "launch-app"
   goal: "Launch the app"
-# [depth 42] also stale
+# tree: also stale
 """.trimStart()
 
     val result = ArbigentScenarioSorter.sort(original)
