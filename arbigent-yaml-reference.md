@@ -259,6 +259,11 @@ scenarios:
   dependency: "open-search"
 ```
 
+`arbigent sort` moves whole `- id:` blocks and leaves every other line as it is, so quoting,
+blank lines and your own comments survive. Before writing it re-reads the result and refuses
+to change the file if the project would decode differently, which needs every scenario to have
+an explicit `id`.
+
 ## Minimal example
 
 ```yaml

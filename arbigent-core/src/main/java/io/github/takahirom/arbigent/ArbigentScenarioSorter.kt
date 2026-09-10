@@ -94,7 +94,42 @@ public object ArbigentScenarioSorter {
     split.footer.forEach { out.appendLine(it) }
     // splitting on "\n" and re-appending lines adds exactly one newline at the end; drop it.
     out.setLength(out.length - 1)
-    return Result(out.toString(), moved, stale)
+    val yaml = out.toString()
+    if (yaml != yamlText) requireSameProject(content, ordered.map { it.first }, yaml)
+    return Result(yaml, moved, stale)
+  }
+
+  /**
+   * The text split is line based and cannot see every YAML construct (a quoted scalar continuing
+   * at column zero, a `|+` block scalar whose trailing blank lines sit at the end of the list, an
+   * omitted `id` that decodes to a fresh random value each time). Rather than trust the split,
+   * decode the rewritten text and refuse to return it unless it is the same project with the
+   * scenarios in the new order.
+   */
+  private fun requireSameProject(
+    content: ArbigentProjectFileContent,
+    ordered: List<ArbigentScenarioContent>,
+    rewritten: String,
+  ) {
+    val serializer = ArbigentProjectSerializer()
+    val expected = serializer.encodeToString(
+      ArbigentProjectFileContent(
+        scenarioContents = ordered,
+        reusableScenarios = content.reusableScenarios,
+        fixedScenarios = content.fixedScenarios,
+        settings = content.settings,
+      )
+    )
+    val actual = try {
+      serializer.encodeToString(serializer.load(rewritten))
+    } catch (e: Exception) {
+      throw IllegalArgumentException("Reordering the scenarios would produce a project file that no longer parses: ${e.message}", e)
+    }
+    require(actual == expected) {
+      "Reordering the scenarios would change the project, so nothing was rewritten. This happens " +
+        "with scenarios that have no explicit `id`, quoted values that continue at column zero, and " +
+        "`|+` block scalars at the end of the list."
+    }
   }
 
   private fun positionComment(
@@ -114,10 +149,13 @@ public object ArbigentScenarioSorter {
     }
     val children = childrenOf[scenario.id].orEmpty().map { it.id }
     return buildString {
-      append("# [depth ").append(depth).append("] ").append(chain.joinToString(" > "))
-      if (children.isNotEmpty()) append(" | children: ").append(children.joinToString(", "))
+      append("# [depth ").append(depth).append("] ").append(chain.joinToString(" > ") { it.singleLine() })
+      if (children.isNotEmpty()) append(" | children: ").append(children.joinToString(", ") { it.singleLine() })
     }
   }
+
+  /** A comment is one line; an id containing a line break would end it early. */
+  private fun String.singleLine(): String = replace("\r", "\\r").replace("\n", "\\n")
 
   private class Block(val leadingComments: List<String>, val body: List<String>)
 
@@ -158,6 +196,18 @@ public object ArbigentScenarioSorter {
       body = mutableListOf()
     }
 
+    /** Position comments left behind after the last item are rewritten with that item. */
+    fun endList(rest: List<String>): List<String> {
+      closeBlock()
+      val (detached, footer) = pending.partition { POSITION_COMMENT_MARKER.containsMatchIn(it) }
+      pending.clear()
+      if (detached.isNotEmpty() && blocks.isNotEmpty()) {
+        val last = blocks.removeAt(blocks.size - 1)
+        blocks += Block(last.leadingComments + detached, last.body)
+      }
+      return footer + rest
+    }
+
     /** Attach [pending] to the item being read: it is inside the item, not between items. */
     fun flushPendingIntoBody() {
       body += pending
@@ -189,9 +239,10 @@ public object ArbigentScenarioSorter {
           closeBlock()
           // The comment run touching this item leads it; anything before the last blank line
           // belongs to whatever came before.
+          // A position comment separated from its item by a blank line is still ours to rewrite.
           val lastBlank = pending.indexOfLast { it.isBlank() }
-          val before = pending.subList(0, lastBlank + 1).toList()
-          val touching = pending.subList(lastBlank + 1, pending.size).toList()
+          val (detached, before) = pending.subList(0, lastBlank + 1).partition { POSITION_COMMENT_MARKER.containsMatchIn(it) }
+          val touching = detached + pending.subList(lastBlank + 1, pending.size)
           pending.clear()
           if (blocks.isEmpty()) header += before else {
             val last = blocks.removeAt(blocks.size - 1)
@@ -208,18 +259,13 @@ public object ArbigentScenarioSorter {
 
         else -> {
           // A key at or above the item level ends the scenarios list.
-          closeBlock()
-          footer = pending.toList() + lines.subList(i, lines.size)
-          pending.clear()
+          footer = endList(lines.subList(i, lines.size))
           break
         }
       }
       i++
     }
-    if (i >= lines.size) {
-      closeBlock()
-      footer = pending.toList()
-    }
+    if (i >= lines.size) footer = endList(emptyList())
     return Split(header, itemIndent, blocks, footer)
   }
 }

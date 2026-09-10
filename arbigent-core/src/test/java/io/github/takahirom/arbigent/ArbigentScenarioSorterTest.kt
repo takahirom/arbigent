@@ -228,6 +228,105 @@ scenarios:
   }
 
   @Test
+  fun `a stale position comment separated from its scenario by a blank line is still replaced`() {
+    val original = """
+scenarios:
+# [depth 99] stale
+
+- id: "launch-app"
+  goal: "Launch the app"
+# [depth 42] also stale
+""".trimStart()
+
+    val result = ArbigentScenarioSorter.sort(original)
+
+    assertEquals(
+      """
+scenarios:
+
+# [depth 0] launch-app
+- id: "launch-app"
+  goal: "Launch the app"
+""".trimStart(),
+      result.yaml
+    )
+    assertEquals(listOf("launch-app"), result.staleCommentScenarioIds)
+    val removed = ArbigentScenarioSorter.sort(original, positionComments = false).yaml
+    assertTrue(removed.lines().none { ArbigentScenarioSorter.POSITION_COMMENT_MARKER.containsMatchIn(it) }, removed)
+  }
+
+  @Test
+  fun `line breaks in ids are escaped so the comment stays one line`() {
+    val original = """
+scenarios:
+- id: "launch\napp"
+  goal: "Launch the app"
+""".trimStart()
+
+    val result = ArbigentScenarioSorter.sort(original)
+
+    assertEquals(
+      """
+scenarios:
+# [depth 0] launch\napp
+- id: "launch\napp"
+  goal: "Launch the app"
+""".trimStart(),
+      result.yaml
+    )
+    assertEquals("launch\napp", ArbigentProjectSerializer().load(result.yaml).scenarioContents.single().id)
+  }
+
+  @Test
+  fun `a scenario without an explicit id is rejected instead of getting a random comment`() {
+    val original = """
+scenarios:
+- goal: "Launch the app"
+""".trimStart()
+
+    val e = assertFailsWith<IllegalArgumentException> { ArbigentScenarioSorter.sort(original) }
+    assertTrue(e.message!!.contains("explicit `id`"), e.message)
+  }
+
+  @Test
+  fun `a quoted value continuing at column zero is rejected instead of swallowing a scenario`() {
+    val original = """
+scenarios:
+- id: "open-settings"
+  goal: "Open settings"
+  dependency: "launch-app"
+- id: "launch-app"
+  goal: "Launch
+the app"
+""".trimStart()
+
+    val e = assertFailsWith<IllegalArgumentException> { ArbigentScenarioSorter.sort(original) }
+    assertTrue(e.message!!.contains("Reordering the scenarios would"), e.message)
+  }
+
+  @Test
+  fun `a keep-chomping block scalar at the end of the list is rejected instead of losing its blank lines`() {
+    val original = "scenarios:\n- id: \"open-settings\"\n  goal: \"Open settings\"\n  dependency: \"launch-app\"\n" +
+      "- id: \"launch-app\"\n  goal: |+\n    Launch the app\n\n\n"
+
+    val e = assertFailsWith<IllegalArgumentException> { ArbigentScenarioSorter.sort(original) }
+    assertTrue(e.message!!.contains("Reordering the scenarios would"), e.message)
+  }
+
+  @Test
+  fun `a file without a final newline sorts without changing any value`() {
+    val original = appendedChild.trimEnd('\n')
+
+    val result = ArbigentScenarioSorter.sort(original, positionComments = false)
+
+    assertEquals(
+      listOf("launch-app", "open-settings", "toggle-dark-mode", "open-search"),
+      ArbigentProjectSerializer().load(result.yaml).scenarioContents.map { it.id }
+    )
+    assertTrue(!result.yaml.endsWith("\n"), result.yaml)
+  }
+
+  @Test
   fun `a cyclic dependency is rejected with the validation report`() {
     val original = """
 scenarios:
