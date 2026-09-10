@@ -673,12 +673,10 @@ public class ArbigentProjectSerializer(
     }
   )
 
+  /** Builds the whole text before opening [file], so a failure while encoding leaves the file as it was. */
   public fun save(projectFileContent: ArbigentProjectFileContent, file: File) {
-    save(projectFileContent, file.outputStream())
-  }
-
-  private fun save(projectFileContent: ArbigentProjectFileContent, outputStream: OutputStream) {
-    fileSystem.writeText(outputStream, encodeToFileText(projectFileContent))
+    val text = encodeToFileText(projectFileContent)
+    file.outputStream().use { fileSystem.writeText(it, text) }
   }
 
   /**
@@ -687,6 +685,7 @@ public class ArbigentProjectSerializer(
    * already writes scenarios in dependency order (callers pass them sorted), so this only adds
    * the comments; [encodeToString] stays the comment-free form used for change tracking.
    */
+  @OptIn(ArbigentInternalApi::class)
   public fun encodeToFileText(projectFileContent: ArbigentProjectFileContent): String {
     val encoded = encodeToString(projectFileContent)
     return ArbigentScenarioSorter.sort(
