@@ -1,3 +1,5 @@
+@file:OptIn(ArbigentInternalApi::class)
+
 package io.github.takahirom.arbigent
 
 /**
@@ -32,17 +34,20 @@ package io.github.takahirom.arbigent
 public object ArbigentScenarioSorter {
 
   /** A position comment this sorter wrote and owns; any such line is replaced on the next sort. */
+  @ArbigentInternalApi
   public val POSITION_COMMENT_MARKER: Regex = Regex("""^\s*#\s*tree:""")
 
   /** The explanatory line written directly under `scenarios:`. */
+  @ArbigentInternalApi
   public const val HEADER_COMMENT: String =
     "# The \"# tree:\" lines below are generated from `dependency` by `arbigent sort` (and on UI save); " +
       "do not edit them, rerun `arbigent sort`."
 
   /** Recognises [HEADER_COMMENT] and earlier wordings of it. */
+  @ArbigentInternalApi
   public val HEADER_COMMENT_MARKER: Regex = Regex("""^\s*#\s*The "# tree:" lines below are generated""")
 
-  public class Result(
+  public class Result internal constructor(
     /** The rewritten YAML. Equal to the input when nothing had to change. */
     public val yaml: String,
     /** Scenarios whose index in the `scenarios:` list changed. */
@@ -67,6 +72,7 @@ public object ArbigentScenarioSorter {
    * Sorts [yamlText], whose decoded form is [content]. [content] must be the decode of exactly this
    * text: its scenarios are matched to the `- id:` blocks by position.
    */
+  @ArbigentInternalApi
   public fun sort(yamlText: String, content: ArbigentProjectFileContent, positionComments: Boolean): Result {
     val scenarios = content.scenarioContents
     if (scenarios.isEmpty()) return Result(yamlText, emptyList(), emptyList(), headerStale = false)
@@ -174,13 +180,21 @@ public object ArbigentScenarioSorter {
     }
     val children = childrenOf[scenario.id].orEmpty().map { it.id }
     return buildString {
-      append("# tree: ").append(chain.joinToString(" > ") { it.singleLine() })
-      if (children.isNotEmpty()) append(" | children: ").append(children.joinToString(", ") { it.singleLine() })
+      append("# tree: ").append(chain.joinToString(" > ") { it.commentToken() })
+      if (children.isNotEmpty()) append(" | children: ").append(children.joinToString(", ") { it.commentToken() })
     }
   }
 
-  /** A comment is one line; an id containing a line break would end it early. */
-  private fun String.singleLine(): String = replace("\r", "\\r").replace("\n", "\\n")
+  /**
+   * An id as written in the comment. Ids are written as they are unless they could be misread:
+   * one containing `>`, `,`, `|`, a quote, or leading/trailing spaces is double-quoted (with `\\` and
+   * `"` escaped), and a line break is escaped so the comment stays one line.
+   */
+  private fun String.commentToken(): String {
+    val oneLine = replace("\\", "\\\\").replace("\r", "\\r").replace("\n", "\\n")
+    val needsQuotes = oneLine != oneLine.trim() || oneLine.any { it in ">,|\"" } || oneLine.isEmpty()
+    return if (needsQuotes) "\"" + oneLine.replace("\"", "\\\"") + "\"" else oneLine
+  }
 
   private class Block(val leadingComments: List<String>, val body: List<String>)
 

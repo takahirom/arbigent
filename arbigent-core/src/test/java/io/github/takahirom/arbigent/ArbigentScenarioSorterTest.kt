@@ -1,5 +1,8 @@
+@file:OptIn(ArbigentInternalApi::class)
+
 package io.github.takahirom.arbigent.sample.test
 
+import io.github.takahirom.arbigent.ArbigentInternalApi
 import io.github.takahirom.arbigent.ArbigentProjectSerializer
 import io.github.takahirom.arbigent.ArbigentProjectValidationException
 import io.github.takahirom.arbigent.ArbigentScenarioSorter
@@ -286,6 +289,26 @@ scenarios:
       result.yaml
     )
     assertEquals("launch\napp", ArbigentProjectSerializer().load(result.yaml).scenarioContents.single().id)
+  }
+
+  @Test
+  fun `ids that could be misread in the comment are quoted`() {
+    val original = """
+scenarios:
+- id: "a > b"
+  goal: "Root with a separator in its id"
+- id: "c, d"
+  goal: "Child with a comma in its id"
+  dependency: "a > b"
+""".trimStart()
+
+    val result = ArbigentScenarioSorter.sort(original)
+
+    val comments = result.yaml.lines().filter { ArbigentScenarioSorter.POSITION_COMMENT_MARKER.containsMatchIn(it) }
+    assertEquals(
+      listOf("# tree: \"a > b\" | children: \"c, d\"", "# tree: \"a > b\" > \"c, d\""),
+      comments
+    )
   }
 
   @Test

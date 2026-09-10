@@ -1,6 +1,9 @@
+@file:OptIn(ArbigentInternalApi::class)
+
 package io.github.takahirom.arbigent.ui
 
 import io.github.takahirom.arbigent.ArbigentProjectSerializer
+import io.github.takahirom.arbigent.ArbigentInternalApi
 import io.github.takahirom.arbigent.ArbigentScenarioSorter
 import io.github.takahirom.arbigent.ArbigentTagManager
 import kotlinx.coroutines.Dispatchers
