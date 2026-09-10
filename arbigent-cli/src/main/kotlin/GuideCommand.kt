@@ -266,7 +266,8 @@ the root down to this scenario, then its direct dependents. A header line under 
 says that these lines are generated. They are derived from `dependency` and regenerated on
 every sort or UI save, so never edit them by hand; after adding or moving a `dependency`, run
 `sort` so they are true again. Nothing else in the file is changed: quoting, other comments and
-unknown keys stay as they were.
+unknown keys stay as they were; only a comment starting with `# tree:` right above a scenario is
+treated as the sorter's own.
 
 Because an id also appears in the `# tree:` lines of every scenario below it, grep with the key:
 `grep 'id: "open-search"'` finds the definition and `grep 'dependency: "open-search"'` finds
