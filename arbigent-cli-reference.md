@@ -149,6 +149,21 @@ Takes a positional `goal` argument (required), the AI-provider group, `--os`,
 
 `--project-file`, `--log-level` (both settings-aware).
 
+### `sort`
+
+Rewrites the project file so each scenario directly follows the scenario it depends on
+(roots and siblings keep their declared order) and refreshes the `# [depth N] root > ... > id | children: ...`
+position comment above each scenario. Only the scenario blocks move and only those comment
+lines change; the rest of the file is left byte for byte. Requires a YAML project file (not a
+Journeys XML source) that passes validation.
+
+| Flag | Settings key | Notes |
+|---|---|---|
+| `--project-file` | `project-file` | |
+| `--log-level` | `log-level` | |
+| `--diff` | | Print a unified diff of what would change and exit `1` if there is any; the file is not written. Exit `0` with `Already sorted` otherwise. |
+| `--comments` / `--no-comments` | | Write or remove the position comments. Default: the project's `settings.positionComments` (`true` unless set). |
+
 ### `instruction`
 
 All settings-aware (keys `scenario-ids`, `include-app-ui-structure`, etc., or

@@ -315,6 +315,8 @@ class ArbigentAppStateHolder(
   val additionalActionsFlow = MutableStateFlow<List<String>?>(null)
   // Null means "not set": scenarios without their own maxRetry use the built-in default.
   val projectMaxRetryFlow = MutableStateFlow<Int?>(null)
+  // Whether saving writes `# [depth N] ...` position comments above scenarios (settings.positionComments).
+  val positionCommentsFlow = MutableStateFlow(true)
   val decisionCache = cacheStrategyFlow
     .map {
       val decisionCacheStrategy = it.aiDecisionCacheStrategy
@@ -534,7 +536,8 @@ class ArbigentAppStateHolder(
         mcpJson = mcpJsonFlow.value,
         deviceFormFactor = defaultDeviceFormFactorFlow.value,
         additionalActions = additionalActionsFlow.value,
-        maxRetry = projectMaxRetryFlow.value
+        maxRetry = projectMaxRetryFlow.value,
+        positionComments = positionCommentsFlow.value,
       ),
       scenarioContents = sortedScenarios.map { it.createArbigentScenarioContent() },
       reusableScenarios = _reusableScenariosFlow.value,
@@ -608,6 +611,7 @@ class ArbigentAppStateHolder(
     defaultDeviceFormFactorFlow.value = projectFile.settings.deviceFormFactor
     additionalActionsFlow.value = projectFile.settings.additionalActions
     projectMaxRetryFlow.value = projectFile.settings.maxRetry
+    positionCommentsFlow.value = projectFile.settings.positionComments
     _fixedScenariosFlow.value = projectFile.fixedScenarios
     _reusableScenariosFlow.value = projectFile.reusableScenarios
     projectStateFlow.value = ArbigentProject(

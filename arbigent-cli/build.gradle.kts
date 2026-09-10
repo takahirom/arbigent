@@ -114,6 +114,8 @@ dependencies {
   implementation("com.github.ajalt.clikt:clikt:5.0.2")
   implementation("com.jakewharton.mosaic:mosaic-runtime:0.18.0")
   implementation("com.charleskorn.kaml:kaml:0.83.0")
+  // Unified diff output for `arbigent sort --diff`.
+  implementation("io.github.java-diff-utils:java-diff-utils:4.12")
   implementation(project(":arbigent-core"))
   implementation(project(":arbigent-ai-openai"))
   implementation(project(":arbigent-ai-anthropic"))

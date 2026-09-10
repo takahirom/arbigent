@@ -556,6 +556,22 @@ arbigent tags
 arbigent graph
 ```
 
+**Keep the project file in dependency order** (each scenario directly after the scenario it depends on, roots and siblings in their declared order). `sort` also writes a *position comment* above every scenario so that anyone reading one scenario in the flat YAML — including a coding agent — can see its depth, ancestors and dependents without searching the file. Only the scenario blocks are reordered and only these comments are rewritten; quoting, other comments and unknown keys are left as they are. The UI writes the same comments on save; set `settings.positionComments: false` in the project file to turn them off.
+```bash
+arbigent sort            # rewrite the project file
+arbigent sort --diff     # CI check: print what would change, exit 1 if anything
+```
+```yaml
+scenarios:
+# [depth 0] launch-app | children: open-search, open-settings
+- id: "launch-app"
+  goal: "Launch the app"
+# [depth 1] launch-app > open-search | children: type-keyword
+- id: "open-search"
+  goal: "Open search"
+  dependency: "launch-app"
+```
+
 **Run a one-shot task without a project file:**
 
 `arbigent run task` executes a single ad-hoc goal on the connected device, using the same AI and OS options as `arbigent run`:
@@ -583,6 +599,7 @@ The CLI is designed so that AI coding agents (Claude Code, Codex, etc.) can oper
 
 - `arbigent --help` ends with the list of built-in guide topics, and `arbigent guide <topic>` prints an agent-oriented guide (`setup`, `writing-yaml`, `inspecting-project`, `running-scenarios`, `debugging-failures`).
 - `arbigent scenarios`, `arbigent tags`, and `arbigent graph` let an agent inspect a project without an AI API key or a device, and `arbigent run --dry-run` previews which scenarios would run without needing a device.
+- `arbigent sort` keeps the YAML in dependency order and refreshes the `# [depth N] ...` position comment above each scenario, so an agent editing one scenario sees where it sits in the dependency tree; `arbigent sort --diff` in CI catches files that drift after a hand edit.
 - `arbigent run` writes machine-readable results to `arbigent-result/result.yml` alongside the HTML report and screenshots, so an agent can check the outcome and debug failures.
 
 For example, you can instruct your agent:

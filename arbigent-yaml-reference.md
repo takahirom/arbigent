@@ -103,6 +103,7 @@ Legacy scenario-level field, tagged by `type:`. Distinct from the `CleanupData`
 | `deviceFormFactor` | [DeviceFormFactor](#deviceformfactor) | `Unspecified` | Default form factor for all scenarios. |
 | `additionalActions` | `List<String>?` | `null` | Project-wide extra actions. |
 | `maxRetry` | Int? | `null` | Default retry count for scenarios that do not set their own. Unset means `3`. |
+| `positionComments` | Boolean | `true` | Whether saving (UI) and `arbigent sort` write a `# [depth N] root > ... > id \| children: ...` comment above each scenario. The comment is derived from `dependency` and regenerated on every write; `false` removes it. See [Scenario order and position comments](#scenario-order-and-position-comments). |
 
 ### Prompt
 
@@ -228,6 +229,35 @@ Values in `launchArguments`, tagged by `type:`.
 ## DeviceFormFactor
 
 Tagged by `type:`: `Mobile`, `Tv`, or `Unspecified` (default). No other fields.
+
+## Scenario order and position comments
+
+The order of `scenarios` is the order `arbigent run` runs them in and the order `--shard`
+splits them by. The UI saves scenarios in dependency order: each scenario directly after
+the scenario it depends on, roots and siblings in their declared order. `arbigent sort`
+brings a hand-edited file back to that order and `arbigent sort --diff` fails in CI when
+a file has drifted.
+
+Both also write a *position comment* above each scenario. It is not a field: it is a
+YAML comment derived from `dependency`, rewritten on every save or sort, and safe to
+delete (set `settings.positionComments: false` to stop writing it). It exists so that a
+reader of one scenario can see its depth, its ancestors and its direct dependents without
+searching the file:
+
+```yaml
+scenarios:
+# [depth 0] launch-app | children: open-search
+- id: "launch-app"
+  goal: "Launch the app"
+# [depth 1] launch-app > open-search | children: type-keyword
+- id: "open-search"
+  goal: "Open the search screen"
+  dependency: "launch-app"
+# [depth 2] launch-app > open-search > type-keyword
+- id: "type-keyword"
+  goal: "Type a keyword into the search box"
+  dependency: "open-search"
+```
 
 ## Minimal example
 
