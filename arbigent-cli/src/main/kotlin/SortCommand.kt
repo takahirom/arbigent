@@ -31,7 +31,7 @@ class ArbigentSortCommand : CliktCommand(name = "sort") {
   ).switch("--comments" to true, "--no-comments" to false)
 
   override fun help(context: Context): String =
-    "Reorder scenarios into depth-first dependency order and refresh the position comments above them"
+    "Rewrite the project YAML: order scenarios by dependency and refresh the \"# tree:\" comments above them"
 
   override fun run() {
     applyLogLevel(logLevel)
