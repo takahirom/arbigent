@@ -144,7 +144,9 @@ field name does not fail the load — it just does nothing. After editing, verif
 - `goal`: string. Natural-language goal the AI agent tries to achieve. Be specific and
   add guardrails ("Be careful not to open other pages").
 - `dependency`: id of another scenario that must run first (its steps are executed
-  before this scenario's goal).
+  before this scenario's goal). Place a new scenario after its dependency (after any earlier siblings and their subtrees) and run
+  `arbigent sort` afterwards: it fixes the order and rewrites the `# tree: ...`
+  position comments above each scenario (see `arbigent guide inspecting-project`).
 - `initializationMethods`: list of setup actions, each with a `type` field:
   - `type: "LaunchApp"` — `packageName` (required), `launchArguments` (optional map)
   - `type: "CleanupData"` — `packageName` (required); clears app data
@@ -251,6 +253,27 @@ with `run --tags`.
 
 Prints the scenario dependency graph (`dependency` edges and reusable `uses` edges)
 as Mermaid text, ready to embed in Markdown.
+
+## Keep the file in dependency order
+
+    arbigent sort --project-file=path/to/project.yaml
+    arbigent sort --diff --project-file=path/to/project.yaml   # CI check, exit 1 if not sorted
+
+`sort` puts the scenarios in depth-first dependency order (each scenario after the scenario it
+depends on, its subtree before the next sibling) and writes a position comment above each one,
+e.g. `# tree: launch-app > log-in > open-search | children: type-keyword`: the ancestors from
+the root down to this scenario, then its direct dependents. A header line under `scenarios:`
+says that these lines are generated. They are derived from `dependency` and regenerated on
+every sort or UI save, so never edit them by hand; after adding or moving a `dependency`, run
+`sort` so they are true again. Nothing else in the file is changed: quoting, other comments and
+unknown keys stay as they were; only a comment starting with `# tree:` inside the `scenarios:` list
+(between or after its items) is treated as the sorter's own. A save from the UI, by contrast,
+regenerates the whole file and drops hand-written comments; notes that must survive belong in
+`noteForHumans`.
+
+Because an id also appears in the `# tree:` lines of every scenario below it, grep with the key:
+`grep 'id: "open-search"'` finds the definition and `grep 'dependency: "open-search"'` finds
+the scenarios that build on it.
 
 ## How --project-file is resolved
 

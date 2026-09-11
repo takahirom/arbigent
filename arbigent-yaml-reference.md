@@ -103,6 +103,7 @@ Legacy scenario-level field, tagged by `type:`. Distinct from the `CleanupData`
 | `deviceFormFactor` | [DeviceFormFactor](#deviceformfactor) | `Unspecified` | Default form factor for all scenarios. |
 | `additionalActions` | `List<String>?` | `null` | Project-wide extra actions. |
 | `maxRetry` | Int? | `null` | Default retry count for scenarios that do not set their own. Unset means `3`. |
+| `positionComments` | Boolean | `true` | Whether saving (UI) and `arbigent sort` write a `# tree: root > ... > id \| children: ...` comment above each scenario. The comment is derived from `dependency` and regenerated on every write; `false` removes it. See [Scenario order and position comments](#scenario-order-and-position-comments). |
 
 ### Prompt
 
@@ -228,6 +229,50 @@ Values in `launchArguments`, tagged by `type:`.
 ## DeviceFormFactor
 
 Tagged by `type:`: `Mobile`, `Tv`, or `Unspecified` (default). No other fields.
+
+## Scenario order and position comments
+
+The order of `scenarios` is the order `arbigent run` runs them in and the order `--shard`
+splits them by. The UI saves scenarios in dependency order (depth-first): a scenario comes after the
+scenario it depends on, and its whole subtree comes before the next sibling. Roots and
+siblings keep their declared order. `arbigent sort`
+brings a hand-edited file back to that order and `arbigent sort --diff` fails in CI when
+a file has drifted.
+
+Both also write a *position comment* above each scenario. It is not a field: it is a
+YAML comment derived from `dependency`, rewritten on every save or sort, and safe to
+delete (set `settings.positionComments: false` to stop writing it). It exists so that a
+reader of one scenario can see its ancestors and its direct dependents without
+searching the file. One header line directly under `scenarios:` says that these lines are
+generated and how to refresh them:
+
+```yaml
+scenarios:
+# The "# tree:" lines below are generated from `dependency` by `arbigent sort` (and on UI save); do not edit them, rerun `arbigent sort`.
+# tree: launch-app | children: open-search
+- id: "launch-app"
+  goal: "Launch the app"
+# tree: launch-app > open-search | children: type-keyword
+- id: "open-search"
+  goal: "Open the search screen"
+  dependency: "launch-app"
+# tree: launch-app > open-search > type-keyword
+- id: "type-keyword"
+  goal: "Type a keyword into the search box"
+  dependency: "open-search"
+```
+
+`arbigent sort` moves whole `- id:` blocks and leaves every other line as it is, so quoting,
+blank lines and your own comments survive. The one reserved form is a comment starting with
+`# tree:` inside the `scenarios:` list (above a scenario, even with blank lines in between, or after
+the last one): the sorter treats it as its own and rewrites or removes it.
+Before writing it re-reads the result and refuses
+to change the file if the project would decode differently, which needs every scenario to have
+an explicit `id`.
+
+Saving from the UI is different: it regenerates the whole YAML from the loaded project, so
+hand-written comments, unknown keys and custom formatting do not survive a UI save; only the
+`# tree:` lines and the header are recreated. Put notes that must survive in `noteForHumans`.
 
 ## Minimal example
 

@@ -1,6 +1,10 @@
+@file:OptIn(ArbigentInternalApi::class)
+
 package io.github.takahirom.arbigent.ui
 
 import io.github.takahirom.arbigent.ArbigentProjectSerializer
+import io.github.takahirom.arbigent.ArbigentInternalApi
+import io.github.takahirom.arbigent.ArbigentScenarioSorter
 import io.github.takahirom.arbigent.ArbigentTagManager
 import kotlinx.coroutines.Dispatchers
 import org.junit.Before
@@ -105,6 +109,37 @@ class ScenarioOrderingUiTest {
 
     val written = ArbigentProjectSerializer().load(file).scenarioContents.map { it.id }
     assertEquals(listOf("root", "child", "loose"), written)
+    file.delete()
+  }
+
+  /**
+   * The saved file carries the same position comments `arbigent sort` writes, so a UI save never
+   * strips them (which would make `sort --diff` fail in CI after every save). The file's
+   * `settings.positionComments: false` is honoured and survives a load/save cycle.
+   */
+  @Test
+  fun `saving writes position comments unless the project turns them off`() {
+    val (app, holders) = appWith("child", "root")
+    holders.getValue("child").dependencyScenarioStateHolderStateFlow.value = holders.getValue("root")
+    val file = File.createTempFile("arbigent-comments", ".yml")
+
+    app.saveProjectContents(file)
+
+    val commentLines = file.readLines().filter { ArbigentScenarioSorter.POSITION_COMMENT_MARKER.containsMatchIn(it) }
+    assertEquals(listOf("# tree: root | children: child", "# tree: root > child"), commentLines)
+    assertTrue(file.readLines().any { ArbigentScenarioSorter.HEADER_COMMENT_MARKER.containsMatchIn(it) }, file.readText())
+    // The comments are not part of what the app tracks as content, so a fresh save is not "dirty".
+    assertFalse(app.hasUnsavedChanges())
+
+    val withoutComments = file.readText().lines()
+      .filterNot { ArbigentScenarioSorter.POSITION_COMMENT_MARKER.containsMatchIn(it) }
+      .joinToString("\n") + "\nsettings:\n  positionComments: false\n"
+    file.writeText(withoutComments)
+    app.loadProjectContents(file)
+    app.saveProjectContents(file)
+
+    assertFalse(file.readLines().any { it.startsWith("#") }, file.readText())
+    assertTrue(file.readText().contains("positionComments: false"), file.readText())
     file.delete()
   }
 
