@@ -270,6 +270,10 @@ Before writing it re-reads the result and refuses
 to change the file if the project would decode differently, which needs every scenario to have
 an explicit `id`.
 
+Saving from the UI is different: it regenerates the whole YAML from the loaded project, so
+hand-written comments, unknown keys and custom formatting do not survive a UI save; only the
+`# tree:` lines and the header are recreated. Put notes that must survive in `noteForHumans`.
+
 ## Minimal example
 
 ```yaml
