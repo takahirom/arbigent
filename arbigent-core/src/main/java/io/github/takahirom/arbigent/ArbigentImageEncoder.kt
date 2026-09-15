@@ -28,8 +28,12 @@ public object ArbigentImageEncoder {
                 writeParam.compressionMode = ImageWriteParam.MODE_EXPLICIT
                 writeParam.compressionType = "Lossless"
 
-                writer.output = FileImageOutputStream(File(filePath))
-                writer.write(null, javax.imageio.IIOImage(image, null, null), writeParam)
+                // writer.dispose() does not close the output, and the decision request reads this
+                // file back as soon as it is written, so close it here.
+                FileImageOutputStream(File(filePath)).use { output ->
+                    writer.output = output
+                    writer.write(null, javax.imageio.IIOImage(image, null, null), writeParam)
+                }
             } finally {
                 writer.dispose()
             }
@@ -47,8 +51,12 @@ public object ArbigentImageEncoder {
                 writeParam.compressionType = "Lossy"
                 writeParam.compressionQuality = 0.7f // 70% quality
 
-                writer.output = FileImageOutputStream(File(filePath))
-                writer.write(null, javax.imageio.IIOImage(image, null, null), writeParam)
+                // writer.dispose() does not close the output, and the decision request reads this
+                // file back as soon as it is written, so close it here.
+                FileImageOutputStream(File(filePath)).use { output ->
+                    writer.output = output
+                    writer.write(null, javax.imageio.IIOImage(image, null, null), writeParam)
+                }
             } finally {
                 writer.dispose()
             }
