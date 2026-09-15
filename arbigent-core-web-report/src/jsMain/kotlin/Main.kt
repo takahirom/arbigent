@@ -157,6 +157,8 @@ private fun ScenarioList(
           fontSize(12.px)
           marginBottom(2.px)
           color(reportMuted)
+          // A status can be several lines, e.g. every unresolved variable a scenario references.
+          whiteSpace("pre-wrap")
         }
       }) {
         Text("Status: ${scenario.executionStatus ?: "N/A"}")
@@ -203,7 +205,7 @@ private fun ScenarioDetails(scenario: ArbigentScenarioResult) {
     Div({ style { heading(26); marginBottom(16.px) } }) {
       Text("Goal: ${scenario.goal ?: "N/A"}")
     }
-    Div({ style { metadata() } }) {
+    Div({ style { metadata(); whiteSpace("pre-wrap") } }) {
       Text("Status: ${scenario.executionStatus ?: "N/A"}")
     }
     Div({ style { outcome(scenario.isSuccess); marginBottom(4.px) } }) {

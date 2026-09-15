@@ -20,23 +20,18 @@ public data class ArbigentUnresolvedVariable(
  * you ask for the literal text.
  */
 internal object UnresolvedVariableFinder {
-  // A character no name can contain, so masking an escape cannot accidentally create a reference
-  // out of the text around it — which is exactly what substitution's own temporary marker does.
-  private const val MASK = "\u0000"
-
   /**
    * The variable names [value] references but [variables] does not define. This must agree with
-   * [GoalVariableResolver] on every input, so it masks escapes with the resolver's own pattern
-   * before looking for references: `\{{name}}` is not a reference, and neither is a name the
-   * resolver would refuse to substitute (e.g. `example://open?template={{user:id}}`), which stays
-   * as literal text.
+   * [GoalVariableResolver] on every input, so it hides escapes with
+   * [maskEscapedArbigentVariables] — the very transformation substitution applies — before looking
+   * for references: `\{{name}}` is not a reference, and neither is a name the resolver would
+   * refuse to substitute (e.g. `example://open?template={{user:id}}`), which stays as literal
+   * text.
    */
   fun missingNames(value: String, variables: Map<String, String>?): List<String> =
-    ArbigentVariablePattern.findAll(ArbigentEscapedVariablePattern.replace(value, MASK))
-      .map { it.groupValues[1].trim() }
-      .filter { ValidArbigentVariableName.matches(it) && variables?.containsKey(it) != true }
+    arbigentVariableReferences(value)
+      .filter { variables?.containsKey(it) != true }
       .distinct()
-      .toList()
 }
 
 /** One message listing every unresolved reference, plus every way to make it resolve. */

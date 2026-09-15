@@ -578,6 +578,9 @@ class ProjectVariablesTest {
       "{{y}} then {{y}}" to listOf("y"),
       """\\{{y}}""" to emptyList(),
       "example://open?template={{user:id}}" to emptyList(),
+      // An escape whose own braces swallow what follows: substitution masks the escape with a
+      // marker that keeps its text, so the next match is one invalid name covering the rest.
+      """\{{{{x}} {{y}}}}""" to emptyList(),
     )
     cases.forEach { (input, expected) ->
       assertEquals(expected, UnresolvedVariableFinder.missingNames(input, variables), input)
@@ -587,6 +590,62 @@ class ProjectVariablesTest {
         assertTrue(resolved.contains("{{$it}}") || resolved.contains("{{ $it }}"), resolved)
       }
     }
+    // The other half of the agreement: a name the resolver does not substitute even though it has
+    // a value must not be reported either. Here the escape swallows the following `{{x}}`.
+    assertEquals("{{{{x}} {{x}}}}", GoalVariableResolver.resolve("""\{{{{x}} {{x}}}}""", variables))
+    assertEquals(emptyList(), UnresolvedVariableFinder.missingNames("""\{{{{x}} {{x}}}}""", variables))
+  }
+
+  private fun ArbigentProjectFileContent.projectOf(
+    device: ArbigentDevice,
+    dispatcher: CoroutineDispatcher,
+  ) = ArbigentProject(
+    settings = settings,
+    initialScenarios = scenarioContents.map { scenarioOf(it.id, device) },
+    appSettings = DefaultArbigentAppSettings,
+    dispatcher = dispatcher,
+  )
+
+  @Test
+  fun oneRejectedScenarioDoesNotStopTheOthers() = runTest {
+    val project = load(
+      """
+      scenarios:
+      - id: "launch-app"
+        goal: "Open {{missing}}"
+      - id: "open-search"
+        goal: "Tap the search icon"
+      """.trimIndent()
+    ).projectOf(RecordingDevice(), coroutineContext[CoroutineDispatcher]!!)
+
+    project.executeScenarios(project.scenarios)
+
+    val results = project.getResult().scenarios.associateBy { it.id }
+    assertFalse(results.getValue("launch-app").isSuccess)
+    assertTrue(results.getValue("open-search").isSuccess, results.getValue("open-search").toString())
+    // The report has no run to describe for a rejected scenario, so it must show the reason.
+    assertTrue(
+      results.getValue("launch-app").executionStatus!!.contains("{{missing}} in"),
+      results.getValue("launch-app").executionStatus!!,
+    )
+  }
+
+  @Test
+  fun aRunWhereNothingCanRunStartsNothing() = runTest {
+    val device = RecordingDevice()
+    val project = load(
+      """
+      scenarios:
+      - id: "launch-app"
+        goal: "Open {{missing}}"
+      """.trimIndent()
+    ).projectOf(device, coroutineContext[CoroutineDispatcher]!!)
+
+    project.executeScenarios(project.scenarios)
+
+    // Nothing is startable, so nothing starts: no device work, and no MCP scope to open either.
+    assertEquals(emptyList(), device.executedCommands)
+    assertFalse(project.isScenariosSuccessful(project.scenarios))
   }
 
   @Test

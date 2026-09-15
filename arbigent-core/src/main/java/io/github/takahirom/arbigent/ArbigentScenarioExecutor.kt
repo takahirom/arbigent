@@ -197,26 +197,40 @@ public class ArbigentScenarioExecutor internal constructor(
     arbigentDebugLog("Arbigent.waitUntilFinished end")
   }
 
-  public suspend fun execute(scenario: ArbigentScenario, mcpClient: MCPClient) {
+  /** Forgets the previous run so nothing it produced can be read as this run's result. */
+  private fun clearPreviousRun() {
     _isFailedToArchiveFlow.value = false
     _preflightErrorFlow.value = null
-    arbigentDebugLog("Arbigent.execute start")
     _taskAssignmentsStateFlow.value.forEach { it.agent.cancel() }
     _taskAssignmentsStateFlow.value = listOf()
     _taskAssignmentsHistoryStateFlow.value = listOf()
-    // Before any device, AI or MCP work: a `{{name}}` nothing defines cannot be what the author
-    // meant, and running with the placeholder as literal text only turns a typo into a confusing
-    // failure later. Every reference is reported at once so one run fixes them all. The previous
-    // run's assignments are already cleared above, so this cannot report a stale success.
+    _arbigentScenarioRunningInfoStateFlow.value = null
+  }
+
+  /**
+   * Rejects [scenario] when it references a `{{name}}` nothing defines: that cannot be what the
+   * author meant, and running with the placeholder as literal text only turns a typo into a
+   * confusing failure later. Every reference is reported at once so one run fixes them all.
+   *
+   * Callers run this before any device, AI or MCP work, and throw the exception it returns; it
+   * returns null when the scenario may run. Either way the previous run is forgotten first, so a
+   * rejection can never show the last run's success, progress or history.
+   */
+  internal fun rejectUnresolvedVariables(scenario: ArbigentScenario): ArbigentUnresolvedVariableException? {
     val unresolved = scenario.unresolvedVariables
-    if (unresolved.isNotEmpty()) {
-      val message = unresolvedVariableMessage(
-        header = "Scenario \"${scenario.id}\" references variables that are not defined:",
-        unresolved = unresolved,
-      )
-      _preflightErrorFlow.value = message
-      throw ArbigentUnresolvedVariableException(message)
-    }
+    clearPreviousRun()
+    if (unresolved.isEmpty()) return null
+    val message = unresolvedVariableMessage(
+      header = "Scenario \"${scenario.id}\" references variables that are not defined:",
+      unresolved = unresolved,
+    )
+    _preflightErrorFlow.value = message
+    return ArbigentUnresolvedVariableException(message)
+  }
+
+  public suspend fun execute(scenario: ArbigentScenario, mcpClient: MCPClient) {
+    arbigentDebugLog("Arbigent.execute start")
+    rejectUnresolvedVariables(scenario)?.let { throw it }
 
     val replayTraceKeys = scenario.replayTraceKeys()
     val replayTraces = if (scenario.replayWithFallback) {
