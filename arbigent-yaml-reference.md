@@ -103,6 +103,7 @@ Legacy scenario-level field, tagged by `type:`. Distinct from the `CleanupData`
 | `deviceFormFactor` | [DeviceFormFactor](#deviceformfactor) | `Unspecified` | Default form factor for all scenarios. |
 | `additionalActions` | `List<String>?` | `null` | Project-wide extra actions. |
 | `maxRetry` | Int? | `null` | Default retry count for scenarios that do not set their own. Unset means `3`. |
+| `variables` | `Map<String,String>?` | `null` | Project-level defaults for `{{name}}` placeholders in goals and in `LaunchApp` / `CleanupData` `packageName` and `OpenLink` `link`. `arbigent run --variables` (or `variables:` in `.arbigent/settings.yml`) overrides them per key, e.g. `appId: com.example.app` here and `--variables=appId=com.example.app.debug` in a debug-build job. |
 | `positionComments` | Boolean | `true` | Whether saving (UI) and `arbigent sort` write a `# tree: root > ... > id \| children: ...` comment above each scenario. The comment is derived from `dependency` and regenerated on every write; `false` removes it. See [Scenario order and position comments](#scenario-order-and-position-comments). |
 
 ### Prompt
@@ -152,13 +153,20 @@ Each entry is tagged by `type:`.
 
 | `type` | Fields | Description |
 |---|---|---|
-| `LaunchApp` | `packageName: String` (required), `launchArguments: Map<String,`[ArgumentValue](#argumentvalue)`> = {}` | Launch an app. |
-| `CleanupData` | `packageName: String` (required) | Clear app data. |
+| `LaunchApp` | `packageName: String` (required), `launchArguments: Map<String,`[ArgumentValue](#argumentvalue)`> = {}` | Launch an app. `packageName` accepts `{{name}}` / `{{inputs.name}}`; string launch arguments accept `{{inputs.name}}`. |
+| `CleanupData` | `packageName: String` (required) | Clear app data. `packageName` accepts `{{name}}` / `{{inputs.name}}`. |
 | `Back` | `times: Int = 3` | Press back N times. |
 | `Wait` | `durationMs: Long` (required) | Wait a fixed duration. |
-| `OpenLink` | `link: String` (required) | Open a URL/deeplink. |
-| `MaestroYaml` | `scenarioId: String` (required), `yamlContent: String? = null` | Run a `fixedScenarios` entry (or inline Maestro YAML). |
+| `OpenLink` | `link: String` (required) | Open a URL/deeplink. `link` accepts `{{name}}` / `{{inputs.name}}`. |
+| `MaestroYaml` | `scenarioId: String` (required), `yamlContent: String? = null` | Run a `fixedScenarios` entry (or inline Maestro YAML). The YAML text accepts `{{inputs.name}}`. |
 | `Noop` | (none) | Do nothing. |
+
+`{{name}}` placeholders are project variables: defaults come from `settings.variables` and
+`arbigent run --variables` overrides them. They are resolved when the initializer runs, and a
+placeholder that is still unresolved at that point fails the scenario with an error naming the
+variable (unlike goals, where an unresolved placeholder is passed to the AI as-is).
+`{{inputs.name}}` placeholders are reusable-scenario inputs bound at the call site; see
+[ReusableInput](#reusableinput). Escape a literal with `\{{name}}`.
 
 ### ArgumentValue
 

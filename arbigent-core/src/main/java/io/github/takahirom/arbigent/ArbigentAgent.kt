@@ -722,11 +722,14 @@ public fun AgentConfigBuilder(
             device: ArbigentDevice,
             chain: ArbigentInitializerInterceptor.Chain
           ) {
+            val packageName = InitializationVariableResolver.resolve(
+              initializeMethod.packageName, appSettings?.variables, "LaunchApp", "packageName"
+            )
             device.executeActions(
               listOf(
                 MaestroCommand(
                   launchAppCommand = LaunchAppCommand(
-                    appId = initializeMethod.packageName,
+                    appId = packageName,
                     launchArguments = initializeMethod.launchArguments.mapValues { (_, value) ->
                       value.value
                     }
@@ -734,7 +737,7 @@ public fun AgentConfigBuilder(
                 )
               )
             )
-            device.waitForAppToSettle(initializeMethod.packageName)
+            device.waitForAppToSettle(packageName)
             chain.proceed(device)
           }
         })
@@ -746,11 +749,14 @@ public fun AgentConfigBuilder(
             device: ArbigentDevice,
             chain: ArbigentInitializerInterceptor.Chain
           ) {
+            val packageName = InitializationVariableResolver.resolve(
+              initializeMethod.packageName, appSettings?.variables, "CleanupData", "packageName"
+            )
             device.executeActions(
               listOf(
                 MaestroCommand(
                   clearStateCommand = ClearStateCommand(
-                    appId = initializeMethod.packageName
+                    appId = packageName
                   )
                 )
               )
@@ -766,11 +772,14 @@ public fun AgentConfigBuilder(
             device: ArbigentDevice,
             chain: ArbigentInitializerInterceptor.Chain
           ) {
+            val link = InitializationVariableResolver.resolve(
+              initializeMethod.link, appSettings?.variables, "OpenLink", "link"
+            )
             device.executeActions(
               listOf(
                 MaestroCommand(
                   openLinkCommand = OpenLinkCommand(
-                    link = initializeMethod.link
+                    link = link
                   )
                 )
               )

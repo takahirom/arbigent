@@ -317,6 +317,9 @@ class ArbigentAppStateHolder(
   val projectMaxRetryFlow = MutableStateFlow<Int?>(null)
   // Whether saving writes `# tree: ...` position comments above scenarios (settings.positionComments).
   val positionCommentsFlow = MutableStateFlow(true)
+  // Project-level defaults for {{name}} variables (settings.variables). The UI has no editor for
+  // them yet, so this only carries the loaded value through save/run without dropping it.
+  val projectVariablesFlow = MutableStateFlow<Map<String, String>?>(null)
   val decisionCache = cacheStrategyFlow
     .map {
       val decisionCacheStrategy = it.aiDecisionCacheStrategy
@@ -428,7 +431,8 @@ class ArbigentAppStateHolder(
         mcpJson = mcpJsonFlow.value,
         deviceFormFactor = defaultDeviceFormFactorFlow.value,
         additionalActions = additionalActionsFlow.value,
-        maxRetry = projectMaxRetryFlow.value
+        maxRetry = projectMaxRetryFlow.value,
+        variables = projectVariablesFlow.value,
       ),
       initialScenarios = allScenarioStateHoldersStateFlow.value.map { scenario ->
         scenario.createScenario(allScenarioStateHoldersStateFlow.value)
@@ -459,7 +463,8 @@ class ArbigentAppStateHolder(
           mcpJson = this@ArbigentAppStateHolder.mcpJsonFlow.value,
           deviceFormFactor = this@ArbigentAppStateHolder.defaultDeviceFormFactorFlow.value,
           additionalActions = this@ArbigentAppStateHolder.additionalActionsFlow.value,
-          maxRetry = this@ArbigentAppStateHolder.projectMaxRetryFlow.value
+          maxRetry = this@ArbigentAppStateHolder.projectMaxRetryFlow.value,
+          variables = this@ArbigentAppStateHolder.projectVariablesFlow.value,
         ),
         scenario = createArbigentScenarioContent(),
         aiFactory = aiFactory,
@@ -538,6 +543,7 @@ class ArbigentAppStateHolder(
         additionalActions = additionalActionsFlow.value,
         maxRetry = projectMaxRetryFlow.value,
         positionComments = positionCommentsFlow.value,
+        variables = projectVariablesFlow.value,
       ),
       scenarioContents = sortedScenarios.map { it.createArbigentScenarioContent() },
       reusableScenarios = _reusableScenariosFlow.value,
@@ -612,6 +618,7 @@ class ArbigentAppStateHolder(
     additionalActionsFlow.value = projectFile.settings.additionalActions
     projectMaxRetryFlow.value = projectFile.settings.maxRetry
     positionCommentsFlow.value = projectFile.settings.positionComments
+    projectVariablesFlow.value = projectFile.settings.variables
     _fixedScenariosFlow.value = projectFile.fixedScenarios
     _reusableScenariosFlow.value = projectFile.reusableScenarios
     projectStateFlow.value = ArbigentProject(

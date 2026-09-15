@@ -269,6 +269,14 @@ public data class ArbigentProjectSettings(
    * removes them.
    */
   public val positionComments: Boolean = true,
+  /**
+   * Project-level defaults for `{{name}}` variables, resolved at runtime in goals and in the
+   * `packageName` / `link` of `LaunchApp`, `CleanupData` and `OpenLink` initialization methods.
+   * App-level variables (`arbigent run --variables`, `.arbigent/settings.yml`) override these
+   * per key, so a project can ship `appId: com.example.app` and a CI job can pass
+   * `--variables=appId=com.example.app.debug`.
+   */
+  public val variables: Map<String, String>? = null,
 ) {
   public companion object {
     public const val DefaultMcpJson: String = "{}"
@@ -324,25 +332,65 @@ public sealed interface AiDecisionCacheStrategy {
 }
 
 /**
- * Resolves {{inputs.*}} inside Maestro YAML referenced from a reusable leaf's initialization
- * methods, so the initializer can run the substituted flow (it prefers yamlContent when present).
+ * Resolves {{inputs.*}} inside a reusable leaf's initialization methods: the `packageName` /
+ * `link` (and string launch arguments) of LaunchApp, CleanupData and OpenLink, and Maestro YAML referenced by MaestroYaml
+ * (the initializer prefers yamlContent when present). Bare {{name}} project variables are left
+ * for the runtime (see [ArbigentAppSettings.variables]).
  */
-private fun resolveMaestroYamlInputs(
+private fun resolveInitializationInputs(
   methods: List<ArbigentScenarioContent.InitializationMethod>,
   inputBindings: Map<String, String>?,
   fixedScenarios: List<FixedScenario>
 ): List<ArbigentScenarioContent.InitializationMethod> {
   if (inputBindings == null) return methods
+  fun String.resolveInputs() = ReusableInputsResolver.resolve(this, inputBindings)
   return methods.map { method ->
-    if (method !is ArbigentScenarioContent.InitializationMethod.MaestroYaml) return@map method
-    val yamlText = fixedScenarios.firstOrNull { it.id == method.scenarioId }?.yamlText
-    if (yamlText != null && ReusableInputsResolver.containsInputPlaceholder(yamlText)) {
-      method.copy(yamlContent = ReusableInputsResolver.resolve(yamlText, inputBindings))
-    } else {
-      method
+    when (method) {
+      is ArbigentScenarioContent.InitializationMethod.LaunchApp ->
+        method.copy(
+          packageName = method.packageName.resolveInputs(),
+          launchArguments = method.launchArguments.mapValues { (_, value) ->
+            when (value) {
+              is ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue.StringVal ->
+                value.copy(value = value.value.resolveInputs())
+              else -> value
+            }
+          },
+        )
+      is ArbigentScenarioContent.InitializationMethod.CleanupData ->
+        method.copy(packageName = method.packageName.resolveInputs())
+      is ArbigentScenarioContent.InitializationMethod.OpenLink ->
+        method.copy(link = method.link.resolveInputs())
+      is ArbigentScenarioContent.InitializationMethod.MaestroYaml -> {
+        val yamlText = fixedScenarios.firstOrNull { it.id == method.scenarioId }?.yamlText
+        if (yamlText != null && ReusableInputsResolver.containsInputPlaceholder(yamlText)) {
+          method.copy(yamlContent = yamlText.resolveInputs())
+        } else {
+          method
+        }
+      }
+      else -> method
     }
   }
 }
+
+/**
+ * Wraps the app-level settings so that [variables] is the project's `settings.variables`
+ * overridden per key by the app-level ones (CLI `--variables`, `.arbigent/settings.yml`, UI).
+ * Everything else delegates unchanged.
+ */
+internal class ProjectVariablesAppSettings(
+  private val delegate: ArbigentAppSettings,
+  projectVariables: Map<String, String>,
+) : ArbigentAppSettings {
+  override val workingDirectory: String? get() = delegate.workingDirectory
+  override val path: String? get() = delegate.path
+  override val variables: Map<String, String> = projectVariables + delegate.variables.orEmpty()
+  override val mcpEnvironmentVariables: Map<String, String>? get() = delegate.mcpEnvironmentVariables
+}
+
+internal fun ArbigentAppSettings.withProjectVariables(projectVariables: Map<String, String>?): ArbigentAppSettings =
+  if (projectVariables.isNullOrEmpty()) this else ProjectVariablesAppSettings(this, projectVariables)
 
 public fun List<ArbigentScenarioContent>.createArbigentScenario(
   projectSettings: ArbigentProjectSettings,
@@ -354,6 +402,7 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
   fixedScenarios: List<FixedScenario> = emptyList(),
   reusableScenarios: List<ArbigentScenarioContent> = emptyList()
 ): ArbigentScenario {
+  val effectiveAppSettings = appSettings.withProjectVariables(projectSettings.variables)
   fun agentTask(
     taskScenarioId: String,
     nodeScenario: ArbigentScenarioContent,
@@ -386,7 +435,7 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
     } else {
       nodeScenario.goal
     }
-    val initializationMethods = resolveMaestroYamlInputs(
+    val initializationMethods = resolveInitializationInputs(
       methods = nodeScenario.initializationMethods.ifEmpty { listOf(nodeScenario.initializeMethods) },
       inputBindings = inputBindings,
       fixedScenarios = fixedScenarios
@@ -423,12 +472,12 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
         aiDecisionCache = aiDecisionCache,
         cacheOptions = nodeScenario.cacheOptions ?: ArbigentScenarioCacheOptions(),
         mcpClient = if (projectSettings.mcpJson.isNotBlank() && projectSettings.mcpJson != DefaultMcpJson) {
-          MCPClient(projectSettings.mcpJson, appSettings)
+          MCPClient(projectSettings.mcpJson, effectiveAppSettings)
         } else {
           null
         },
         fixedScenarios = fixedScenarios,
-        appSettings = appSettings
+        appSettings = effectiveAppSettings
       ).apply {
         aiOptions(projectSettings.aiOptions?.mergeWith(nodeScenario.aiOptions) ?: nodeScenario.aiOptions)
         aiFactory(aiFactory)
