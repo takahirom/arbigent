@@ -271,7 +271,7 @@ arbigent run --project-file=project.yaml                                        
 arbigent run --project-file=project.yaml --variables=appId=com.example.app.debug  # debug build
 ```
 
-Variables are substituted when the initializer runs. A `{{name}}` that has no value at that point fails the scenario with an error naming the variable, because launching `{{appId}}` can never succeed (in goals, an unresolved placeholder is left as-is for the AI). Only names the resolver can substitute count as placeholders, so text like `{{user:id}}` stays literal. Maestro YAML `appId:` headers and deep-link hosts are not rewritten, so a debug build must handle the same links or you point `link` at a variable too.
+A `{{name}}` that no variable defines is an error: before a scenario runs, Arbigent lists every unresolved placeholder in its goals and initialization methods and fails the scenario without touching the device, so a typo costs one message instead of a confusing run. Write `\{{name}}` when you mean the text itself. Only names the resolver can substitute count as placeholders, so text like `{{user:id}}` stays literal. Building or loading a project never fails for this — only running the scenario that has the unresolved placeholder does. Maestro YAML (including its `appId:` header) and deep-link hosts are not rewritten, so a debug build must handle the same links or you point `link` at a variable too.
 
 See [arbigent-reusable-scenarios-specification.md](arbigent-reusable-scenarios-specification.md) for the full specification.
 

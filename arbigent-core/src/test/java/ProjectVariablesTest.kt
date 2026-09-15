@@ -2,6 +2,8 @@ package io.github.takahirom.arbigent.sample.test
 
 import io.github.takahirom.arbigent.*
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import maestro.orchestra.MaestroCommand
 import kotlin.test.Test
@@ -25,11 +27,13 @@ class ProjectVariablesTest {
     override val mcpEnvironmentVariables: Map<String, String>? = null
   }
 
-  private class RecordingDevice : ArbigentDevice by FakeDevice() {
+  private class RecordingDevice(private val delegate: FakeDevice = FakeDevice()) : ArbigentDevice by delegate {
     val executedCommands = mutableListOf<MaestroCommand>()
     val settledAppIds = mutableListOf<String?>()
     override fun executeActions(actions: List<MaestroCommand>) {
       executedCommands += actions
+      // Still delegate: a full executor run needs FakeDevice to write the screenshots it asks for.
+      delegate.executeActions(actions)
     }
     override fun waitForAppToSettle(appId: String?) {
       settledAppIds += appId
@@ -434,5 +438,234 @@ class ProjectVariablesTest {
       "example://inline?user=premium",
       device.executedCommands.mapNotNull { it.openLinkCommand }.firstOrNull()?.link
     )
+  }
+
+  // ----- unresolved variables are rejected before the run starts -----
+
+  /** Runs the whole scenario through the executor, which is where the pre-flight check lives. */
+  private suspend fun ArbigentScenario.run(
+    dispatcher: CoroutineDispatcher,
+    executor: ArbigentScenarioExecutor = ArbigentScenarioExecutor(dispatcher),
+  ): ArbigentScenarioExecutor {
+    executor.execute(this, MCPClient())
+    return executor
+  }
+
+  @Test
+  fun unresolvedVariablesInGoalAndInitializerAreAllReportedBeforeAnythingRuns() = runTest {
+    val project = load(
+      """
+      scenarios:
+      - id: "open-search"
+        goal: "Search for {{query}}"
+        initializationMethods:
+        - type: "LaunchApp"
+          packageName: "{{appId}}"
+        - type: "OpenLink"
+          link: "example://open?from={{appId}}"
+      """.trimIndent()
+    )
+    val device = RecordingDevice()
+    val error = assertFailsWith<ArbigentUnresolvedVariableException> {
+      project.scenarioOf("open-search", device).run(coroutineContext[CoroutineDispatcher]!!)
+    }
+    val message = error.message!!
+    // One message per reference, listed together, so a single run fixes every typo.
+    assertTrue(message.contains("{{query}} in the goal of scenario \"open-search\""), message)
+    assertTrue(message.contains("{{appId}} in LaunchApp packageName of scenario \"open-search\""), message)
+    assertTrue(message.contains("{{appId}} in OpenLink link of scenario \"open-search\""), message)
+    assertTrue(message.contains("settings.variables"), message)
+    assertTrue(message.contains("--variables=query=com.example.app"), message)
+    assertTrue(message.contains("\\{{query}}"), message)
+    // Nothing touched the device: the run never started.
+    assertTrue(device.executedCommands.isEmpty(), device.executedCommands.toString())
+  }
+
+  @Test
+  fun unresolvedVariableDoesNotStopTheProjectFromBeingBuilt() = runTest {
+    val project = load(
+      """
+      scenarios:
+      - id: "launch-app"
+        goal: "Open {{missing}}"
+      """.trimIndent()
+    )
+    // Building a project builds every scenario, so the check must not throw here: one scenario
+    // with a typo may not stop the others from loading or running.
+    val built = ArbigentProject(
+      projectFileContent = project,
+      aiFactory = { FakeAi() },
+      deviceFactory = { FakeDevice() },
+      appSettings = DefaultArbigentAppSettings,
+      dispatcher = coroutineContext[CoroutineDispatcher]!!,
+    )
+    assertEquals(
+      listOf(ArbigentUnresolvedVariable("missing", "the goal of scenario \"launch-app\"")),
+      built.scenarioAssignments().single().scenario.unresolvedVariables
+    )
+  }
+
+  @Test
+  fun escapedPlaceholderInGoalIsLiteralAndRuns() = runTest {
+    val project = load(
+      """
+      scenarios:
+      - id: "launch-app"
+        goal: "Type \\{{appId}} into the field"
+      """.trimIndent()
+    )
+    val scenario = project.scenarioOf("launch-app", RecordingDevice())
+    assertTrue(scenario.unresolvedVariables.isEmpty(), scenario.unresolvedVariables.toString())
+    scenario.run(coroutineContext[CoroutineDispatcher]!!)
+    // The escape is what the author writes instead of the placeholder, so it must become the
+    // literal text even when the project defines no variables at all.
+    val task = scenario.agentTasks.single()
+    assertEquals("Type {{appId}} into the field", task.agentConfig.resolveGoal(task.goal))
+  }
+
+  @Test
+  fun placeholderOutsideTheVariableGrammarIsLiteralAndRuns() = runTest {
+    val project = load(
+      """
+      scenarios:
+      - id: "launch-app"
+        goal: "Open example://open?template={{user:id}}"
+      """.trimIndent()
+    )
+    val scenario = project.scenarioOf("launch-app", RecordingDevice())
+    assertTrue(scenario.unresolvedVariables.isEmpty(), scenario.unresolvedVariables.toString())
+    scenario.run(coroutineContext[CoroutineDispatcher]!!)
+  }
+
+  @Test
+  fun variableSuppliedByTheAppSettingsPassesThePreflight() = runTest {
+    val project = load(
+      """
+      scenarios:
+      - id: "launch-app"
+        goal: "Search for {{query}}"
+        initializationMethods:
+        - type: "LaunchApp"
+          packageName: "{{appId}}"
+      """.trimIndent()
+    )
+    val device = RecordingDevice()
+    val scenario = project.scenarioOf(
+      "launch-app",
+      device,
+      TestAppSettings(mapOf("query" to "shoes", "appId" to "com.example.app"))
+    )
+    assertTrue(scenario.unresolvedVariables.isEmpty(), scenario.unresolvedVariables.toString())
+    scenario.run(coroutineContext[CoroutineDispatcher]!!)
+    assertEquals(
+      listOf("com.example.app"),
+      device.executedCommands.mapNotNull { it.launchAppCommand?.appId }
+    )
+  }
+
+  @Test
+  fun whatCountsAsAReferenceMatchesWhatTheResolverSubstitutes() {
+    val variables = mapOf("x" to "X")
+    // Escapes are masked before references are looked for, exactly as substitution does it, so
+    // odd brace runs cannot be reported as unresolved while the resolver keeps them as text.
+    val cases = mapOf(
+      "{{x}}" to emptyList(),
+      "{{y}}" to listOf("y"),
+      """\{{y}}""" to emptyList(),
+      """\{{{y}}""" to emptyList(),
+      "{{{y}}}" to emptyList(),
+      "{{ y }}" to listOf("y"),
+      "{{y}} then {{y}}" to listOf("y"),
+      """\\{{y}}""" to emptyList(),
+      "example://open?template={{user:id}}" to emptyList(),
+    )
+    cases.forEach { (input, expected) ->
+      assertEquals(expected, UnresolvedVariableFinder.missingNames(input, variables), input)
+      // Every reported name must be one the resolver really does leave in the text.
+      val resolved = GoalVariableResolver.resolve(input, variables)
+      expected.forEach {
+        assertTrue(resolved.contains("{{$it}}") || resolved.contains("{{ $it }}"), resolved)
+      }
+    }
+  }
+
+  @Test
+  fun aRejectedRunReportsFailedAndStopsWaiting() = runTest {
+    val project = load(
+      """
+      scenarios:
+      - id: "launch-app"
+        goal: "Open {{missing}}"
+      """.trimIndent()
+    )
+    val executor = ArbigentScenarioExecutor(coroutineContext[CoroutineDispatcher]!!)
+    val states = mutableListOf<ArbigentScenarioExecutorState>()
+    val collecting = launch { executor.scenarioStateFlow.toList(states) }
+    assertFailsWith<ArbigentUnresolvedVariableException> {
+      project.scenarioOf("launch-app", RecordingDevice()).run(coroutineContext[CoroutineDispatcher]!!, executor)
+    }
+    // A rejected run assigns no agent, so everything built on the running flow has to be told the
+    // run is over: otherwise the UI shows Idle forever and waiting for it never returns.
+    executor.waitUntilFinished()
+    assertEquals(ArbigentScenarioExecutorState.Failed, executor.scenarioState())
+    assertTrue(states.contains(ArbigentScenarioExecutorState.Failed), states.toString())
+    collecting.cancel()
+  }
+
+  @Test
+  fun aRejectedRunDoesNotKeepThePreviousRunsSuccess() = runTest {
+    val project = load(
+      """
+      settings:
+        variables:
+          appId: "com.example.app"
+      scenarios:
+      - id: "launch-app"
+        goal: "Open the app"
+        initializationMethods:
+        - type: "LaunchApp"
+          packageName: "{{appId}}"
+      """.trimIndent()
+    )
+    val dispatcher = coroutineContext[CoroutineDispatcher]!!
+    val executor = project.scenarioOf("launch-app", RecordingDevice()).run(dispatcher)
+    assertTrue(executor.isSuccessful())
+
+    val broken = load(
+      """
+      scenarios:
+      - id: "launch-app"
+        goal: "Open {{missing}}"
+      """.trimIndent()
+    )
+    assertFailsWith<ArbigentUnresolvedVariableException> {
+      broken.scenarioOf("launch-app", RecordingDevice()).run(dispatcher, executor)
+    }
+    // Reusing the executor must not let the earlier run's result stand for the rejected one.
+    assertFalse(executor.isSuccessful())
+  }
+
+  @Test
+  fun runningOnlyOneTaskChecksOnlyThatTask() = runTest {
+    val project = load(
+      """
+      scenarios:
+      - id: "launch-app"
+        goal: "Open {{missing}}"
+      - id: "open-search"
+        dependency: "launch-app"
+        goal: "Tap the search icon"
+      """.trimIndent()
+    )
+    val scenario = project.scenarioOf("open-search", RecordingDevice())
+    assertEquals(2, scenario.agentTasks.size, scenario.agentTasks.map { it.goal }.toString())
+    // The whole chain cannot run: the dependency references a variable nothing defines.
+    assertFailsWith<ArbigentUnresolvedVariableException> {
+      scenario.run(coroutineContext[CoroutineDispatcher]!!)
+    }
+    // The UI's Debug runs only the last task, and that task is fine, so it must still run.
+    val lastTaskOnly = scenario.copy(agentTasks = listOf(scenario.agentTasks.last()))
+    assertTrue(lastTaskOnly.unresolvedVariables.isEmpty(), lastTaskOnly.unresolvedVariables.toString())
+    lastTaskOnly.run(coroutineContext[CoroutineDispatcher]!!)
   }
 }

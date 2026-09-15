@@ -349,6 +349,51 @@ internal fun ArbigentScenarioContent.InitializationMethod.MaestroYaml.effectiveY
 ): String? = yamlContent ?: fixedScenarios.firstOrNull { it.id == scenarioId }?.yamlText
 
 /**
+ * Records the `{{name}}` references a task's goal and initialization methods make that the run's
+ * variables do not define. Maestro YAML is not scanned: the initializer runs it as written, so a
+ * `{{name}}` in it is Maestro's business and not a project variable.
+ */
+private fun unresolvedVariables(
+  scenarioId: String,
+  goal: String,
+  initializationMethods: List<ArbigentScenarioContent.InitializationMethod>,
+  variables: Map<String, String>?,
+): List<ArbigentUnresolvedVariable> {
+  val found = mutableListOf<ArbigentUnresolvedVariable>()
+  fun scan(value: String, field: String) {
+    UnresolvedVariableFinder.missingNames(value, variables).forEach { name ->
+      found += ArbigentUnresolvedVariable(name, "$field of scenario \"$scenarioId\"")
+    }
+  }
+  scan(goal, "the goal")
+  initializationMethods.forEach { method ->
+    when (method) {
+      is ArbigentScenarioContent.InitializationMethod.LaunchApp -> {
+        scan(method.packageName, "LaunchApp packageName")
+        method.launchArguments.forEach { (name, value) ->
+          if (value is ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue.StringVal) {
+            scan(value.value, "LaunchApp launchArguments.$name")
+          }
+        }
+      }
+
+      is ArbigentScenarioContent.InitializationMethod.CleanupData ->
+        scan(method.packageName, "CleanupData packageName")
+
+      is ArbigentScenarioContent.InitializationMethod.OpenLink ->
+        scan(method.link, "OpenLink link")
+
+      // No text a project variable could appear in.
+      is ArbigentScenarioContent.InitializationMethod.MaestroYaml,
+      is ArbigentScenarioContent.InitializationMethod.Back,
+      is ArbigentScenarioContent.InitializationMethod.Wait,
+      ArbigentScenarioContent.InitializationMethod.Noop -> Unit
+    }
+  }
+  return found.distinct()
+}
+
+/**
  * Resolves {{inputs.*}} inside a reusable leaf's initialization methods: the `packageName` /
  * `link` (and string launch arguments) of LaunchApp, CleanupData and OpenLink, and Maestro YAML referenced by MaestroYaml
  * (the initializer prefers yamlContent when present). Bare {{name}} project variables are left
@@ -457,10 +502,19 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
       inputBindings = inputBindings,
       fixedScenarios = fixedScenarios
     )
+    // Collected rather than thrown: building a project builds every scenario, so throwing here
+    // would stop unrelated scenarios from loading. The executor rejects the run instead.
+    val unresolvedVariables = unresolvedVariables(
+      scenarioId = nodeScenario.id,
+      goal = goal,
+      initializationMethods = initializationMethods,
+      variables = effectiveAppSettings.variables,
+    )
 
     return ArbigentAgentTask(
       scenarioId = taskScenarioId,
       goal = goal,
+      unresolvedVariables = unresolvedVariables,
       maxStep = nodeScenario.maxStep,
       deviceFormFactor = effectiveDeviceFormFactor,
       additionalActions = mergedAdditionalActions,

@@ -162,12 +162,13 @@ Each entry is tagged by `type:`.
 | `Noop` | (none) | Do nothing. |
 
 `{{name}}` placeholders are project variables: defaults come from `settings.variables` and
-`arbigent run --variables` overrides them. They are resolved when the initializer runs, and a
-placeholder that is still unresolved at that point fails the scenario with an error naming the
-variable (unlike goals, where an unresolved placeholder is passed to the AI as-is). Only names the
-resolver can substitute count as placeholders (letters, digits, `_`, `.`, `-`, spaces), so text
-such as `{{user:id}}` is left alone; values are substituted once, so a `{{...}}` inside a value
-stays literal.
+`arbigent run --variables` overrides them. Before a scenario runs, every `{{name}}` in its goals
+and in its initialization methods must resolve; if any does not, the scenario fails with one error
+listing all of them and nothing is sent to the device. Loading or building a project never fails
+for this, so one scenario with a typo does not stop the others. Only names the resolver can
+substitute count as placeholders (letters, digits, `_`, `.`, `-`, spaces), so text such as
+`{{user:id}}` is left alone; values are substituted once, so a `{{...}}` inside a value stays
+literal. Maestro YAML text is run as written and is not scanned.
 `{{inputs.name}}` placeholders are reusable-scenario inputs bound at the call site; see
 [ReusableInput](#reusableinput). Escape a literal with `\{{name}}`.
 

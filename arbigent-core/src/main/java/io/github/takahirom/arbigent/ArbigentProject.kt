@@ -181,6 +181,15 @@ public data class ArbigentScenario(
   val cacheOptions: ArbigentScenarioCacheOptions? = null,
   val mcpOptions: ArbigentMcpOptions? = null,
 ) {
+  /**
+   * What the tasks of this scenario reference and the run's variables do not define.
+   * [ArbigentScenarioExecutor.execute] rejects the run when this is not empty. Derived from the
+   * tasks so that trimming the chain — the UI's Debug runs only the last task — also trims what
+   * has to resolve.
+   */
+  public val unresolvedVariables: List<ArbigentUnresolvedVariable>
+    get() = agentTasks.flatMap { it.unresolvedVariables }.distinct()
+
   public fun goal(): String? {
     return agentTasks.lastOrNull()?.goal
   }

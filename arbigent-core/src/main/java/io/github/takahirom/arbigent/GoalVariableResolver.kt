@@ -11,6 +11,14 @@ package io.github.takahirom.arbigent
  */
 internal val ValidArbigentVariableName: Regex = """^[a-zA-Z0-9_.\-\s]+$""".toRegex()
 
+/**
+ * The two patterns substitution is built on, shared so anything that decides whether a `{{...}}`
+ * is a variable reference decides it exactly as [GoalVariableResolver] does. Escapes are matched
+ * and masked first; only what is left is a reference.
+ */
+internal val ArbigentEscapedVariablePattern: Regex = """\\\{\{([^}]+)\}\}""".toRegex()
+internal val ArbigentVariablePattern: Regex = """\{\{([^}]+)\}\}""".toRegex()
+
 public object GoalVariableResolver {
     private val delegate = DefaultGoalVariableResolver()
     
@@ -49,8 +57,8 @@ internal class DefaultGoalVariableResolver : GoalVariableResolverInterface {
         private const val MAX_GOAL_LENGTH = 100_000
         
         // Pre-compiled regex patterns for performance
-        private val VARIABLE_PATTERN = """\{\{([^}]+)\}\}""".toRegex()
-        private val ESCAPED_VARIABLE_PATTERN = """\\\{\{([^}]+)\}\}""".toRegex()
+        private val VARIABLE_PATTERN = ArbigentVariablePattern
+        private val ESCAPED_VARIABLE_PATTERN = ArbigentEscapedVariablePattern
         
         // Escape sequences for temporary replacement
         private const val TEMP_PREFIX = "\u0000ESCAPED_"

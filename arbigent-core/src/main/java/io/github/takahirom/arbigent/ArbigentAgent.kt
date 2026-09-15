@@ -233,12 +233,9 @@ public class ArbigentAgent internal constructor(
     mcpClient: MCPClient,
     mcpOptions: ArbigentMcpOptions? = null
   ) {
-    // Resolve variables in the goal
-    val resolvedGoal = if (appSettings?.variables != null) {
-      GoalVariableResolver.resolve(goal, appSettings.variables)
-    } else {
-      goal
-    }
+    // Always resolve, even with no variables configured: that is also what turns the documented
+    // `\{{name}}` escape into the literal `{{name}}` the goal asked for.
+    val resolvedGoal = GoalVariableResolver.resolve(goal, appSettings?.variables)
     
     val executeInput = ExecuteInput(
       scenarioId = scenarioId,
@@ -384,11 +381,8 @@ public class AgentConfig(
   internal val aiOptions: ArbigentAiOptions?,
   internal val appSettings: ArbigentAppSettings?,
 ) {
-  internal fun resolveGoal(goal: String): String {
-    return appSettings?.variables?.let { variables ->
-      GoalVariableResolver.resolve(goal, variables)
-    } ?: goal
-  }
+  internal fun resolveGoal(goal: String): String =
+    GoalVariableResolver.resolve(goal, appSettings?.variables)
 
   public class Builder {
     private val interceptors = mutableListOf<ArbigentInterceptor>()

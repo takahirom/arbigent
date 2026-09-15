@@ -127,8 +127,8 @@ reusableScenarios:
 ### Variable namespaces
 
 - `{{name}}` (bare) — **project variable** (`appSettings.variables`),
-  resolved at runtime, everywhere, exactly as today. Full backward
-  compatibility; bare form never changes meaning inside a reusable.
+  resolved at runtime, everywhere. The bare form never changes meaning inside
+  a reusable; one that no variable defines fails the scenario before it runs.
 - `{{inputs.name}}` — **declared input**, valid only inside a reusable
   definition. Load-time checked against the `inputs:` declaration.
 

@@ -512,6 +512,10 @@ class ArbigentAppStateHolder(
       projectStateFlow.value?.execute(scenario)
     } catch (e: FailedToArchiveException) {
       arbigentDebugLog("Failed to archive scenario: ${e.message}")
+    } catch (e: ArbigentUnresolvedVariableException) {
+      // The executor already marked the scenario failed; surface the message instead of letting it
+      // escape into the UI coroutine.
+      arbigentErrorLog("${e.message}")
     }
   }
 
