@@ -222,9 +222,13 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     val original = File(screenshotFilePath)
     val canvas = ArbigentCanvas.load(original, elements.screenWidth, TYPE_INT_RGB)
     canvas.draw(elements)
-    canvas.save(original.getAnnotatedFilePath(), decisionInput.aiOptions)
+    val annotatedFile = original.toAnnotatedFile()
+    canvas.save(annotatedFile.absolutePath, decisionInput.aiOptions)
 
-    val imageBase64 = File(screenshotFilePath).getResizedIamgeBase64(1.0F)
+    // The decision is made from the annotated image: the numbered boxes drawn on it are what lets
+    // the model connect what it sees to the indices in <ELEMENTS>. The image assertion keeps using
+    // the un-annotated screenshot, because the boxes are not part of the screen being judged.
+    val imageBase64 = annotatedFile.getResizedIamgeBase64(1.0F)
     val prompt =
       buildPrompt(
         contextHolder = contextHolder,

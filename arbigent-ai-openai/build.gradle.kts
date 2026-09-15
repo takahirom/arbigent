@@ -29,4 +29,5 @@ dependencies {
   implementation("com.github.mrmike:ok2curl:0.8.0")
 
   testImplementation(libs.junit)
+  testImplementation(libs.ktor.client.mock)
 }
