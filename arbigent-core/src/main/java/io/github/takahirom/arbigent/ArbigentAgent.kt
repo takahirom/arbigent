@@ -730,8 +730,14 @@ public fun AgentConfigBuilder(
                 MaestroCommand(
                   launchAppCommand = LaunchAppCommand(
                     appId = packageName,
-                    launchArguments = initializeMethod.launchArguments.mapValues { (_, value) ->
-                      value.value
+                    launchArguments = initializeMethod.launchArguments.mapValues { (name, value) ->
+                      when (value) {
+                        is ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue.StringVal ->
+                          InitializationVariableResolver.resolve(
+                            value.value, appSettings?.variables, "LaunchApp", "launchArguments.$name"
+                          )
+                        else -> value.value
+                      }
                     }
                   )
                 )

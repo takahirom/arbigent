@@ -153,7 +153,7 @@ Each entry is tagged by `type:`.
 
 | `type` | Fields | Description |
 |---|---|---|
-| `LaunchApp` | `packageName: String` (required), `launchArguments: Map<String,`[ArgumentValue](#argumentvalue)`> = {}` | Launch an app. `packageName` accepts `{{name}}` / `{{inputs.name}}`; string launch arguments accept `{{inputs.name}}`. |
+| `LaunchApp` | `packageName: String` (required), `launchArguments: Map<String,`[ArgumentValue](#argumentvalue)`> = {}` | Launch an app. `packageName` and string launch arguments accept `{{name}}` / `{{inputs.name}}`. |
 | `CleanupData` | `packageName: String` (required) | Clear app data. `packageName` accepts `{{name}}` / `{{inputs.name}}`. |
 | `Back` | `times: Int = 3` | Press back N times. |
 | `Wait` | `durationMs: Long` (required) | Wait a fixed duration. |
@@ -164,7 +164,10 @@ Each entry is tagged by `type:`.
 `{{name}}` placeholders are project variables: defaults come from `settings.variables` and
 `arbigent run --variables` overrides them. They are resolved when the initializer runs, and a
 placeholder that is still unresolved at that point fails the scenario with an error naming the
-variable (unlike goals, where an unresolved placeholder is passed to the AI as-is).
+variable (unlike goals, where an unresolved placeholder is passed to the AI as-is). Only names the
+resolver can substitute count as placeholders (letters, digits, `_`, `.`, `-`, spaces), so text
+such as `{{user:id}}` is left alone; values are substituted once, so a `{{...}}` inside a value
+stays literal.
 `{{inputs.name}}` placeholders are reusable-scenario inputs bound at the call site; see
 [ReusableInput](#reusableinput). Escape a literal with `\{{name}}`.
 

@@ -332,6 +332,14 @@ public sealed interface AiDecisionCacheStrategy {
 }
 
 /**
+ * The initializers that actually run: the plural `initializationMethods`, falling back to the
+ * deprecated singular `initializeMethods`. Validation and execution must agree on this list.
+ */
+@Suppress("DEPRECATION")
+internal fun ArbigentScenarioContent.effectiveInitializationMethods(): List<ArbigentScenarioContent.InitializationMethod> =
+  initializationMethods.ifEmpty { listOf(initializeMethods) }
+
+/**
  * Resolves {{inputs.*}} inside a reusable leaf's initialization methods: the `packageName` /
  * `link` (and string launch arguments) of LaunchApp, CleanupData and OpenLink, and Maestro YAML referenced by MaestroYaml
  * (the initializer prefers yamlContent when present). Bare {{name}} project variables are left
@@ -436,7 +444,7 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
       nodeScenario.goal
     }
     val initializationMethods = resolveInitializationInputs(
-      methods = nodeScenario.initializationMethods.ifEmpty { listOf(nodeScenario.initializeMethods) },
+      methods = nodeScenario.effectiveInitializationMethods(),
       inputBindings = inputBindings,
       fixedScenarios = fixedScenarios
     )

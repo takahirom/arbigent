@@ -138,7 +138,7 @@ private fun ArbigentProjectFileContent.reusableScenarioErrors(): List<String> {
     // {{inputs.*}} may only appear in reusable definitions and only for declared inputs.
     val referencedInputs = ReusableInputsResolver.referencedInputNames(content.goal) +
       content.imageAssertions.flatMap { ReusableInputsResolver.referencedInputNames(it.assertionPrompt) } +
-      content.initializationMethods.flatMap { method ->
+      content.effectiveInitializationMethods().flatMap { method ->
         // Keep in sync with resolveInitializationInputs in ArbigentProjectSerializer.kt.
         when (method) {
           is ArbigentScenarioContent.InitializationMethod.LaunchApp ->

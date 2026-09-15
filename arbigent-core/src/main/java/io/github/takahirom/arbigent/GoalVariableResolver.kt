@@ -4,6 +4,13 @@ package io.github.takahirom.arbigent
  * Resolves variables in goal strings by replacing {{variable_name}} patterns
  * with their corresponding values from the provided variables map.
  */
+/**
+ * Variable names [GoalVariableResolver] is willing to substitute. An unescaped `{{...}}` whose
+ * name does not match is not a variable reference at all: it is left in the text untouched, so
+ * callers that reject unresolved variables must ignore it too.
+ */
+internal val ValidArbigentVariableName: Regex = """^[a-zA-Z0-9_.\-\s]+$""".toRegex()
+
 public object GoalVariableResolver {
     private val delegate = DefaultGoalVariableResolver()
     
@@ -37,7 +44,7 @@ internal class DefaultGoalVariableResolver : GoalVariableResolverInterface {
     companion object {
         // Allow alphanumeric, underscore, dash, dot, and space in variable names
         // Disallow only dangerous characters like }, {, <, >, &, |, ;, $, `, \, etc.
-        private val VALID_VARIABLE_NAME = """^[a-zA-Z0-9_.\-\s]+$""".toRegex()
+        private val VALID_VARIABLE_NAME = ValidArbigentVariableName
         private const val MAX_VARIABLE_VALUE_LENGTH = 10_000
         private const val MAX_GOAL_LENGTH = 100_000
         

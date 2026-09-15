@@ -16,7 +16,9 @@ internal object InitializationVariableResolver {
   fun resolve(value: String, variables: Map<String, String>?, methodName: String, fieldName: String): String {
     val missing = PLACEHOLDER.findAll(value)
       .map { it.groupValues[1].trim() }
-      .filter { variables?.containsKey(it) != true }
+      // Only names the resolver would actually substitute count as variable references; anything
+      // else (e.g. `example://open?template={{user:id}}`) is literal text and stays as it is.
+      .filter { ValidArbigentVariableName.matches(it) && variables?.containsKey(it) != true }
       .toList()
     if (missing.isNotEmpty()) {
       throw ArbigentUnresolvedVariableException(

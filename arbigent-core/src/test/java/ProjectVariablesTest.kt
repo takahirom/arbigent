@@ -248,6 +248,106 @@ class ProjectVariablesTest {
   }
 
   @Test
+  fun undeclaredInputInLegacySingularInitializeMethodsFailsAtLoad() {
+    val error = assertFailsWith<ArbigentProjectValidationException> {
+      load(
+        """
+        scenarios:
+        - id: "caller"
+          uses: "part"
+        reusableScenarios:
+        - id: "part"
+          initializeMethods:
+            type: "LaunchApp"
+            packageName: "{{inputs.typo}}"
+          goal: "Open the app"
+        """.trimIndent()
+      )
+    }
+    assertTrue(error.message!!.contains("'{{inputs.typo}}' is not declared in inputs"), error.message)
+  }
+
+  @Test
+  fun escapedPlaceholderInLaunchArgumentIsPassedLiterally() {
+    val device = RecordingDevice()
+    load(
+      """
+      scenarios:
+      - id: "caller"
+        uses: "open-screen"
+        with:
+          screen: "search"
+      reusableScenarios:
+      - id: "open-screen"
+        inputs:
+          screen:
+            required: true
+        initializationMethods:
+        - type: "LaunchApp"
+          packageName: "com.example.app"
+          launchArguments:
+            screen:
+              type: "String"
+              value: "{{inputs.screen}}"
+            template:
+              type: "String"
+              value: "\\{{inputs.screen}}"
+        goal: "Open the screen"
+      """.trimIndent()
+    ).scenarioOf("caller", device).runInitializers(device)
+
+    assertEquals(
+      mapOf("screen" to "search", "template" to "{{inputs.screen}}"),
+      device.executedCommands.mapNotNull { it.launchAppCommand }.single().launchArguments
+    )
+  }
+
+  @Test
+  fun bracesThatAreNotVariableNamesAreLeftLiteral() {
+    val device = RecordingDevice()
+    load(
+      """
+      scenarios:
+      - id: "open-link"
+        goal: "Open the link"
+        initializationMethods:
+        - type: "OpenLink"
+          link: "example://open?template={{user:id}}"
+      """.trimIndent()
+    ).scenarioOf("open-link", device).runInitializers(device)
+
+    // `user:id` is outside the variable-name grammar, so it is text, not an unresolved variable.
+    assertEquals(
+      "example://open?template={{user:id}}",
+      device.executedCommands.mapNotNull { it.openLinkCommand }.single().link
+    )
+  }
+
+  @Test
+  fun variableValuesAreNotResolvedAgain() {
+    val device = RecordingDevice()
+    load(
+      """
+      settings:
+        variables:
+          link: "example://open?next={{missing}}"
+      scenarios:
+      - id: "open-link"
+        goal: "Open the link"
+        initializationMethods:
+        - type: "OpenLink"
+          link: "{{link}}"
+      """.trimIndent()
+    ).scenarioOf("open-link", device).runInitializers(device)
+
+    // Substitution is single-pass: a placeholder inside a value is data, not a second reference.
+    assertEquals(
+      "example://open?next={{missing}}",
+      device.executedCommands.mapNotNull { it.openLinkCommand }.single().link
+    )
+  }
+
+  @Test
   fun inputsInOpenLinkOutsideReusableScenariosFailAtLoad() {
     val error = assertFailsWith<ArbigentProjectValidationException> {
       load(

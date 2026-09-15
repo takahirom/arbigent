@@ -244,7 +244,7 @@ reusableScenarios:
 
 Key points:
 - A scenario (or reusable scenario) is either a **leaf** (has `goal` plus the full option set: `initializationMethods`, `mcpOptions`, `maxStep`, image assertions, …) or a **call** (`uses` + `with`, or a `steps` list of calls). `uses` is sugar for a single-entry `steps`.
-- Reusable scenarios declare their parameters via `inputs` (`required` / `default`) and reference them as `{{inputs.name}}` in the goal — bare `{{name}}` still resolves project variables. `{{inputs.*}}` also works in the `packageName` / `link` of `LaunchApp`, `CleanupData` and `OpenLink` initialization methods and inside Maestro YAML referenced from a reusable scenario's initialization methods, and combined with `type: Execution` this gives deterministic, parameterized steps with zero AI calls.
+- Reusable scenarios declare their parameters via `inputs` (`required` / `default`) and reference them as `{{inputs.name}}` in the goal — bare `{{name}}` still resolves project variables. `{{inputs.*}}` also works in the `packageName` / `link` / string launch arguments of `LaunchApp`, `CleanupData` and `OpenLink` initialization methods and inside Maestro YAML referenced from a reusable scenario's initialization methods, and combined with `type: Execution` this gives deterministic, parameterized steps with zero AI calls.
 - Composites can call other composites; unknown references, cycles, undeclared `with` keys and missing required inputs are all rejected when the project loads.
 - In the GUI, choose the "Reusable steps" scenario type to build calls, manage the library in the Reusable Scenarios dialog, and use "Make this reusable" to extract an existing scenario into the library without breaking scenarios that depend on it.
 
@@ -271,7 +271,7 @@ arbigent run --project-file=project.yaml                                        
 arbigent run --project-file=project.yaml --variables=appId=com.example.app.debug  # debug build
 ```
 
-Variables are substituted when the initializer runs. A `{{name}}` that has no value at that point fails the scenario with an error naming the variable, because launching `{{appId}}` can never succeed (in goals, an unresolved placeholder is left as-is for the AI). Maestro YAML `appId:` headers and deep-link hosts are not rewritten, so a debug build must handle the same links or you point `link` at a variable too.
+Variables are substituted when the initializer runs. A `{{name}}` that has no value at that point fails the scenario with an error naming the variable, because launching `{{appId}}` can never succeed (in goals, an unresolved placeholder is left as-is for the AI). Only names the resolver can substitute count as placeholders, so text like `{{user:id}}` stays literal. Maestro YAML `appId:` headers and deep-link hosts are not rewritten, so a debug build must handle the same links or you point `link` at a variable too.
 
 See [arbigent-reusable-scenarios-specification.md](arbigent-reusable-scenarios-specification.md) for the full specification.
 
