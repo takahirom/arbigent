@@ -1,6 +1,7 @@
 package io.github.takahirom.arbigent.cli
 
 import com.github.ajalt.clikt.core.CliktError
+import io.github.takahirom.arbigent.isArbigentVariableName
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -57,7 +58,7 @@ class VariableParserTest {
     
     @Test
     fun `parseVariables throws on invalid variable name`() {
-        val input = "123invalid=value"
+        val input = "my@var=value"
         
         val exception = assertFailsWith<CliktError> {
             parseVariables(input)
@@ -66,13 +67,13 @@ class VariableParserTest {
     }
     
     @Test
-    fun `parseVariables throws on invalid variable name with special chars`() {
-        val input = "my-var=value"
-        
-        val exception = assertFailsWith<CliktError> {
-            parseVariables(input)
-        }
-        assert(exception.message?.contains("Invalid variable name") == true)
+    fun `parseVariables accepts every name a placeholder can carry`() {
+        // A name the project YAML can define must be a name --variables can supply, or the
+        // unresolved-variable message would suggest a command that cannot be run.
+        assertEquals(mapOf("my-var" to "value"), parseVariables("my-var=value"))
+        assertEquals(mapOf("app.id" to "com.example.app"), parseVariables("app.id=com.example.app"))
+        assertEquals(mapOf("my var" to "value"), parseVariables("my var=value"))
+        assertEquals(mapOf("123start" to "value"), parseVariables("123start=value"))
     }
     
     @Test
@@ -102,16 +103,19 @@ class VariableParserTest {
         assert(isValidVariableName("CONSTANT_NAME"))
         assert(isValidVariableName("_"))
         assert(isValidVariableName("a"))
+        // Accepted by the shared grammar, so a name the project YAML can define is suppliable.
+        assert(isValidVariableName("123start"))
+        assert(isValidVariableName("my-var"))
+        assert(isValidVariableName("my.var"))
+        assert(isValidVariableName("my var"))
     }
     
     @Test
     fun `isValidVariableName with invalid names`() {
         assert(!isValidVariableName(""))
-        assert(!isValidVariableName("123start"))
-        assert(!isValidVariableName("my-var"))
-        assert(!isValidVariableName("my.var"))
-        assert(!isValidVariableName("my var"))
         assert(!isValidVariableName("my@var"))
+        assert(!isValidVariableName("my/var"))
+        assert(!isValidVariableName("my:var"))
     }
     
     // Quote handling tests

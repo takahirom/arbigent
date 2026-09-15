@@ -16,6 +16,12 @@ internal val ValidArbigentVariableName: Regex = """^[a-zA-Z0-9_.\-\s]+$""".toReg
  * is a variable reference decides it exactly as [GoalVariableResolver] does. Escapes are matched
  * and masked first; only what is left is a reference.
  */
+/**
+ * Whether [name] is a name Arbigent substitutes. Exposed so every way of supplying a variable —
+ * the project YAML, the CLI, the UI — accepts exactly the names a `{{...}}` reference can carry.
+ */
+public fun isArbigentVariableName(name: String): Boolean = ValidArbigentVariableName.matches(name)
+
 internal val ArbigentEscapedVariablePattern: Regex = """\\\{\{([^}]+)\}\}""".toRegex()
 internal val ArbigentVariablePattern: Regex = """\{\{([^}]+)\}\}""".toRegex()
 

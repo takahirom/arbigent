@@ -475,7 +475,7 @@ class ProjectVariablesTest {
     assertTrue(message.contains("{{appId}} in LaunchApp packageName of scenario \"open-search\""), message)
     assertTrue(message.contains("{{appId}} in OpenLink link of scenario \"open-search\""), message)
     assertTrue(message.contains("settings.variables"), message)
-    assertTrue(message.contains("--variables=query=com.example.app"), message)
+    assertTrue(message.contains("--variables=\"query=com.example.app\""), message)
     assertTrue(message.contains("\\{{query}}"), message)
     // Nothing touched the device: the run never started.
     assertTrue(device.executedCommands.isEmpty(), device.executedCommands.toString())

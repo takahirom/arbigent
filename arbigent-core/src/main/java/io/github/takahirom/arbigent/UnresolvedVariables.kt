@@ -43,7 +43,8 @@ internal fun unresolvedVariableMessage(header: String, unresolved: List<Arbigent
     appendLine()
     append(
       "Give it a default in settings.variables in the project YAML, pass it in with " +
-        "--variables=$example=com.example.app, or write \\{{$example}} if you meant the text itself."
+        "--variables=\"$example=com.example.app\", or write \\{{$example}} if you meant the text " +
+        "itself."
     )
   }
 }
