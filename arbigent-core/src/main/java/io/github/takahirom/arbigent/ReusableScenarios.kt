@@ -148,7 +148,7 @@ private fun ArbigentProjectFileContent.reusableScenarioErrors(): List<String> {
           is ArbigentScenarioContent.InitializationMethod.CleanupData -> listOf(method.packageName)
           is ArbigentScenarioContent.InitializationMethod.OpenLink -> listOf(method.link)
           is ArbigentScenarioContent.InitializationMethod.MaestroYaml ->
-            listOfNotNull(fixedScenarios.firstOrNull { it.id == method.scenarioId }?.yamlText)
+            listOfNotNull(method.effectiveYamlText(fixedScenarios))
           else -> emptyList()
         }
       }.flatMap { ReusableInputsResolver.referencedInputNames(it) }

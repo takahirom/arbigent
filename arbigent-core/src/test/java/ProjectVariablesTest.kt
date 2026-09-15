@@ -86,7 +86,7 @@ class ProjectVariablesTest {
 
     val encoded = serializer.encodeToString(project)
     assertTrue(encoded.contains("variables:"), encoded)
-    assertEquals(project.settings.variables!!, load(encoded).settings.variables!!)
+    assertEquals(project.settings.variables, load(encoded).settings.variables)
   }
 
   @Test
@@ -362,5 +362,77 @@ class ProjectVariablesTest {
       )
     }
     assertTrue(error.message!!.contains("'{{inputs.*}}' can only be used inside reusable scenario definitions"), error.message)
+  }
+
+  @Test
+  fun undeclaredInputInInlineMaestroYamlFailsAtLoad() {
+    val error = assertFailsWith<ArbigentProjectValidationException> {
+      load(
+        """
+        scenarios:
+        - id: "caller"
+          uses: "part"
+        reusableScenarios:
+        - id: "part"
+          initializationMethods:
+          - type: "MaestroYaml"
+            scenarioId: "flow"
+            yamlContent: |-
+              appId: "com.example.app"
+              ---
+              - openLink: "example://login?user={{inputs.typo}}"
+          goal: "Open the app"
+        fixedScenarios:
+        - id: "flow"
+          title: "flow"
+          description: "flow"
+          yamlText: |-
+            appId: "com.example.app"
+            ---
+            - openLink: "example://login"
+        """.trimIndent()
+      )
+    }
+    assertTrue(error.message!!.contains("'{{inputs.typo}}' is not declared in inputs"), error.message)
+  }
+
+  @Test
+  fun inlineMaestroYamlTakesPrecedenceWhenInputsAreResolved() {
+    val project = load(
+      """
+      scenarios:
+      - id: "caller"
+        uses: "part"
+        with:
+          user: "premium"
+      reusableScenarios:
+      - id: "part"
+        inputs:
+          user:
+            required: true
+        initializationMethods:
+        - type: "MaestroYaml"
+          scenarioId: "flow"
+          yamlContent: |-
+            appId: "com.example.app"
+            ---
+            - openLink: "example://inline?user={{inputs.user}}"
+        goal: "Open the app"
+      fixedScenarios:
+      - id: "flow"
+        title: "flow"
+        description: "flow"
+        yamlText: |-
+          appId: "com.example.app"
+          ---
+          - openLink: "example://fixed"
+      """.trimIndent()
+    )
+    val device = RecordingDevice()
+    project.scenarioOf("caller", device).runInitializers(device)
+    assertEquals(
+      "example://inline?user=premium",
+      device.executedCommands.mapNotNull { it.openLinkCommand }.firstOrNull()?.link
+    )
   }
 }

@@ -244,13 +244,13 @@ reusableScenarios:
 
 Key points:
 - A scenario (or reusable scenario) is either a **leaf** (has `goal` plus the full option set: `initializationMethods`, `mcpOptions`, `maxStep`, image assertions, …) or a **call** (`uses` + `with`, or a `steps` list of calls). `uses` is sugar for a single-entry `steps`.
-- Reusable scenarios declare their parameters via `inputs` (`required` / `default`) and reference them as `{{inputs.name}}` in the goal — bare `{{name}}` still resolves project variables. `{{inputs.*}}` also works in the `packageName` / `link` / string launch arguments of `LaunchApp`, `CleanupData` and `OpenLink` initialization methods and inside Maestro YAML referenced from a reusable scenario's initialization methods, and combined with `type: Execution` this gives deterministic, parameterized steps with zero AI calls.
+- Reusable scenarios declare their parameters via `inputs` (`required` / `default`) and reference them as `{{inputs.name}}` in the goal — bare `{{name}}` still resolves project variables. `{{inputs.*}}` also works in initialization methods — `LaunchApp`'s `packageName` and its string `launchArguments`, `CleanupData`'s `packageName`, `OpenLink`'s `link`, and the Maestro YAML a `MaestroYaml` method runs — and combined with `type: Execution` this gives deterministic, parameterized steps with zero AI calls.
 - Composites can call other composites; unknown references, cycles, undeclared `with` keys and missing required inputs are all rejected when the project loads.
 - In the GUI, choose the "Reusable steps" scenario type to build calls, manage the library in the Reusable Scenarios dialog, and use "Make this reusable" to extract an existing scenario into the library without breaking scenarios that depend on it.
 
 ### Project Variables
 
-`{{name}}` placeholders in goals and in the `packageName` / `link` of `LaunchApp`, `CleanupData` and `OpenLink` initialization methods are project variables. Declare defaults once under `settings.variables` and override them per run with `--variables` (or `variables:` under `run:` in `.arbigent/settings.yml`). A typical use is pointing the same scenarios at a debug build with a different application id:
+`{{name}}` placeholders in goals and in initialization methods — `LaunchApp`'s `packageName` and its string `launchArguments`, `CleanupData`'s `packageName` and `OpenLink`'s `link` — are project variables. Declare defaults once under `settings.variables` and override them per run with `--variables` (or `variables:` under `run:` in `.arbigent/settings.yml`). A typical use is pointing the same scenarios at a debug build with a different application id:
 
 ```yaml
 settings:

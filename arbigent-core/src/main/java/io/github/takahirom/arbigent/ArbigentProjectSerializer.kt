@@ -340,6 +340,15 @@ internal fun ArbigentScenarioContent.effectiveInitializationMethods(): List<Arbi
   initializationMethods.ifEmpty { listOf(initializeMethods) }
 
 /**
+ * The Maestro YAML the initializer actually runs: the inline [MaestroYaml.yamlContent] when set,
+ * otherwise the referenced fixed scenario's text. Validation and input resolution must look at the
+ * same source as [ArbigentAgent], which prefers the inline content.
+ */
+internal fun ArbigentScenarioContent.InitializationMethod.MaestroYaml.effectiveYamlText(
+  fixedScenarios: List<FixedScenario>
+): String? = yamlContent ?: fixedScenarios.firstOrNull { it.id == scenarioId }?.yamlText
+
+/**
  * Resolves {{inputs.*}} inside a reusable leaf's initialization methods: the `packageName` /
  * `link` (and string launch arguments) of LaunchApp, CleanupData and OpenLink, and Maestro YAML referenced by MaestroYaml
  * (the initializer prefers yamlContent when present). Bare {{name}} project variables are left
@@ -370,7 +379,7 @@ private fun resolveInitializationInputs(
       is ArbigentScenarioContent.InitializationMethod.OpenLink ->
         method.copy(link = method.link.resolveInputs())
       is ArbigentScenarioContent.InitializationMethod.MaestroYaml -> {
-        val yamlText = fixedScenarios.firstOrNull { it.id == method.scenarioId }?.yamlText
+        val yamlText = method.effectiveYamlText(fixedScenarios)
         if (yamlText != null && ReusableInputsResolver.containsInputPlaceholder(yamlText)) {
           method.copy(yamlContent = yamlText.resolveInputs())
         } else {
