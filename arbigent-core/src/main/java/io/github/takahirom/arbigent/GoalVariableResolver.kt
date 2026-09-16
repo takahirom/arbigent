@@ -4,6 +4,49 @@ package io.github.takahirom.arbigent
  * Resolves variables in goal strings by replacing {{variable_name}} patterns
  * with their corresponding values from the provided variables map.
  */
+/**
+ * Variable names [GoalVariableResolver] is willing to substitute. An unescaped `{{...}}` whose
+ * name does not match is not a variable reference at all: it is left in the text untouched, so
+ * callers that reject unresolved variables must ignore it too.
+ */
+internal val ValidArbigentVariableName: Regex = """^[a-zA-Z0-9_.\-\s]+$""".toRegex()
+
+/**
+ * The two patterns substitution is built on, shared so anything that decides whether a `{{...}}`
+ * is a variable reference decides it exactly as [GoalVariableResolver] does. Escapes are matched
+ * and masked first; only what is left is a reference.
+ */
+/**
+ * Whether [name] is a name Arbigent substitutes. Exposed so every way of supplying a variable —
+ * the project YAML, the CLI, the UI — accepts exactly the names a `{{...}}` reference can carry.
+ */
+public fun isArbigentVariableName(name: String): Boolean = ValidArbigentVariableName.matches(name)
+
+internal val ArbigentEscapedVariablePattern: Regex = """\\\{\{([^}]+)\}\}""".toRegex()
+internal val ArbigentVariablePattern: Regex = """\{\{([^}]+)\}\}""".toRegex()
+
+
+// The markers substitution swaps an escape for while it substitutes the rest. They hold the
+// escape's own text, so the braces inside it keep affecting where the next match starts.
+internal const val ArbigentEscapedVariableMarkerPrefix: String = "\u0000ESCAPED_"
+internal const val ArbigentEscapedVariableMarkerSuffix: String = "_ESCAPED\u0000"
+
+/**
+ * Hides `\{{...}}` escapes exactly as substitution does, so whatever `[ArbigentVariablePattern]`
+ * still finds afterwards is exactly what substitution will try to look up — including the awkward
+ * cases where an escape's own braces swallow the text after it.
+ */
+internal fun maskEscapedArbigentVariables(value: String): String =
+  ArbigentEscapedVariablePattern.replace(value) { match ->
+    "$ArbigentEscapedVariableMarkerPrefix${match.groupValues[1]}$ArbigentEscapedVariableMarkerSuffix"
+  }
+
+/** Every name substitution would look up in [value], in the order it would look them up. */
+internal fun arbigentVariableReferences(value: String): List<String> =
+  ArbigentVariablePattern.findAll(maskEscapedArbigentVariables(value))
+    .map { it.groupValues[1].trim() }
+    .filter { ValidArbigentVariableName.matches(it) }
+    .toList()
 public object GoalVariableResolver {
     private val delegate = DefaultGoalVariableResolver()
     
@@ -37,17 +80,17 @@ internal class DefaultGoalVariableResolver : GoalVariableResolverInterface {
     companion object {
         // Allow alphanumeric, underscore, dash, dot, and space in variable names
         // Disallow only dangerous characters like }, {, <, >, &, |, ;, $, `, \, etc.
-        private val VALID_VARIABLE_NAME = """^[a-zA-Z0-9_.\-\s]+$""".toRegex()
+        private val VALID_VARIABLE_NAME = ValidArbigentVariableName
         private const val MAX_VARIABLE_VALUE_LENGTH = 10_000
         private const val MAX_GOAL_LENGTH = 100_000
         
         // Pre-compiled regex patterns for performance
-        private val VARIABLE_PATTERN = """\{\{([^}]+)\}\}""".toRegex()
-        private val ESCAPED_VARIABLE_PATTERN = """\\\{\{([^}]+)\}\}""".toRegex()
+        private val VARIABLE_PATTERN = ArbigentVariablePattern
+        private val ESCAPED_VARIABLE_PATTERN = ArbigentEscapedVariablePattern
         
         // Escape sequences for temporary replacement
-        private const val TEMP_PREFIX = "\u0000ESCAPED_"
-        private const val TEMP_SUFFIX = "_ESCAPED\u0000"
+        private const val TEMP_PREFIX = ArbigentEscapedVariableMarkerPrefix
+        private const val TEMP_SUFFIX = ArbigentEscapedVariableMarkerSuffix
     }
 
     override fun resolve(goal: String, variables: Map<String, String>?): String {
@@ -89,10 +132,7 @@ internal class DefaultGoalVariableResolver : GoalVariableResolverInterface {
     
     private fun processGoal(goal: String, variables: Map<String, String>): String {
         // First handle escaped variables by temporarily replacing them
-        val goalWithTempMarkers = ESCAPED_VARIABLE_PATTERN.replace(goal) { matchResult ->
-            val variableName = matchResult.groupValues[1]
-            "$TEMP_PREFIX$variableName$TEMP_SUFFIX"
-        }
+        val goalWithTempMarkers = maskEscapedArbigentVariables(goal)
         
         // Then replace non-escaped variables
         var substitutionCount = 0

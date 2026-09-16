@@ -13,7 +13,9 @@ public data class ArbigentScenarioAssignment(
       id = scenario.id,
       goal = scenario.goal(),
       tags = scenario.tags,
-      executionStatus = scenarioExecutor.runningInfo()?.toString(),
+      // A rejected scenario has no run to describe, so its report would say nothing at all
+      // without the reason it was rejected.
+      executionStatus = scenarioExecutor.preflightError() ?: scenarioExecutor.runningInfo()?.toString(),
       isSuccess = taskAssignmentsHistory.lastOrNull()?.all { it.agent.isGoalAchieved() } ?: false,
       histories = taskAssignmentsHistory.mapIndexed { index, taskAssignments ->
         ArbigentAgentResults(

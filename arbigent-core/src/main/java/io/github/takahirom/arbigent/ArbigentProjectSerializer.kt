@@ -269,6 +269,14 @@ public data class ArbigentProjectSettings(
    * removes them.
    */
   public val positionComments: Boolean = true,
+  /**
+   * Project-level defaults for `{{name}}` variables, resolved at runtime in goals and in the
+   * `packageName` / `link` of `LaunchApp`, `CleanupData` and `OpenLink` initialization methods.
+   * App-level variables (`arbigent run --variables`, `.arbigent/settings.yml`) override these
+   * per key, so a project can ship `appId: com.example.app` and a CI job can pass
+   * `--variables=appId=com.example.app.debug`.
+   */
+  public val variables: Map<String, String>? = null,
 ) {
   public companion object {
     public const val DefaultMcpJson: String = "{}"
@@ -324,25 +332,127 @@ public sealed interface AiDecisionCacheStrategy {
 }
 
 /**
- * Resolves {{inputs.*}} inside Maestro YAML referenced from a reusable leaf's initialization
- * methods, so the initializer can run the substituted flow (it prefers yamlContent when present).
+ * The initializers that actually run: the plural `initializationMethods`, falling back to the
+ * deprecated singular `initializeMethods`. Validation and execution must agree on this list.
  */
-private fun resolveMaestroYamlInputs(
+@Suppress("DEPRECATION")
+internal fun ArbigentScenarioContent.effectiveInitializationMethods(): List<ArbigentScenarioContent.InitializationMethod> =
+  initializationMethods.ifEmpty { listOf(initializeMethods) }
+
+/**
+ * The Maestro YAML the initializer actually runs: the inline [MaestroYaml.yamlContent] when set,
+ * otherwise the referenced fixed scenario's text. Validation and input resolution must look at the
+ * same source as [ArbigentAgent], which prefers the inline content.
+ */
+internal fun ArbigentScenarioContent.InitializationMethod.MaestroYaml.effectiveYamlText(
+  fixedScenarios: List<FixedScenario>
+): String? = yamlContent ?: fixedScenarios.firstOrNull { it.id == scenarioId }?.yamlText
+
+/**
+ * Records the `{{name}}` references a task's goal and initialization methods make that the run's
+ * variables do not define. Maestro YAML is not scanned: the initializer runs it as written, so a
+ * `{{name}}` in it is Maestro's business and not a project variable.
+ */
+private fun unresolvedVariables(
+  scenarioId: String,
+  goal: String,
+  initializationMethods: List<ArbigentScenarioContent.InitializationMethod>,
+  variables: Map<String, String>?,
+): List<ArbigentUnresolvedVariable> {
+  val found = mutableListOf<ArbigentUnresolvedVariable>()
+  fun scan(value: String, field: String) {
+    UnresolvedVariableFinder.missingNames(value, variables).forEach { name ->
+      found += ArbigentUnresolvedVariable(name, "$field of scenario \"$scenarioId\"")
+    }
+  }
+  scan(goal, "the goal")
+  initializationMethods.forEach { method ->
+    when (method) {
+      is ArbigentScenarioContent.InitializationMethod.LaunchApp -> {
+        scan(method.packageName, "LaunchApp packageName")
+        method.launchArguments.forEach { (name, value) ->
+          if (value is ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue.StringVal) {
+            scan(value.value, "LaunchApp launchArguments.$name")
+          }
+        }
+      }
+
+      is ArbigentScenarioContent.InitializationMethod.CleanupData ->
+        scan(method.packageName, "CleanupData packageName")
+
+      is ArbigentScenarioContent.InitializationMethod.OpenLink ->
+        scan(method.link, "OpenLink link")
+
+      // No text a project variable could appear in.
+      is ArbigentScenarioContent.InitializationMethod.MaestroYaml,
+      is ArbigentScenarioContent.InitializationMethod.Back,
+      is ArbigentScenarioContent.InitializationMethod.Wait,
+      ArbigentScenarioContent.InitializationMethod.Noop -> Unit
+    }
+  }
+  return found.distinct()
+}
+
+/**
+ * Resolves {{inputs.*}} inside a reusable leaf's initialization methods: the `packageName` /
+ * `link` (and string launch arguments) of LaunchApp, CleanupData and OpenLink, and Maestro YAML referenced by MaestroYaml
+ * (the initializer prefers yamlContent when present). Bare {{name}} project variables are left
+ * for the runtime (see [ArbigentAppSettings.variables]).
+ */
+private fun resolveInitializationInputs(
   methods: List<ArbigentScenarioContent.InitializationMethod>,
   inputBindings: Map<String, String>?,
   fixedScenarios: List<FixedScenario>
 ): List<ArbigentScenarioContent.InitializationMethod> {
   if (inputBindings == null) return methods
+  fun String.resolveInputs() = ReusableInputsResolver.resolve(this, inputBindings)
   return methods.map { method ->
-    if (method !is ArbigentScenarioContent.InitializationMethod.MaestroYaml) return@map method
-    val yamlText = fixedScenarios.firstOrNull { it.id == method.scenarioId }?.yamlText
-    if (yamlText != null && ReusableInputsResolver.containsInputPlaceholder(yamlText)) {
-      method.copy(yamlContent = ReusableInputsResolver.resolve(yamlText, inputBindings))
-    } else {
-      method
+    when (method) {
+      is ArbigentScenarioContent.InitializationMethod.LaunchApp ->
+        method.copy(
+          packageName = method.packageName.resolveInputs(),
+          launchArguments = method.launchArguments.mapValues { (_, value) ->
+            when (value) {
+              is ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue.StringVal ->
+                value.copy(value = value.value.resolveInputs())
+              else -> value
+            }
+          },
+        )
+      is ArbigentScenarioContent.InitializationMethod.CleanupData ->
+        method.copy(packageName = method.packageName.resolveInputs())
+      is ArbigentScenarioContent.InitializationMethod.OpenLink ->
+        method.copy(link = method.link.resolveInputs())
+      is ArbigentScenarioContent.InitializationMethod.MaestroYaml -> {
+        val yamlText = method.effectiveYamlText(fixedScenarios)
+        if (yamlText != null && ReusableInputsResolver.containsInputPlaceholder(yamlText)) {
+          method.copy(yamlContent = yamlText.resolveInputs())
+        } else {
+          method
+        }
+      }
+      else -> method
     }
   }
 }
+
+/**
+ * Wraps the app-level settings so that [variables] is the project's `settings.variables`
+ * overridden per key by the app-level ones (CLI `--variables`, `.arbigent/settings.yml`, UI).
+ * Everything else delegates unchanged.
+ */
+internal class ProjectVariablesAppSettings(
+  private val delegate: ArbigentAppSettings,
+  projectVariables: Map<String, String>,
+) : ArbigentAppSettings {
+  override val workingDirectory: String? get() = delegate.workingDirectory
+  override val path: String? get() = delegate.path
+  override val variables: Map<String, String> = projectVariables + delegate.variables.orEmpty()
+  override val mcpEnvironmentVariables: Map<String, String>? get() = delegate.mcpEnvironmentVariables
+}
+
+internal fun ArbigentAppSettings.withProjectVariables(projectVariables: Map<String, String>?): ArbigentAppSettings =
+  if (projectVariables.isNullOrEmpty()) this else ProjectVariablesAppSettings(this, projectVariables)
 
 public fun List<ArbigentScenarioContent>.createArbigentScenario(
   projectSettings: ArbigentProjectSettings,
@@ -354,6 +464,7 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
   fixedScenarios: List<FixedScenario> = emptyList(),
   reusableScenarios: List<ArbigentScenarioContent> = emptyList()
 ): ArbigentScenario {
+  val effectiveAppSettings = appSettings.withProjectVariables(projectSettings.variables)
   fun agentTask(
     taskScenarioId: String,
     nodeScenario: ArbigentScenarioContent,
@@ -386,15 +497,24 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
     } else {
       nodeScenario.goal
     }
-    val initializationMethods = resolveMaestroYamlInputs(
-      methods = nodeScenario.initializationMethods.ifEmpty { listOf(nodeScenario.initializeMethods) },
+    val initializationMethods = resolveInitializationInputs(
+      methods = nodeScenario.effectiveInitializationMethods(),
       inputBindings = inputBindings,
       fixedScenarios = fixedScenarios
+    )
+    // Collected rather than thrown: building a project builds every scenario, so throwing here
+    // would stop unrelated scenarios from loading. The executor rejects the run instead.
+    val unresolvedVariables = unresolvedVariables(
+      scenarioId = nodeScenario.id,
+      goal = goal,
+      initializationMethods = initializationMethods,
+      variables = effectiveAppSettings.variables,
     )
 
     return ArbigentAgentTask(
       scenarioId = taskScenarioId,
       goal = goal,
+      unresolvedVariables = unresolvedVariables,
       maxStep = nodeScenario.maxStep,
       deviceFormFactor = effectiveDeviceFormFactor,
       additionalActions = mergedAdditionalActions,
@@ -423,12 +543,12 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
         aiDecisionCache = aiDecisionCache,
         cacheOptions = nodeScenario.cacheOptions ?: ArbigentScenarioCacheOptions(),
         mcpClient = if (projectSettings.mcpJson.isNotBlank() && projectSettings.mcpJson != DefaultMcpJson) {
-          MCPClient(projectSettings.mcpJson, appSettings)
+          MCPClient(projectSettings.mcpJson, effectiveAppSettings)
         } else {
           null
         },
         fixedScenarios = fixedScenarios,
-        appSettings = appSettings
+        appSettings = effectiveAppSettings
       ).apply {
         aiOptions(projectSettings.aiOptions?.mergeWith(nodeScenario.aiOptions) ?: nodeScenario.aiOptions)
         aiFactory(aiFactory)

@@ -138,9 +138,20 @@ private fun ArbigentProjectFileContent.reusableScenarioErrors(): List<String> {
     // {{inputs.*}} may only appear in reusable definitions and only for declared inputs.
     val referencedInputs = ReusableInputsResolver.referencedInputNames(content.goal) +
       content.imageAssertions.flatMap { ReusableInputsResolver.referencedInputNames(it.assertionPrompt) } +
-      content.initializationMethods.filterIsInstance<ArbigentScenarioContent.InitializationMethod.MaestroYaml>()
-        .mapNotNull { method -> fixedScenarios.firstOrNull { it.id == method.scenarioId }?.yamlText }
-        .flatMap { ReusableInputsResolver.referencedInputNames(it) }
+      content.effectiveInitializationMethods().flatMap { method ->
+        // Keep in sync with resolveInitializationInputs in ArbigentProjectSerializer.kt.
+        when (method) {
+          is ArbigentScenarioContent.InitializationMethod.LaunchApp ->
+            listOf(method.packageName) + method.launchArguments.values.mapNotNull {
+              (it as? ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue.StringVal)?.value
+            }
+          is ArbigentScenarioContent.InitializationMethod.CleanupData -> listOf(method.packageName)
+          is ArbigentScenarioContent.InitializationMethod.OpenLink -> listOf(method.link)
+          is ArbigentScenarioContent.InitializationMethod.MaestroYaml ->
+            listOfNotNull(method.effectiveYamlText(fixedScenarios))
+          else -> emptyList()
+        }
+      }.flatMap { ReusableInputsResolver.referencedInputNames(it) }
     if (isReusable) {
       (referencedInputs - content.inputs.keys).forEach {
         errors += "$where: '{{inputs.$it}}' is not declared in inputs"

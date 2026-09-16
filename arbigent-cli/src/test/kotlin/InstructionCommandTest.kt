@@ -214,6 +214,35 @@ reusableScenarios:
   }
 
   @Test
+  fun `lists project variable defaults separately from unresolved variables`() {
+    yaml.writeText(
+      """
+settings:
+  variables:
+    app_package: "com.example.app"
+scenarios:
+- id: "prep"
+  goal: "Prepare the device as {{owner}}"
+  initializationMethods:
+  - type: "LaunchApp"
+    packageName: "{{app_package}}"
+      """.trimIndent()
+    )
+    val result = run("--scenario-ids=prep")
+    assertEquals(0, result.statusCode, result.output)
+    val output = result.output
+
+    val defaultsSection = output.substringAfter("Variables (defaults from `settings.variables`")
+      .substringBefore("Variables (unresolved")
+    assertContains(defaultsSection, "{{app_package}} = com.example.app")
+    val unresolvedSection = output.substringAfter("Variables (unresolved").substringBefore("## Step 1")
+    assertContains(unresolvedSection, "{{owner}}")
+    assertFalse(unresolvedSection.contains("{{app_package}}"), output)
+    // The step itself still shows the placeholder, so readers know it is a variable.
+    assertContains(output, "Launch app: package={{app_package}}")
+  }
+
+  @Test
   fun `renders legacy singular initializeMethods field`() {
     yaml.writeText(
       """

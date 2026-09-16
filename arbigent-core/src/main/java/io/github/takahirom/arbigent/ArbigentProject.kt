@@ -67,8 +67,18 @@ public class ArbigentProject(
   }
 
   public suspend fun executeScenarios(scenarios: List<ArbigentScenario>) {
+    // Rejected scenarios are decided before anything starts: one of them must not stop the
+    // others, but it must not start MCP servers either, so nothing runs if none of them can.
+    val runnableScenarios = scenarios.filter { scenario ->
+      val rejection = scenarioExecutorOf(scenario).rejectUnresolvedVariables(scenario)
+      if (rejection != null) {
+        arbigentErrorLog { "🔴 ${scenario.id} scenario was not run: ${rejection.message}" }
+      }
+      rejection == null
+    }
+    if (runnableScenarios.isEmpty()) return
     mcpScope { mcpClient ->
-      scenarios.forEachIndexed { index, scenario ->
+      runnableScenarios.forEach { scenario ->
         arbigentInfoLog("⏺ ${scenario.id} scenario has been started")
         
         try {
@@ -98,14 +108,18 @@ public class ArbigentProject(
     .filter { it.scenario.isLeaf }
 
   public suspend fun execute(scenario: ArbigentScenario) {
+    val scenarioExecutor = scenarioExecutorOf(scenario)
+    // Before mcpScope: a scenario that cannot run is no reason to start MCP servers.
+    scenarioExecutor.rejectUnresolvedVariables(scenario)?.let { throw it }
     mcpScope { mcpClient ->
       arbigentInfoLog("⏺ ${scenario.id} scenario has been started")
-      val scenarioExecutor =
-        scenarioAssignments().first { it.scenario.id == scenario.id }.scenarioExecutor
       scenarioExecutor.execute(scenario, mcpClient)
       arbigentDebugLog(scenarioExecutor.statusText())
     }
   }
+
+  private fun scenarioExecutorOf(scenario: ArbigentScenario): ArbigentScenarioExecutor =
+    scenarioAssignments().first { it.scenario.id == scenario.id }.scenarioExecutor
 
   public fun cancel() {
     scenarioAssignments().forEach { (_, scenarioExecutor) ->
@@ -181,6 +195,15 @@ public data class ArbigentScenario(
   val cacheOptions: ArbigentScenarioCacheOptions? = null,
   val mcpOptions: ArbigentMcpOptions? = null,
 ) {
+  /**
+   * What the tasks of this scenario reference and the run's variables do not define.
+   * [ArbigentScenarioExecutor.execute] rejects the run when this is not empty. Derived from the
+   * tasks so that trimming the chain — the UI's Debug runs only the last task — also trims what
+   * has to resolve.
+   */
+  public val unresolvedVariables: List<ArbigentUnresolvedVariable>
+    get() = agentTasks.flatMap { it.unresolvedVariables }.distinct()
+
   public fun goal(): String? {
     return agentTasks.lastOrNull()?.goal
   }

@@ -1,6 +1,7 @@
 package io.github.takahirom.arbigent.cli
 
 import com.github.ajalt.clikt.core.CliktError
+import io.github.takahirom.arbigent.isArbigentVariableName
 
 /**
  * Parses variable input string into a map of key-value pairs.
@@ -63,15 +64,13 @@ internal fun parseVariables(input: String): Map<String, String> {
             }
             
             if (!isValidVariableName(key)) {
-                throw CliktError("Invalid variable name: '$key'. Variable names must start with a letter or underscore and contain only letters, numbers, and underscores.")
+                throw CliktError("Invalid variable name: '$key'. Variable names must contain only letters, numbers, underscores, dashes, dots, and spaces.")
             }
             
             key to value
         }
 }
 
-internal fun isValidVariableName(name: String): Boolean {
-    if (name.isEmpty()) return false
-    if (!name[0].isLetter() && name[0] != '_') return false
-    return name.all { it.isLetterOrDigit() || it == '_' }
-}
+// The same names a `{{...}}` reference can carry, so a variable the project YAML can define is a
+// variable --variables can supply.
+internal fun isValidVariableName(name: String): Boolean = isArbigentVariableName(name)

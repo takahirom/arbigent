@@ -438,7 +438,10 @@ concrete goal, with `{{inputs.*}}` bindings already resolved.
   giving the agent a map of the app before it starts.
 - Bare `{{name}}` placeholders left unresolved in any rendered field (goal, note,
   verification, or an initialization field such as `packageName`/`link`) are listed in a
-  "Variables" section; supply them at runtime with `run --variables`. Leftover
+  "Variables" section; supply them at runtime with `run --variables`. A run fails before
+  it starts when a goal or a supported initialization field still has one; the same
+  placeholder in a note or a verification check is reported here but is not part of that
+  check. Leftover
   `{{inputs.*}}` reusable inputs are listed separately as "Unbound reusable inputs";
   bind them with `with:` at the call site.
 

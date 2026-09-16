@@ -123,6 +123,12 @@ public class ArbigentScenarioExecutor internal constructor(
   public val isFailedToArchiveFlow: Flow<Boolean> = _isFailedToArchiveFlow.asSharedFlow()
   public fun isFailedToArchive(): Boolean = _isFailedToArchiveFlow.value
 
+  // Why the scenario was rejected before it ran, so the UI can show Failed instead of an untouched
+  // Idle for a run that never started.
+  private val _preflightErrorFlow = MutableStateFlow<String?>(null)
+  public val preflightErrorFlow: Flow<String?> = _preflightErrorFlow.asSharedFlow()
+  public fun preflightError(): String? = _preflightErrorFlow.value
+
   // isAchievedStateFlow is WhileSubscribed so we can't use it in waitUntilFinished
   public fun isGoalAchieved(): Boolean {
     if (taskAssignments().isEmpty()) {
@@ -132,6 +138,11 @@ public class ArbigentScenarioExecutor internal constructor(
   }
 
   public val isRunningFlow: Flow<Boolean> = taskAssignmentsFlow.flatMapLatest { taskToAgents ->
+    // combine() of nothing never emits, so a run that assigned no agent — one rejected before it
+    // started — would leave every flow built on this one stuck at its initial value.
+    if (taskToAgents.isEmpty()) {
+      return@flatMapLatest flowOf(false)
+    }
     val flows: List<Flow<Boolean>> = taskToAgents.map { taskToAgent ->
       taskToAgent.agent.isRunningFlow
     }
@@ -151,8 +162,10 @@ public class ArbigentScenarioExecutor internal constructor(
     isRunningFlow,
     isSuccessFlow,
     isFailedToArchiveFlow,
-  ) { isRunning, success, isFailedToArchive ->
+    preflightErrorFlow,
+  ) { isRunning, success, isFailedToArchive, preflightError ->
     when {
+      preflightError != null -> ArbigentScenarioExecutorState.Failed
       isFailedToArchive -> ArbigentScenarioExecutorState.Failed
       isRunning -> ArbigentScenarioExecutorState.Running
       success -> ArbigentScenarioExecutorState.Success
@@ -170,6 +183,7 @@ public class ArbigentScenarioExecutor internal constructor(
     val isAchieved = isSuccessful()
     val isFailedToArchive = isFailedToArchive()
     return when {
+      preflightError() != null -> ArbigentScenarioExecutorState.Failed
       isFailedToArchive -> ArbigentScenarioExecutorState.Failed
       isRunning -> ArbigentScenarioExecutorState.Running
       isAchieved -> ArbigentScenarioExecutorState.Success
@@ -183,10 +197,40 @@ public class ArbigentScenarioExecutor internal constructor(
     arbigentDebugLog("Arbigent.waitUntilFinished end")
   }
 
-  public suspend fun execute(scenario: ArbigentScenario, mcpClient: MCPClient) {
+  /** Forgets the previous run so nothing it produced can be read as this run's result. */
+  private fun clearPreviousRun() {
     _isFailedToArchiveFlow.value = false
-    arbigentDebugLog("Arbigent.execute start")
+    _preflightErrorFlow.value = null
+    _taskAssignmentsStateFlow.value.forEach { it.agent.cancel() }
+    _taskAssignmentsStateFlow.value = listOf()
     _taskAssignmentsHistoryStateFlow.value = listOf()
+    _arbigentScenarioRunningInfoStateFlow.value = null
+  }
+
+  /**
+   * Rejects [scenario] when it references a `{{name}}` nothing defines: that cannot be what the
+   * author meant, and running with the placeholder as literal text only turns a typo into a
+   * confusing failure later. Every reference is reported at once so one run fixes them all.
+   *
+   * Callers run this before any device, AI or MCP work, and throw the exception it returns; it
+   * returns null when the scenario may run. Either way the previous run is forgotten first, so a
+   * rejection can never show the last run's success, progress or history.
+   */
+  internal fun rejectUnresolvedVariables(scenario: ArbigentScenario): ArbigentUnresolvedVariableException? {
+    val unresolved = scenario.unresolvedVariables
+    clearPreviousRun()
+    if (unresolved.isEmpty()) return null
+    val message = unresolvedVariableMessage(
+      header = "Scenario \"${scenario.id}\" references variables that are not defined:",
+      unresolved = unresolved,
+    )
+    _preflightErrorFlow.value = message
+    return ArbigentUnresolvedVariableException(message)
+  }
+
+  public suspend fun execute(scenario: ArbigentScenario, mcpClient: MCPClient) {
+    arbigentDebugLog("Arbigent.execute start")
+    rejectUnresolvedVariables(scenario)?.let { throw it }
 
     val replayTraceKeys = scenario.replayTraceKeys()
     val replayTraces = if (scenario.replayWithFallback) {

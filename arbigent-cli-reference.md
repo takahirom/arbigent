@@ -113,7 +113,7 @@ All of the following are settings-aware (readable from the settings file) unless
 | `--project-file` | `project-file` | String | required at runtime |
 | `--ai-type` | `ai-type` | `openai` / `gemini` / `azureopenai` | `openai` |
 | `--os` | `os` | `android` / `ios` / `web` | `android` |
-| `--variables` | `variables` | `k=v,...` map | (none) |
+| `--variables` | `variables` | `k=v,...` map | (none; overrides `settings.variables` in the project YAML per key) |
 | `--scenario-ids` | `scenario-ids` | comma list | (none → runs all leaf scenarios) |
 | `--tags` | `tags` | comma list (OR) | (none) |
 | `--shard` | `shard` | `n/m` | `1/1` |

@@ -233,12 +233,9 @@ public class ArbigentAgent internal constructor(
     mcpClient: MCPClient,
     mcpOptions: ArbigentMcpOptions? = null
   ) {
-    // Resolve variables in the goal
-    val resolvedGoal = if (appSettings?.variables != null) {
-      GoalVariableResolver.resolve(goal, appSettings.variables)
-    } else {
-      goal
-    }
+    // Always resolve, even with no variables configured: that is also what turns the documented
+    // `\{{name}}` escape into the literal `{{name}}` the goal asked for.
+    val resolvedGoal = GoalVariableResolver.resolve(goal, appSettings?.variables)
     
     val executeInput = ExecuteInput(
       scenarioId = scenarioId,
@@ -384,11 +381,8 @@ public class AgentConfig(
   internal val aiOptions: ArbigentAiOptions?,
   internal val appSettings: ArbigentAppSettings?,
 ) {
-  internal fun resolveGoal(goal: String): String {
-    return appSettings?.variables?.let { variables ->
-      GoalVariableResolver.resolve(goal, variables)
-    } ?: goal
-  }
+  internal fun resolveGoal(goal: String): String =
+    GoalVariableResolver.resolve(goal, appSettings?.variables)
 
   public class Builder {
     private val interceptors = mutableListOf<ArbigentInterceptor>()
@@ -722,19 +716,28 @@ public fun AgentConfigBuilder(
             device: ArbigentDevice,
             chain: ArbigentInitializerInterceptor.Chain
           ) {
+            val packageName = InitializationVariableResolver.resolve(
+              initializeMethod.packageName, appSettings?.variables, "LaunchApp", "packageName"
+            )
             device.executeActions(
               listOf(
                 MaestroCommand(
                   launchAppCommand = LaunchAppCommand(
-                    appId = initializeMethod.packageName,
-                    launchArguments = initializeMethod.launchArguments.mapValues { (_, value) ->
-                      value.value
+                    appId = packageName,
+                    launchArguments = initializeMethod.launchArguments.mapValues { (name, value) ->
+                      when (value) {
+                        is ArbigentScenarioContent.InitializationMethod.LaunchApp.ArgumentValue.StringVal ->
+                          InitializationVariableResolver.resolve(
+                            value.value, appSettings?.variables, "LaunchApp", "launchArguments.$name"
+                          )
+                        else -> value.value
+                      }
                     }
                   )
                 )
               )
             )
-            device.waitForAppToSettle(initializeMethod.packageName)
+            device.waitForAppToSettle(packageName)
             chain.proceed(device)
           }
         })
@@ -746,11 +749,14 @@ public fun AgentConfigBuilder(
             device: ArbigentDevice,
             chain: ArbigentInitializerInterceptor.Chain
           ) {
+            val packageName = InitializationVariableResolver.resolve(
+              initializeMethod.packageName, appSettings?.variables, "CleanupData", "packageName"
+            )
             device.executeActions(
               listOf(
                 MaestroCommand(
                   clearStateCommand = ClearStateCommand(
-                    appId = initializeMethod.packageName
+                    appId = packageName
                   )
                 )
               )
@@ -766,11 +772,14 @@ public fun AgentConfigBuilder(
             device: ArbigentDevice,
             chain: ArbigentInitializerInterceptor.Chain
           ) {
+            val link = InitializationVariableResolver.resolve(
+              initializeMethod.link, appSettings?.variables, "OpenLink", "link"
+            )
             device.executeActions(
               listOf(
                 MaestroCommand(
                   openLinkCommand = OpenLinkCommand(
-                    link = initializeMethod.link
+                    link = link
                   )
                 )
               )

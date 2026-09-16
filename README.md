@@ -244,9 +244,34 @@ reusableScenarios:
 
 Key points:
 - A scenario (or reusable scenario) is either a **leaf** (has `goal` plus the full option set: `initializationMethods`, `mcpOptions`, `maxStep`, image assertions, …) or a **call** (`uses` + `with`, or a `steps` list of calls). `uses` is sugar for a single-entry `steps`.
-- Reusable scenarios declare their parameters via `inputs` (`required` / `default`) and reference them as `{{inputs.name}}` in the goal — bare `{{name}}` still resolves project variables. `{{inputs.*}}` also works inside Maestro YAML referenced from a reusable scenario's initialization methods, and combined with `type: Execution` this gives deterministic, parameterized steps with zero AI calls.
+- Reusable scenarios declare their parameters via `inputs` (`required` / `default`) and reference them as `{{inputs.name}}` in the goal — bare `{{name}}` still resolves project variables. `{{inputs.*}}` also works in initialization methods — `LaunchApp`'s `packageName` and its string `launchArguments`, `CleanupData`'s `packageName`, `OpenLink`'s `link`, and the Maestro YAML a `MaestroYaml` method runs — and combined with `type: Execution` this gives deterministic, parameterized steps with zero AI calls.
 - Composites can call other composites; unknown references, cycles, undeclared `with` keys and missing required inputs are all rejected when the project loads.
 - In the GUI, choose the "Reusable steps" scenario type to build calls, manage the library in the Reusable Scenarios dialog, and use "Make this reusable" to extract an existing scenario into the library without breaking scenarios that depend on it.
+
+### Project Variables
+
+`{{name}}` placeholders in goals and in initialization methods — `LaunchApp`'s `packageName` and its string `launchArguments`, `CleanupData`'s `packageName` and `OpenLink`'s `link` — are project variables. Declare defaults once under `settings.variables` and override them per run with `--variables` (or `variables:` under `run:` in `.arbigent/settings.yml`). A typical use is pointing the same scenarios at a debug build with a different application id:
+
+```yaml
+settings:
+  variables:
+    appId: "com.example.app"
+scenarios:
+- id: "launch-app"
+  goal: "Confirm the home screen is shown"
+  initializationMethods:
+  - type: "CleanupData"
+    packageName: "{{appId}}"
+  - type: "LaunchApp"
+    packageName: "{{appId}}"
+```
+
+```bash
+arbigent run --project-file=project.yaml                                        # com.example.app
+arbigent run --project-file=project.yaml --variables=appId=com.example.app.debug  # debug build
+```
+
+A `{{name}}` that no variable defines is an error: before a scenario runs, Arbigent lists every unresolved placeholder in its goals and initialization methods and fails the scenario without touching the device, so a typo costs one message instead of a confusing run. Write `\{{name}}` when you mean the text itself. Only names the resolver can substitute count as placeholders, so text like `{{user:id}}` stays literal. Building or loading a project never fails for this — only running the scenario that has the unresolved placeholder does. Maestro YAML (including its `appId:` header) and deep-link hosts are not rewritten, so a debug build must handle the same links or you point `link` at a variable too.
 
 See [arbigent-reusable-scenarios-specification.md](arbigent-reusable-scenarios-specification.md) for the full specification.
 
@@ -485,7 +510,7 @@ Options:
   --log-file=<text>                      Log file path
   --working-directory=<text>             Working directory for the project
   --path=<text>                          Path to a file
-  --variables=<value>                    Variables to replace {{placeholders}} in goals (e.g., key1=value1,key2=value2)
+  --variables=<value>                    Variables to replace {{placeholders}} in goals and LaunchApp/CleanupData/OpenLink initialization methods; override settings.variables (e.g., key1=value1,key2=value2)
   --scenario-ids=<text>                  Scenario IDs to execute (comma-separated)
   --tags=<text>                          Tags to filter scenarios (comma-separated)
   --dry-run                              Dry run mode

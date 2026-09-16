@@ -83,7 +83,7 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
 
   private val variables by defaultOption(
     "--variables",
-    help = """Variables to replace in goals. Format: key1=value1,key2=value2
+    help = """Variables to replace {{placeholders}} in goals and in LaunchApp/CleanupData/OpenLink initialization methods. Override settings.variables from the project YAML. Format: key1=value1,key2=value2
              |Quote values with spaces: key="value with spaces"
              |Example: name=John,message="Hello World",url="https://example.com"""".trimMargin()
   )

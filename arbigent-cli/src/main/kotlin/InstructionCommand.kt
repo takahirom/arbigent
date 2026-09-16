@@ -83,7 +83,15 @@ class ArbigentInstructionCommand : CliktCommand(name = "instruction") {
       .flatMap { step -> renderedTexts(step).flatMap { unresolvedPlaceholders(it) } }
       .distinct()
     val unboundInputs = unresolved.filter { isInputPlaceholder(it) }
-    val unresolvedVariables = unresolved.filterNot { isInputPlaceholder(it) }
+    val projectVariables = projectFileContent.settings.variables.orEmpty()
+    val (defaultedVariables, unresolvedVariables) = unresolved
+      .filterNot { isInputPlaceholder(it) }
+      .partition { placeholderName(it) in projectVariables }
+    if (defaultedVariables.isNotEmpty()) {
+      out.appendLine()
+      out.appendLine("Variables (defaults from `settings.variables`; override with `run --variables`):")
+      defaultedVariables.forEach { out.appendLine("- $it = ${projectVariables.getValue(placeholderName(it))}") }
+    }
     if (unresolvedVariables.isNotEmpty()) {
       out.appendLine()
       out.appendLine("Variables (unresolved; provide with `run --variables`):")
@@ -225,6 +233,10 @@ class ArbigentInstructionCommand : CliktCommand(name = "instruction") {
 
   private fun isInputPlaceholder(placeholder: String): Boolean =
     INPUT_PLACEHOLDER_PATTERN.matches(placeholder)
+
+  /** `{{ appId }}` -> `appId`, the key looked up in variables maps. */
+  private fun placeholderName(placeholder: String): String =
+    placeholder.removePrefix("{{").removeSuffix("}}").trim()
 
   /** Every rendered string of a step, so leftover placeholders anywhere get surfaced. */
   private fun renderedTexts(step: ResolvedStep): List<String> = buildList {
