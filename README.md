@@ -520,7 +520,7 @@ Options:
 
 #### Choosing a device
 
-When exactly one device is connected, Arbigent uses it. When several are, pick one explicitly with `--device-id`:
+When exactly one usable device is connected, Arbigent uses it. When several are, pick one explicitly with `--device-id`:
 
 ```bash
 arbigent run --device-id=emulator-5554                 # adb serial
@@ -570,7 +570,7 @@ run:
   ios-real-device-port: "22087"
 ```
 
-The team id and the device id are treated as sensitive: both are masked in `--help` output and redacted from persisted logs.
+The team id and the device id are treated as sensitive: both are masked in `--help` output, and neither the team id nor a physical iPhone's hardware UDID is ever printed in full by Arbigent's own logs and errors (a UDID is shown as a short prefix). adb serials and simulator UDIDs are not secret and are printed in full so they can be pasted into `--device-id`.
 
 **Troubleshooting**
 

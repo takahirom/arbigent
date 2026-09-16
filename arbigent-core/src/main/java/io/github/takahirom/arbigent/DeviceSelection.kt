@@ -135,11 +135,12 @@ public fun describeArbigentDevices(devices: List<ArbigentAvailableDevice>): List
     .toMap()
   return devices.map { device ->
     val id = maskedByDevice[device] ?: device.deviceId
-    // Discovery has no name for an iPhone that does not report one, and a name is printed verbatim
-    // next to the masked id — so a name that is the hardware UDID would leak it in full despite the
-    // masking. Such a device is shown by its masked id alone.
-    val name = device.name.takeUnless {
-      device is ArbigentAvailableDevice.IosReal && it == device.deviceId
+    // A name is printed verbatim next to the masked id, so a name that carries the hardware UDID
+    // would leak it in full despite the masking — whether the name IS the UDID (what discovery falls
+    // back to when the device reports none) or merely contains it. Such a device is shown by its
+    // masked id alone.
+    val name = device.name.takeUnless { candidate ->
+      device is ArbigentAvailableDevice.IosReal && device.deviceId?.let { candidate.contains(it) } == true
     }
     when {
       id == null -> name ?: device.deviceOs.name

@@ -36,6 +36,45 @@ class IosRealDeviceDiscoveryTest {
     assertEquals(emptyList(), executor.commands)
   }
 
+  // A requested device that never comes up must not look like "no such device" when the reason is a
+  // devicectl that could not talk to it.
+  @Test
+  fun aFailedWakeOfTheRequestedDeviceIsReportedAsADiscoveryFailure() {
+    val executor = object : ArbigentCommandExecutor {
+      override fun execute(command: List<String>, timeoutMs: Long) =
+        ArbigentCommandResult(exitCode = 1, stdout = "", stderr = "no connection to the device")
+    }
+
+    val result = discoverIosRealDevices(
+      executor = executor,
+      requestedDeviceId = "UDID-1",
+      lister = { listOf(device("core-1", "UDID-1", "disconnected")) },
+    )
+
+    assertEquals(emptyList(), result.devices.map { it.deviceId })
+    val failure = assertNotNull(result.failure)
+    assertTrue(failure.message.orEmpty().contains("exited with 1"), failure.message.orEmpty())
+    assertTrue(failure.message.orEmpty().contains("no connection to the device"), failure.message.orEmpty())
+  }
+
+  // A paired iPhone that is simply not plugged in never wakes. That is a normal state, so it must not
+  // be reported as a failure — doing so would stop a simulator run for anyone holding an old pairing.
+  @Test
+  fun aFailedWakeIsNotAFailureWhenNoDeviceWasRequested() {
+    val executor = object : ArbigentCommandExecutor {
+      override fun execute(command: List<String>, timeoutMs: Long) =
+        ArbigentCommandResult(exitCode = 1, stdout = "", stderr = "no connection to the device")
+    }
+
+    val result = discoverIosRealDevices(
+      executor = executor,
+      lister = { listOf(device("core-1", "UDID-1", "disconnected")) },
+    )
+
+    assertEquals(emptyList(), result.devices.map { it.deviceId })
+    assertNull(result.failure)
+  }
+
   // Each wake is a devicectl round trip with a 20s ceiling, so only the requested device may be woken.
   @Test
   fun onlyTheRequestedDeviceIsWoken() {

@@ -199,15 +199,20 @@ public fun parseAdbDevices(output: String): List<ArbigentAdbDevice> = output.lin
   }
   .toList()
 
+// Both file names are tried everywhere we look: a File lookup does not apply Windows PATHEXT, so
+// an SDK that ships `adb.exe` is invisible if only `adb` is probed.
+private val ADB_EXECUTABLE_NAMES = listOf("adb", "adb.exe")
+
 private fun adbExecutablePath(): String? {
   val fromEnv = sequenceOf(System.getenv("ANDROID_HOME"), System.getenv("ANDROID_SDK_ROOT"))
     .filterNotNull()
-    .map { java.io.File(it, "platform-tools/adb") }
+    .flatMap { sdk -> ADB_EXECUTABLE_NAMES.asSequence().map { java.io.File(sdk, "platform-tools/$it") } }
     .firstOrNull { it.canExecute() }
   if (fromEnv != null) return fromEnv.absolutePath
   val onPath = System.getenv("PATH")
     ?.split(java.io.File.pathSeparator)
-    ?.map { java.io.File(it, "adb") }
+    ?.asSequence()
+    ?.flatMap { dir -> ADB_EXECUTABLE_NAMES.asSequence().map { java.io.File(dir, it) } }
     ?.firstOrNull { it.canExecute() }
   return onPath?.absolutePath
 }
@@ -262,12 +267,13 @@ public fun discoverIosRealDevices(
     } else {
       devices.any { matchesRequest(it) && !isConnected(it) }
     }
+    var wakeFailure: Throwable? = null
     if (needsWake && wakeTunnels) {
       val toWake = devices.filter { matchesRequest(it) && !isConnected(it) }.mapNotNull { it.identifier }
       // Each wake costs a devicectl round trip with a 20s ceiling, so skip the re-list entirely when
       // there is nothing to wake (e.g. the requested id belongs to no paired device).
       if (toWake.isNotEmpty()) {
-        wakeIosRealDeviceTunnels(toWake, executor)
+        wakeFailure = wakeIosRealDeviceTunnels(toWake, executor)
         devices = lister.list()
       }
     }
@@ -286,7 +292,13 @@ public fun discoverIosRealDevices(
           config = config,
         )
       }
-    ArbigentIosRealDeviceDiscovery(found)
+    // A wake that failed is only reported when it left us without the device the user named: that is
+    // the case where "no device with that id" would otherwise hide a broken devicectl. With no
+    // requested id, a paired iPhone that is simply not plugged in never wakes, which is a normal
+    // state rather than a discovery failure — reporting it would stop a simulator run for anyone
+    // holding an old pairing.
+    val requestedDeviceMissing = requestedDeviceId != null && found.isEmpty()
+    ArbigentIosRealDeviceDiscovery(found, wakeFailure.takeIf { requestedDeviceMissing })
   } catch (e: Exception) {
     arbigentInfoLog("iOS real device discovery failed: ${e.message}")
     ArbigentIosRealDeviceDiscovery(emptyList(), e)
@@ -294,14 +306,29 @@ public fun discoverIosRealDevices(
 }
 
 // Reads device info to establish the CoreDevice tunnel (read-only; no device state changes), so the
-// subsequent `list devices` reports the device as connected. Failures are ignored — a device that
-// stays disconnected simply won't be surfaced.
-private fun wakeIosRealDeviceTunnels(identifiers: List<String>, executor: ArbigentCommandExecutor) {
+// subsequent `list devices` reports the device as connected. Returns the first failure so the
+// caller can tell "your iPhone is not connected" apart from "devicectl could not talk to it"; the
+// wake is still attempted for every identifier, because one unreachable device must not stop the
+// others from coming up.
+private fun wakeIosRealDeviceTunnels(
+  identifiers: List<String>,
+  executor: ArbigentCommandExecutor,
+): Throwable? {
+  var failure: Throwable? = null
   identifiers.forEach { identifier ->
     arbigentInfoLog("iOS real device: waking CoreDevice tunnel for a paired device")
-    executor.execute(
+    val result = executor.execute(
       listOf("xcrun", "devicectl", "device", "info", "details", "--device", identifier),
       timeoutMs = 20_000,
     )
+    if (!result.isSuccess && failure == null) {
+      // The stderr of a timeout carries the command line, so this message can contain the CoreDevice
+      // identifier. That is a pairing-local UUID, not the hardware UDID this project never prints.
+      failure = IllegalStateException(
+        "`xcrun devicectl device info` exited with ${result.exitCode} while establishing the " +
+          "CoreDevice tunnel: ${result.stderr.trim().take(500)}"
+      )
+    }
   }
+  return failure
 }

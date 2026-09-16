@@ -195,6 +195,21 @@ class DeviceSelectionTest {
   }
 
   @Test
+  fun describe_neverPrintsAHardwareUdidEmbeddedInTheName() {
+    val udid = "00008110-0123456789ABCDEF"
+    val real = ArbigentAvailableDevice.IosReal(
+      coreDeviceIdentifier = "core-1",
+      hardwareUdid = udid,
+      name = "Test $udid",
+    )
+
+    val labels = describeArbigentDevices(listOf(real))
+
+    assertEquals(listOf("00008110…"), labels)
+    assertTrue(labels.none { it.contains(udid) }, labels.toString())
+  }
+
+  @Test
   fun describe_showsSerialsInFullAndHardwareUdidsMasked() {
     val real = ArbigentAvailableDevice.IosReal(
       coreDeviceIdentifier = "core-1",

@@ -96,14 +96,16 @@ time.
 
 | Setting | CLI flag | Settings key | Env var | Default |
 |---|---|---|---|---|
-| Device id | `--device-id` | `device-id` | `ARBIGENT_DEVICE_ID` | the only connected device; an error when several are |
+| Device id | `--device-id` | `device-id` | `ARBIGENT_DEVICE_ID` | the only usable connected device; an error when several usable devices are present |
 
 The value is an adb serial for `--os=android`, and a simulator UDID or a physical iPhone's
 hardware UDID for `--os=ios`. It is matched exactly, and an unmatched id is an error rather
 than a fallback to another device. `--os=web` takes no device id. On Android, a serial that adb
 reports as `unauthorized` or `offline` is listed as attached but is never selectable and never
 counts towards ambiguity. The key is treated as
-sensitive, so it is masked in `--help` output.
+sensitive, so it is masked in `--help` output, and a physical iPhone's hardware UDID is never
+printed in full by Arbigent's own logs and errors (it is shown as a short prefix). adb serials
+and simulator UDIDs are printed in full so they can be pasted back into `--device-id`.
 
 The removed `--ios-real-device-id` / `ios-real-device-id` / `ARBIGENT_IOS_REAL_DEVICE_ID` are
 reported as a migration error rather than silently ignored.
