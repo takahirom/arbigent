@@ -40,20 +40,33 @@ public sealed interface ArbigentAvailableDevice {
   // name would re-point a selection at the wrong device after a rediscovery.
   public val stableKey: String
 
+  // The identifier the user passes to `--device-id`: an adb serial (Android), a simulator UDID or a
+  // physical iPhone's hardware UDID (iOS). Null for device kinds that cannot be addressed by id
+  // (Web, Fake). Unlike [stableKey] this is a public contract, so selection never parses stableKey.
+  public val deviceId: String?
+
   // Do not use data class because dadb return true for equals
-  public class Android(private val dadb: Dadb) : ArbigentAvailableDevice {
+  public class Android(
+    public val serial: String,
+    // Only set when the device came from the Dadb-based discovery fallback. Discovery normally
+    // reads serials from `adb devices`, which needs no per-device connection, so there is usually
+    // nothing to hand over or close here.
+    private val dadb: Dadb? = null,
+  ) : ArbigentAvailableDevice {
+    public constructor(dadb: Dadb) : this(dadb.toString(), dadb)
+
     override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Android
-    override val name: String = dadb.toString()
-    // The adb serial (dadb.toString()) already uniquely identifies the device.
+    override val name: String = serial
+    // The adb serial already uniquely identifies the device.
     override val stableKey: String get() = "android:$name"
+    override val deviceId: String get() = serial
     override fun connectToDevice(): ArbigentDevice {
       // Maestro's AndroidDeviceConnection refactor (#3372) made AndroidDriver take an
-      // AndroidDeviceConnection instead of a raw Dadb. byId() selects the same device by
-      // serial that Dadb.list() gave us, so this keeps behavior identical.
-      val serial = dadb.toString()
-      // AndroidDriver/Maestro opens and manages its own connection via byId(serial), so the
-      // Dadb we were handed from Dadb.list() is no longer needed once we have the serial.
-      dadb.close()
+      // AndroidDeviceConnection instead of a raw Dadb. byId() selects the device by the same
+      // serial discovery reported, so this keeps behavior identical.
+      // AndroidDriver/Maestro opens and manages its own connection via byId(serial), so any Dadb
+      // handed to us by the fallback path is no longer needed once we have the serial.
+      dadb?.close()
       val connection = AndroidDeviceConnection.byId(serial)
         ?: throw RuntimeException("Arbigent could not open an AndroidDeviceConnection for device: $serial")
       val driver = AndroidDriver(
@@ -84,6 +97,7 @@ public sealed interface ArbigentAvailableDevice {
     override val name: String = device.name
     // Simulator UDID uniquely identifies the device even when models share a name.
     override val stableKey: String get() = "iossimulator:${device.udid}"
+    override val deviceId: String get() = device.udid
     override fun connectToDevice(): ArbigentDevice {
       val port = port
       val host = host
@@ -182,6 +196,7 @@ public sealed interface ArbigentAvailableDevice {
     // Full hardware UDID for internal identity only (never displayed — see the interface doc and
     // [maskedUdid]); real iPhones share model names so name alone would collide.
     override val stableKey: String get() = "iosreal:$hardwareUdid"
+    override val deviceId: String get() = hardwareUdid
 
     // First 8 chars of the UDID: enough to point at a device in a message without ever printing the
     // full hardware UDID. When several candidates share this prefix, use [maskedUdidLabels] instead
@@ -301,6 +316,8 @@ public sealed interface ArbigentAvailableDevice {
     override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Web
     override val name: String = "Chrome"
     override val stableKey: String get() = "web:$name"
+    // The browser session is not addressable by id, so `--device-id` is rejected for --os=web.
+    override val deviceId: String? = null
     public override fun connectToDevice(): ArbigentDevice {
       return MaestroDevice(
         // Maestro.web() gained a third arg (custom Chrome binary path); null keeps the default.
@@ -310,9 +327,16 @@ public sealed interface ArbigentAvailableDevice {
     }
   }
 
-  public class Fake : ArbigentAvailableDevice {
-    override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Android
-    override val name: String = "Fake"
+  /**
+   * Stand-in device for tests and previews. Parameterized so selection rules can be exercised
+   * without hardware: the real Android/iOS candidates wrap a live adb connection or a simctl
+   * listing, neither of which can be constructed off-device.
+   */
+  public class Fake(
+    override val name: String = "Fake",
+    override val deviceId: String? = null,
+    override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Android,
+  ) : ArbigentAvailableDevice {
     override val stableKey: String get() = "fake:$name"
     public override fun connectToDevice(): ArbigentDevice {
       // This is not called

@@ -64,9 +64,10 @@ command-line flag  >  environment variable  >  settings file  >  built-in defaul
 Within the settings files the order is: for each file (in the priority list above),
 the command-scoped key (`<command>.<key>`) first, then the global key (`<key>`).
 
-> **iOS real-device options are the exception.** They have no Clikt `envvar`, so their
-> environment fallback happens later inside `arbigent-core`, *after* the settings file.
-> For those three options the order is: **flag > settings file > env var > default**.
+> **The iOS real-device connection options are the exception.** `--ios-xctest-apple-team-id`
+> and `--ios-real-device-port` have no Clikt `envvar`, so their environment fallback happens
+> later inside `arbigent-core`, *after* the settings file: **flag > settings file > env var >
+> default**. `--device-id` is a normal option and follows the standard order above.
 
 ## AI provider / API key mapping
 
@@ -89,7 +90,25 @@ time.
 | Azure model / deployment | `--azure-openai-model-name` | `azure-openai-model-name` | — | `gpt-4.1` |
 
 > API keys and other sensitive values are masked as `****` in `--help` output (any key
-> containing `key`, `token`, `secret`, `password`, or `team`).
+> containing `key`, `token`, `secret`, `password`, or `team`, plus `device-id`).
+
+## Device selection
+
+| Setting | CLI flag | Settings key | Env var | Default |
+|---|---|---|---|---|
+| Device id | `--device-id` | `device-id` | `ARBIGENT_DEVICE_ID` | the only usable connected device; an error when several usable devices are present |
+
+The value is an adb serial for `--os=android`, and a simulator UDID or a physical iPhone's
+hardware UDID for `--os=ios`. It is matched exactly, and an unmatched id is an error rather
+than a fallback to another device. `--os=web` takes no device id. On Android, a serial that adb
+reports as `unauthorized` or `offline` is listed as attached but is never selectable and never
+counts towards ambiguity. The key is treated as
+sensitive, so it is masked in `--help` output, and a physical iPhone's hardware UDID is never
+printed in full by Arbigent's own logs and errors (it is shown as a short prefix). adb serials
+and simulator UDIDs are printed in full so they can be pasted back into `--device-id`.
+
+The removed `--ios-real-device-id` / `ios-real-device-id` / `ARBIGENT_IOS_REAL_DEVICE_ID` are
+reported as a migration error rather than silently ignored.
 
 ## iOS real-device mapping
 
@@ -99,7 +118,6 @@ settings file here (see the note above).
 | Setting | CLI flag | Settings key | Env var | Default |
 |---|---|---|---|---|
 | Apple team id | `--ios-xctest-apple-team-id` | `ios-xctest-apple-team-id` | `ARBIGENT_IOS_XCTEST_APPLE_TEAM_ID` | auto-detect when signing certs resolve to one team |
-| Device UDID | `--ios-real-device-id` | `ios-real-device-id` | `ARBIGENT_IOS_REAL_DEVICE_ID` | auto (when one device) |
 | Runner port | `--ios-real-device-port` | `ios-real-device-port` | `ARBIGENT_IOS_REAL_DEVICE_PORT` | `22087` |
 
 ## Common options (per command)
@@ -113,6 +131,7 @@ All of the following are settings-aware (readable from the settings file) unless
 | `--project-file` | `project-file` | String | required at runtime |
 | `--ai-type` | `ai-type` | `openai` / `gemini` / `azureopenai` | `openai` |
 | `--os` | `os` | `android` / `ios` / `web` | `android` |
+| `--device-id` | `device-id` | String (adb serial / UDID) | the only connected device |
 | `--variables` | `variables` | `k=v,...` map | (none; overrides `settings.variables` in the project YAML per key) |
 | `--scenario-ids` | `scenario-ids` | comma list | (none → runs all leaf scenarios) |
 | `--tags` | `tags` | comma list (OR) | (none) |
@@ -130,7 +149,7 @@ Plus the AI-provider group options for the selected `--ai-type`.
 ### `run task`
 
 Takes a positional `goal` argument (required), the AI-provider group, `--os`,
-`--ios-*`, `--ai-api-logging`, `--log-level`, `--log-file`, `--working-directory`, plus:
+`--device-id`, `--ios-*`, `--ai-api-logging`, `--log-level`, `--log-file`, `--working-directory`, plus:
 
 | Flag | Settings key | Type | Default |
 |---|---|---|---|

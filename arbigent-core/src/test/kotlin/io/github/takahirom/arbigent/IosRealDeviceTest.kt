@@ -126,12 +126,25 @@ class IosRealDeviceTest {
     )
   }
 
+  // Device selection moved to the OS-agnostic --device-id, which is resolved once by the caller and
+  // passed explicitly. The legacy variable must no longer opt into preferring physical devices,
+  // because a leftover export would otherwise keep steering discovery (and the UI's device list).
   @Test
-  fun resolvedDeviceId_fallsBackToEnv() {
+  fun isOptedIn_ignoresLegacyDeviceIdEnv() {
     assertEquals(
-      "UDID-FROM-ENV",
-      ArbigentIosRealDeviceSettings.resolvedDeviceId(ArbigentIosRealDeviceConfiguration(deviceId = null)) { name ->
-        if (name == ArbigentIosRealDeviceSettings.ENV_DEVICE_ID) "UDID-FROM-ENV" else null
+      false,
+      ArbigentIosRealDeviceSettings.isOptedIn(ArbigentIosRealDeviceConfiguration()) { name ->
+        if (name == ArbigentIosRealDeviceSettings.LEGACY_ENV_DEVICE_ID) "UDID-FROM-ENV" else null
+      },
+    )
+  }
+
+  @Test
+  fun isOptedIn_followsAppleTeamIdEnv() {
+    assertEquals(
+      true,
+      ArbigentIosRealDeviceSettings.isOptedIn(ArbigentIosRealDeviceConfiguration()) { name ->
+        if (name == ArbigentIosRealDeviceSettings.ENV_APPLE_TEAM_ID) "ABCDE12345" else null
       },
     )
   }
