@@ -222,9 +222,13 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     val original = File(screenshotFilePath)
     val canvas = ArbigentCanvas.load(original, elements.screenWidth, TYPE_INT_RGB)
     canvas.draw(elements)
-    canvas.save(original.getAnnotatedFilePath(), decisionInput.aiOptions)
+    val annotatedFile = original.toAnnotatedFile()
+    canvas.save(annotatedFile.absolutePath, decisionInput.aiOptions)
 
-    val imageBase64 = File(screenshotFilePath).getResizedIamgeBase64(1.0F)
+    // The decision is made from the annotated image: the numbered boxes drawn on it are what lets
+    // the model connect what it sees to the indices in <ELEMENTS>. The image assertion keeps using
+    // the un-annotated screenshot, because the boxes are not part of the screen being judged.
+    val imageBase64 = annotatedFile.readImageBase64()
     val prompt =
       buildPrompt(
         contextHolder = contextHolder,
@@ -1142,22 +1146,6 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
   }
 }
 
-private fun File.getResizedIamgeBase64(scale: Float): String {
-//  val scale = 0.1F
-//  val image = ImageIO.read(this)
-//  val scaledImage = image.getScaledInstance(
-//    (image.width * scale).toInt(),
-//    (image.height * scale).toInt(),
-//    BufferedImage.SCALE_SMOOTH
-//  )
-//  val bufferedImage = BufferedImage(
-//    scaledImage.getWidth(null),
-//    scaledImage.getHeight(null),
-//    BufferedImage.TYPE_INT_RGB
-//  )
-//  bufferedImage.graphics.drawImage(scaledImage, 0, 0, null)
-//  val output = File.createTempFile("scaled", ".png")
-//  ImageIO.write(bufferedImage, "png", output)
-//  return output.readBytes().encodeBase64()
+private fun File.readImageBase64(): String {
   return this.readBytes().encodeBase64()
 }
