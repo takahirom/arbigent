@@ -311,15 +311,17 @@ Done when: you know the scenario ids and tags you need for the next `run` comman
   matching key via the OPENAI_API_KEY / GEMINI_API_KEY / AZURE_OPENAI_API_KEY / ANTHROPIC_API_KEY
   environment variable, `--openai-api-key`-style options, or `.arbigent/settings.local.yml`.
   Never commit keys; use the `settings.local.yml` file (gitignore it).
-- A connected device matching `--os` (`android` (default) / `ios` / `web`). The first
-  available device is used. Not needed for `--dry-run`.
+- A connected device matching `--os` (`android` (default) / `ios` / `web`). With one device
+  connected it is used automatically; with several, pass `--device-id` (an adb serial on
+  Android, a simulator or iPhone UDID on iOS). It can also come from `ARBIGENT_DEVICE_ID` or
+  the `device-id` settings key. Not needed for `--dry-run`.
   - `--os=ios` uses a booted simulator, or a physical iPhone when one is connected.
     Runner signing and USB port forwarding are handled for you (needs Xcode, the iOS
     platform matching the device, and `iproxy` on PATH). Keep the iPhone paired,
     trusted, and unlocked for the whole run. Real-device options: `--ios-xctest-apple-team-id`
-    (signing team; auto-detected when you have exactly one identity),
-    `--ios-real-device-id` (hardware UDID; required when several iPhones are connected),
-    `--ios-real-device-port` (default 22087). All can live in `.arbigent/settings.local.yml`.
+    (signing team; auto-detected when you have exactly one identity) and
+    `--ios-real-device-port` (default 22087); select the iPhone itself with `--device-id`.
+    All can live in `.arbigent/settings.local.yml`.
     See the README "iOS real devices" section for details.
 
 ## Selecting scenarios

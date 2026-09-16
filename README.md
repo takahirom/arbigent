@@ -502,8 +502,8 @@ Options:
   --ai-type=(openai|gemini|azureopenai|anthropic)  Type of AI to use
   --ai-api-logging                       Enable AI API debug logging
   --os=(android|ios|web)                 Target operating system
+  --device-id=<text>                     Device to run on: an adb serial (android) or a simulator/iPhone UDID (ios)
   --ios-xctest-apple-team-id=<text>      Apple team id for signing the XCTest runner on a physical iPhone
-  --ios-real-device-id=<text>            Hardware UDID selecting a specific physical iPhone
   --ios-real-device-port=<text>          Host/device port for the XCTest runner (default 22087)
   --project-file=<text>                  Path to the project YAML file
   --log-level=(debug|info|warn|error)    Log level
@@ -517,6 +517,21 @@ Options:
   --shard=<value>                        Shard specification (e.g., 1/5)
   -h, --help                             Show this message and exit
 ```
+
+#### Choosing a device
+
+When exactly one device is connected, Arbigent uses it. When several are, pick one explicitly with `--device-id`:
+
+```bash
+arbigent run --device-id=emulator-5554                 # adb serial
+arbigent run --os=ios --device-id=00008110-XXXXXXXXXXXXXXXX  # simulator or iPhone UDID
+```
+
+A device that adb reports as `unauthorized` or `offline` — one whose USB-debugging prompt has not been accepted, or an emulator that is still booting — is listed but never selected, so it neither hides a working device nor counts as an ambiguity.
+
+The value is matched exactly; Arbigent never falls back to another device when the requested one is missing. It can also come from `ARBIGENT_DEVICE_ID` or the `device-id` settings key, and the resolution order is the usual one: flag > environment variable > settings file. Every run logs which device it picked and where the id came from.
+
+When device discovery itself fails (say `xcrun devicectl` is unavailable while you have `--ios-xctest-apple-team-id` set), Arbigent reports the failure instead of auto-selecting whatever else it happened to find, so a run never quietly moves from the iPhone you configured to a booted simulator. Passing `--device-id` still selects any device that was discovered.
 
 #### iOS real devices
 
@@ -542,7 +557,7 @@ For multiple connected devices, or when auto-detection can't pick a single signi
 ```bash
 arbigent run --os=ios \
   --ios-xctest-apple-team-id=ABCDE12345 \
-  --ios-real-device-id=00008110-XXXXXXXXXXXXXXXX
+  --device-id=00008110-XXXXXXXXXXXXXXXX
 ```
 
 These options can also live in `.arbigent/settings.local.yml` like any other option (globally or under `run:`), so you don't repeat them:
@@ -551,11 +566,11 @@ These options can also live in `.arbigent/settings.local.yml` like any other opt
 run:
   os: ios
   ios-xctest-apple-team-id: ABCDE12345
-  ios-real-device-id: 00008110-XXXXXXXXXXXXXXXX
+  device-id: 00008110-XXXXXXXXXXXXXXXX
   ios-real-device-port: "22087"
 ```
 
-The team id is treated as sensitive and is masked in `--help` output and redacted from persisted logs.
+The team id and the device id are treated as sensitive: both are masked in `--help` output and redacted from persisted logs.
 
 **Troubleshooting**
 

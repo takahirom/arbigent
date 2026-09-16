@@ -171,7 +171,6 @@ scenarios:
       """
       project-file: ${yaml.absolutePath}
       ios-xctest-apple-team-id: ABCDE12345
-      ios-real-device-id: 00008110-XXXXXXXXXXXXXXXX
       ios-real-device-port: "22090"
       """.trimIndent()
     )
@@ -194,7 +193,6 @@ scenarios:
       assertContains(test.output, "Selected scenarios for execution")
 
       assertEquals("ABCDE12345", runCommand.iosAppleTeamId)
-      assertEquals("00008110-XXXXXXXXXXXXXXXX", runCommand.iosRealDeviceId)
       assertEquals("22090", runCommand.iosRealDevicePort)
     } finally {
       settingsFile.delete()

@@ -71,6 +71,9 @@ fun ParameterHolder.defaultOption(
 internal fun isSensitiveOptionKey(optionKey: String): Boolean {
     val lower = optionKey.lowercase()
     // "team" covers the Apple developer team id, which is treated as sensitive and never shown.
+    // "device-id" covers the settings-file device selector: on iOS it may hold a physical iPhone's
+    // hardware UDID, which this project never prints in full — and --help is printed in CI logs.
+    if (lower == "device-id") return true
     return listOf("key", "token", "secret", "password", "team").any { lower.contains(it) }
 }
 

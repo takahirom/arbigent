@@ -23,7 +23,10 @@ import java.io.File
 import kotlin.system.exitProcess
 
 @ArbigentInternalApi
-class ArbigentRunTaskCommand : CliktCommand(name = "task") {
+class ArbigentRunTaskCommand(
+  // Defaulted so production wiring is unchanged; tests substitute a recording connector.
+  private val deviceConnector: ArbigentDeviceConnector = defaultDeviceConnector,
+) : CliktCommand(name = "task") {
 
   private val goal by argument(help = "The goal for the task to execute")
 
@@ -58,10 +61,11 @@ class ArbigentRunTaskCommand : CliktCommand(name = "task") {
     help = "Apple developer team id used to sign the XCTest runner for a physical iPhone (--os=ios). " +
       "Falls back to ${ArbigentIosRealDeviceSettings.ENV_APPLE_TEAM_ID}, then single-identity auto-detect."
   )
-  private val iosRealDeviceId by defaultOption(
-    "--ios-real-device-id",
-    help = "Hardware UDID selecting a specific physical iPhone (--os=ios)."
-  )
+  // The option object is kept so an error can name where the value came from; clikt exposes no
+  // provenance on the finalized value.
+  private val deviceIdOptionRef = deviceIdOption()
+  internal val deviceId by deviceIdOptionRef
+  internal val legacyIosRealDeviceId by legacyIosRealDeviceIdOption()
   private val iosRealDevicePort by defaultOption(
     "--ios-real-device-port",
     help = "Host/device port for the XCTest runner on a physical iPhone (default 22087)."
@@ -77,10 +81,15 @@ class ArbigentRunTaskCommand : CliktCommand(name = "task") {
 
     val (resultDir, resultFile) = setupArbigentFiles(workingDirectory, logFile)
     val ai = createAi(aiType, aiApiLoggingEnabled)
-    val device = connectDevice(
+    val device = deviceConnector.connect(
       os = os,
+      requestedDevice = resolveRequestedDevice(
+        os = os,
+        deviceId = deviceId,
+        deviceIdOption = deviceIdOptionRef,
+        legacyIosRealDeviceId = legacyIosRealDeviceId,
+      ),
       iosAppleTeamId = iosAppleTeamId,
-      iosRealDeviceId = iosRealDeviceId,
       iosRealDevicePort = parseIosRealDevicePort(iosRealDevicePort),
     )
 

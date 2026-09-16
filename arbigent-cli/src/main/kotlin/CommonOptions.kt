@@ -206,10 +206,29 @@ fun loadArbigentProject(
   }
 }
 
+/**
+ * Seam for the "the command handed the chosen device id to connection" step. Selection can be tested
+ * as a pure function and option resolution through --dry-run, but neither catches an option that is
+ * parsed and then never passed on, which is the failure this indirection exists to make testable.
+ */
+fun interface ArbigentDeviceConnector {
+  fun connect(
+    os: String,
+    requestedDevice: ArbigentRequestedDevice?,
+    iosAppleTeamId: String?,
+    iosRealDevicePort: Int?,
+  ): ArbigentDevice
+}
+
+val defaultDeviceConnector: ArbigentDeviceConnector =
+  ArbigentDeviceConnector { os, requestedDevice, iosAppleTeamId, iosRealDevicePort ->
+    connectDevice(os, requestedDevice, iosAppleTeamId, iosRealDevicePort)
+  }
+
 fun connectDevice(
   os: String,
+  requestedDevice: ArbigentRequestedDevice? = null,
   iosAppleTeamId: String? = null,
-  iosRealDeviceId: String? = null,
   iosRealDevicePort: Int? = null,
 ): ArbigentDevice {
   val deviceOs =
@@ -219,31 +238,44 @@ fun connectDevice(
           ArbigentDeviceOs.entries
             .joinToString(", ") { it.name.toLowerCasePreservingASCIIRules() }
         }")
-  // iOS real-device options, threaded into discovery so each discovered IosReal carries them to
-  // connection time. Only relevant for --os=ios with a physical iPhone; simulators and other OSes
-  // ignore it.
+  // iOS real-device connection knobs, threaded into discovery so each discovered IosReal carries
+  // them to connection time. These configure *how* to talk to a physical iPhone once chosen; which
+  // device to run on is [requestedDevice] and is deliberately kept separate.
   val iosConfig = ArbigentIosRealDeviceConfiguration(
     appleTeamId = iosAppleTeamId?.takeIf { it.isNotBlank() },
-    deviceId = iosRealDeviceId?.takeIf { it.isNotBlank() },
     port = iosRealDevicePort,
   )
-  val candidates = fetchAvailableDevicesByOs(deviceOs, iosConfig = iosConfig)
-  val chosen = candidates.firstOrNull() ?: throw IllegalArgumentException("No available device found")
-  // When the device we would connect is a physical iPhone and the user gave no explicit id, refuse to
-  // guess between several connected iPhones (devicectl ordering is not stable). List the candidates by
-  // a short, masked UDID prefix so the user can pick one with --ios-real-device-id.
-  if (chosen is ArbigentAvailableDevice.IosReal &&
-    ArbigentIosRealDeviceSettings.resolvedDeviceId(iosConfig) == null
-  ) {
-    val realCandidates = candidates.filterIsInstance<ArbigentAvailableDevice.IosReal>()
-    if (realCandidates.size > 1) {
-      throw IllegalArgumentException(
-        "Multiple connected iPhones found. Set --ios-real-device-id (or ${ArbigentIosRealDeviceSettings.ENV_DEVICE_ID}) " +
-          "to choose one. Candidates: " +
-          ArbigentAvailableDevice.IosReal.maskedUdidLabels(realCandidates).joinToString(", ")
-      )
-    }
+  val candidates = fetchDeviceCandidates(
+    deviceOs = deviceOs,
+    requestedDeviceId = requestedDevice?.id,
+    iosConfig = iosConfig,
+  )
+  // Maestro's AndroidDeviceConnection.byId() enumerates every attached device (dadb opens a
+  // connection to each one), so an unauthorized or offline device can break the connection even
+  // when a different, healthy device was selected. Discovery tolerates it; connection cannot, so
+  // say so up front instead of letting a raw dadb IOException be the first hint.
+  if (candidates.unavailable.isNotEmpty()) {
+    arbigentInfoLog(
+      "Attached but not usable: " +
+        candidates.unavailable.joinToString(", ") { "${it.deviceId} (${it.state})" } +
+        ". Authorize or disconnect it — connecting to any device can fail while it is attached."
+    )
   }
+  // A device that cannot be chosen is a configuration problem, not a crash: rethrow as a CliktError
+  // so the user gets the message alone instead of a stack trace. The message already carries any
+  // discovery failure's text, which the cause chain would otherwise drop.
+  val chosen = try {
+    selectArbigentDevice(deviceOs, candidates, requestedDevice)
+  } catch (e: ArbigentDeviceSelectionException) {
+    throw CliktError(e.message)
+  }
+  // Logged on success too: an unexpected device is otherwise invisible until the report is read, and
+  // a stale environment variable is precisely the kind of mistake that needs to be loud.
+  val chosenLabel = describeArbigentDevices(listOf(chosen)).single()
+  arbigentInfoLog(
+    if (requestedDevice == null) "Selected device: $chosenLabel (only connected device)"
+    else "Selected device: $chosenLabel (requested via ${requestedDevice.source})"
+  )
   return chosen.connectToDevice()
 }
 

@@ -16,8 +16,6 @@ public class ArbigentIosRealDeviceConfiguration(
    * auto-detection (see [resolveAppleTeamId]).
    */
   public val appleTeamId: String? = null,
-  /** Hardware UDID selecting a specific connected device; null means "the only connected one". */
-  public val deviceId: String? = null,
   /** Host/device loopback port the XCTest runner binds and iproxy forwards. */
   public val port: Int? = null,
   /** When true, arbigent spawns and manages `iproxy` to bridge the device loopback to the host. */
@@ -32,19 +30,19 @@ public class ArbigentIosRealDeviceConfiguration(
  */
 public object ArbigentIosRealDeviceSettings {
   public const val ENV_APPLE_TEAM_ID: String = "ARBIGENT_IOS_XCTEST_APPLE_TEAM_ID"
-  public const val ENV_DEVICE_ID: String = "ARBIGENT_IOS_REAL_DEVICE_ID"
+
+  /**
+   * Superseded by the OS-agnostic `--device-id` / `ARBIGENT_DEVICE_ID`. Kept only so the CLI can
+   * detect a leftover setting and fail with a migration message instead of silently ignoring it.
+   * Nothing in discovery reads it: which device to run on is resolved once by the caller and passed
+   * explicitly, so a stale value can no longer narrow the UI's device list either.
+   */
+  public const val LEGACY_ENV_DEVICE_ID: String = "ARBIGENT_IOS_REAL_DEVICE_ID"
   public const val ENV_PORT: String = "ARBIGENT_IOS_REAL_DEVICE_PORT"
 
   // The maestro XCTest runner's default loopback port (XCTestHTTPServer defaults to 22087 when the
   // PORT env is unset). Keeping this as the host/iproxy port keeps both ends in sync.
   public const val DEFAULT_PORT: Int = 22087
-
-  /** Resolved device UDID filter: explicit config, then env, else null (auto-select single device). */
-  public fun resolvedDeviceId(
-    config: ArbigentIosRealDeviceConfiguration,
-    env: (String) -> String? = System::getenv,
-  ): String? =
-    config.deviceId?.takeIf { it.isNotBlank() } ?: env(ENV_DEVICE_ID)?.takeIf { it.isNotBlank() }
 
   /**
    * Resolved runner port: explicit config, then env, else [DEFAULT_PORT]. A configured or env value
@@ -66,18 +64,19 @@ public object ArbigentIosRealDeviceSettings {
   }
 
   /**
-   * Whether the user opted into physical-iPhone selection — an explicit Apple team id or device id
-   * (config or env). Discovery uses this to decide whether a physical device should be preferred
-   * over a booted simulator.
+   * Whether the user opted into physical-iPhone selection — an explicit Apple team id (config or
+   * env). Discovery uses this to decide whether a physical device should be preferred over a booted
+   * simulator when no device was requested explicitly.
+   *
+   * A requested device id deliberately does NOT opt in: an explicit `--device-id` bypasses the
+   * preference rules entirely and must match exactly, so there is nothing to prefer.
    */
   public fun isOptedIn(
     config: ArbigentIosRealDeviceConfiguration,
     env: (String) -> String? = System::getenv,
   ): Boolean {
     if (!config.appleTeamId.isNullOrBlank()) return true
-    if (!config.deviceId.isNullOrBlank()) return true
-    if (!env(ENV_APPLE_TEAM_ID).isNullOrBlank()) return true
-    return !env(ENV_DEVICE_ID).isNullOrBlank()
+    return !env(ENV_APPLE_TEAM_ID).isNullOrBlank()
   }
 
   private inline fun requireValidPort(port: Int, name: () -> String): Int {

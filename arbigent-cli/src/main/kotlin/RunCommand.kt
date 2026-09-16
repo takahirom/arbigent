@@ -37,7 +37,10 @@ import java.io.File
 import kotlin.system.exitProcess
 
 @ArbigentInternalApi
-class ArbigentRunCommand : CliktCommand(name = "run") {
+class ArbigentRunCommand(
+  // Defaulted so production wiring is unchanged; tests substitute a recording connector.
+  private val deviceConnector: ArbigentDeviceConnector = defaultDeviceConnector,
+) : CliktCommand(name = "run") {
   override val invokeWithoutSubcommand = true
   
   private val aiType by defaultOption("--ai-type", help = "Type of AI to use")
@@ -64,10 +67,12 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
     help = "Apple developer team id used to sign the XCTest runner for a physical iPhone (--os=ios). " +
       "Falls back to ${ArbigentIosRealDeviceSettings.ENV_APPLE_TEAM_ID}, then single-identity auto-detect."
   )
-  internal val iosRealDeviceId by defaultOption(
-    "--ios-real-device-id",
-    help = "Hardware UDID selecting a specific physical iPhone (--os=ios)."
-  )
+  // The option object is kept because it records whether the flag was typed on the command line —
+  // clikt exposes no provenance on the finalized value — which both names the source in errors and
+  // decides whether `run --device-id X task ...` is rejected.
+  private val deviceIdOptionRef = deviceIdOption()
+  internal val deviceId by deviceIdOptionRef
+  internal val legacyIosRealDeviceId by legacyIosRealDeviceIdOption()
   internal val iosRealDevicePort by defaultOption(
     "--ios-real-device-port",
     help = "Host/device port for the XCTest runner on a physical iPhone (default 22087)."
@@ -130,7 +135,16 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
 
   override fun run() {
     // If a subcommand (like "task") was invoked, let it handle execution
-    if (currentContext.invokedSubcommand != null) return
+    if (currentContext.invokedSubcommand != null) {
+      // clikt does not pass a parent's option to a subcommand, so `run --device-id X task ...` would
+      // be accepted and then ignored, running on whatever device happened to be picked. A value that
+      // came from the environment or the settings file needs no warning: `task` resolves those itself.
+      rejectDeviceOptionsBeforeSubcommand(
+        deviceIdOption = deviceIdOptionRef,
+        legacyIosRealDeviceId = legacyIosRealDeviceId,
+      )
+      return
+    }
 
     // Check that project-file is provided either via CLI args or settings file
     val projectFilePath = requireProjectFile(projectFile)
@@ -140,6 +154,14 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
 
     validateAiConfig(aiType)
     applyLogLevel(logLevel)
+    // Resolved before any work (including --dry-run) so a stale setting is reported up front rather
+    // than after scenario selection.
+    val requestedDevice = resolveRequestedDevice(
+      os = os,
+      deviceId = deviceId,
+      deviceIdOption = deviceIdOptionRef,
+      legacyIosRealDeviceId = legacyIosRealDeviceId,
+    )
     
     arbigentDebugLog("=== Configuration Priority Demonstration ===")
     arbigentDebugLog("Command: run")
@@ -204,10 +226,10 @@ class ArbigentRunCommand : CliktCommand(name = "run") {
       return
     }
 
-    device = connectDevice(
+    device = deviceConnector.connect(
       os = os,
+      requestedDevice = requestedDevice,
       iosAppleTeamId = iosAppleTeamId,
-      iosRealDeviceId = iosRealDeviceId,
       iosRealDevicePort = parseIosRealDevicePort(iosRealDevicePort),
     )
     Runtime.getRuntime().addShutdownHook(object : Thread() {
