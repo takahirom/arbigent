@@ -1417,12 +1417,24 @@ private suspend fun step(
     aiOptions = stepInput.aiOptions,
     mcpTools = tools
   )
+  // Read before the decision, not after it: the AI call takes tens of seconds with reasoning on,
+  // and by the time it returns a carousel or an auto-hiding overlay has moved focus off the screen
+  // the decision was made against.
+  val focusedElementAtDecision = try {
+    device.focusedElement()
+  } catch (exception: Exception) {
+    arbigentDebugLog("Could not read the focused element: $exception")
+    null
+  }
   val decisionOutput = try {
     val output = decisionChain(decisionInput)
     val action = output.step.agentAction ?: output.agentActions.singleOrNull()
     output.copy(
       step = output.step.copy(
         targetElement = action?.withTargetIdentity(elements),
+        // The screen this decision was made against, not the one the action leads to: replay
+        // waits for this before it captures the step, the same way it waits for the target.
+        focusedElement = focusedElementAtDecision,
       ),
     )
   } catch (exception: ReplayDivergenceException) {

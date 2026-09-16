@@ -6,6 +6,7 @@ import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import maestro.TreeNode
+import maestro.UiElement.Companion.toUiElementOrNull
 import java.io.File
 import java.security.MessageDigest
 
@@ -38,8 +39,14 @@ internal class ReplayDivergenceException(
  * and proceeds the moment it is. Waiting further for the element list to stop changing was tried
  * and dropped: a screen with anything animating or ticking never stops changing, so the wait ran to
  * the budget every time and a screen that was in fact ready was reported as one the target never
- * reached. A step with no target to wait for (reaching the goal, back, scroll, wait, and text
- * actions recorded without an identity) waits its budget out.
+ * reached.
+ *
+ * A step with no recorded target — reaching the goal, back, scroll, wait, and every bare D-pad
+ * press, which is most of an Android TV run — falls back to its recorded focus: it polls until
+ * focus sits where the recording had it, which is what a D-pad press moves and therefore the one
+ * signal those steps leave behind. Only a focus the recording moved is waited for; see
+ * [ArbigentReplayPacingStepInterceptor.distinguishableFocus]. A step with neither waits its budget
+ * out, as does a step recorded before focus was captured, so no trace paces worse than it used to.
  */
 internal class ArbigentReplayPacingStepInterceptor(
   private val trace: ArbigentReplayTrace,
@@ -56,9 +63,33 @@ internal class ArbigentReplayPacingStepInterceptor(
       .distinctBy { step -> step.stepId }
       .count()
     val budgetMillis = remainingBudgetMillis(replayIndex)
-    val identity = trace.steps.getOrNull(replayIndex)?.decisionOutput?.step?.targetElement
+    val recordedStep = trace.steps.getOrNull(replayIndex)?.decisionOutput?.step
+    val identity = recordedStep?.targetElement
+    val focus = distinguishableFocus(replayIndex)
     if (identity != null) {
-      awaitTarget(replayIndex, identity, stepInput.device, budgetMillis)
+      awaitCondition(
+        replayIndex = replayIndex,
+        description = "target ${identity.description()}",
+        budgetMillis = budgetMillis,
+        isSatisfied = {
+          val elements = readElements(stepInput.device)
+          elements != null && identity.findMatch(elements) != null
+        },
+      )
+    } else if (focus != null) {
+      val previousFocus = trace.steps.getOrNull(replayIndex - 1)?.decisionOutput?.step?.focusedElement
+      awaitCondition(
+        replayIndex = replayIndex,
+        description = "focus ${focus.description()}",
+        budgetMillis = budgetMillis,
+        // A screen that still has focus where it was before proves nothing, even when the two
+        // recordings are far enough apart to count as a move: the tolerance that absorbs layout
+        // drift is wider than a couple of pixels of it, so both would match the same screen.
+        isSatisfied = {
+          val current = readFocus(stepInput.device)
+          focus.matches(current) && previousFocus?.matches(current) != true
+        },
+      )
     } else {
       waitOutBudget(replayIndex, budgetMillis)
     }
@@ -90,16 +121,41 @@ internal class ArbigentReplayPacingStepInterceptor(
   }
 
   /**
-   * Polls until the recorded target is present, or until [budgetMillis] is spent. The screen is
-   * read once before the budget is consulted, so a step whose budget is already gone still gets the
-   * chance to find its target on a screen that is in fact ready — and a target that never appears
-   * is left for the decision interceptor to report as a divergence, which is what it is.
+   * The recorded focus to wait for, or null when waiting for it would prove nothing.
+   *
+   * Focus only tells replay the screen has arrived when it moved: two steps in a row recorded with
+   * focus in the same place cannot distinguish the screen before the previous action landed from
+   * the screen after it, so the wait would end immediately on a screen that has not changed yet.
+   * This rejects only the steps recorded in exactly the same place, which is the cheap half —
+   * a screen that still matches the previous focus within the tolerance is rejected by the wait's
+   * own predicate, so a move of a pixel or two does not become an early exit either.
+   * The first step of a task has no predecessor to have moved from, and nothing is focused on a
+   * screen that has not drawn, so it is safe to wait for.
    */
-  private suspend fun awaitTarget(
+  private fun distinguishableFocus(replayIndex: Int): ArbigentFocusedElement? {
+    val focus = trace.steps.getOrNull(replayIndex)?.decisionOutput?.step?.focusedElement ?: return null
+    if (replayIndex == 0) return focus
+    // Not "focus was nowhere" but "the recording could not say": a step whose own focus failed to
+    // record leaves no way to tell a move from a screen that never changed, so this waits as it did
+    // before rather than exiting on a screen that may still be the previous one.
+    val previousFocus = trace.steps.getOrNull(replayIndex - 1)?.decisionOutput?.step?.focusedElement
+      ?: return null
+    return focus.takeIf { it != previousFocus }
+  }
+
+  /**
+   * Polls until [isSatisfied], or until [budgetMillis] is spent — give or take the one read that
+   * may overrun it, which the loop documents where it decides whether to start another read. The screen is
+   * read once before the budget is consulted, so a step whose budget is already gone still gets the
+   * chance to find what it is waiting for on a screen that is in fact ready — and a target that
+   * never appears is left for the decision interceptor to report as a divergence, which is what it
+   * is.
+   */
+  private suspend fun awaitCondition(
     replayIndex: Int,
-    identity: ArbigentElementIdentity,
-    device: ArbigentDevice,
+    description: String,
     budgetMillis: Long,
+    isSatisfied: () -> Boolean,
   ) {
     // Everything between here and the return is charged to the budget, measured on the clock
     // rather than summed from what was asked for: reading the hierarchy is synchronous and can
@@ -107,36 +163,66 @@ internal class ArbigentReplayPacingStepInterceptor(
     // Adding up only the requested delays would let either one push the wait past the recorded
     // interval it is supposed to fit inside.
     val startedAtMillis = TimeProvider.get().currentTimeMillis()
+    fun elapsedMillis(): Long =
+      (TimeProvider.get().currentTimeMillis() - startedAtMillis).coerceAtLeast(0)
+    var isFirstRead = true
     var waitedMillis = 0L
+    var lastReadMillis = 0L
     while (true) {
-      val present = isPresent(device, identity)
-      waitedMillis = (TimeProvider.get().currentTimeMillis() - startedAtMillis).coerceAtLeast(0)
-      if (present) {
+      // Only the first read may start with the budget already gone: a step that arrives late still
+      // gets one chance to find what it is waiting for on a screen that is in fact ready. Later
+      // reads are not free, so a read that the previous one says will not fit in what is left of
+      // the budget is not started — the rest is slept out instead, which is what pacing did before.
+      // The previous read is an estimate, not a promise: a read is synchronous and cannot be cut
+      // short, so a read that turns out slower than the one before it can still carry the wait past
+      // the recorded interval, by at most that one read.
+      if (!isFirstRead) {
+        val remainingMillis = budgetMillis - waitedMillis
+        if (remainingMillis < lastReadMillis || remainingMillis <= 0) {
+          if (remainingMillis > 0) delay(remainingMillis)
+          break
+        }
+      }
+      isFirstRead = false
+      val readStartedAtMillis = elapsedMillis()
+      val satisfied = isSatisfied()
+      waitedMillis = elapsedMillis()
+      lastReadMillis = (waitedMillis - readStartedAtMillis).coerceAtLeast(0)
+      if (satisfied) {
         arbigentInfoLog(
-          "Replay wait: target ${identity.description()} found after ${waitedMillis}ms " +
+          "Replay wait: $description found after ${waitedMillis}ms " +
             "before capturing step ${replayIndex + 1}",
         )
         return
       }
       if (waitedMillis >= budgetMillis) break
       delay(POLL_INTERVAL_MILLIS.coerceAtMost(budgetMillis - waitedMillis))
+      waitedMillis = elapsedMillis()
     }
     arbigentInfoLog(
-      "Replay wait: budget ${budgetMillis}ms spent waiting for target ${identity.description()} " +
+      "Replay wait: budget ${budgetMillis}ms spent waiting for $description " +
         "before capturing step ${replayIndex + 1}; capturing anyway",
     )
   }
 
-  private fun isPresent(device: ArbigentDevice, identity: ArbigentElementIdentity): Boolean {
-    val elements = try {
+  private fun readElements(device: ArbigentDevice): ArbigentElementList? {
+    return try {
       device.elements()
     } catch (exception: Exception) {
       // Reading the hierarchy can fail while the screen is mid-transition, which is exactly the
       // state this waits out. Treat it as "not there yet".
       arbigentDebugLog("Replay wait: could not read elements: $exception")
-      return false
+      null
     }
-    return identity.findMatch(elements) != null
+  }
+
+  private fun readFocus(device: ArbigentDevice): ArbigentFocusedElement? {
+    return try {
+      device.focusedElement()
+    } catch (exception: Exception) {
+      arbigentDebugLog("Replay wait: could not read focus: $exception")
+      null
+    }
   }
 
   private suspend fun waitOutBudget(replayIndex: Int, budgetMillis: Long) {
@@ -278,42 +364,113 @@ public data class ArbigentElementIdentity(
       return identityWithoutOccurrence.copy(occurrence = occurrence)
     }
 
-    private val TEXT_ATTRIBUTE_KEYS = listOf("text", "value")
-    private val RESOURCE_ID_ATTRIBUTE_KEYS = listOf("resource-id", "resourceId", "id")
-    private val ACCESSIBILITY_ATTRIBUTE_KEYS = listOf(
-      "accessibilityText",
-      "content-desc",
-      "contentDescription",
-      "accessibility-id",
-      "label",
-      "name",
-    )
-
-    /**
-     * First non-blank value for [keys], searched over the element's own node and then its
-     * descendants, the same way the element text shown to the AI is built.
-     *
-     * Reading only the node's own attributes made this return null for the shape an Android TV
-     * card or tab actually has: the focusable container carries no text, resource-id or
-     * accessibility text at all, and the text lives in a non-clickable child TextView. No identity
-     * meant no identity was recorded, so a replayed index action was neither rebound to the
-     * element's current position nor reported as a divergence — it silently operated on whatever
-     * happened to sit at the recorded index.
-     */
-    private fun ArbigentElement.firstNonBlank(keys: List<String>): String? =
-      keys.firstNotNullOfOrNull { key ->
-        treeNode.dfs { node -> node.attributes[key].nonBlankOrNull() != null }
-          ?.attributes?.get(key).nonBlankOrNull()
-      }
-
-    private fun TreeNode.dfs(condition: (TreeNode) -> Boolean): TreeNode? {
-      if (condition(this)) return this
-      return children.firstNotNullOfOrNull { child -> child.dfs(condition) }
-    }
-
-    private fun String?.nonBlankOrNull(): String? = this?.takeIf(String::isNotBlank)
   }
 }
+
+/**
+ * Where focus sat on the screen a recorded step was decided against, so replay can wait for the
+ * app to arrive at that screen instead of sleeping out the recorded interval.
+ *
+ * Most Android TV steps are bare D-pad presses, which carry no target element, and a step with no
+ * target used to wait its whole budget every time. Focus is what those presses move, so the screen
+ * the next step needs is exactly the screen whose focus matches this.
+ *
+ * Bounds are part of the identity because a class name and a resource id do not say which item
+ * holds focus: every row of a sidebar shares one container id and only its position tells them
+ * apart. They are compared with a tolerance rather than exactly because the same screen lays out a
+ * few pixels apart between machines - 2 to 4px was measured between a local run and CI on the same
+ * build. The resource id is nullable because the focused node often has none: on the screens this
+ * was measured on, the node holding focus was a bare ViewGroup two times out of seven.
+ */
+@Serializable
+public data class ArbigentFocusedElement(
+  public val className: String,
+  public val x: Int,
+  public val y: Int,
+  public val width: Int,
+  public val height: Int,
+  public val resourceId: String? = null,
+) {
+  public fun description(): String =
+    "${resourceId ?: className} at [$x,$y,${x + width},${y + height}]"
+
+  /**
+   * Whether [current], the focus now on the device, is where this recorded it. A focus the device
+   * cannot report - nothing focused, or a focused node with no bounds - never matches, so the step
+   * falls back to waiting its budget.
+   */
+  internal fun matches(current: ArbigentFocusedElement?): Boolean {
+    if (current == null) return false
+    if (current.className != className) return false
+    if (current.resourceId != resourceId) return false
+    return kotlin.math.abs(current.x - x) <= BOUNDS_TOLERANCE &&
+      kotlin.math.abs(current.y - y) <= BOUNDS_TOLERANCE &&
+      kotlin.math.abs(current.width - width) <= BOUNDS_TOLERANCE &&
+      kotlin.math.abs(current.height - height) <= BOUNDS_TOLERANCE
+  }
+
+  public companion object {
+    /**
+     * Reads the node the device reports as focused. This has to be the node from the full view
+     * hierarchy: the focused node is regularly a container that the element list the AI is shown
+     * does not keep, which is why reading focus from that list recorded nothing at all.
+     */
+    public fun from(node: TreeNode): ArbigentFocusedElement? {
+      val bounds = node.toUiElementOrNull()?.bounds ?: return null
+      val className = node.attributes["class"]?.nonBlankOrNull() ?: return null
+      return ArbigentFocusedElement(
+        className = className,
+        x = bounds.x,
+        y = bounds.y,
+        width = bounds.width,
+        height = bounds.height,
+        resourceId = node.attributes["resource-id"]?.nonBlankOrNull(),
+      )
+    }
+
+    /**
+     * How far each edge may sit from where it was recorded. It stays far below the pitch between
+     * neighbouring focusable rows, which is what the bounds are here to tell apart, and well above
+     * the few pixels of drift that were measured between machines.
+     */
+    private const val BOUNDS_TOLERANCE = 8
+  }
+}
+
+private val TEXT_ATTRIBUTE_KEYS = listOf("text", "value")
+private val RESOURCE_ID_ATTRIBUTE_KEYS = listOf("resource-id", "resourceId", "id")
+private val ACCESSIBILITY_ATTRIBUTE_KEYS = listOf(
+  "accessibilityText",
+  "content-desc",
+  "contentDescription",
+  "accessibility-id",
+  "label",
+  "name",
+)
+
+/**
+ * First non-blank value for [keys], searched over the element's own node and then its
+ * descendants, the same way the element text shown to the AI is built.
+ *
+ * Reading only the node's own attributes made this return null for the shape an Android TV
+ * card or tab actually has: the focusable container carries no text, resource-id or
+ * accessibility text at all, and the text lives in a non-clickable child TextView. No identity
+ * meant no identity was recorded, so a replayed index action was neither rebound to the
+ * element's current position nor reported as a divergence — it silently operated on whatever
+ * happened to sit at the recorded index.
+ */
+private fun ArbigentElement.firstNonBlank(keys: List<String>): String? =
+  keys.firstNotNullOfOrNull { key ->
+    treeNode.dfs { node -> node.attributes[key].nonBlankOrNull() != null }
+      ?.attributes?.get(key).nonBlankOrNull()
+  }
+
+private fun TreeNode.dfs(condition: (TreeNode) -> Boolean): TreeNode? {
+  if (condition(this)) return this
+  return children.firstNotNullOfOrNull { child -> child.dfs(condition) }
+}
+
+private fun String?.nonBlankOrNull(): String? = this?.takeIf(String::isNotBlank)
 
 internal fun ArbigentAgentAction.withTargetIdentity(
   elements: ArbigentElementList,
