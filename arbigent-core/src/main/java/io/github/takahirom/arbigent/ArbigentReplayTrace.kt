@@ -78,6 +78,12 @@ internal class ArbigentReplayPacingStepInterceptor(
       )
     } else if (focus != null) {
       val previousFocus = trace.steps.getOrNull(replayIndex - 1)?.decisionOutput?.step?.focusedElement
+      // The first step of a task has no recorded predecessor to have moved from, so a screen that
+      // matches on the very first read cannot say whether the previous task's last action has
+      // landed yet — the same control can hold focus on both screens. There the match has to be
+      // watched happening: something other than the recorded focus must be seen first. Later steps
+      // have the recorded predecessor for that, and start out satisfied by a match.
+      var sawOtherScreen = replayIndex > 0
       awaitCondition(
         replayIndex = replayIndex,
         description = "focus ${focus.description()}",
@@ -87,7 +93,9 @@ internal class ArbigentReplayPacingStepInterceptor(
         // drift is wider than a couple of pixels of it, so both would match the same screen.
         isSatisfied = {
           val current = readFocus(stepInput.device)
-          focus.matches(current) && previousFocus?.matches(current) != true
+          val matches = focus.matches(current) && previousFocus?.matches(current) != true
+          if (!matches) sawOtherScreen = true
+          matches && sawOtherScreen
         },
       )
     } else {
@@ -129,8 +137,8 @@ internal class ArbigentReplayPacingStepInterceptor(
    * This rejects only the steps recorded in exactly the same place, which is the cheap half —
    * a screen that still matches the previous focus within the tolerance is rejected by the wait's
    * own predicate, so a move of a pixel or two does not become an early exit either.
-   * The first step of a task has no predecessor to have moved from, and nothing is focused on a
-   * screen that has not drawn, so it is safe to wait for.
+   * The first step of a task has no recorded predecessor to have moved from, so it is the wait
+   * itself that has to watch the move happen; the branch that runs the wait says how.
    */
   private fun distinguishableFocus(replayIndex: Int): ArbigentFocusedElement? {
     val focus = trace.steps.getOrNull(replayIndex)?.decisionOutput?.step?.focusedElement ?: return null

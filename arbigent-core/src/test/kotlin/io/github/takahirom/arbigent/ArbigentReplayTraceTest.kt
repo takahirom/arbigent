@@ -494,16 +494,34 @@ class ArbigentReplayTraceTest {
   }
 
   @Test
+  fun `a first step does not exit on a screen that already had the recorded focus`() = runTest {
+    withVirtualClock {
+      // The first step of a task has no recorded predecessor, so a screen that matches from the
+      // start cannot say whether the action before it has landed — the same control holds focus on
+      // both screens. Only watching focus arrive proves it, so this waits as pacing always did.
+      val device = ScriptedDevice(focuses = listOf(focusAt(400)))
+      ArbigentReplayPacingStepInterceptor(traceWithFocus(listOf(focusAt(400))))
+        .intercept(stepInput(device)) { ArbigentAgent.StepResult.Continue }
+
+      assertEquals(
+        10_000,
+        currentTime,
+        "a match that was already there when the wait started is not an arrival",
+      )
+    }
+  }
+
+  @Test
   fun `a few pixels of layout drift still counts as the recorded focus`() = runTest {
     withVirtualClock {
       // The same screen lays out a few pixels apart between machines, so the bounds recorded on one
       // never arrive exactly on another; only a move to a different item may keep a step waiting.
-      val device = ScriptedDevice(focuses = listOf(focusAt(403)))
+      val device = ScriptedDevice(focuses = listOf(focusAt(200), focusAt(403)))
       ArbigentReplayPacingStepInterceptor(traceWithFocus(listOf(focusAt(400))))
         .intercept(stepInput(device)) { ArbigentAgent.StepResult.Continue }
 
-      assertEquals(1, device.focusedElementCallCount)
-      assertEquals(0, currentTime, "a screen already showing the recorded focus should not wait")
+      assertEquals(2, device.focusedElementCallCount)
+      assertEquals(500, currentTime, "focus arriving three pixels off is focus arriving")
     }
   }
 
@@ -531,7 +549,9 @@ class ArbigentReplayTraceTest {
       focuses = listOf(focusAt(400), focusAt(400)),
       timestamps = listOf(0L, 3_000L),
     )
-    val device = ScriptedDevice(focuses = listOf(focusAt(400)))
+    // The first step watches focus arrive, which is what its own wait requires; the second is the
+    // one under test.
+    val device = ScriptedDevice(focuses = listOf(focusAt(200), focusAt(400)))
     val contextHolder = ArbigentContextHolder("goal", 10)
     val interceptor = ArbigentReplayPacingStepInterceptor(trace)
 
@@ -549,12 +569,12 @@ class ArbigentReplayTraceTest {
       interceptor.intercept(stepInput(device, contextHolder)) { ArbigentAgent.StepResult.Continue }
 
       assertEquals(
-        3_000,
+        500 + 3_000,
         currentTime,
-        "the first step exits at once on the focus it recorded, and the second waits out the " +
+        "the first step exits on the poll that saw focus arrive, and the second waits out the " +
           "3000ms recorded between them rather than exiting on a focus that never moved",
       )
-      assertEquals(1, device.focusedElementCallCount, "only the first step had a focus worth polling for")
+      assertEquals(2, device.focusedElementCallCount, "only the first step had a focus worth polling for")
     }
   }
 
@@ -567,7 +587,7 @@ class ArbigentReplayTraceTest {
       focuses = listOf(focusAt(400), focusAt(402)),
       timestamps = listOf(0L, 3_000L),
     )
-    val device = ScriptedDevice(focuses = listOf(focusAt(400)))
+    val device = ScriptedDevice(focuses = listOf(focusAt(200), focusAt(400)))
     val contextHolder = ArbigentContextHolder("goal", 10)
     val interceptor = ArbigentReplayPacingStepInterceptor(trace)
 
@@ -585,7 +605,7 @@ class ArbigentReplayTraceTest {
       interceptor.intercept(stepInput(device, contextHolder)) { ArbigentAgent.StepResult.Continue }
 
       assertEquals(
-        3_000,
+        500 + 3_000,
         currentTime,
         "a screen that still matches the previous focus is not the screen the step was recorded on",
       )
