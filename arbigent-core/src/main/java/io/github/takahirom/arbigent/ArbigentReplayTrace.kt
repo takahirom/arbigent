@@ -660,23 +660,24 @@ internal data class ArbigentReplayTrace(
     ): ArbigentReplayTrace {
       val prefix = precedingSteps.replayable()
       val steps = prefix + contextHolder.steps().replayable()
-      // Replayed steps carry the time the replay reached them, which is faster than the AI was. Writing
+      // Replayed steps carry what this run observed rather than what was recorded. The time is the
+      // one the replay reached them at, which is faster than the AI was. Writing
       // that back would make the next replay's budget the pace of this one instead of the AI's, and
       // every clean replay would tighten it further. The recorded intervals are kept instead, anchored
       // on the last replayed step so the gap to the replacement agent's first AI decision stays the
       // real one; anchoring on the first could leave that gap non-positive.
-      val recordedTimestamps = recordedTrace?.steps?.map { it.decisionOutput.step.timestamp }.orEmpty()
+      val recordedSteps = recordedTrace?.steps?.map { it.decisionOutput.step }.orEmpty()
       val replayedCount = if (recordedTrace == null) 0 else {
         prefix.size + steps.drop(prefix.size).takeWhile { it.stepSource == ArbigentStepSource.Replay }.size
       }
       require(steps.take(replayedCount).all { it.stepSource == ArbigentStepSource.Replay }) {
         "Every step in the replayed prefix must come from replay"
       }
-      require(replayedCount <= recordedTimestamps.size) {
+      require(replayedCount <= recordedSteps.size) {
         "The replayed prefix cannot be longer than its recorded trace"
       }
       val shift = if (replayedCount == 0) 0L else {
-        steps[replayedCount - 1].timestamp - recordedTimestamps[replayedCount - 1]
+        steps[replayedCount - 1].timestamp - recordedSteps[replayedCount - 1].timestamp
       }
       return ArbigentReplayTrace(
         version = key.version,
@@ -689,7 +690,14 @@ internal data class ArbigentReplayTrace(
             decisionOutput = ArbigentAi.DecisionOutput(
               agentActions = listOf(requireNotNull(step.agentAction)),
               step = if (index < replayedCount) {
-                step.copy(timestamp = recordedTimestamps[index] + shift)
+                step.copy(
+                  timestamp = recordedSteps[index].timestamp + shift,
+                  // The focus this run happened to read, likewise. A step that spent its whole
+                  // budget without reaching its recorded focus read the screen it was still on,
+                  // and writing that back would leave the next replay waiting for the screen
+                  // before the action instead of the one after it, which is always already there.
+                  focusedElement = recordedSteps[index].focusedElement,
+                )
               } else {
                 step
               },

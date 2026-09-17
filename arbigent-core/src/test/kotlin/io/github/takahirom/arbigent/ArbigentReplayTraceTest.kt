@@ -69,6 +69,33 @@ class ArbigentReplayTraceTest {
   }
 
   @Test
+  fun `candidate keeps the recorded focus of replayed steps and the run's own focus after them`() {
+    val recordedSteps = timestampedSteps(listOf(1_000, 5_000, 12_000)).mapIndexed { index, step ->
+      step.copy(focusedElement = focusAt(100 + index * 100))
+    }
+    val recordedTrace = trace(recordedSteps.map { it to requireNotNull(it.agentAction) })
+    // What a step that spent its whole budget reads: the screen it was still on, not the recorded one.
+    val replayedSteps = recordedSteps.take(2).mapIndexed { index, step ->
+      step.copy(
+        timestamp = 100_000L + index * 100L,
+        stepSource = ArbigentStepSource.Replay,
+        focusedElement = focusAt(900),
+      )
+    }
+    val aiStep = timestampedSteps(listOf(102_200)).single().copy(stepId = "ai", focusedElement = focusAt(900))
+    val context = ArbigentContextHolder("goal", 10).apply {
+      (replayedSteps + aiStep).forEach(::addStep)
+    }
+
+    val candidate = ArbigentReplayTrace.candidateFrom(candidateKey(), context, recordedTrace = recordedTrace)
+
+    assertEquals(
+      listOf(focusAt(100), focusAt(200), focusAt(900)),
+      candidate.steps.map { it.decisionOutput.step.focusedElement },
+    )
+  }
+
+  @Test
   fun `normal candidate keeps its own timestamps`() {
     val freshSteps = timestampedSteps(listOf(100_000, 102_200, 105_200))
     val context = ArbigentContextHolder("goal", 10).apply { freshSteps.forEach(::addStep) }
