@@ -39,6 +39,11 @@ public class ArbigentAgent internal constructor(
   // degrade to normal execution, and the failed attempt would then purge the AI-decision cache as
   // if it were an ordinary failure. Null means normal AI-driven execution.
   private val replayTrace: ArbigentReplayTrace?,
+  // The trace of the task replayed just before this one, so this task's first step can tell where
+  // the recording had focus before it. Answers null for the first task of a scenario, and for a
+  // previous task that fell back: the recorded focus is used to rule out the screen that task left
+  // behind, and once it stopped following its recording that screen is not the one described.
+  private val previousTaskReplayTrace: () -> ArbigentReplayTrace? = { null },
   // False for the agent that replaces a task which fell back from replay: that task's initializers
   // already ran for the replay attempt, and running them again would undo the device state the
   // replayed actions produced, which is exactly what the replacement carries on from.
@@ -95,7 +100,13 @@ public class ArbigentAgent internal constructor(
 
   private val stepInterceptors: List<ArbigentStepInterceptor> = buildList {
     if (replayTrace != null) {
-      add(ArbigentReplayPacingStepInterceptor(replayTrace))
+      add(
+        ArbigentReplayPacingStepInterceptor(
+          trace = replayTrace,
+          previousTaskTrace = previousTaskReplayTrace,
+          runsInitializers = runInitializers && initializerInterceptors.isNotEmpty(),
+        ),
+      )
     }
     addAll(interceptors.filterIsInstance<ArbigentStepInterceptor>())
   }

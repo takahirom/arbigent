@@ -45,11 +45,21 @@ internal class ReplayDivergenceException(
  * press, which is most of an Android TV run — falls back to its recorded focus: it polls until
  * focus sits where the recording had it, which is what a D-pad press moves and therefore the one
  * signal those steps leave behind. Only a focus the recording moved is waited for; see
- * [ArbigentReplayPacingStepInterceptor.distinguishableFocus]. A step with neither waits its budget
+ * [ArbigentReplayPacingStepInterceptor.focusWait]. A step with neither waits its budget
  * out, as does a step recorded before focus was captured, so no trace paces worse than it used to.
  */
 internal class ArbigentReplayPacingStepInterceptor(
   private val trace: ArbigentReplayTrace,
+  // The trace of the task replayed just before this one, when there is one. A task's first step has
+  // no predecessor inside its own trace, and that is where the previous task's last step is. It is
+  // read when the step runs rather than when this is built, because a task that fell back stopped
+  // following its recording partway: what it left on the device is no longer what the recording
+  // describes, and the caller answers null once that has happened.
+  private val previousTaskTrace: () -> ArbigentReplayTrace? = { null },
+  // Whether this task runs initializers, which move the device between the previous task's last
+  // step and this task's first one. When they do, what the previous task left behind no longer
+  // says the screen has stopped moving.
+  private val runsInitializers: Boolean = false,
 ) : ArbigentStepInterceptor {
   private var previousStepStartedAtMillis: Long? = null
 
@@ -65,7 +75,7 @@ internal class ArbigentReplayPacingStepInterceptor(
     val budgetMillis = remainingBudgetMillis(replayIndex)
     val recordedStep = trace.steps.getOrNull(replayIndex)?.decisionOutput?.step
     val identity = recordedStep?.targetElement
-    val focus = distinguishableFocus(replayIndex)
+    val focusWait = focusWait(replayIndex)
     if (identity != null) {
       awaitCondition(
         replayIndex = replayIndex,
@@ -76,24 +86,23 @@ internal class ArbigentReplayPacingStepInterceptor(
           elements != null && identity.findMatch(elements) != null
         },
       )
-    } else if (focus != null) {
-      val previousFocus = trace.steps.getOrNull(replayIndex - 1)?.decisionOutput?.step?.focusedElement
-      // The first step of a task has no recorded predecessor to have moved from, so a screen that
-      // matches on the very first read cannot say whether the previous task's last action has
-      // landed yet — the same control can hold focus on both screens. There the match has to be
-      // watched happening: something other than the recorded focus must be seen first. Later steps
-      // have the recorded predecessor for that, and start out satisfied by a match.
-      var sawOtherScreen = replayIndex > 0
+    } else if (focusWait != null) {
+      // When the wait requires a transition, nothing recorded tells this step's screen from the one
+      // before it, so a match on the very first read cannot say what came before it has landed —
+      // the same control can hold focus on both screens. There the match has to be watched
+      // happening; otherwise the first read is allowed to end the wait.
+      var sawOtherScreen = !focusWait.requireTransition
       awaitCondition(
         replayIndex = replayIndex,
-        description = "focus ${focus.description()}",
+        description = "focus ${focusWait.focus.description()}",
         budgetMillis = budgetMillis,
         // A screen that still has focus where it was before proves nothing, even when the two
         // recordings are far enough apart to count as a move: the tolerance that absorbs layout
         // drift is wider than a couple of pixels of it, so both would match the same screen.
         isSatisfied = {
           val current = readFocus(stepInput.device)
-          val matches = focus.matches(current) && previousFocus?.matches(current) != true
+          val matches = focusWait.focus.matches(current) &&
+            focusWait.previousFocus?.matches(current) != true
           if (!matches) sawOtherScreen = true
           matches && sawOtherScreen
         },
@@ -129,27 +138,70 @@ internal class ArbigentReplayPacingStepInterceptor(
   }
 
   /**
-   * The recorded focus to wait for, or null when waiting for it would prove nothing.
+   * What the wait for step [replayIndex] has to see, or null when waiting for focus would prove
+   * nothing and the step should keep the recorded pace instead.
    *
-   * Focus only tells replay the screen has arrived when it moved: two steps in a row recorded with
-   * focus in the same place cannot distinguish the screen before the previous action landed from
-   * the screen after it, so the wait would end immediately on a screen that has not changed yet.
-   * This rejects only the steps recorded in exactly the same place, which is the cheap half —
-   * a screen that still matches the previous focus within the tolerance is rejected by the wait's
-   * own predicate, so a move of a pixel or two does not become an early exit either.
-   * The first step of a task has no recorded predecessor to have moved from, so it is the wait
-   * itself that has to watch the move happen; the branch that runs the wait says how.
+   * Focus only tells replay the screen has arrived when it moved: two steps recorded with focus in
+   * the same place cannot distinguish the screen before the previous action landed from the screen
+   * after it, so the wait would end immediately on a screen that has not changed yet. What comes
+   * before a step is its predecessor in this trace, or for a task's first step, the last step of
+   * the task replayed before it.
    */
-  private fun distinguishableFocus(replayIndex: Int): ArbigentFocusedElement? {
+  private fun focusWait(replayIndex: Int): FocusWait? {
     val focus = trace.steps.getOrNull(replayIndex)?.decisionOutput?.step?.focusedElement ?: return null
-    if (replayIndex == 0) return focus
-    // Not "focus was nowhere" but "the recording could not say": a step whose own focus failed to
-    // record leaves no way to tell a move from a screen that never changed, so this waits as it did
-    // before rather than exiting on a screen that may still be the previous one.
-    val previousFocus = trace.steps.getOrNull(replayIndex - 1)?.decisionOutput?.step?.focusedElement
-      ?: return null
-    return focus.takeIf { it != previousFocus }
+    if (replayIndex > 0) {
+      // Not "focus was nowhere" but "the recording could not say": a step whose focus failed to
+      // record leaves no way to tell a move from a screen that never changed, so this keeps the
+      // recorded pace rather than exiting on a screen that may still be the previous one.
+      val previousFocus = trace.steps.getOrNull(replayIndex - 1)
+        ?.decisionOutput?.step?.focusedElement ?: return null
+      if (focus == previousFocus) return null
+      // This rejects only the steps recorded in exactly the same place, which is the cheap half — a
+      // screen that still matches the previous focus within the tolerance is rejected by the wait's
+      // own predicate, so a move of a pixel or two does not become an early exit either.
+      return FocusWait(focus, previousFocus, requireTransition = false)
+    }
+    // The first step of a task: what came before it is the last step of the task replayed before
+    // it. With no previous task there is nothing recorded before this step at all.
+    val previousStep = previousTaskTrace()?.steps?.lastOrNull()?.decisionOutput?.step
+      ?: return FocusWait(focus, previousFocus = null, requireTransition = true)
+    // Nothing records the screens initializers pass through on their way here, and one of them
+    // holding the focus this step waits for would end the wait on a screen still on its way. The
+    // focus recorded before they ran cannot reject such a screen — it is not the screen they left
+    // — so where they run the move is watched happening whatever the recording says.
+    if (runsInitializers) return FocusWait(focus, previousFocus = null, requireTransition = true)
+    val previousFocus = previousStep.focusedElement
+    // The recording says focus was somewhere else before this step, so a screen showing it is one
+    // this step's own predicate can tell from the screen before it.
+    if (previousFocus != null && previousFocus != focus) {
+      return FocusWait(focus, previousFocus, requireTransition = false)
+    }
+    // Focus was where this step's is, or the recording could not say: the two screens are
+    // indistinguishable by focus alone, and only a previous step that left nothing in flight makes
+    // a screen already showing the recorded focus that screen rather than one on its way to it.
+    // A stored trace always ends with this action, since it is rejected on read otherwise, so this
+    // holds for every trace that came from the store. It stays a check because the interceptor
+    // waits on the trace it is handed, not on one the store has vouched for.
+    if (previousStep.agentAction?.actionName == GoalAchievedAgentAction.actionName) {
+      return FocusWait(focus, previousFocus = null, requireTransition = false)
+    }
+    // Something did run between the two recordings, and a match on the first read cannot say it has
+    // landed, so the move has to be watched happening. That costs no more than the pacing it
+    // replaces, and can still end early.
+    return FocusWait(focus, previousFocus = null, requireTransition = true)
   }
+
+  /**
+   * [focus] is what the screen has to show. [previousFocus] is where the recording had focus before
+   * this step, which the same screen must not still be showing. [requireTransition] is set when
+   * there is no [previousFocus] to tell the two apart, and the wait has to see some other screen
+   * before it accepts a match.
+   */
+  private data class FocusWait(
+    val focus: ArbigentFocusedElement,
+    val previousFocus: ArbigentFocusedElement?,
+    val requireTransition: Boolean,
+  )
 
   /**
    * Polls until [isSatisfied], or until [budgetMillis] is spent — give or take the one read that

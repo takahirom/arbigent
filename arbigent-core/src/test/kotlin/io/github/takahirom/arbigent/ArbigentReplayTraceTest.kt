@@ -496,9 +496,9 @@ class ArbigentReplayTraceTest {
   @Test
   fun `a first step does not exit on a screen that already had the recorded focus`() = runTest {
     withVirtualClock {
-      // The first step of a task has no recorded predecessor, so a screen that matches from the
-      // start cannot say whether the action before it has landed — the same control holds focus on
-      // both screens. Only watching focus arrive proves it, so this waits as pacing always did.
+      // The first step of the first task has nothing recorded before it, so a screen that matches
+      // from the start cannot say whether the action before it has landed — the same control holds
+      // focus on both screens. Only watching focus arrive proves it, so this waits as pacing did.
       val device = ScriptedDevice(focuses = listOf(focusAt(400)))
       ArbigentReplayPacingStepInterceptor(traceWithFocus(listOf(focusAt(400))))
         .intercept(stepInput(device)) { ArbigentAgent.StepResult.Continue }
@@ -509,6 +509,193 @@ class ArbigentReplayTraceTest {
         "a match that was already there when the wait started is not an arrival",
       )
     }
+  }
+
+  @Test
+  fun `the first step of a task trusts the focus the previous task ended on`() = runTest {
+    withVirtualClock {
+      // The previous task ended by reporting its goal reached, which touches nothing: no action was
+      // left in flight for this step to wait out, so the screen already showing the recorded focus
+      // is the screen this step was recorded on.
+      val device = ScriptedDevice(focuses = listOf(focusAt(400)))
+      ArbigentReplayPacingStepInterceptor(
+        trace = traceWithFocus(listOf(focusAt(400))),
+        previousTaskTrace = { traceWithFocus(listOf(focusAt(400))) },
+      ).intercept(stepInput(device)) { ArbigentAgent.StepResult.Continue }
+
+      assertEquals(0, currentTime, "nothing was in flight, so there was nothing to wait for")
+      assertEquals(1, device.focusedElementCallCount)
+    }
+  }
+
+  @Test
+  fun `the first step of a task whose initializers ran watches the focus arrive`() = runTest {
+    withVirtualClock {
+      // Initializers run between the previous task's last step and this one, so whatever the
+      // previous task left behind says nothing about the screen this step starts on: the recorded
+      // focus is on both the screen the initializers left and the one they are moving towards.
+      val device = ScriptedDevice(focuses = listOf(focusAt(400)))
+      ArbigentReplayPacingStepInterceptor(
+        trace = traceWithFocus(listOf(focusAt(400))),
+        previousTaskTrace = { traceWithFocus(listOf(focusAt(400))) },
+        runsInitializers = true,
+      ).intercept(stepInput(device)) { ArbigentAgent.StepResult.Continue }
+
+      assertEquals(10_000, currentTime, "the initializers moved the device after the recording")
+    }
+  }
+
+  @Test
+  fun `the first step of a task whose initializers ran does not trust a different recorded focus`() =
+    runTest {
+      withVirtualClock {
+        // The previous task ended with focus somewhere else, so outside initializers this step
+        // would exit on the first read. Initializers pass through screens nobody recorded, and one
+        // of them can hold the focus this step is waiting for while still on its way to it — the
+        // focus recorded before they ran is not the screen they left, so it rejects nothing.
+        val device = ScriptedDevice(focuses = listOf(focusAt(400)))
+        ArbigentReplayPacingStepInterceptor(
+          trace = traceWithFocus(listOf(focusAt(400))),
+          previousTaskTrace = { traceWithFocus(listOf(focusAt(900))) },
+          runsInitializers = true,
+        ).intercept(stepInput(device)) { ArbigentAgent.StepResult.Continue }
+
+        assertEquals(
+          10_000,
+          currentTime,
+          "a focus the initializers may be passing through is not the focus having arrived",
+        )
+      }
+    }
+
+  @Test
+  fun `the first step of a task waits out the action the previous task ended with`() = runTest {
+    withVirtualClock {
+      // The previous task ended on an action that moves focus, so the screen it left behind is not
+      // the screen this step was recorded on — the recorded focus has to be seen replacing it.
+      val device = ScriptedDevice(focuses = listOf(focusAt(200), focusAt(400)))
+      ArbigentReplayPacingStepInterceptor(
+        trace = traceWithFocus(listOf(focusAt(400))),
+        previousTaskTrace = { traceEndingWithClick(focusAt(200)) },
+      ).intercept(stepInput(device)) { ArbigentAgent.StepResult.Continue }
+
+      assertEquals(500, currentTime, "the screen the previous task left behind is not an arrival")
+      assertEquals(2, device.focusedElementCallCount)
+    }
+  }
+
+  @Test
+  fun `the first step of a task watches focus arrive when the previous task ended on it`() = runTest {
+    withVirtualClock {
+      // The previous task's last action was recorded with focus already where this step wants it,
+      // so a screen matching it says nothing about whether that action has landed here yet.
+      val device = ScriptedDevice(focuses = listOf(focusAt(400)))
+      ArbigentReplayPacingStepInterceptor(
+        trace = traceWithFocus(listOf(focusAt(400))),
+        previousTaskTrace = { traceEndingWithClick(focusAt(400)) },
+      ).intercept(stepInput(device)) { ArbigentAgent.StepResult.Continue }
+
+      assertEquals(10_000, currentTime, "focus that never moved cannot show the action landed")
+    }
+  }
+
+  @Test
+  fun `the first step of a task accepts a focus the previous task did not end on`() = runTest {
+    withVirtualClock {
+      // The previous task's recording ends somewhere else, so a screen already showing this step's
+      // focus is one that recording can tell from the screen it left behind — nothing has to be
+      // watched moving. Without that recording the same read would have to be waited out.
+      val device = ScriptedDevice(focuses = listOf(focusAt(400)))
+      ArbigentReplayPacingStepInterceptor(
+        trace = traceWithFocus(listOf(focusAt(400))),
+        previousTaskTrace = { traceEndingWithClick(focusAt(200)) },
+      ).intercept(stepInput(device)) { ArbigentAgent.StepResult.Continue }
+
+      assertEquals(0, currentTime, "a focus the previous task did not end on is an arrival")
+      assertEquals(1, device.focusedElementCallCount)
+    }
+  }
+
+  @Test
+  fun `the previous task's recording is read when the step runs, not when the wait is built`() =
+    runTest {
+      withVirtualClock {
+        // Whether the task before this one kept to its recording is not known when this is built —
+        // it falls back while running, after every task's wait already exists. Reading the answer
+        // at construction would hand this step a predecessor that never ran.
+        var previousTaskKeptToItsRecording = true
+        val device = ScriptedDevice(focuses = listOf(focusAt(400)))
+        val interceptor = ArbigentReplayPacingStepInterceptor(
+          trace = traceWithFocus(listOf(focusAt(400))),
+          previousTaskTrace = {
+            traceEndingWithClick(focusAt(200)).takeIf { previousTaskKeptToItsRecording }
+          },
+        )
+        previousTaskKeptToItsRecording = false
+
+        interceptor.intercept(stepInput(device)) { ArbigentAgent.StepResult.Continue }
+
+        assertEquals(
+          10_000,
+          currentTime,
+          "a recording the previous task stopped following cannot rule out the screen it left",
+        )
+      }
+    }
+
+  @Test
+  fun `a task whose predecessor fell back has no recording of what ran before it`() {
+    val traces = listOf(
+      traceWithFocus(listOf(focusAt(200))),
+      traceWithFocus(listOf(focusAt(400))),
+    )
+
+    assertEquals(
+      null,
+      previousReplayedTaskTrace(
+        index = 1,
+        replayTraces = traces,
+        attemptMode = ArbigentAttemptMode.ReplayWithFallback,
+        fellBackTaskIndexes = setOf(0),
+      ),
+      "the task before this one finished under the AI, not on its recording",
+    )
+    assertEquals(
+      traces[0],
+      previousReplayedTaskTrace(
+        index = 1,
+        replayTraces = traces,
+        attemptMode = ArbigentAttemptMode.ReplayWithFallback,
+        fellBackTaskIndexes = setOf(1),
+      ),
+      "this task's own fallback says nothing about the one before it",
+    )
+  }
+
+  @Test
+  fun `the first task of a scenario and a normal attempt have nothing recorded before them`() {
+    val traces = listOf(traceWithFocus(listOf(focusAt(200))))
+
+    assertEquals(
+      null,
+      previousReplayedTaskTrace(
+        index = 0,
+        replayTraces = traces,
+        attemptMode = ArbigentAttemptMode.ReplayWithFallback,
+        fellBackTaskIndexes = emptySet(),
+      ),
+      "nothing replayed before the first task of a scenario",
+    )
+    assertEquals(
+      null,
+      previousReplayedTaskTrace(
+        index = 1,
+        replayTraces = traces,
+        attemptMode = ArbigentAttemptMode.Normal,
+        fellBackTaskIndexes = emptySet(),
+      ),
+      "nothing replayed at all when the attempt is not a replay",
+    )
   }
 
   @Test
@@ -798,6 +985,22 @@ class ArbigentReplayTraceTest {
           timestamps?.get(index)?.let { step.copy(timestamp = it) } ?: step
         } to action
       },
+    )
+  }
+
+  /** A one-step trace whose task ended on an action that leaves the screen moving. */
+  private fun traceEndingWithClick(focus: ArbigentFocusedElement): ArbigentReplayTrace {
+    val action = ClickWithTextAgentAction("target")
+    return trace(
+      listOf(
+        ArbigentContextHolder.Step(
+          stepId = "previous-task-step",
+          agentAction = action,
+          cacheKey = "cache-key",
+          screenshotFilePath = "screenshot.png",
+          focusedElement = focus,
+        ) to action,
+      ),
     )
   }
 
