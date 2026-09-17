@@ -39,6 +39,12 @@ public class ArbigentContextHolder(
     public val apiCallJsonLFilePath: String? = null,
     public val stepSource: ArbigentStepSource = ArbigentStepSource.Ai,
     public val targetElement: ArbigentElementIdentity? = null,
+    /**
+     * Where focus sat when this step was decided, on the screen the decision was made against.
+     * Null when nothing was focused, when the device could not say, and on every step of a trace
+     * recorded before this was captured — replay then paces that step the way it always has.
+     */
+    public val focusedElement: ArbigentFocusedElement? = null,
   ) {
     public fun isFailed(): Boolean {
       return feedback?.contains("Failed") == true

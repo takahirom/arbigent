@@ -263,6 +263,9 @@ public class ArbigentScenarioExecutor internal constructor(
         _taskAssignmentsStateFlow.value.forEach {
           it.agent.cancel()
         }
+        // Tasks that already fell back to normal execution in this attempt. A task gets one
+        // fallback: failing again is an ordinary failure and restarts the whole scenario.
+        val fellBackTaskIndexes = mutableSetOf<Int>()
         _taskAssignmentsStateFlow.value = scenario.agentTasks.mapIndexed { index, task ->
           ArbigentTaskAssignment(
             task,
@@ -271,13 +274,19 @@ public class ArbigentScenarioExecutor internal constructor(
               dispatcher = dispatcher,
               replayTrace = replayTraces?.get(index)
                 .takeIf { attemptMode == ArbigentAttemptMode.ReplayWithFallback },
+              // Asked while the task runs, when whether the task before it fell back is known.
+              previousTaskReplayTrace = {
+                previousReplayedTaskTrace(
+                  index = index,
+                  replayTraces = replayTraces,
+                  attemptMode = attemptMode,
+                  fellBackTaskIndexes = fellBackTaskIndexes,
+                )
+              },
             ),
           )
         }
         _taskAssignmentsHistoryStateFlow.value += listOf(taskAssignments())
-        // Tasks that already fell back to normal execution in this attempt. A task gets one
-        // fallback: failing again is an ordinary failure and restarts the whole scenario.
-        val fellBackTaskIndexes = mutableSetOf<Int>()
         var index = 0
         while (index < taskAssignments().size) {
           val (task, agent) = taskAssignments()[index]
@@ -497,6 +506,23 @@ private fun ArbigentScenario.replayTraceKeys(): List<ArbigentReplayTraceKey> =
       maxStep = task.maxStep,
     )
   }
+
+// The recording of what actually ran before the task at [index], which is what its first replayed
+// step compares the screen against. A task that fell back stopped following its recording partway
+// and finished under the AI: the screen it left behind is not the one its recording ends on, and a
+// focus taken from that recording would be ruling out a screen that was never there. Answering null
+// makes the next step watch the move happen instead, which is what it does with no recording at all.
+internal fun previousReplayedTaskTrace(
+  index: Int,
+  replayTraces: List<ArbigentReplayTrace>?,
+  attemptMode: ArbigentAttemptMode,
+  fellBackTaskIndexes: Set<Int>,
+): ArbigentReplayTrace? {
+  if (attemptMode != ArbigentAttemptMode.ReplayWithFallback) return null
+  val previousIndex = index - 1
+  if (previousIndex in fellBackTaskIndexes) return null
+  return replayTraces?.getOrNull(previousIndex)
+}
 
 public fun ArbigentScenarioExecutor(
   dispatcher: CoroutineDispatcher,

@@ -6,6 +6,7 @@ import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import maestro.TreeNode
+import maestro.UiElement.Companion.toUiElementOrNull
 import java.io.File
 import java.security.MessageDigest
 
@@ -38,11 +39,27 @@ internal class ReplayDivergenceException(
  * and proceeds the moment it is. Waiting further for the element list to stop changing was tried
  * and dropped: a screen with anything animating or ticking never stops changing, so the wait ran to
  * the budget every time and a screen that was in fact ready was reported as one the target never
- * reached. A step with no target to wait for (reaching the goal, back, scroll, wait, and text
- * actions recorded without an identity) waits its budget out.
+ * reached.
+ *
+ * A step with no recorded target — reaching the goal, back, scroll, wait, and every bare D-pad
+ * press, which is most of an Android TV run — falls back to its recorded focus: it polls until
+ * focus sits where the recording had it, which is what a D-pad press moves and therefore the one
+ * signal those steps leave behind. Only a focus the recording moved is waited for; see
+ * [ArbigentReplayPacingStepInterceptor.focusWait]. A step with neither waits its budget
+ * out, as does a step recorded before focus was captured, so no trace paces worse than it used to.
  */
 internal class ArbigentReplayPacingStepInterceptor(
   private val trace: ArbigentReplayTrace,
+  // The trace of the task replayed just before this one, when there is one. A task's first step has
+  // no predecessor inside its own trace, and that is where the previous task's last step is. It is
+  // read when the step runs rather than when this is built, because a task that fell back stopped
+  // following its recording partway: what it left on the device is no longer what the recording
+  // describes, and the caller answers null once that has happened.
+  private val previousTaskTrace: () -> ArbigentReplayTrace? = { null },
+  // Whether this task runs initializers, which move the device between the previous task's last
+  // step and this task's first one. When they do, what the previous task left behind no longer
+  // says the screen has stopped moving.
+  private val runsInitializers: Boolean = false,
 ) : ArbigentStepInterceptor {
   private var previousStepStartedAtMillis: Long? = null
 
@@ -56,9 +73,40 @@ internal class ArbigentReplayPacingStepInterceptor(
       .distinctBy { step -> step.stepId }
       .count()
     val budgetMillis = remainingBudgetMillis(replayIndex)
-    val identity = trace.steps.getOrNull(replayIndex)?.decisionOutput?.step?.targetElement
+    val recordedStep = trace.steps.getOrNull(replayIndex)?.decisionOutput?.step
+    val identity = recordedStep?.targetElement
+    val focusWait = focusWait(replayIndex)
     if (identity != null) {
-      awaitTarget(replayIndex, identity, stepInput.device, budgetMillis)
+      awaitCondition(
+        replayIndex = replayIndex,
+        description = "target ${identity.description()}",
+        budgetMillis = budgetMillis,
+        isSatisfied = {
+          val elements = readElements(stepInput.device)
+          elements != null && identity.findMatch(elements) != null
+        },
+      )
+    } else if (focusWait != null) {
+      // When the wait requires a transition, nothing recorded tells this step's screen from the one
+      // before it, so a match on the very first read cannot say what came before it has landed —
+      // the same control can hold focus on both screens. There the match has to be watched
+      // happening; otherwise the first read is allowed to end the wait.
+      var sawOtherScreen = !focusWait.requireTransition
+      awaitCondition(
+        replayIndex = replayIndex,
+        description = "focus ${focusWait.focus.description()}",
+        budgetMillis = budgetMillis,
+        // A screen that still has focus where it was before proves nothing, even when the two
+        // recordings are far enough apart to count as a move: the tolerance that absorbs layout
+        // drift is wider than a couple of pixels of it, so both would match the same screen.
+        isSatisfied = {
+          val current = readFocus(stepInput.device)
+          val matches = focusWait.focus.matches(current) &&
+            focusWait.previousFocus?.matches(current) != true
+          if (!matches) sawOtherScreen = true
+          matches && sawOtherScreen
+        },
+      )
     } else {
       waitOutBudget(replayIndex, budgetMillis)
     }
@@ -90,16 +138,84 @@ internal class ArbigentReplayPacingStepInterceptor(
   }
 
   /**
-   * Polls until the recorded target is present, or until [budgetMillis] is spent. The screen is
-   * read once before the budget is consulted, so a step whose budget is already gone still gets the
-   * chance to find its target on a screen that is in fact ready — and a target that never appears
-   * is left for the decision interceptor to report as a divergence, which is what it is.
+   * What the wait for step [replayIndex] has to see, or null when waiting for focus would prove
+   * nothing and the step should keep the recorded pace instead.
+   *
+   * Focus only tells replay the screen has arrived when it moved: two steps recorded with focus in
+   * the same place cannot distinguish the screen before the previous action landed from the screen
+   * after it, so the wait would end immediately on a screen that has not changed yet. What comes
+   * before a step is its predecessor in this trace, or for a task's first step, the last step of
+   * the task replayed before it.
    */
-  private suspend fun awaitTarget(
+  private fun focusWait(replayIndex: Int): FocusWait? {
+    val focus = trace.steps.getOrNull(replayIndex)?.decisionOutput?.step?.focusedElement ?: return null
+    if (replayIndex > 0) {
+      // Not "focus was nowhere" but "the recording could not say": a step whose focus failed to
+      // record leaves no way to tell a move from a screen that never changed, so this keeps the
+      // recorded pace rather than exiting on a screen that may still be the previous one.
+      val previousFocus = trace.steps.getOrNull(replayIndex - 1)
+        ?.decisionOutput?.step?.focusedElement ?: return null
+      if (focus == previousFocus) return null
+      // This rejects only the steps recorded in exactly the same place, which is the cheap half — a
+      // screen that still matches the previous focus within the tolerance is rejected by the wait's
+      // own predicate, so a move of a pixel or two does not become an early exit either.
+      return FocusWait(focus, previousFocus, requireTransition = false)
+    }
+    // The first step of a task: what came before it is the last step of the task replayed before
+    // it. With no previous task there is nothing recorded before this step at all.
+    val previousStep = previousTaskTrace()?.steps?.lastOrNull()?.decisionOutput?.step
+      ?: return FocusWait(focus, previousFocus = null, requireTransition = true)
+    // Nothing records the screens initializers pass through on their way here, and one of them
+    // holding the focus this step waits for would end the wait on a screen still on its way. The
+    // focus recorded before they ran cannot reject such a screen — it is not the screen they left
+    // — so where they run the move is watched happening whatever the recording says.
+    if (runsInitializers) return FocusWait(focus, previousFocus = null, requireTransition = true)
+    val previousFocus = previousStep.focusedElement
+    // The recording says focus was somewhere else before this step, so a screen showing it is one
+    // this step's own predicate can tell from the screen before it.
+    if (previousFocus != null && previousFocus != focus) {
+      return FocusWait(focus, previousFocus, requireTransition = false)
+    }
+    // Focus was where this step's is, or the recording could not say: the two screens are
+    // indistinguishable by focus alone, and only a previous step that left nothing in flight makes
+    // a screen already showing the recorded focus that screen rather than one on its way to it.
+    // A stored trace always ends with this action, since it is rejected on read otherwise, so this
+    // holds for every trace that came from the store. It stays a check because the interceptor
+    // waits on the trace it is handed, not on one the store has vouched for.
+    if (previousStep.agentAction?.actionName == GoalAchievedAgentAction.actionName) {
+      return FocusWait(focus, previousFocus = null, requireTransition = false)
+    }
+    // Something did run between the two recordings, and a match on the first read cannot say it has
+    // landed, so the move has to be watched happening. That costs no more than the pacing it
+    // replaces, and can still end early.
+    return FocusWait(focus, previousFocus = null, requireTransition = true)
+  }
+
+  /**
+   * [focus] is what the screen has to show. [previousFocus] is where the recording had focus before
+   * this step, which the same screen must not still be showing. [requireTransition] is set when
+   * there is no [previousFocus] to tell the two apart, and the wait has to see some other screen
+   * before it accepts a match.
+   */
+  private data class FocusWait(
+    val focus: ArbigentFocusedElement,
+    val previousFocus: ArbigentFocusedElement?,
+    val requireTransition: Boolean,
+  )
+
+  /**
+   * Polls until [isSatisfied], or until [budgetMillis] is spent — give or take the one read that
+   * may overrun it, which the loop documents where it decides whether to start another read. The screen is
+   * read once before the budget is consulted, so a step whose budget is already gone still gets the
+   * chance to find what it is waiting for on a screen that is in fact ready — and a target that
+   * never appears is left for the decision interceptor to report as a divergence, which is what it
+   * is.
+   */
+  private suspend fun awaitCondition(
     replayIndex: Int,
-    identity: ArbigentElementIdentity,
-    device: ArbigentDevice,
+    description: String,
     budgetMillis: Long,
+    isSatisfied: () -> Boolean,
   ) {
     // Everything between here and the return is charged to the budget, measured on the clock
     // rather than summed from what was asked for: reading the hierarchy is synchronous and can
@@ -107,36 +223,66 @@ internal class ArbigentReplayPacingStepInterceptor(
     // Adding up only the requested delays would let either one push the wait past the recorded
     // interval it is supposed to fit inside.
     val startedAtMillis = TimeProvider.get().currentTimeMillis()
+    fun elapsedMillis(): Long =
+      (TimeProvider.get().currentTimeMillis() - startedAtMillis).coerceAtLeast(0)
+    var isFirstRead = true
     var waitedMillis = 0L
+    var lastReadMillis = 0L
     while (true) {
-      val present = isPresent(device, identity)
-      waitedMillis = (TimeProvider.get().currentTimeMillis() - startedAtMillis).coerceAtLeast(0)
-      if (present) {
+      // Only the first read may start with the budget already gone: a step that arrives late still
+      // gets one chance to find what it is waiting for on a screen that is in fact ready. Later
+      // reads are not free, so a read that the previous one says will not fit in what is left of
+      // the budget is not started — the rest is slept out instead, which is what pacing did before.
+      // The previous read is an estimate, not a promise: a read is synchronous and cannot be cut
+      // short, so a read that turns out slower than the one before it can still carry the wait past
+      // the recorded interval, by at most that one read.
+      if (!isFirstRead) {
+        val remainingMillis = budgetMillis - waitedMillis
+        if (remainingMillis < lastReadMillis || remainingMillis <= 0) {
+          if (remainingMillis > 0) delay(remainingMillis)
+          break
+        }
+      }
+      isFirstRead = false
+      val readStartedAtMillis = elapsedMillis()
+      val satisfied = isSatisfied()
+      waitedMillis = elapsedMillis()
+      lastReadMillis = (waitedMillis - readStartedAtMillis).coerceAtLeast(0)
+      if (satisfied) {
         arbigentInfoLog(
-          "Replay wait: target ${identity.description()} found after ${waitedMillis}ms " +
+          "Replay wait: $description found after ${waitedMillis}ms " +
             "before capturing step ${replayIndex + 1}",
         )
         return
       }
       if (waitedMillis >= budgetMillis) break
       delay(POLL_INTERVAL_MILLIS.coerceAtMost(budgetMillis - waitedMillis))
+      waitedMillis = elapsedMillis()
     }
     arbigentInfoLog(
-      "Replay wait: budget ${budgetMillis}ms spent waiting for target ${identity.description()} " +
+      "Replay wait: budget ${budgetMillis}ms spent waiting for $description " +
         "before capturing step ${replayIndex + 1}; capturing anyway",
     )
   }
 
-  private fun isPresent(device: ArbigentDevice, identity: ArbigentElementIdentity): Boolean {
-    val elements = try {
+  private fun readElements(device: ArbigentDevice): ArbigentElementList? {
+    return try {
       device.elements()
     } catch (exception: Exception) {
       // Reading the hierarchy can fail while the screen is mid-transition, which is exactly the
       // state this waits out. Treat it as "not there yet".
       arbigentDebugLog("Replay wait: could not read elements: $exception")
-      return false
+      null
     }
-    return identity.findMatch(elements) != null
+  }
+
+  private fun readFocus(device: ArbigentDevice): ArbigentFocusedElement? {
+    return try {
+      device.focusedElement()
+    } catch (exception: Exception) {
+      arbigentDebugLog("Replay wait: could not read focus: $exception")
+      null
+    }
   }
 
   private suspend fun waitOutBudget(replayIndex: Int, budgetMillis: Long) {
@@ -278,42 +424,113 @@ public data class ArbigentElementIdentity(
       return identityWithoutOccurrence.copy(occurrence = occurrence)
     }
 
-    private val TEXT_ATTRIBUTE_KEYS = listOf("text", "value")
-    private val RESOURCE_ID_ATTRIBUTE_KEYS = listOf("resource-id", "resourceId", "id")
-    private val ACCESSIBILITY_ATTRIBUTE_KEYS = listOf(
-      "accessibilityText",
-      "content-desc",
-      "contentDescription",
-      "accessibility-id",
-      "label",
-      "name",
-    )
-
-    /**
-     * First non-blank value for [keys], searched over the element's own node and then its
-     * descendants, the same way the element text shown to the AI is built.
-     *
-     * Reading only the node's own attributes made this return null for the shape an Android TV
-     * card or tab actually has: the focusable container carries no text, resource-id or
-     * accessibility text at all, and the text lives in a non-clickable child TextView. No identity
-     * meant no identity was recorded, so a replayed index action was neither rebound to the
-     * element's current position nor reported as a divergence — it silently operated on whatever
-     * happened to sit at the recorded index.
-     */
-    private fun ArbigentElement.firstNonBlank(keys: List<String>): String? =
-      keys.firstNotNullOfOrNull { key ->
-        treeNode.dfs { node -> node.attributes[key].nonBlankOrNull() != null }
-          ?.attributes?.get(key).nonBlankOrNull()
-      }
-
-    private fun TreeNode.dfs(condition: (TreeNode) -> Boolean): TreeNode? {
-      if (condition(this)) return this
-      return children.firstNotNullOfOrNull { child -> child.dfs(condition) }
-    }
-
-    private fun String?.nonBlankOrNull(): String? = this?.takeIf(String::isNotBlank)
   }
 }
+
+/**
+ * Where focus sat on the screen a recorded step was decided against, so replay can wait for the
+ * app to arrive at that screen instead of sleeping out the recorded interval.
+ *
+ * Most Android TV steps are bare D-pad presses, which carry no target element, and a step with no
+ * target used to wait its whole budget every time. Focus is what those presses move, so the screen
+ * the next step needs is exactly the screen whose focus matches this.
+ *
+ * Bounds are part of the identity because a class name and a resource id do not say which item
+ * holds focus: every row of a sidebar shares one container id and only its position tells them
+ * apart. They are compared with a tolerance rather than exactly because the same screen lays out a
+ * few pixels apart between machines - 2 to 4px was measured between a local run and CI on the same
+ * build. The resource id is nullable because the focused node often has none: on the screens this
+ * was measured on, the node holding focus was a bare ViewGroup two times out of seven.
+ */
+@Serializable
+public data class ArbigentFocusedElement(
+  public val className: String,
+  public val x: Int,
+  public val y: Int,
+  public val width: Int,
+  public val height: Int,
+  public val resourceId: String? = null,
+) {
+  public fun description(): String =
+    "${resourceId ?: className} at [$x,$y,${x + width},${y + height}]"
+
+  /**
+   * Whether [current], the focus now on the device, is where this recorded it. A focus the device
+   * cannot report - nothing focused, or a focused node with no bounds - never matches, so the step
+   * falls back to waiting its budget.
+   */
+  internal fun matches(current: ArbigentFocusedElement?): Boolean {
+    if (current == null) return false
+    if (current.className != className) return false
+    if (current.resourceId != resourceId) return false
+    return kotlin.math.abs(current.x - x) <= BOUNDS_TOLERANCE &&
+      kotlin.math.abs(current.y - y) <= BOUNDS_TOLERANCE &&
+      kotlin.math.abs(current.width - width) <= BOUNDS_TOLERANCE &&
+      kotlin.math.abs(current.height - height) <= BOUNDS_TOLERANCE
+  }
+
+  public companion object {
+    /**
+     * Reads the node the device reports as focused. This has to be the node from the full view
+     * hierarchy: the focused node is regularly a container that the element list the AI is shown
+     * does not keep, which is why reading focus from that list recorded nothing at all.
+     */
+    public fun from(node: TreeNode): ArbigentFocusedElement? {
+      val bounds = node.toUiElementOrNull()?.bounds ?: return null
+      val className = node.attributes["class"]?.nonBlankOrNull() ?: return null
+      return ArbigentFocusedElement(
+        className = className,
+        x = bounds.x,
+        y = bounds.y,
+        width = bounds.width,
+        height = bounds.height,
+        resourceId = node.attributes["resource-id"]?.nonBlankOrNull(),
+      )
+    }
+
+    /**
+     * How far each edge may sit from where it was recorded. It stays far below the pitch between
+     * neighbouring focusable rows, which is what the bounds are here to tell apart, and well above
+     * the few pixels of drift that were measured between machines.
+     */
+    private const val BOUNDS_TOLERANCE = 8
+  }
+}
+
+private val TEXT_ATTRIBUTE_KEYS = listOf("text", "value")
+private val RESOURCE_ID_ATTRIBUTE_KEYS = listOf("resource-id", "resourceId", "id")
+private val ACCESSIBILITY_ATTRIBUTE_KEYS = listOf(
+  "accessibilityText",
+  "content-desc",
+  "contentDescription",
+  "accessibility-id",
+  "label",
+  "name",
+)
+
+/**
+ * First non-blank value for [keys], searched over the element's own node and then its
+ * descendants, the same way the element text shown to the AI is built.
+ *
+ * Reading only the node's own attributes made this return null for the shape an Android TV
+ * card or tab actually has: the focusable container carries no text, resource-id or
+ * accessibility text at all, and the text lives in a non-clickable child TextView. No identity
+ * meant no identity was recorded, so a replayed index action was neither rebound to the
+ * element's current position nor reported as a divergence — it silently operated on whatever
+ * happened to sit at the recorded index.
+ */
+private fun ArbigentElement.firstNonBlank(keys: List<String>): String? =
+  keys.firstNotNullOfOrNull { key ->
+    treeNode.dfs { node -> node.attributes[key].nonBlankOrNull() != null }
+      ?.attributes?.get(key).nonBlankOrNull()
+  }
+
+private fun TreeNode.dfs(condition: (TreeNode) -> Boolean): TreeNode? {
+  if (condition(this)) return this
+  return children.firstNotNullOfOrNull { child -> child.dfs(condition) }
+}
+
+private fun String?.nonBlankOrNull(): String? = this?.takeIf(String::isNotBlank)
 
 internal fun ArbigentAgentAction.withTargetIdentity(
   elements: ArbigentElementList,
@@ -443,23 +660,24 @@ internal data class ArbigentReplayTrace(
     ): ArbigentReplayTrace {
       val prefix = precedingSteps.replayable()
       val steps = prefix + contextHolder.steps().replayable()
-      // Replayed steps carry the time the replay reached them, which is faster than the AI was. Writing
+      // Replayed steps carry what this run observed rather than what was recorded. The time is the
+      // one the replay reached them at, which is faster than the AI was. Writing
       // that back would make the next replay's budget the pace of this one instead of the AI's, and
       // every clean replay would tighten it further. The recorded intervals are kept instead, anchored
       // on the last replayed step so the gap to the replacement agent's first AI decision stays the
       // real one; anchoring on the first could leave that gap non-positive.
-      val recordedTimestamps = recordedTrace?.steps?.map { it.decisionOutput.step.timestamp }.orEmpty()
+      val recordedSteps = recordedTrace?.steps?.map { it.decisionOutput.step }.orEmpty()
       val replayedCount = if (recordedTrace == null) 0 else {
         prefix.size + steps.drop(prefix.size).takeWhile { it.stepSource == ArbigentStepSource.Replay }.size
       }
       require(steps.take(replayedCount).all { it.stepSource == ArbigentStepSource.Replay }) {
         "Every step in the replayed prefix must come from replay"
       }
-      require(replayedCount <= recordedTimestamps.size) {
+      require(replayedCount <= recordedSteps.size) {
         "The replayed prefix cannot be longer than its recorded trace"
       }
       val shift = if (replayedCount == 0) 0L else {
-        steps[replayedCount - 1].timestamp - recordedTimestamps[replayedCount - 1]
+        steps[replayedCount - 1].timestamp - recordedSteps[replayedCount - 1].timestamp
       }
       return ArbigentReplayTrace(
         version = key.version,
@@ -472,7 +690,14 @@ internal data class ArbigentReplayTrace(
             decisionOutput = ArbigentAi.DecisionOutput(
               agentActions = listOf(requireNotNull(step.agentAction)),
               step = if (index < replayedCount) {
-                step.copy(timestamp = recordedTimestamps[index] + shift)
+                step.copy(
+                  timestamp = recordedSteps[index].timestamp + shift,
+                  // The focus this run happened to read, likewise. A step that spent its whole
+                  // budget without reaching its recorded focus read the screen it was still on,
+                  // and writing that back would leave the next replay waiting for the screen
+                  // before the action instead of the one after it, which is always already there.
+                  focusedElement = recordedSteps[index].focusedElement,
+                )
               } else {
                 step
               },

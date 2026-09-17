@@ -39,6 +39,11 @@ public class ArbigentAgent internal constructor(
   // degrade to normal execution, and the failed attempt would then purge the AI-decision cache as
   // if it were an ordinary failure. Null means normal AI-driven execution.
   private val replayTrace: ArbigentReplayTrace?,
+  // The trace of the task replayed just before this one, so this task's first step can tell where
+  // the recording had focus before it. Answers null for the first task of a scenario, and for a
+  // previous task that fell back: the recorded focus is used to rule out the screen that task left
+  // behind, and once it stopped following its recording that screen is not the one described.
+  private val previousTaskReplayTrace: () -> ArbigentReplayTrace? = { null },
   // False for the agent that replaces a task which fell back from replay: that task's initializers
   // already ran for the replay attempt, and running them again would undo the device state the
   // replayed actions produced, which is exactly what the replacement carries on from.
@@ -95,7 +100,13 @@ public class ArbigentAgent internal constructor(
 
   private val stepInterceptors: List<ArbigentStepInterceptor> = buildList {
     if (replayTrace != null) {
-      add(ArbigentReplayPacingStepInterceptor(replayTrace))
+      add(
+        ArbigentReplayPacingStepInterceptor(
+          trace = replayTrace,
+          previousTaskTrace = previousTaskReplayTrace,
+          runsInitializers = runInitializers && initializerInterceptors.isNotEmpty(),
+        ),
+      )
     }
     addAll(interceptors.filterIsInstance<ArbigentStepInterceptor>())
   }
@@ -1417,12 +1428,24 @@ private suspend fun step(
     aiOptions = stepInput.aiOptions,
     mcpTools = tools
   )
+  // Read before the decision, not after it: the AI call takes tens of seconds with reasoning on,
+  // and by the time it returns a carousel or an auto-hiding overlay has moved focus off the screen
+  // the decision was made against.
+  val focusedElementAtDecision = try {
+    device.focusedElement()
+  } catch (exception: Exception) {
+    arbigentDebugLog("Could not read the focused element: $exception")
+    null
+  }
   val decisionOutput = try {
     val output = decisionChain(decisionInput)
     val action = output.step.agentAction ?: output.agentActions.singleOrNull()
     output.copy(
       step = output.step.copy(
         targetElement = action?.withTargetIdentity(elements),
+        // The screen this decision was made against, not the one the action leads to: replay
+        // waits for this before it captures the step, the same way it waits for the target.
+        focusedElement = focusedElementAtDecision,
       ),
     )
   } catch (exception: ReplayDivergenceException) {

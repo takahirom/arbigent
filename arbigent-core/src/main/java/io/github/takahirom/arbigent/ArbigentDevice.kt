@@ -56,6 +56,13 @@ public interface ArbigentDevice {
   public fun executeActions(actions: List<MaestroCommand>)
   public fun viewTreeString(): ArbigentUiTreeStrings
   public fun focusedTreeString(): String
+
+  /**
+   * The node the device reports as focused, or null when the device cannot say. Replay waits for
+   * this to reach where a recorded step had it; a device that does not report focus simply paces
+   * that step the way it always has, which is why this has a default rather than being required.
+   */
+  public fun focusedElement(): ArbigentFocusedElement? = null
   public fun close()
   public fun isClosed(): Boolean
   public fun elements(): ArbigentElementList
@@ -323,6 +330,13 @@ public class MaestroDevice(
     ensureConnected()
     return findCurrentFocus()
       ?.optimizedToString(0, enableDepth = false) ?: ""
+  }
+
+  // Read from the full hierarchy, not from elements(): the node holding focus is regularly a
+  // container that the optimized element list drops or replaces with a child.
+  override fun focusedElement(): ArbigentFocusedElement? {
+    ensureConnected()
+    return findCurrentFocus()?.let(ArbigentFocusedElement::from)
   }
 
   public data class OptimizationResult(
