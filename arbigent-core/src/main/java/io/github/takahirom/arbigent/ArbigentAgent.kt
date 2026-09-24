@@ -1258,7 +1258,7 @@ private suspend fun executeDefault(
     if (input.runInitializers) {
       try {
         ArbigentGlobalStatus.onInitializing {
-          input.initializerChain(input.device)
+          arbigentTimed("agent.initializers") { input.initializerChain(input.device) }
         }
       } catch (e: MaestroException.AssertionFailure) {
         arbigentInfoLog { "Initialization failed: ${e.stackTraceToString()}" }
@@ -1295,7 +1295,7 @@ private suspend fun executeDefault(
         mcpClient = input.mcpClient,
         mcpOptions = input.mcpOptions
       )
-      when (input.stepChain(stepInput)) {
+      when (arbigentTimed("agent.step") { input.stepChain(stepInput) }) {
         StepResult.GoalAchieved -> break
         StepResult.Failed -> return ExecutionResult.Failed(contextHolder)
         StepResult.Continue -> {}
@@ -1342,9 +1342,9 @@ private suspend fun step(
   val executeActionChain = stepInput.executeActionChain
 
   val stepId = contextHolder.generateStepId()
-  val elements = device.elements()
-  takeScreenshot(device, stepId)
-  val uiTreeStrings = device.viewTreeString()
+  val elements = arbigentTimed("step.elements") { device.elements() }
+  arbigentTimed("step.screenshot") { takeScreenshot(device, stepId) }
+  val uiTreeStrings = arbigentTimed("step.viewTreeString") { device.viewTreeString() }
   val uiTreeHash = uiTreeStrings.optimizedTreeString.hashCode().toString().replace("-", "")
   val contextHash = contextHolder.context(aiOptions).hashCode().toString().replace("-", "")
   val cacheKey = "v${BuildConfig.VERSION_NAME}-uitree-${uiTreeHash}-context-${contextHash}"
@@ -1364,7 +1364,7 @@ private suspend fun step(
     return StepResult.Failed
   }
   val imageFormat = stepInput.aiOptions?.imageFormat ?: ImageFormat.PNG
-  val screenshotFilePath = convertScreenshot(originalScreenshotFilePath, stepId, imageFormat)
+  val screenshotFilePath = arbigentTimed("step.convertScreenshot") { convertScreenshot(originalScreenshotFilePath, stepId, imageFormat) }
   val requestUuid = java.util.UUID.randomUUID().toString()
   val decisionJsonlFilePath = ArbigentFiles.jsonlsDir.absolutePath + File.separator + "$requestUuid.jsonl"
   val lastStepOrNull = contextHolder.steps().lastOrNull()
@@ -1372,7 +1372,7 @@ private suspend fun step(
   val newScreenshot = File(screenshotFilePath)
   if (lastStepOrNull?.agentAction !is ExecuteMcpToolAgentAction
     && lastStepOrNull?.feedback == null
-    && detectStuckScreen(lastScreenshot, newScreenshot)
+    && arbigentTimed("step.detectStuckScreen") { detectStuckScreen(lastScreenshot, newScreenshot) }
   ) {
     arbigentDebugLog("Stuck screen detected.")
     contextHolder.addStep(
@@ -1432,13 +1432,13 @@ private suspend fun step(
   // and by the time it returns a carousel or an auto-hiding overlay has moved focus off the screen
   // the decision was made against.
   val focusedElementAtDecision = try {
-    device.focusedElement()
+    arbigentTimed("step.focusedElement") { device.focusedElement() }
   } catch (exception: Exception) {
     arbigentDebugLog("Could not read the focused element: $exception")
     null
   }
   val decisionOutput = try {
-    val output = decisionChain(decisionInput)
+    val output = arbigentTimed("step.decision") { decisionChain(decisionInput) }
     val action = output.step.agentAction ?: output.agentActions.singleOrNull()
     output.copy(
       step = output.step.copy(
@@ -1462,7 +1462,7 @@ private suspend fun step(
     return StepResult.Failed
   }
   if (decisionOutput.agentActions.any { it is GoalAchievedAgentAction }) {
-    val imageAssertionOutput = imageAssertionChain(
+    val imageAssertionOutput = arbigentTimed("step.imageAssertion") { imageAssertionChain(
       ArbigentAi.ImageAssertionInput(
         ai = ai,
         arbigentContextHolder = contextHolder,
@@ -1475,7 +1475,7 @@ private suspend fun step(
         // Added by interceptors
         assertions = ArbigentImageAssertions()
       )
-    )
+    ) }
     imageAssertionOutput.results.forEach {
       contextHolder.addStep(
         ArbigentContextHolder.Step(
@@ -1527,7 +1527,7 @@ private suspend fun step(
   if (contextHolder.steps().last().agentAction is FailedAgentAction) {
     return StepResult.Failed
   }
-  executeActionChain(
+  arbigentTimed("step.executeAction") { executeActionChain(
     ExecuteActionsInput(
       stepId = stepId,
       decisionOutput = decisionOutput,
@@ -1538,6 +1538,6 @@ private suspend fun step(
       cacheKey = cacheKey,
       mcpClient = stepInput.mcpClient,
     )
-  )
+  ) }
   return StepResult.Continue
 }

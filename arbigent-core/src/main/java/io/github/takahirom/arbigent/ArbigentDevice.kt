@@ -252,7 +252,7 @@ public class MaestroDevice(
   private fun ensureConnected() {
     // Try a simple operation to check connection
     try {
-      runBlocking { maestro.viewHierarchy() }
+      arbigentTimed("device.ensureConnected") { runBlocking { maestro.viewHierarchy() } }
     } catch (e: Exception) {
       // Device appears disconnected, reconnect
       arbigentInfoLog("MaestroDevice failed to fetch view hierarchy: ${e.message}. Reconnect device ${maestro.deviceName}")
@@ -273,9 +273,11 @@ public class MaestroDevice(
       runBlocking {
         if (screenshot != null) {
           val file = resolveScreenshotFile(screenshotsDir, screenshot.path)
-          maestro.takeScreenshot(file.sink(), false)
+          arbigentTimed("device.screenshot") { maestro.takeScreenshot(file.sink(), false) }
         } else {
-          orchestra.runFlow(actions)
+          arbigentTimed("device.runFlow ${actions.joinToString { it.description() }}") {
+            orchestra.runFlow(actions)
+          }
         }
       }
     }
@@ -283,14 +285,14 @@ public class MaestroDevice(
 
   public override fun waitForAppToSettle(appId: String?) {
     ensureConnected()
-    runBlocking { maestro.waitForAppToSettle(appId = appId) }
+    arbigentTimed("device.waitForAppToSettle") { runBlocking { maestro.waitForAppToSettle(appId = appId) } }
   }
 
   override fun elements(): ArbigentElementList {
     ensureConnected()
     for (it in 0..2) {
       try {
-        val viewHierarchy = runBlocking { maestro.viewHierarchy(false) }
+        val viewHierarchy = arbigentTimed("device.elements.viewHierarchy") { runBlocking { maestro.viewHierarchy(false) } }
         val deviceInfo = maestro.cachedDeviceInfo
         val elementList = ArbigentElementList.from(viewHierarchy, deviceInfo)
         return elementList
@@ -307,7 +309,7 @@ public class MaestroDevice(
     ensureConnected()
     for (it in 0..2) {
       try {
-        val viewHierarchy = runBlocking { maestro.viewHierarchy(false) }
+        val viewHierarchy = arbigentTimed("device.viewTreeString.viewHierarchy") { runBlocking { maestro.viewHierarchy(false) } }
         return ArbigentUiTreeStrings(
           allTreeString = viewHierarchy.toString(),
           optimizedTreeString = viewHierarchy.toOptimizedString(

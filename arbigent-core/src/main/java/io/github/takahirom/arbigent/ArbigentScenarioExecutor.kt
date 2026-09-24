@@ -229,6 +229,10 @@ public class ArbigentScenarioExecutor internal constructor(
   }
 
   public suspend fun execute(scenario: ArbigentScenario, mcpClient: MCPClient) {
+    arbigentTimed("scenario ${scenario.id}") { executeScenario(scenario, mcpClient) }
+  }
+
+  private suspend fun executeScenario(scenario: ArbigentScenario, mcpClient: MCPClient) {
     arbigentDebugLog("Arbigent.execute start")
     rejectUnresolvedVariables(scenario)?.let { throw it }
 
