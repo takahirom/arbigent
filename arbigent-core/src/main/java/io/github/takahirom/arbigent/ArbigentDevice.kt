@@ -473,15 +473,15 @@ public class MaestroDevice(
   ) {
     ensureConnected()
     moveFocusToElement(
-      fetchTarget = { fetchTargetBounds(selector) }
+      fetchTarget = { viewHierarchy -> fetchTargetBounds(selector, viewHierarchy) }
     )
   }
 
   override fun moveFocusToElement(element: ArbigentElement) {
     ensureConnected()
     moveFocusToElement(
-      fetchTarget = {
-        val newElement = runBlocking { maestro.viewHierarchy() }.refreshedElement(element.identifierData)
+      fetchTarget = { viewHierarchy ->
+        val newElement = viewHierarchy.refreshedElement(element.identifierData)
         val bounds = newElement?.toUiElement()?.bounds
         if (bounds == null) {
           arbigentInfoLog("Element(${element.treeNode.getIdentifierDataForFocus()}) not found in current ViewHierarchy.")
@@ -518,14 +518,16 @@ public class MaestroDevice(
   }
 
   private fun moveFocusToElement(
-    fetchTarget: () -> Bounds?
+    fetchTarget: (ViewHierarchy) -> Bounds?
   ) {
     var remainCount = 15
     while (remainCount-- > 0) {
-      val currentFocus = findCurrentFocus()
+      // The focus and the target come from one fetch, so a scroll in between cannot put them on different frames.
+      val viewHierarchy = arbigentTimed("focus.viewHierarchy") { fetchViewHierarchy() }
+      val currentFocus = findCurrentFocus(viewHierarchy)
         ?: throw IllegalStateException("No focused node")
-      val targetBounds =
-        fetchTarget() ?: throw IllegalStateException("Attempted to move to element but missed the target bounds")
+      val targetBounds = fetchTarget(viewHierarchy)
+        ?: throw IllegalStateException("Attempted to move to element but missed the target bounds")
       val currentBounds = currentFocus.toUiElement().bounds
 
       // Helper functions to calculate the center X and Y of a Bounds object.
@@ -642,78 +644,29 @@ public class MaestroDevice(
       val direction = directionCandidates.random()
       arbigentDebugLog("directionCandidates: $directionCandidates \ndirection: $direction")
       runBlocking {
-        maestro.pressKey(direction)
-        maestro.waitForAnimationToEnd("100")
+        // Same calls as maestro.pressKey(direction), split so the key press and the settle are timed apart.
+        arbigentTimed("focus.pressKey") { maestro.pressKey(direction, waitForAppToSettle = false) }
+        arbigentTimed("focus.waitForAppToSettle") { maestro.waitForAppToSettle() }
+        arbigentTimed("focus.waitForAnimationToEnd") { maestro.waitForAnimationToEnd("100") }
       }
     }
   }
 
-  private fun fetchTargetBounds(selector: ArbigentTvCompatDevice.Selector): Bounds {
-    return when (selector) {
-      is ArbigentTvCompatDevice.Selector.ById -> {
-        try {
-          val element: FindElementResult = runBlocking { maestro.findElementWithTimeout(
-            timeoutMs = 100,
-            filter = Filters.compose(
-              Filters.idMatches(selector.id.toRegex()),
-              Filters.index(selector.index)
-            ),
-          ) } ?: throw MaestroException.ElementNotFound(
-            "Element not found",
-            runBlocking { maestro.viewHierarchy() }.root,
-            "Element not found",
-          )
-          val uiElement: UiElement = element.element
-          uiElement
-        } catch (e: MaestroException.ElementNotFound) {
-          val element: FindElementResult = runBlocking { maestro.findElementWithTimeout(
-            timeoutMs = 100,
-            filter = Filters.compose(
-              Filters.idMatches((".*" + selector.id + ".*").toRegex()),
-              Filters.index(selector.index)
-            )
-          ) } ?: throw MaestroException.ElementNotFound(
-            "Element not found",
-            runBlocking { maestro.viewHierarchy() }.root,
-            "Element not found",
-          )
-          val uiElement: UiElement = element.element
-          uiElement
-        }
+  private fun fetchTargetBounds(selector: ArbigentTvCompatDevice.Selector, viewHierarchy: ViewHierarchy): Bounds {
+    // An exact match first, then a partial one.
+    val patterns = when (selector) {
+      is ArbigentTvCompatDevice.Selector.ById -> listOf(selector.id, ".*" + selector.id + ".*").map { pattern ->
+        Filters.compose(Filters.idMatches(pattern.toRegex()), Filters.index(selector.index))
       }
 
-      is ArbigentTvCompatDevice.Selector.ByText -> {
-        try {
-          val element: FindElementResult = runBlocking { maestro.findElementWithTimeout(
-            timeoutMs = 100,
-            filter = Filters.compose(
-              Filters.textMatches(selector.text.toRegex()),
-              Filters.index(selector.index)
-            ),
-          ) } ?: throw MaestroException.ElementNotFound(
-            "Element not found",
-            runBlocking { maestro.viewHierarchy() }.root,
-            "Element not found",
-          )
-          val uiElement: UiElement = element.element
-          uiElement
-        } catch (e: MaestroException.ElementNotFound) {
-          val element: FindElementResult = runBlocking { maestro.findElementWithTimeout(
-            timeoutMs = 100,
-            filter = Filters.compose(
-              Filters.textMatches((".*" + selector.text + ".*").toRegex()),
-              Filters.index(selector.index)
-            )
-          ) } ?: throw MaestroException.ElementNotFound(
-            "Element not found",
-            runBlocking { maestro.viewHierarchy() }.root,
-            "Element not found",
-          )
-          val uiElement: UiElement = element.element
-          uiElement
-        }
+      is ArbigentTvCompatDevice.Selector.ByText -> listOf(selector.text, ".*" + selector.text + ".*").map { pattern ->
+        Filters.compose(Filters.textMatches(pattern.toRegex()), Filters.index(selector.index))
       }
-    }.bounds
+    }
+    val nodes = viewHierarchy.aggregate()
+    val element = patterns.firstNotNullOfOrNull { filter -> filter(nodes).firstOrNull()?.toUiElementOrNull() }
+      ?: throw MaestroException.ElementNotFound("Element not found", viewHierarchy.root, "Element not found")
+    return element.bounds
   }
 
   private fun findCurrentFocus(viewHierarchy: ViewHierarchy = fetchViewHierarchy()): TreeNode? {
