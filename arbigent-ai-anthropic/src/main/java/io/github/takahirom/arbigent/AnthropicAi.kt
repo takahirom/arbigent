@@ -2,6 +2,7 @@ package io.github.takahirom.arbigent
 
 import com.moczul.ok2curl.CurlCommandGenerator
 import io.github.takahirom.arbigent.ConfidentialInfo.removeConfidentialInfo
+import io.github.takahirom.arbigent.ConfidentialInfo.removeConfidentialInfoFromApiError
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import io.github.takahirom.arbigent.serialization.GenerateJsonSchemaApiType
 import io.github.takahirom.arbigent.serialization.generateRootJsonSchema
@@ -34,7 +35,9 @@ import java.util.Deque
 import java.util.UUID
 import java.util.concurrent.ConcurrentLinkedDeque
 
-public class AnthropicAiRateLimitExceededException : Exception("Rate limit exceeded")
+/** HTTP 429. [detail] is the provider's error message, since a 429 is not always transient. */
+public class AnthropicAiRateLimitExceededException(detail: String? = null) :
+  Exception(if (detail.isNullOrBlank()) "Rate limit exceeded" else "Rate limit exceeded: $detail")
 
 private const val ANTHROPIC_RATE_LIMIT_INITIAL_DELAY_MS: Long = 10_000L
 
@@ -57,7 +60,7 @@ internal fun <T> retryOnAnthropicRateLimit(
         throw e
       }
       val waitMs = ANTHROPIC_RATE_LIMIT_INITIAL_DELAY_MS * (1L shl retryCount)
-      arbigentInfoLog("Rate limit exceeded. Waiting for ${waitMs / 1000} seconds.")
+      arbigentInfoLog("${e.message}. Waiting for ${waitMs / 1000} seconds.")
       waitForRetry(waitMs)
       retryCount++
     }
@@ -651,7 +654,7 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
   }
 
   @OptIn(ArbigentInternalApi::class)
-  private fun createMessage(
+  internal fun createMessage(
     requestUuid: String,
     request: AnthropicMessagesRequest,
     aiOptions: ArbigentAiOptions? = null
@@ -668,9 +671,7 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
           setBody(buildRequestBody(requestWithTemp, aiOptions?.extraBody))
         }
       val responseBody = response.bodyAsText()
-      if (response.status == HttpStatusCode.TooManyRequests) {
-        throw AnthropicAiRateLimitExceededException()
-      } else if (400 <= response.status.value) {
+      if (400 <= response.status.value) {
         val apiErrorMessage = try {
           Json { ignoreUnknownKeys = true }
             .decodeFromString<AnthropicErrorResponse>(responseBody).error?.message
@@ -679,7 +680,10 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
           null
         }
         // The raw body reaches step feedback/reports, so redact and cap it first.
-        val errorDetail = (apiErrorMessage ?: responseBody).removeConfidentialInfo().take(1_000)
+        val errorDetail = (apiErrorMessage ?: responseBody).removeConfidentialInfoFromApiError().take(1_000)
+        if (response.status == HttpStatusCode.TooManyRequests) {
+          throw AnthropicAiRateLimitExceededException(errorDetail)
+        }
         throw IllegalStateException(
           "Failed to call API: ${response.status} $errorDetail"
         )

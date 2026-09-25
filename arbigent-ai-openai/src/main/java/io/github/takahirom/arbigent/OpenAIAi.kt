@@ -8,6 +8,7 @@ import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.OpenAiAiAssertionModel
 import com.moczul.ok2curl.CurlCommandGenerator
 import io.github.takahirom.arbigent.ConfidentialInfo.removeConfidentialInfo
+import io.github.takahirom.arbigent.ConfidentialInfo.removeConfidentialInfoFromApiError
 import io.github.takahirom.arbigent.result.ArbigentScenarioDeviceFormFactor
 import io.github.takahirom.arbigent.serialization.GenerateJsonSchemaApiType
 import io.github.takahirom.arbigent.serialization.generateRootJsonSchema
@@ -39,7 +40,12 @@ import java.nio.charset.Charset
 import java.util.Deque
 import java.util.concurrent.ConcurrentLinkedDeque
 
-public class ArbigentAiRateLimitExceededException : Exception("Rate limit exceeded")
+/**
+ * HTTP 429. [detail] is the provider's response body: OpenAI also uses 429 for non-transient
+ * errors such as `insufficient_quota`, and OpenAI-compatible providers word it differently.
+ */
+public class ArbigentAiRateLimitExceededException(detail: String? = null) :
+  Exception(if (detail.isNullOrBlank()) "Rate limit exceeded" else "Rate limit exceeded: $detail")
 
 private enum class ArbigentAiAnswerItems(
   val key: String,
@@ -291,7 +297,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
       )
     } catch (e: ArbigentAiRateLimitExceededException) {
       val waitMs = 10000L * (1 shl retried)
-      arbigentInfoLog("Rate limit exceeded. Waiting for ${waitMs / 1000} seconds.")
+      arbigentInfoLog("${e.message}. Waiting for ${waitMs / 1000} seconds.")
       ArbigentGlobalStatus.onAiRateLimitWait(waitSec = waitMs / 1000) {
         Thread.sleep(waitMs)
       }
@@ -585,7 +591,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
 
 
   @OptIn(ArbigentInternalApi::class)
-  private fun chatCompletion(
+  internal fun chatCompletion(
     requestUuid: String,
     chatCompletionRequest: ChatCompletionRequest,
     aiOptions: ArbigentAiOptions? = null
@@ -611,16 +617,15 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
             }
           )
         }
-      if (response.status == HttpStatusCode.TooManyRequests) {
-        throw ArbigentAiRateLimitExceededException()
-      } else if (400 <= response.status.value) {
-        throw IllegalStateException(
-          "Failed to call API: ${response.status} ${
-            response.bodyAsText(
-              Charset.defaultCharset()
-            )
-          }"
-        )
+      if (400 <= response.status.value) {
+        // The body reaches step feedback/reports, so redact and cap it first.
+        val errorDetail = response.bodyAsText(Charset.defaultCharset())
+          .removeConfidentialInfoFromApiError()
+          .take(1_000)
+        if (response.status == HttpStatusCode.TooManyRequests) {
+          throw ArbigentAiRateLimitExceededException(errorDetail)
+        }
+        throw IllegalStateException("Failed to call API: ${response.status} $errorDetail")
       }
       val responseBody = response.bodyAsText()
       return@runBlocking if (useResponsesApi) {
@@ -1117,7 +1122,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
     } catch (e: ArbigentAiRateLimitExceededException) {
       // Handle rate limit exceeded
       val waitMs = 10000L
-      arbigentInfoLog("Rate limit exceeded. Waiting for ${waitMs / 1000} seconds.")
+      arbigentInfoLog("${e.message}. Waiting for ${waitMs / 1000} seconds.")
       ArbigentGlobalStatus.onAiRateLimitWait(waitSec = waitMs / 1000) {
         Thread.sleep(waitMs)
       }
