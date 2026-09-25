@@ -226,12 +226,14 @@ class ArbigentRunCommand(
       return
     }
 
-    device = deviceConnector.connect(
-      os = os,
-      requestedDevice = requestedDevice,
-      iosAppleTeamId = iosAppleTeamId,
-      iosRealDevicePort = parseIosRealDevicePort(iosRealDevicePort),
-    )
+    device = arbigentTimed("cli.connect") {
+      deviceConnector.connect(
+        os = os,
+        requestedDevice = requestedDevice,
+        iosAppleTeamId = iosAppleTeamId,
+        iosRealDevicePort = parseIosRealDevicePort(iosRealDevicePort),
+      )
+    }
     Runtime.getRuntime().addShutdownHook(object : Thread() {
       override fun run() {
         arbigentProject.cancel()
