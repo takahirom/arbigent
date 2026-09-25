@@ -71,6 +71,22 @@ public interface ArbigentDevice {
   public fun os(): ArbigentDeviceOs
 }
 
+/**
+ * A device that can read everything a step looks at from a single UI hierarchy fetch. Separate
+ * from [ArbigentDevice] rather than a default method there, so devices that delegate to another
+ * device (`by`) keep going through their own [ArbigentDevice.elements] and friends.
+ */
+public interface ArbigentScreenReader {
+  public fun readScreen(includeFocusedTree: Boolean): ArbigentScreen
+}
+
+public data class ArbigentScreen(
+  val elements: ArbigentElementList,
+  val uiTreeStrings: ArbigentUiTreeStrings,
+  val focusedTreeString: String?,
+  val focusedElement: ArbigentFocusedElement?,
+)
+
 public data class ArbigentElement(
   val index: Int,
   val textForAI: String,
@@ -214,7 +230,7 @@ public class MaestroDevice(
   // Extra teardown tied to this connection (e.g. the iproxy port forwarder for a physical
   // iPhone), run after maestro.close() so session-scoped child processes stop with the device.
   onClose: (() -> Unit)? = null,
-) : ArbigentDevice, ArbigentTvCompatDevice {
+) : ArbigentDevice, ArbigentTvCompatDevice, ArbigentScreenReader {
   // maestro, its Orchestra and the connection-scoped teardown are swapped together as one
   // Connection, so a reconnect can never pair the new maestro with the old cleanup (which would
   // leak the replacement device's iproxy) or keep invoking the stale one on close().
@@ -314,54 +330,85 @@ public class MaestroDevice(
     arbigentTimed("device.waitForAppToSettle") { runBlocking { maestro.waitForAppToSettle(appId = appId) } }
   }
 
-  override fun elements(): ArbigentElementList {
-    for (it in 0..2) {
-      try {
-        val viewHierarchy = arbigentTimed("device.elements.viewHierarchy") { fetchViewHierarchy() }
-        val deviceInfo = maestro.cachedDeviceInfo
-        val elementList = ArbigentElementList.from(viewHierarchy, deviceInfo)
-        return elementList
-      } catch (e: ArbigentElementList.NodeInBoundsNotFoundException) {
-        arbigentDebugLog("NodeInBoundsNotFoundException. Retry $it")
-        Thread.sleep(1000)
-      }
+  override fun elements(): ArbigentElementList =
+    deriveWithRetry("device.elements.viewHierarchy", derive = ::elementsFrom) {
+      ArbigentElementList(emptyList(), maestro.cachedDeviceInfo.widthPixels)
     }
-    return ArbigentElementList(emptyList(), maestro.cachedDeviceInfo.widthPixels)
-  }
 
-
-  override fun viewTreeString(): ArbigentUiTreeStrings {
-    for (it in 0..2) {
-      try {
-        val viewHierarchy = arbigentTimed("device.viewTreeString.viewHierarchy") { fetchViewHierarchy() }
-        return ArbigentUiTreeStrings(
-          allTreeString = viewHierarchy.toString(),
-          optimizedTreeString = viewHierarchy.toOptimizedString(
-            deviceInfo = maestro.cachedDeviceInfo
-          ),
-          aiHints = viewHierarchy.root.findAllAiHints()
-        )
-      } catch (e: ArbigentElementList.NodeInBoundsNotFoundException) {
-        arbigentDebugLog("NodeInBoundsNotFoundException. Retry $it")
-        Thread.sleep(1000)
-      }
+  override fun viewTreeString(): ArbigentUiTreeStrings =
+    deriveWithRetry("device.viewTreeString.viewHierarchy", derive = ::uiTreeStringsFrom) {
+      ArbigentUiTreeStrings(allTreeString = "", optimizedTreeString = "")
     }
-    return ArbigentUiTreeStrings(
-      allTreeString = "",
-      optimizedTreeString = ""
-    )
-  }
 
-  override fun focusedTreeString(): String {
-    return findCurrentFocus()
-      ?.optimizedToString(0, enableDepth = false) ?: ""
-  }
+  override fun focusedTreeString(): String = focusedTreeStringFrom(fetchViewHierarchy())
 
   // Read from the full hierarchy, not from elements(): the node holding focus is regularly a
   // container that the optimized element list drops or replaces with a child.
-  override fun focusedElement(): ArbigentFocusedElement? {
-    return findCurrentFocus()?.let(ArbigentFocusedElement::from)
+  override fun focusedElement(): ArbigentFocusedElement? =
+    findCurrentFocus(fetchViewHierarchy())?.let(ArbigentFocusedElement::from)
+
+  // Every hierarchy fetch waits for the device to go idle, so reading the step's elements, tree
+  // strings and focus from one fetch saves the others; it also means they all describe the same frame.
+  // A frame that cannot be derived is dropped as a whole, so the parts never mix two frames.
+  override fun readScreen(includeFocusedTree: Boolean): ArbigentScreen {
+    fun screenFrom(viewHierarchy: ViewHierarchy): ArbigentScreen {
+      val focusedNode = findCurrentFocus(viewHierarchy)
+      return ArbigentScreen(
+        elements = elementsFrom(viewHierarchy),
+        uiTreeStrings = uiTreeStringsFrom(viewHierarchy),
+        focusedTreeString = if (includeFocusedTree) focusedNode.focusedTreeString() else null,
+        focusedElement = focusedNode?.let(ArbigentFocusedElement::from),
+      )
+    }
+    return deriveWithRetry("device.readScreen.viewHierarchy", derive = ::screenFrom) { lastHierarchy ->
+      // Focus does not need the node bounds that failed, so keep reporting it as the separate reads did.
+      val focusedNode = findCurrentFocus(lastHierarchy)
+      ArbigentScreen(
+        elements = ArbigentElementList(emptyList(), maestro.cachedDeviceInfo.widthPixels),
+        uiTreeStrings = ArbigentUiTreeStrings(allTreeString = "", optimizedTreeString = ""),
+        focusedTreeString = if (includeFocusedTree) focusedNode.focusedTreeString() else null,
+        focusedElement = focusedNode?.let(ArbigentFocusedElement::from),
+      )
+    }
   }
+
+  // Deriving can hit a node whose bounds are not laid out yet; fetch a fresh hierarchy and retry.
+  private fun <T> deriveWithRetry(
+    label: String,
+    derive: (ViewHierarchy) -> T,
+    fallback: (lastHierarchy: ViewHierarchy) -> T,
+  ): T {
+    var attempt = 0
+    while (true) {
+      val viewHierarchy = arbigentTimed(label) { fetchViewHierarchy() }
+      try {
+        return derive(viewHierarchy)
+      } catch (e: ArbigentElementList.NodeInBoundsNotFoundException) {
+        if (attempt == 2) return fallback(viewHierarchy)
+        arbigentDebugLog("NodeInBoundsNotFoundException. Retry $attempt")
+        attempt++
+        Thread.sleep(1000)
+      }
+    }
+  }
+
+  private fun elementsFrom(viewHierarchy: ViewHierarchy): ArbigentElementList =
+    ArbigentElementList.from(viewHierarchy, maestro.cachedDeviceInfo)
+
+  private fun uiTreeStringsFrom(viewHierarchy: ViewHierarchy): ArbigentUiTreeStrings =
+    ArbigentUiTreeStrings(
+      allTreeString = viewHierarchy.toString(),
+      optimizedTreeString = viewHierarchy.toOptimizedString(
+        deviceInfo = maestro.cachedDeviceInfo
+      ),
+      aiHints = viewHierarchy.root.findAllAiHints()
+    )
+
+  private fun focusedTreeStringFrom(viewHierarchy: ViewHierarchy): String =
+    findCurrentFocus(viewHierarchy).focusedTreeString()
+
+  private fun TreeNode?.focusedTreeString(): String =
+    this?.optimizedToString(0, enableDepth = false) ?: ""
 
   public data class OptimizationResult(
     val node: TreeNode?,
@@ -669,8 +716,7 @@ public class MaestroDevice(
     }.bounds
   }
 
-  private fun findCurrentFocus(): TreeNode? {
-    val viewHierarchy = fetchViewHierarchy()
+  private fun findCurrentFocus(viewHierarchy: ViewHierarchy = fetchViewHierarchy()): TreeNode? {
     return dfs(viewHierarchy.root) {
       // If keyboard is focused, return the focused node with keyboard
       it.attributes["resource-id"]?.startsWith("com.google.android.inputmethod.latin:id/") == true && it.focused == true
