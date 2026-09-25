@@ -62,6 +62,20 @@ class MaestroDeviceReadTest {
   }
 
   @Test
+  fun readScreenFetchesTheHierarchyOnce() {
+    val fake = FakeDriver()
+    val device = device(fake)
+
+    val screen = device.readScreen(includeFocusedTree = true)
+
+    assertEquals(1, fake.contentDescriptorCalls)
+    assertEquals(device.elements(), screen.elements)
+    assertEquals(device.viewTreeString(), screen.uiTreeStrings)
+    assertEquals(device.focusedTreeString(), screen.focusedTreeString)
+    assertEquals(device.focusedElement(), screen.focusedElement)
+  }
+
+  @Test
   fun aScreenshotThatCannotBeWrittenDoesNotReconnect() {
     val notADirectory = File.createTempFile("screenshots", "")
     val device = device(FakeDriver(), screenshotsDir = notADirectory)

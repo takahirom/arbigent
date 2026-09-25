@@ -1321,6 +1321,23 @@ private suspend fun executeDefault(
   }
 }
 
+private fun readScreen(device: ArbigentDevice, formFactor: ArbigentScenarioDeviceFormFactor): ArbigentScreen {
+  // It is important to get focused tree string for TV form factor
+  val includeFocusedTree = formFactor.isTv()
+  if (device is ArbigentScreenReader) return device.readScreen(includeFocusedTree)
+  return ArbigentScreen(
+    elements = device.elements(),
+    uiTreeStrings = device.viewTreeString(),
+    focusedTreeString = if (includeFocusedTree) device.focusedTreeString() else null,
+    focusedElement = try {
+      device.focusedElement()
+    } catch (exception: Exception) {
+      arbigentDebugLog("Could not read the focused element: $exception")
+      null
+    },
+  )
+}
+
 private suspend fun step(
   stepInput: StepInput
 ): StepResult {
@@ -1342,9 +1359,10 @@ private suspend fun step(
   val executeActionChain = stepInput.executeActionChain
 
   val stepId = contextHolder.generateStepId()
-  val elements = arbigentTimed("step.elements") { device.elements() }
+  val screen = arbigentTimed("step.readScreen") { readScreen(device, deviceFormFactor) }
+  val elements = screen.elements
   arbigentTimed("step.screenshot") { takeScreenshot(device, stepId) }
-  val uiTreeStrings = arbigentTimed("step.viewTreeString") { device.viewTreeString() }
+  val uiTreeStrings = screen.uiTreeStrings
   val uiTreeHash = uiTreeStrings.optimizedTreeString.hashCode().toString().replace("-", "")
   val contextHash = contextHolder.context(aiOptions).hashCode().toString().replace("-", "")
   val cacheKey = "v${BuildConfig.VERSION_NAME}-uitree-${uiTreeHash}-context-${contextHash}"
@@ -1415,12 +1433,7 @@ private suspend fun step(
     uiTreeStrings = uiTreeStrings,
     requestUuid = requestUuid,
     apiCallJsonLFilePath = decisionJsonlFilePath,
-    focusedTreeString = if (deviceFormFactor.isTv()) {
-      // It is important to get focused tree string for TV form factor
-      device.focusedTreeString()
-    } else {
-      null
-    },
+    focusedTreeString = screen.focusedTreeString,
     agentActionTypes = actionTypes,
     screenshotFilePath = screenshotFilePath,
     prompt = stepInput.prompt,
@@ -1431,12 +1444,7 @@ private suspend fun step(
   // Read before the decision, not after it: the AI call takes tens of seconds with reasoning on,
   // and by the time it returns a carousel or an auto-hiding overlay has moved focus off the screen
   // the decision was made against.
-  val focusedElementAtDecision = try {
-    arbigentTimed("step.focusedElement") { device.focusedElement() }
-  } catch (exception: Exception) {
-    arbigentDebugLog("Could not read the focused element: $exception")
-    null
-  }
+  val focusedElementAtDecision = screen.focusedElement
   val decisionOutput = try {
     val output = arbigentTimed("step.decision") { decisionChain(decisionInput) }
     val action = output.step.agentAction ?: output.agentActions.singleOrNull()
