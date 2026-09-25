@@ -260,7 +260,35 @@ public class MaestroDevice(
     }
   }
 
+  // Reads go straight to the device and reconnect only when the read itself fails. Checking the
+  // connection with an extra hierarchy fetch first doubled the cost of every read (about five per
+  // step). Actions keep the up-front check in ensureConnected(): a tap or key press that failed
+  // part way must not be blindly repeated after a reconnect, but a read can be.
+  @Synchronized
+  private fun <T> readWithReconnect(read: () -> T): T {
+    return try {
+      read()
+    } catch (e: Exception) {
+      arbigentInfoLog("MaestroDevice failed to read from the device: ${e.message}. Reconnect device ${maestro.deviceName}")
+      reconnectIfDisconnected()
+      read()
+    }
+  }
+
+  private fun fetchViewHierarchy(): ViewHierarchy =
+    readWithReconnect { runBlocking { maestro.viewHierarchy(false) } }
+
   override fun executeActions(actions: List<MaestroCommand>) {
+    val screenshot = actions.singleOrNull()?.takeScreenshotCommand
+    if (screenshot != null) {
+      val file = resolveScreenshotFile(screenshotsDir, screenshot.path)
+      ArbigentGlobalStatus.onDevice(actions.joinToString { it.toString() }) {
+        readWithReconnect {
+          arbigentTimed("device.screenshot") { runBlocking { maestro.takeScreenshot(file.sink(), false) } }
+        }
+      }
+      return
+    }
     ensureConnected()
     // A lone takeScreenshot (how arbigent always issues one, see ArbigentAgent) is captured
     // directly to screenshotsDir/<path>.png. Maestro's Orchestra artifact refactor (#3282)
@@ -268,16 +296,10 @@ public class MaestroDevice(
     // arbigent reads the file, so screenshots bypass Orchestra to keep the path contract.
     // Every other command still runs through Orchestra via runFlow (which manages the JS
     // engine lifecycle internally, replacing the old shouldReinitJsEngine reflection).
-    val screenshot = actions.singleOrNull()?.takeScreenshotCommand
     ArbigentGlobalStatus.onDevice(actions.joinToString { it.toString() }) {
       runBlocking {
-        if (screenshot != null) {
-          val file = resolveScreenshotFile(screenshotsDir, screenshot.path)
-          arbigentTimed("device.screenshot") { maestro.takeScreenshot(file.sink(), false) }
-        } else {
-          arbigentTimed("device.runFlow ${actions.joinToString { it.description() }}") {
-            orchestra.runFlow(actions)
-          }
+        arbigentTimed("device.runFlow ${actions.joinToString { it.description() }}") {
+          orchestra.runFlow(actions)
         }
       }
     }
@@ -289,10 +311,9 @@ public class MaestroDevice(
   }
 
   override fun elements(): ArbigentElementList {
-    ensureConnected()
     for (it in 0..2) {
       try {
-        val viewHierarchy = arbigentTimed("device.elements.viewHierarchy") { runBlocking { maestro.viewHierarchy(false) } }
+        val viewHierarchy = arbigentTimed("device.elements.viewHierarchy") { fetchViewHierarchy() }
         val deviceInfo = maestro.cachedDeviceInfo
         val elementList = ArbigentElementList.from(viewHierarchy, deviceInfo)
         return elementList
@@ -306,10 +327,9 @@ public class MaestroDevice(
 
 
   override fun viewTreeString(): ArbigentUiTreeStrings {
-    ensureConnected()
     for (it in 0..2) {
       try {
-        val viewHierarchy = arbigentTimed("device.viewTreeString.viewHierarchy") { runBlocking { maestro.viewHierarchy(false) } }
+        val viewHierarchy = arbigentTimed("device.viewTreeString.viewHierarchy") { fetchViewHierarchy() }
         return ArbigentUiTreeStrings(
           allTreeString = viewHierarchy.toString(),
           optimizedTreeString = viewHierarchy.toOptimizedString(
@@ -329,7 +349,6 @@ public class MaestroDevice(
   }
 
   override fun focusedTreeString(): String {
-    ensureConnected()
     return findCurrentFocus()
       ?.optimizedToString(0, enableDepth = false) ?: ""
   }
@@ -337,7 +356,6 @@ public class MaestroDevice(
   // Read from the full hierarchy, not from elements(): the node holding focus is regularly a
   // container that the optimized element list drops or replaces with a child.
   override fun focusedElement(): ArbigentFocusedElement? {
-    ensureConnected()
     return findCurrentFocus()?.let(ArbigentFocusedElement::from)
   }
 
@@ -648,7 +666,7 @@ public class MaestroDevice(
   }
 
   private fun findCurrentFocus(): TreeNode? {
-    val viewHierarchy = runBlocking { maestro.viewHierarchy(false) }
+    val viewHierarchy = fetchViewHierarchy()
     return dfs(viewHierarchy.root) {
       // If keyboard is focused, return the focused node with keyboard
       it.attributes["resource-id"]?.startsWith("com.google.android.inputmethod.latin:id/") == true && it.focused == true
@@ -702,8 +720,9 @@ public class MaestroDevice(
       // onClose, which stops the iproxy forwarder and frees the port — BEFORE building the
       // replacement. Building first would start a second forwarder on the same port, and the
       // ownership check would reject it because this very JVM still owns the port, so reconnect
-      // could never succeed. Readers are serialized behind ensureConnected()'s monitor, so no one
-      // observes the closed connection during the swap; a transient failure that retries is fine.
+      // could never succeed. Callers are serialized behind the device monitor (ensureConnected() and
+      // readWithReconnect()), so no one observes the closed connection during the swap; a transient
+      // failure that retries is fine.
       closeConnection(this.connection)
 
       var lastException: Exception? = null
