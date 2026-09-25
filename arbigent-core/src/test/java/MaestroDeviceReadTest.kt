@@ -1,5 +1,6 @@
 package io.github.takahirom.arbigent.test
 
+import io.github.takahirom.arbigent.ArbigentAvailableDevice
 import io.github.takahirom.arbigent.MaestroDevice
 import maestro.DeviceInfo
 import maestro.Driver
@@ -70,6 +71,23 @@ class MaestroDeviceReadTest {
     }
 
     assertTrue(exception.message.orEmpty().contains("Cannot reconnect").not(), "was: $exception")
+  }
+
+  @Test
+  fun aFailedReadIsRetriedOnTheReconnectedDevice() {
+    val broken = FakeDriver(failContentDescriptor = true)
+    val replacement = FakeDriver()
+    val device = MaestroDevice(
+      Maestro(broken.driver),
+      screenshotsDir = createTempDirectory().toFile(),
+      availableDevice = ArbigentAvailableDevice.Fake(connect = { device(replacement) }),
+    )
+
+    val tree = device.viewTreeString()
+
+    assertEquals(1, broken.contentDescriptorCalls)
+    assertEquals(1, replacement.contentDescriptorCalls)
+    assertTrue(tree.allTreeString.contains("Settings"), "was: $tree")
   }
 
   @Test
