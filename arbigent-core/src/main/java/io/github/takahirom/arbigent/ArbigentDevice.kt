@@ -521,9 +521,9 @@ public class MaestroDevice(
     fetchTarget: (ViewHierarchy) -> Bounds?
   ) {
     var remainCount = 15
+    // The focus and the target come from one fetch, so a scroll in between cannot put them on different frames.
+    var viewHierarchy = arbigentTimed("focus.viewHierarchy") { fetchViewHierarchy() }
     while (remainCount-- > 0) {
-      // The focus and the target come from one fetch, so a scroll in between cannot put them on different frames.
-      val viewHierarchy = arbigentTimed("focus.viewHierarchy") { fetchViewHierarchy() }
       val currentFocus = findCurrentFocus(viewHierarchy)
         ?: throw IllegalStateException("No focused node")
       val targetBounds = fetchTarget(viewHierarchy)
@@ -643,12 +643,13 @@ public class MaestroDevice(
 
       val direction = directionCandidates.random()
       arbigentDebugLog("directionCandidates: $directionCandidates \ndirection: $direction")
-      runBlocking {
+      viewHierarchy = runBlocking {
         // Same calls as maestro.pressKey(direction), split so the key press and the settle are timed apart.
         arbigentTimed("focus.pressKey") { maestro.pressKey(direction, waitForAppToSettle = false) }
+        // The settle ends on two identical fetches, bounds included, so a scroll or a focus animation still
+        // in progress keeps it waiting. Its last fetch is the frame the next key press is decided on.
         arbigentTimed("focus.waitForAppToSettle") { maestro.waitForAppToSettle() }
-        arbigentTimed("focus.waitForAnimationToEnd") { maestro.waitForAnimationToEnd("100") }
-      }
+      } ?: arbigentTimed("focus.viewHierarchy") { fetchViewHierarchy() }
     }
   }
 

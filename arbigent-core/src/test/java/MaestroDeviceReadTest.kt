@@ -25,6 +25,8 @@ class MaestroDeviceReadTest {
     var failContentDescriptor: Boolean = false,
     // Served in order, the last one repeating; defaults to a single on-screen, focused node.
     val trees: List<TreeNode> = listOf(node("Settings", "[0,0][1080,1920]")),
+    // What the driver's own settle returns; null when it has nothing to hand back.
+    val settledTree: TreeNode? = null,
   ) {
     var contentDescriptorCalls = 0
     val pressedKeys = mutableListOf<KeyCode>()
@@ -44,7 +46,10 @@ class MaestroDeviceReadTest {
             trees[minOf(contentDescriptorCalls, trees.size) - 1]
           }
 
-          else -> if (method.returnType == Boolean::class.javaPrimitiveType) false else null
+          else -> if (method.name.startsWith("waitForAppToSettle")) {
+            // ViewHierarchy is a value class, so the JVM method is name-mangled and returns the bare TreeNode.
+            settledTree
+          } else if (method.returnType == Boolean::class.javaPrimitiveType) false else null
         }
       }
     ) as Driver
@@ -124,6 +129,18 @@ class MaestroDeviceReadTest {
     assertEquals(listOf(KeyCode.REMOTE_DOWN), fake.pressedKeys)
     // The connection check, then one fetch before the key press and one after it.
     assertEquals(3, fake.contentDescriptorCalls)
+  }
+
+  @Test
+  fun movingFocusDecidesTheNextKeyOnTheSettledHierarchy() {
+    val fake = FakeDriver(trees = listOf(screen(focusedText = "Top")), settledTree = screen(focusedText = "Bottom"))
+    val device = device(fake)
+
+    device.moveFocusToElement(ArbigentTvCompatDevice.Selector.ByText("Bottom", 0))
+
+    assertEquals(listOf(KeyCode.REMOTE_DOWN), fake.pressedKeys)
+    // The connection check and the fetch before the key press; the settle's frame shows focus on the target.
+    assertEquals(2, fake.contentDescriptorCalls)
   }
 
   @Test
