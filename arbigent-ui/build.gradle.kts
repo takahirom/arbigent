@@ -61,6 +61,20 @@ compose.desktop {
 
     nativeDistributions {
       targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+      // The jlinked runtime only gets java.desktop and friends by default. Output of
+      // ./gradlew arbigent-ui:suggestRuntimeModules; e.g. java-keyring needs jdk.security.auth on
+      // Linux and Maestro's JS engine needs java.sql. Re-run it after adding dependencies.
+      modules(
+        "java.compiler",
+        "java.instrument",
+        "java.net.http",
+        "java.rmi",
+        "java.scripting",
+        "java.sql",
+        "jdk.management",
+        "jdk.security.auth",
+        "jdk.unsupported",
+      )
       macOS {
         iconFile.set(project.file("icons/icon.icns"))
       }
