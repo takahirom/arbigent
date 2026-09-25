@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.serialization.Serializable
 
 private var stepCount = 1
+private const val TARGET_NAME_MAX_LENGTH = 80
 
 public class ArbigentContextHolder(
   public val goal: String,
@@ -56,8 +57,20 @@ public class ArbigentContextHolder(
         memo?.let { append("memo: $it\n") }
         feedback?.let { append("feedback: $it\n") }
         if (feedback == null) {
-          agentAction?.let { append("action done: ${it.stepLogText()}\n") }
+          agentAction?.let { append("action done: ${it.stepLogText()}${targetText(it)}\n") }
         }
+      }
+    }
+
+    // An index only means something on the screen it was chosen from, so name what it pointed at.
+    private fun targetText(action: ArbigentAgentAction): String {
+      val name = targetElement?.let { it.text ?: it.accessibilityId } ?: return ""
+      val quoted = "\"${name.replace(Regex("\\s+"), " ").trim().take(TARGET_NAME_MAX_LENGTH)}\""
+      return when (action) {
+        is DpadAutoFocusWithIndexAgentAction,
+        is DpadAutoFocusWithTextAgentAction,
+        is DpadAutoFocusWithIdAgentAction -> " (target: $quoted; focus only, not pressed or selected)"
+        else -> " (target: $quoted)"
       }
     }
 

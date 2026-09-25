@@ -39,6 +39,40 @@ class ArbigentContextHolderTest {
     }
 
     @Test
+    fun stepTextNamesTheElementAnIndexActionTargeted() {
+        fun step(action: ArbigentAgentAction, target: ArbigentElementIdentity?) = ArbigentContextHolder.Step(
+            stepId = "step",
+            agentAction = action,
+            targetElement = target,
+            cacheKey = "cache",
+            screenshotFilePath = "screenshot.png"
+        )
+
+        assertEquals(
+            "action done: Click on index: 5 (target: \"Settings\")\n",
+            step(ClickWithIndex(5), ArbigentElementIdentity(text = "Settings")).text()
+        )
+        assertEquals(
+            "action done: Click on index: 2 (target: \"Navigate up\")\n",
+            step(ClickWithIndex(2), ArbigentElementIdentity(accessibilityId = "Navigate up")).text()
+        )
+        assertEquals(
+            true,
+            step(DpadAutoFocusWithIndexAgentAction(3), ArbigentElementIdentity(text = "Search")).text()
+                .contains("(target: \"Search\"; focus only, not pressed or selected)")
+        )
+        // No readable name: keep the plain log text rather than naming a resource id.
+        assertEquals(
+            "action done: Click on index: 1\n",
+            step(ClickWithIndex(1), ArbigentElementIdentity(resourceId = "container")).text()
+        )
+        assertEquals(
+            "action done: Click on index: 1\n",
+            step(ClickWithIndex(1), null).text()
+        )
+    }
+
+    @Test
     fun testPromptWithUIElements() {
         val contextHolder = ArbigentContextHolder(
             goal = "Test Goal",
