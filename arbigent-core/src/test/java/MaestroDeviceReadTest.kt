@@ -1,9 +1,11 @@
 package io.github.takahirom.arbigent.test
 
 import io.github.takahirom.arbigent.ArbigentAvailableDevice
+import io.github.takahirom.arbigent.ArbigentTvCompatDevice
 import io.github.takahirom.arbigent.MaestroDevice
 import maestro.DeviceInfo
 import maestro.Driver
+import maestro.KeyCode
 import maestro.Maestro
 import maestro.TreeNode
 import maestro.device.Platform
@@ -25,12 +27,15 @@ class MaestroDeviceReadTest {
     val trees: List<TreeNode> = listOf(node("Settings", "[0,0][1080,1920]")),
   ) {
     var contentDescriptorCalls = 0
+    val pressedKeys = mutableListOf<KeyCode>()
 
     val driver: Driver = Proxy.newProxyInstance(
       Driver::class.java.classLoader,
       arrayOf(Driver::class.java),
-      InvocationHandler { _, method, _ ->
+      InvocationHandler { _, method, args ->
         when (method.name) {
+          "pressKey" -> pressedKeys += args[0] as KeyCode
+
           "name" -> "fake"
           "deviceInfo" -> DeviceInfo(Platform.ANDROID, 1080, 1920, 1080, 1920)
           "contentDescriptor" -> {
@@ -49,6 +54,18 @@ class MaestroDeviceReadTest {
     fun node(text: String, bounds: String) = TreeNode(
       attributes = mutableMapOf("text" to text, "bounds" to bounds, "class" to "android.widget.TextView"),
       focused = true,
+    )
+
+    fun screen(focusedText: String, hasBottom: Boolean = true) = TreeNode(
+      attributes = mutableMapOf("bounds" to "[0,0][1080,1920]"),
+      children = listOf("Top" to "[0,0][100,100]", "Bottom" to "[0,500][100,600]").filter { (text, _) ->
+        hasBottom || text != "Bottom"
+      }.map { (text, bounds) ->
+        TreeNode(
+          attributes = mutableMapOf("text" to text, "bounds" to bounds, "class" to "android.widget.TextView"),
+          focused = text == focusedText,
+        )
+      },
     )
   }
 
@@ -95,6 +112,35 @@ class MaestroDeviceReadTest {
     assertTrue(screen.elements.elements.single().rawText.contains("New"))
     // The new frame spans the screen; the rejected one was 1000 wide.
     assertEquals(1080, screen.focusedElement?.width)
+  }
+
+  @Test
+  fun movingFocusFetchesTheHierarchyOncePerKeyPress() {
+    val fake = FakeDriver(trees = listOf(screen(focusedText = "Top"), screen(focusedText = "Top"), screen(focusedText = "Bottom")))
+    val device = device(fake)
+
+    device.moveFocusToElement(ArbigentTvCompatDevice.Selector.ByText("Bottom", 0))
+
+    assertEquals(listOf(KeyCode.REMOTE_DOWN), fake.pressedKeys)
+    // The connection check, then one fetch before the key press and one after it.
+    assertEquals(3, fake.contentDescriptorCalls)
+  }
+
+  @Test
+  fun aSelectorTargetStillAppearingIsFoundOnAFreshHierarchy() {
+    val fake = FakeDriver(
+      trees = listOf(
+        screen(focusedText = "Top", hasBottom = false),
+        screen(focusedText = "Top", hasBottom = false),
+        screen(focusedText = "Top"),
+        screen(focusedText = "Bottom"),
+      )
+    )
+    val device = device(fake)
+
+    device.moveFocusToElement(ArbigentTvCompatDevice.Selector.ByText("Bottom", 0))
+
+    assertEquals(listOf(KeyCode.REMOTE_DOWN), fake.pressedKeys)
   }
 
   @Test
