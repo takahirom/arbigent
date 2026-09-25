@@ -336,12 +336,13 @@ public sealed interface ArbigentAvailableDevice {
     override val name: String = "Fake",
     override val deviceId: String? = null,
     override val deviceOs: ArbigentDeviceOs = ArbigentDeviceOs.Android,
+    // What connecting (or reconnecting) returns; tests that exercise a reconnect pass a device here.
+    private val connect: () -> ArbigentDevice = {
+      throw UnsupportedOperationException("Fake device is not supported")
+    },
   ) : ArbigentAvailableDevice {
     override val stableKey: String get() = "fake:$name"
-    public override fun connectToDevice(): ArbigentDevice {
-      // This is not called
-      throw UnsupportedOperationException("Fake device is not supported")
-    }
+    public override fun connectToDevice(): ArbigentDevice = connect()
   }
 
   public fun connectToDevice(): ArbigentDevice
