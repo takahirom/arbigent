@@ -154,4 +154,16 @@ public object ConfidentialInfo {
       acc.replace(s.key, s.value, ignoreCase = true)
     }
   }
+
+  // sk-... (OpenAI, Anthropic, OpenRouter) and AIza... (Google). Providers echo keys back in error
+  // bodies, sometimes partially masked, so these may not match the configured key.
+  private val apiKeyLikeToken = Regex("""\bsk-[A-Za-z0-9_*\-]{8,}|\bAIza[A-Za-z0-9_*\-]{20,}""")
+
+  /**
+   * For text from an AI provider's error response, which ends up in step feedback and reports:
+   * removes the registered strings and fully masks anything that looks like an API key.
+   */
+  public fun String.removeConfidentialInfoFromApiError(): String {
+    return removeConfidentialInfo().replace(apiKeyLikeToken, "****")
+  }
 }
