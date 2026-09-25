@@ -331,12 +331,12 @@ public class MaestroDevice(
   }
 
   override fun elements(): ArbigentElementList =
-    deriveWithRetry("device.elements.viewHierarchy", initial = null, derive = ::elementsFrom) {
+    deriveWithRetry("device.elements.viewHierarchy", derive = ::elementsFrom) {
       ArbigentElementList(emptyList(), maestro.cachedDeviceInfo.widthPixels)
     }
 
   override fun viewTreeString(): ArbigentUiTreeStrings =
-    deriveWithRetry("device.viewTreeString.viewHierarchy", initial = null, derive = ::uiTreeStringsFrom) {
+    deriveWithRetry("device.viewTreeString.viewHierarchy", derive = ::uiTreeStringsFrom) {
       ArbigentUiTreeStrings(allTreeString = "", optimizedTreeString = "")
     }
 
@@ -349,40 +349,47 @@ public class MaestroDevice(
 
   // Every hierarchy fetch waits for the device to go idle, so reading the step's elements, tree
   // strings and focus from one fetch saves the others; it also means they all describe the same frame.
+  // A frame that cannot be derived is dropped as a whole, so the parts never mix two frames.
   override fun readScreen(includeFocusedTree: Boolean): ArbigentScreen {
-    val hierarchy = arbigentTimed("device.readScreen.viewHierarchy") { fetchViewHierarchy() }
-    val elements = deriveWithRetry("device.elements.viewHierarchy", hierarchy, ::elementsFrom) {
-      ArbigentElementList(emptyList(), maestro.cachedDeviceInfo.widthPixels)
+    fun screenFrom(viewHierarchy: ViewHierarchy): ArbigentScreen {
+      val focusedNode = findCurrentFocus(viewHierarchy)
+      return ArbigentScreen(
+        elements = elementsFrom(viewHierarchy),
+        uiTreeStrings = uiTreeStringsFrom(viewHierarchy),
+        focusedTreeString = if (includeFocusedTree) focusedNode.focusedTreeString() else null,
+        focusedElement = focusedNode?.let(ArbigentFocusedElement::from),
+      )
     }
-    val uiTreeStrings = deriveWithRetry("device.viewTreeString.viewHierarchy", hierarchy, ::uiTreeStringsFrom) {
-      ArbigentUiTreeStrings(allTreeString = "", optimizedTreeString = "")
+    return deriveWithRetry("device.readScreen.viewHierarchy", derive = ::screenFrom) { lastHierarchy ->
+      // Focus does not need the node bounds that failed, so keep reporting it as the separate reads did.
+      val focusedNode = findCurrentFocus(lastHierarchy)
+      ArbigentScreen(
+        elements = ArbigentElementList(emptyList(), maestro.cachedDeviceInfo.widthPixels),
+        uiTreeStrings = ArbigentUiTreeStrings(allTreeString = "", optimizedTreeString = ""),
+        focusedTreeString = if (includeFocusedTree) focusedNode.focusedTreeString() else null,
+        focusedElement = focusedNode?.let(ArbigentFocusedElement::from),
+      )
     }
-    val focusedNode = findCurrentFocus(hierarchy)
-    return ArbigentScreen(
-      elements = elements,
-      uiTreeStrings = uiTreeStrings,
-      focusedTreeString = if (includeFocusedTree) focusedNode.focusedTreeString() else null,
-      focusedElement = focusedNode?.let(ArbigentFocusedElement::from),
-    )
   }
 
   // Deriving can hit a node whose bounds are not laid out yet; fetch a fresh hierarchy and retry.
   private fun <T> deriveWithRetry(
     label: String,
-    initial: ViewHierarchy?,
     derive: (ViewHierarchy) -> T,
-    fallback: () -> T,
+    fallback: (lastHierarchy: ViewHierarchy) -> T,
   ): T {
-    for (it in 0..2) {
+    var attempt = 0
+    while (true) {
+      val viewHierarchy = arbigentTimed(label) { fetchViewHierarchy() }
       try {
-        val viewHierarchy = if (it == 0 && initial != null) initial else arbigentTimed(label) { fetchViewHierarchy() }
         return derive(viewHierarchy)
       } catch (e: ArbigentElementList.NodeInBoundsNotFoundException) {
-        arbigentDebugLog("NodeInBoundsNotFoundException. Retry $it")
+        if (attempt == 2) return fallback(viewHierarchy)
+        arbigentDebugLog("NodeInBoundsNotFoundException. Retry $attempt")
+        attempt++
         Thread.sleep(1000)
       }
     }
-    return fallback()
   }
 
   private fun elementsFrom(viewHierarchy: ViewHierarchy): ArbigentElementList =

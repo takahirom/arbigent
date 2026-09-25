@@ -19,7 +19,11 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class MaestroDeviceReadTest {
-  private class FakeDriver(var failContentDescriptor: Boolean = false) {
+  private class FakeDriver(
+    var failContentDescriptor: Boolean = false,
+    // Served in order, the last one repeating; defaults to a single on-screen, focused node.
+    val trees: List<TreeNode> = listOf(node("Settings", "[0,0][1080,1920]")),
+  ) {
     var contentDescriptorCalls = 0
 
     val driver: Driver = Proxy.newProxyInstance(
@@ -32,16 +36,20 @@ class MaestroDeviceReadTest {
           "contentDescriptor" -> {
             contentDescriptorCalls++
             if (failContentDescriptor) throw IllegalStateException("device is gone")
-            TreeNode(
-              attributes = mutableMapOf("text" to "Settings", "bounds" to "[0,0][1080,1920]"),
-              focused = true,
-            )
+            trees[minOf(contentDescriptorCalls, trees.size) - 1]
           }
 
           else -> if (method.returnType == Boolean::class.javaPrimitiveType) false else null
         }
       }
     ) as Driver
+  }
+
+  private companion object {
+    fun node(text: String, bounds: String) = TreeNode(
+      attributes = mutableMapOf("text" to text, "bounds" to bounds, "class" to "android.widget.TextView"),
+      focused = true,
+    )
   }
 
   private fun device(fake: FakeDriver, screenshotsDir: File = createTempDirectory().toFile()) = MaestroDevice(
@@ -73,6 +81,20 @@ class MaestroDeviceReadTest {
     assertEquals(device.viewTreeString(), screen.uiTreeStrings)
     assertEquals(device.focusedTreeString(), screen.focusedTreeString)
     assertEquals(device.focusedElement(), screen.focusedElement)
+  }
+
+  @Test
+  fun readScreenTakesFocusFromTheFrameItsElementsCameFrom() {
+    // The first frame is laid out off screen, so deriving elements from it fails and is retried.
+    val fake = FakeDriver(trees = listOf(node("Old", "[2000,2000][3000,3000]"), node("New", "[0,0][1080,1920]")))
+    val device = device(fake)
+
+    val screen = device.readScreen(includeFocusedTree = true)
+
+    assertEquals(2, fake.contentDescriptorCalls)
+    assertTrue(screen.elements.elements.single().rawText.contains("New"))
+    // The new frame spans the screen; the rejected one was 1000 wide.
+    assertEquals(1080, screen.focusedElement?.width)
   }
 
   @Test
