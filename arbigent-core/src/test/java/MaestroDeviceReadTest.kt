@@ -56,9 +56,11 @@ class MaestroDeviceReadTest {
       focused = true,
     )
 
-    fun screen(focusedText: String) = TreeNode(
+    fun screen(focusedText: String, hasBottom: Boolean = true) = TreeNode(
       attributes = mutableMapOf("bounds" to "[0,0][1080,1920]"),
-      children = listOf("Top" to "[0,0][100,100]", "Bottom" to "[0,500][100,600]").map { (text, bounds) ->
+      children = listOf("Top" to "[0,0][100,100]", "Bottom" to "[0,500][100,600]").filter { (text, _) ->
+        hasBottom || text != "Bottom"
+      }.map { (text, bounds) ->
         TreeNode(
           attributes = mutableMapOf("text" to text, "bounds" to bounds, "class" to "android.widget.TextView"),
           focused = text == focusedText,
@@ -122,6 +124,23 @@ class MaestroDeviceReadTest {
     assertEquals(listOf(KeyCode.REMOTE_DOWN), fake.pressedKeys)
     // The connection check, then one fetch before the key press and one after it.
     assertEquals(3, fake.contentDescriptorCalls)
+  }
+
+  @Test
+  fun aSelectorTargetStillAppearingIsFoundOnAFreshHierarchy() {
+    val fake = FakeDriver(
+      trees = listOf(
+        screen(focusedText = "Top", hasBottom = false),
+        screen(focusedText = "Top", hasBottom = false),
+        screen(focusedText = "Top"),
+        screen(focusedText = "Bottom"),
+      )
+    )
+    val device = device(fake)
+
+    device.moveFocusToElement(ArbigentTvCompatDevice.Selector.ByText("Bottom", 0))
+
+    assertEquals(listOf(KeyCode.REMOTE_DOWN), fake.pressedKeys)
   }
 
   @Test

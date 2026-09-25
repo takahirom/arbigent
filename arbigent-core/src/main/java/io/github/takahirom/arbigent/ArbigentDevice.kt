@@ -653,8 +653,7 @@ public class MaestroDevice(
   }
 
   private fun fetchTargetBounds(selector: ArbigentTvCompatDevice.Selector, viewHierarchy: ViewHierarchy): Bounds {
-    // An exact match first, then a partial one.
-    val patterns = when (selector) {
+    val filters = when (selector) {
       is ArbigentTvCompatDevice.Selector.ById -> listOf(selector.id, ".*" + selector.id + ".*").map { pattern ->
         Filters.compose(Filters.idMatches(pattern.toRegex()), Filters.index(selector.index))
       }
@@ -663,9 +662,16 @@ public class MaestroDevice(
         Filters.compose(Filters.textMatches(pattern.toRegex()), Filters.index(selector.index))
       }
     }
-    val nodes = viewHierarchy.aggregate()
-    val element = patterns.firstNotNullOfOrNull { filter -> filter(nodes).firstOrNull()?.toUiElementOrNull() }
-      ?: throw MaestroException.ElementNotFound("Element not found", viewHierarchy.root, "Element not found")
+    // An exact match in the frame the focus came from. Otherwise poll fresh hierarchies as before: the exact
+    // match for up to 100ms, then the partial one, so a target that is still appearing can be found.
+    filters.first()(viewHierarchy.aggregate()).firstOrNull()?.toUiElementOrNull()?.let { return it.bounds }
+    val element = filters.firstNotNullOfOrNull { filter ->
+      runBlocking { maestro.findElementWithTimeout(timeoutMs = 100, filter = filter) }?.element
+    } ?: throw MaestroException.ElementNotFound(
+      "Element not found",
+      runBlocking { maestro.viewHierarchy() }.root,
+      "Element not found",
+    )
     return element.bounds
   }
 
