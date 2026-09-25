@@ -36,7 +36,6 @@ import okhttp3.Response
 import okio.Buffer
 import java.awt.image.BufferedImage.TYPE_INT_RGB
 import java.io.File
-import java.nio.charset.Charset
 import java.util.Deque
 import java.util.concurrent.ConcurrentLinkedDeque
 
@@ -619,7 +618,7 @@ public class OpenAIAi @OptIn(ArbigentInternalApi::class) constructor(
         }
       if (400 <= response.status.value) {
         // The body reaches step feedback/reports, so redact and cap it first.
-        val errorDetail = response.bodyAsText(Charset.defaultCharset())
+        val errorDetail = response.bodyAsText()
           .removeConfidentialInfoFromApiError()
           .take(1_000)
         if (response.status == HttpStatusCode.TooManyRequests) {

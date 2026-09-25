@@ -676,7 +676,7 @@ public class AnthropicAi @OptIn(ArbigentInternalApi::class) constructor(
           Json { ignoreUnknownKeys = true }
             .decodeFromString<AnthropicErrorResponse>(responseBody).error?.message
         } catch (e: Exception) {
-          arbigentDebugLog { "Anthropic error response was not the expected shape: ${e.message}" }
+          arbigentDebugLog { "Anthropic error response was not the expected shape." }
           null
         }
         // The raw body reaches step feedback/reports, so redact and cap it first.
