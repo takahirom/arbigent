@@ -9,6 +9,7 @@ import maestro.UiElement.Companion.toUiElementOrNull
 import maestro.device.Platform
 import maestro.orchestra.MaestroCommand
 import maestro.orchestra.Orchestra
+import okio.Buffer
 import okio.sink
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
@@ -283,9 +284,12 @@ public class MaestroDevice(
     if (screenshot != null) {
       val file = resolveScreenshotFile(screenshotsDir, screenshot.path)
       ArbigentGlobalStatus.onDevice(actions.joinToString { it.toString() }) {
-        readWithReconnect {
-          arbigentTimed("device.screenshot") { runBlocking { maestro.takeScreenshot(file.sink(), false) } }
+        // Only the capture is retried after a reconnect; failing to write the file is a local
+        // problem that a new connection cannot fix, so it surfaces as it is.
+        val image = readWithReconnect {
+          arbigentTimed("device.screenshot") { Buffer().also { runBlocking { maestro.takeScreenshot(it, false) } } }
         }
+        file.sink().use { it.write(image, image.size) }
       }
       return
     }

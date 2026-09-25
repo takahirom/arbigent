@@ -6,12 +6,16 @@ import maestro.Driver
 import maestro.Maestro
 import maestro.TreeNode
 import maestro.device.Platform
+import maestro.orchestra.MaestroCommand
+import maestro.orchestra.TakeScreenshotCommand
+import java.io.File
 import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Proxy
 import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class MaestroDeviceReadTest {
   private class FakeDriver(var failContentDescriptor: Boolean = false) {
@@ -39,9 +43,9 @@ class MaestroDeviceReadTest {
     ) as Driver
   }
 
-  private fun device(fake: FakeDriver) = MaestroDevice(
+  private fun device(fake: FakeDriver, screenshotsDir: File = createTempDirectory().toFile()) = MaestroDevice(
     Maestro(fake.driver),
-    screenshotsDir = createTempDirectory().toFile(),
+    screenshotsDir = screenshotsDir,
   )
 
   @Test
@@ -54,6 +58,18 @@ class MaestroDeviceReadTest {
     device.focusedElement()
 
     assertEquals(3, fake.contentDescriptorCalls)
+  }
+
+  @Test
+  fun aScreenshotThatCannotBeWrittenDoesNotReconnect() {
+    val notADirectory = File.createTempFile("screenshots", "")
+    val device = device(FakeDriver(), screenshotsDir = notADirectory)
+
+    val exception = assertFailsWith<Exception> {
+      device.executeActions(listOf(MaestroCommand(takeScreenshotCommand = TakeScreenshotCommand("shot"))))
+    }
+
+    assertTrue(exception.message.orEmpty().contains("Cannot reconnect").not(), "was: $exception")
   }
 
   @Test
