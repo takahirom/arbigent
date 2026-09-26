@@ -1214,7 +1214,11 @@ private fun ContentPanel(
                 )
                 if (step.stepSource != ArbigentStepSource.Ai) {
                   Text(
-                    if (step.stepSource == ArbigentStepSource.Replay) "Replayed" else "Cache hit",
+                    when (step.stepSource) {
+                      ArbigentStepSource.Replay -> "Replayed"
+                      ArbigentStepSource.Jev -> "Jev"
+                      ArbigentStepSource.Cache, ArbigentStepSource.Ai -> "Cache hit"
+                    },
                     modifier = Modifier.padding(4.dp)
                       .background(JewelTheme.colorPalette.purple(8))
                   )

@@ -8,6 +8,7 @@ import androidx.compose.runtime.getValue
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.groups.defaultByName
+import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import com.github.ajalt.clikt.parameters.groups.groupChoice
 import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.choice
@@ -71,6 +72,8 @@ class ArbigentRunTaskCommand(
     help = "Host/device port for the XCTest runner on a physical iPhone (default 22087)."
   )
 
+  private val jevOptions by JevOptions()
+
   private val logLevel by logLevelOption()
   private val logFile by logFileOption()
   private val workingDirectory by workingDirectoryOption()
@@ -81,6 +84,9 @@ class ArbigentRunTaskCommand(
 
     val (resultDir, resultFile) = setupArbigentFiles(workingDirectory, logFile)
     val ai = createAi(aiType, aiApiLoggingEnabled)
+    // No project file, so Jev runs only when --jev-mode turns it on. Resolved before connecting, so
+    // a missing key fails before any device work.
+    val jev = jevOptions.resolve(projectSettings = null)
     val device = deviceConnector.connect(
       os = os,
       requestedDevice = resolveRequestedDevice(
@@ -110,7 +116,7 @@ class ArbigentRunTaskCommand(
       val appSettings = CliAppSettings(workingDirectory = workingDirectory, path = null)
       // Composition root for the `run task` command: the one place the production dispatcher is
       // created and threaded down (no per-signature defaults, no process-wide global).
-      val arbigentProject = ArbigentProject(projectFileContent, aiFactory = { ai }, deviceFactory = { device }, appSettings = appSettings, dispatcher = Dispatchers.Default)
+      val arbigentProject = ArbigentProject(projectFileContent, aiFactory = { ai }, deviceFactory = { device }, appSettings = appSettings, dispatcher = Dispatchers.Default, jev = jev)
       val scenarios = arbigentProject.scenarios
 
       Runtime.getRuntime().addShutdownHook(object : Thread() {

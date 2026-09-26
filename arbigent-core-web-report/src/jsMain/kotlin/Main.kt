@@ -344,6 +344,7 @@ private fun StepView(step: ArbigentAgentTaskStepResult) {
             when (step.stepSource) {
               ArbigentStepSource.Cache -> "Cache Hit"
               ArbigentStepSource.Replay -> "Replayed"
+              ArbigentStepSource.Jev -> "Jev"
               ArbigentStepSource.Ai -> ""
             }
           )
@@ -408,6 +409,7 @@ private fun StepView(step: ArbigentAgentTaskStepResult) {
                 "AI Request/Response (JSONL): ${step.apiCallJsonPath} " +
                   when (step.stepSource) {
                     ArbigentStepSource.Replay -> "(Replayed)"
+                    ArbigentStepSource.Jev -> "(Jev)"
                     else -> "(Cache Hit)"
                   }
               )

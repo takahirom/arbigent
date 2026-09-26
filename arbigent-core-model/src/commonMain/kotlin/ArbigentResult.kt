@@ -104,14 +104,16 @@ public data class ArbigentAgentTaskStepResult(
 
 /**
  * Which rung of the ladder produced this step: the AI itself, the AI-decision cache keyed on the
- * UI tree, or a replay of the actions recorded on the last successful run. They differ in how much
- * was actually verified this run, so the report keeps them apart.
+ * UI tree, a replay of the actions recorded on the last successful run, or Jev, a decision model
+ * that stands in for the AI when it is confident. They differ in how much was actually verified
+ * this run, so the report keeps them apart.
  */
 @Serializable
 public enum class ArbigentStepSource {
   Ai,
   Cache,
   Replay,
+  Jev,
 }
 
 @Serializable

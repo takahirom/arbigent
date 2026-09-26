@@ -46,6 +46,11 @@ public class ArbigentContextHolder(
      * recorded before this was captured — replay then paces that step the way it always has.
      */
     public val focusedElement: ArbigentFocusedElement? = null,
+    /**
+     * False when no LLM call decided this step (Jev), so it doesn't use up maxStep. Kept when the
+     * decision is cached, since replaying it from the cache costs no LLM call either.
+     */
+    public val countsTowardMaxStep: Boolean = true,
   ) {
     public fun isFailed(): Boolean {
       return feedback?.contains("Failed") == true
@@ -105,6 +110,11 @@ public class ArbigentContextHolder(
     }
   }
 
+  // Jev steps don't use up maxStep, so the step number shown against the limit leaves them out;
+  // otherwise a run with many Jev steps would tell the AI it is past its limit.
+  private fun currentStepAgainstLimit(): Int =
+    steps().count { it.agentAction != null && it.agentAction !is FailedAgentAction && it.countsTowardMaxStep } + 1
+
   public fun getStepsText(aiOptions: ArbigentAiOptions?): String {
     val allSteps = steps().withIndex().toList()
     val stepsToInclude = aiOptions?.historicalStepLimit?.let { count ->
@@ -123,7 +133,7 @@ public class ArbigentContextHolder(
   ): String {
     return userPromptTemplate.format(
       goal = goal,
-      currentStep = countMeaningfulActions() + 1,
+      currentStep = currentStepAgainstLimit(),
       maxStep = maxStep,
       steps = getStepsText(aiOptions),
       uiElements = uiElements,
@@ -135,7 +145,7 @@ public class ArbigentContextHolder(
   public fun context(aiOptions: ArbigentAiOptions): String {
     return userPromptTemplate.format(
       goal = goal,
-      currentStep = countMeaningfulActions() + 1,
+      currentStep = currentStepAgainstLimit(),
       maxStep = maxStep,
       steps = getStepsText(aiOptions)
     )

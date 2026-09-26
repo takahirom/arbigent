@@ -8,6 +8,9 @@ import com.github.ajalt.clikt.testing.test
 import com.github.ajalt.clikt.sources.ValueSource
 import com.github.ajalt.clikt.sources.ChainedValueSource
 import io.github.takahirom.arbigent.ArbigentInternalApi
+import io.github.takahirom.arbigent.ArbigentJevHttpClient
+import io.github.takahirom.arbigent.ArbigentJevMode
+import io.github.takahirom.arbigent.ArbigentJevOverrides
 import java.io.File
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -230,6 +233,114 @@ scenarios:
     } finally {
       settingsFile.delete()
     }
+  }
+
+  @Test
+  fun `jev options resolve from settings yaml, environment and command line`() {
+    // Placeholder key only — never a real value.
+    val settingsFile = File("build/test-.arbigent/settings-jev.yml")
+    settingsFile.parentFile.mkdirs()
+    settingsFile.writeText(
+      """
+      project-file: ${yaml.absolutePath}
+      jev-action-threshold: "0.9"
+      run:
+        jev-model: jev-test
+      """.trimIndent()
+    )
+
+    try {
+      val runCommand = ArbigentRunCommand().subcommands(ArbigentRunTaskCommand())
+      val command = ArbigentCli().apply {
+        context {
+          valueSource = ChainedValueSource(
+            listOf(
+              YamlValueSource.from(settingsFile.absolutePath, getKey = ValueSource.getKey(joinSubcommands = ".")),
+              YamlValueSource.from(settingsFile.absolutePath, getKey = { _, option -> option.names.first().removePrefix("--") })
+            )
+          )
+        }
+      }.subcommands(runCommand)
+
+      val test = command.test(
+        "run --dry-run --jev-mode=shadow",
+        envvars = mapOf("OPENAI_API_KEY" to "key", "TYPESAFE_API_KEY" to "jev-placeholder-key"),
+      )
+      assertContains(test.output, "Selected scenarios for execution")
+
+      val jev = runCommand.jevOptions
+      assertEquals("jev-placeholder-key", jev.jevApiKey)
+      assertEquals("jev-test", jev.jevModel)
+      assertEquals(ArbigentJevHttpClient.DefaultBaseUrl, jev.jevBaseUrl)
+      assertEquals(ArbigentJevOverrides(mode = ArbigentJevMode.Shadow, actionThreshold = 0.9), jev.overrides)
+    } finally {
+      settingsFile.delete()
+    }
+  }
+
+  @Test
+  fun `jev thresholds outside 0 to 1 are rejected`() {
+    val command = ArbigentCli().subcommands(ArbigentRunCommand().subcommands(ArbigentRunTaskCommand()))
+
+    val test = command.test(
+      "run --dry-run --project-file=${yaml.absolutePath} --jev-action-threshold=1.5",
+      envvars = mapOf("OPENAI_API_KEY" to "key"),
+    )
+
+    assertNotEquals(0, test.statusCode)
+    assertContains(test.output, "--jev-action-threshold")
+  }
+
+  @Test
+  fun `jev options before task are rejected rather than ignored`() {
+    val command = ArbigentCli().subcommands(ArbigentRunCommand().subcommands(ArbigentRunTaskCommand()))
+
+    val test = command.test(
+      listOf("run", "--jev-mode=active", "task", "Open settings"),
+      envvars = mapOf("OPENAI_API_KEY" to "key"),
+    )
+
+    assertNotEquals(0, test.statusCode)
+    assertContains(test.output, "--jev-mode must be passed after `task`")
+  }
+
+  @Test
+  fun `jev turned on without a key fails unless it is turned off`() {
+    val command = { ArbigentCli().subcommands(ArbigentRunCommand().subcommands(ArbigentRunTaskCommand())) }
+
+    val missingKey = command().test(
+      "run --dry-run --project-file=${yaml.absolutePath} --jev-mode=active",
+      envvars = mapOf("OPENAI_API_KEY" to "key"),
+    )
+    assertNotEquals(0, missingKey.statusCode)
+    assertContains(missingKey.output, "no Jev API key is set")
+    assertContains(missingKey.output, "--jev-mode=disabled")
+
+    val turnedOff = command().test(
+      "run --dry-run --project-file=${yaml.absolutePath} --jev-mode=disabled",
+      envvars = mapOf("OPENAI_API_KEY" to "key"),
+    )
+    assertEquals(0, turnedOff.statusCode, turnedOff.output)
+
+    val taskMissingKey = command().test(
+      listOf("run", "task", "--jev-mode=active", "Open settings"),
+      envvars = mapOf("OPENAI_API_KEY" to "key"),
+    )
+    assertNotEquals(0, taskMissingKey.statusCode)
+    assertContains(taskMissingKey.output, "no Jev API key is set")
+  }
+
+  @Test
+  fun `a cleartext jev base url is rejected`() {
+    val command = ArbigentCli().subcommands(ArbigentRunCommand().subcommands(ArbigentRunTaskCommand()))
+
+    val test = command.test(
+      "run --dry-run --project-file=${yaml.absolutePath} --jev-base-url=http://jev.example.com",
+      envvars = mapOf("OPENAI_API_KEY" to "key", "TYPESAFE_API_KEY" to "jev-placeholder-key"),
+    )
+
+    assertNotEquals(0, test.statusCode)
+    assertContains(test.output, "must use https")
   }
 
   @Test
