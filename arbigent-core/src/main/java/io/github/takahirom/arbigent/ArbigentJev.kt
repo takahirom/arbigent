@@ -77,6 +77,11 @@ public class ArbigentJevHttpClient(
 
   init {
     require(apiKey.isNotBlank()) { "Jev API key is blank" }
+    // The key goes in a header, so it must not travel in cleartext; plain HTTP is for a local server.
+    val uri = URI(baseUrl)
+    require(uri.scheme == "https" || (uri.scheme == "http" && uri.host in LoopbackHosts)) {
+      "Jev base URL must use https (plain http only for localhost): $baseUrl"
+    }
     ConfidentialInfo.addStringToBeRemoved(apiKey, "{{JEV_API_KEY}}")
   }
 
@@ -105,6 +110,7 @@ public class ArbigentJevHttpClient(
     public const val BaseUrlEnv: String = "TYPESAFE_BASE_URL"
     public const val ModelEnv: String = "TYPESAFE_DEFAULT_MODEL"
     private const val SystemOnePath = "/v1/systemone"
+    private val LoopbackHosts = setOf("localhost", "127.0.0.1", "[::1]", "::1")
   }
 }
 
@@ -114,12 +120,15 @@ public class ArbigentJevConfig(
   public val client: ArbigentJevClient,
 ) {
   public companion object {
-    /** The settings Jev runs with, or null when the project and [overrides] leave it off. */
+    /**
+     * The settings Jev runs with, or null when the project and [overrides] leave it off. Without
+     * project settings only an override mode turns Jev on; a threshold alone does not.
+     */
     public fun effectiveSettings(
       projectSettings: ArbigentJevSettings?,
       overrides: ArbigentJevOverrides,
     ): ArbigentJevSettings? {
-      if (projectSettings == null && overrides.isEmpty()) return null
+      if (projectSettings == null && overrides.mode == null) return null
       return (projectSettings ?: ArbigentJevSettings()).withOverrides(overrides)
         .takeIf { it.mode != ArbigentJevMode.Disabled }
     }

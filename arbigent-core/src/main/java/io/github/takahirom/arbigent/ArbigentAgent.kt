@@ -129,7 +129,8 @@ public class ArbigentAgent internal constructor(
     addAll(interceptors.filterIsInstance<ArbigentDecisionInterceptor>())
     // Innermost, right before the AI: cache hits and replays never reach Jev, and image assertions
     // still check a goal Jev decides. A fresh instance per agent, since its guards are per task.
-    jev?.let { add(ArbigentJevDecisionInterceptor(it.settings, it.client)) }
+    jev?.takeIf { it.settings.mode != ArbigentJevMode.Disabled }
+      ?.let { add(ArbigentJevDecisionInterceptor(it.settings, it.client)) }
   }
   private val decisionChain: suspend (ArbigentAi.DecisionInput) -> ArbigentAi.DecisionOutput = { input ->
     var chain: suspend (ArbigentAi.DecisionInput) -> ArbigentAi.DecisionOutput = { decisionInput ->
@@ -1314,7 +1315,7 @@ private suspend fun executeDefault(
         StepResult.Continue -> {
           // A Jev step costs no LLM call, so it doesn't use up maxStep; the interceptor caps how
           // many Jev steps can run in a row instead.
-          if (contextHolder.steps().drop(stepsBefore).any { it.stepSource == ArbigentStepSource.Jev }) stepRemain++
+          if (contextHolder.steps().drop(stepsBefore).any { !it.countsTowardMaxStep }) stepRemain++
         }
       }
       yield()
@@ -1509,7 +1510,8 @@ private suspend fun step(
           screenshotFilePath = screenshotFilePath,
           aiRequest = decisionOutput.step.aiRequest,
           cacheKey = cacheKey,
-          aiResponse = decisionOutput.step.aiResponse
+          aiResponse = decisionOutput.step.aiResponse,
+          countsTowardMaxStep = decisionOutput.step.countsTowardMaxStep,
         )
       )
     }
@@ -1535,7 +1537,9 @@ private suspend fun step(
             screenshotFilePath = screenshotFilePath,
             aiRequest = decisionOutput.step.aiRequest,
             cacheKey = cacheKey,
-            aiResponse = decisionOutput.step.aiResponse
+            aiResponse = decisionOutput.step.aiResponse,
+            // A goal rejected by the image assertion leaves only these steps behind.
+            countsTowardMaxStep = decisionOutput.step.countsTowardMaxStep,
           )
         )
       }

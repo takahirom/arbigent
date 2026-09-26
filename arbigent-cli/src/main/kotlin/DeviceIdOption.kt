@@ -22,7 +22,7 @@ import kotlin.reflect.KProperty
  * Declared per command (not once globally) because clikt does not pass a parent's option down to a
  * subcommand, so `run task` needs its own.
  */
-internal fun ParameterHolder.deviceIdOption(): CommandLineTrackedOption<String?> =
+internal fun ParameterHolder.deviceIdOption(): CommandLineTrackedOption<String?, String, String> =
   CommandLineTrackedOption(
     defaultOption(
       "--device-id",
@@ -42,7 +42,7 @@ internal fun ParameterHolder.deviceIdOption(): CommandLineTrackedOption<String?>
  * (fine) but a leftover `ios-real-device-id` settings key silently ignored (not fine) — the run
  * would then auto-select some other device. Accepting it here lets both be reported.
  */
-internal fun ParameterHolder.legacyIosRealDeviceIdOption(): CommandLineTrackedOption<String?> =
+internal fun ParameterHolder.legacyIosRealDeviceIdOption(): CommandLineTrackedOption<String?, String, String> =
   CommandLineTrackedOption(
     defaultOption(
       "--ios-real-device-id",
@@ -61,9 +61,9 @@ internal fun ParameterHolder.legacyIosRealDeviceIdOption(): CommandLineTrackedOp
  * mistaken for a settings value, slipped past the rejection, and the run then connected to whatever
  * the `task` subcommand resolved on its own — a different device than the one named.
  */
-internal class CommandLineTrackedOption<AllT>(
-  private val delegate: OptionWithValues<AllT, String, String>,
-) : OptionWithValues<AllT, String, String> by delegate {
+internal class CommandLineTrackedOption<AllT, EachT, ValueT>(
+  private val delegate: OptionWithValues<AllT, EachT, ValueT>,
+) : OptionWithValues<AllT, EachT, ValueT> by delegate {
   /** True once parsing is done if the option appeared in argv for the command that declares it. */
   internal var givenOnCommandLine: Boolean = false
     private set
@@ -100,7 +100,7 @@ private const val LEGACY_IOS_REAL_DEVICE_ID_MIGRATION: String =
 internal fun CliktCommand.resolveRequestedDevice(
   os: String,
   deviceId: String?,
-  deviceIdOption: CommandLineTrackedOption<String?>,
+  deviceIdOption: CommandLineTrackedOption<String?, String, String>,
   legacyIosRealDeviceId: String?,
 ): ArbigentRequestedDevice? {
   // clikt's own envvar reader, so this sees exactly what the option machinery saw.
@@ -145,7 +145,7 @@ internal fun CliktCommand.resolveRequestedDevice(
  * `run task --device-id <id>`, for one).
  */
 internal fun CliktCommand.rejectDeviceOptionsBeforeSubcommand(
-  deviceIdOption: CommandLineTrackedOption<String?>,
+  deviceIdOption: CommandLineTrackedOption<String?, String, String>,
   legacyIosRealDeviceId: String?,
 ) {
   // The superseded option is checked whatever its source: nothing reads it any more, so a leftover
@@ -159,7 +159,7 @@ internal fun CliktCommand.rejectDeviceOptionsBeforeSubcommand(
 }
 
 /** Labels where the value came from, so an error names the knob to change. */
-private fun CliktCommand.deviceIdSource(value: String, option: CommandLineTrackedOption<String?>, env: (String) -> String?): String {
+private fun CliktCommand.deviceIdSource(value: String, option: CommandLineTrackedOption<String?, String, String>, env: (String) -> String?): String {
   if (option.givenOnCommandLine) return "--device-id"
   val envValue = env(ENV_ARBIGENT_DEVICE_ID)?.trim()?.takeIf { it.isNotEmpty() }
   if (envValue == value) return ENV_ARBIGENT_DEVICE_ID

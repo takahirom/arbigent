@@ -1,6 +1,9 @@
 package io.github.takahirom.arbigent.cli
 
+import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.core.CliktError
 import com.github.ajalt.clikt.parameters.groups.OptionGroup
+import com.github.ajalt.clikt.parameters.options.OptionWithValues
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.types.choice
 import com.github.ajalt.clikt.parameters.types.double
@@ -19,31 +22,64 @@ import io.github.takahirom.arbigent.arbigentInfoLog
  * to the project (`settings.jev`); these flags override them for one run.
  */
 class JevOptions : OptionGroup("Options for Jev, which decides the steps it is confident about without the AI") {
-  val jevApiKey by defaultOption("--jev-api-key", envvar = ArbigentJevHttpClient.ApiKeyEnv, help = "Jev API key. Without one, the AI decides every step")
-  val jevBaseUrl by defaultOption("--jev-base-url", envvar = ArbigentJevHttpClient.BaseUrlEnv, help = "Jev API base URL (default: ${ArbigentJevHttpClient.DefaultBaseUrl})")
-    .default(ArbigentJevHttpClient.DefaultBaseUrl, defaultForHelp = ArbigentJevHttpClient.DefaultBaseUrl)
-  val jevModel by defaultOption("--jev-model", envvar = ArbigentJevHttpClient.ModelEnv, help = "Jev model (default: ${ArbigentJevHttpClient.DefaultModel})")
-    .default(ArbigentJevHttpClient.DefaultModel, defaultForHelp = ArbigentJevHttpClient.DefaultModel)
-  val jevMode by defaultOption("--jev-mode", help = "Override settings.jev.mode: disabled, shadow (ask Jev but let the AI act, for tuning) or active")
-    .choice(ArbigentJevMode.entries.associateBy { it.name.lowercase() })
-  val jevActionThreshold by defaultOption("--jev-action-threshold", help = "Override settings.jev.actionThreshold: the confidence Jev needs to act without the AI")
-    .double().restrictTo(0.0..1.0)
-  val jevGoalThreshold by defaultOption("--jev-goal-threshold", help = "Override settings.jev.goalThreshold: the confidence Jev needs to end a task as achieved")
-    .double().restrictTo(0.0..1.0)
+  // Which of these were typed on the command line, as opposed to read from the environment or a
+  // settings file: only those are lost when they come before a subcommand.
+  private val trackedOptions = mutableListOf<CommandLineTrackedOption<*, *, *>>()
+
+  private fun <AllT, EachT, ValueT> tracked(option: OptionWithValues<AllT, EachT, ValueT>) =
+    CommandLineTrackedOption(option).also { trackedOptions += it }
+
+  val jevApiKey by tracked(defaultOption("--jev-api-key", envvar = ArbigentJevHttpClient.ApiKeyEnv, help = "Jev API key. Without one, the AI decides every step"))
+  val jevBaseUrl by tracked(defaultOption("--jev-base-url", envvar = ArbigentJevHttpClient.BaseUrlEnv, help = "Jev API base URL (default: ${ArbigentJevHttpClient.DefaultBaseUrl})")
+    .default(ArbigentJevHttpClient.DefaultBaseUrl, defaultForHelp = ArbigentJevHttpClient.DefaultBaseUrl))
+  val jevModel by tracked(defaultOption("--jev-model", envvar = ArbigentJevHttpClient.ModelEnv, help = "Jev model (default: ${ArbigentJevHttpClient.DefaultModel})")
+    .default(ArbigentJevHttpClient.DefaultModel, defaultForHelp = ArbigentJevHttpClient.DefaultModel))
+  val jevMode by tracked(defaultOption("--jev-mode", help = "Override settings.jev.mode: disabled, shadow (ask Jev but let the AI act, for tuning) or active")
+    .choice(ArbigentJevMode.entries.associateBy { it.name.lowercase() }))
+  val jevActionThreshold by tracked(defaultOption("--jev-action-threshold", help = "Override settings.jev.actionThreshold: the confidence Jev needs to act without the AI")
+    .double().restrictTo(0.0..1.0))
+  val jevGoalThreshold by tracked(defaultOption("--jev-goal-threshold", help = "Override settings.jev.goalThreshold: the confidence Jev needs to end a task as achieved")
+    .double().restrictTo(0.0..1.0))
+
+  internal fun namesGivenOnCommandLine(): List<String> =
+    trackedOptions.filter { it.givenOnCommandLine }.map { it.names.first() }
 
   val overrides: ArbigentJevOverrides
     get() = ArbigentJevOverrides(mode = jevMode, actionThreshold = jevActionThreshold, goalThreshold = jevGoalThreshold)
 
-  fun createClient(): ArbigentJevClient? =
-    jevApiKey?.takeIf { it.isNotBlank() }?.let { ArbigentJevHttpClient(apiKey = it, baseUrl = jevBaseUrl, model = jevModel) }
+  fun createClient(): ArbigentJevClient? {
+    val apiKey = jevApiKey?.takeIf { it.isNotBlank() } ?: return null
+    return try {
+      ArbigentJevHttpClient(apiKey = apiKey, baseUrl = jevBaseUrl, model = jevModel)
+    } catch (e: IllegalArgumentException) {
+      throw CliktError(e.message)
+    }
+  }
 }
 
 /** Says which settings Jev runs with, or why it doesn't, so a run's log shows what was in effect. */
 internal fun logJevSettings(projectSettings: ArbigentJevSettings?, options: JevOptions, client: ArbigentJevClient?) {
-  val settings = ArbigentJevConfig.effectiveSettings(projectSettings, options.overrides) ?: return
+  val settings = ArbigentJevConfig.effectiveSettings(projectSettings, options.overrides)
+  if (settings == null) {
+    if (projectSettings == null && !options.overrides.isEmpty()) {
+      arbigentInfoLog("Jev thresholds were given, but Jev is off: the project has no settings.jev, so pass --jev-mode to turn it on")
+    }
+    return
+  }
   if (client == null) {
     arbigentInfoLog("Jev is ${settings.mode}, but no Jev API key is set (--jev-api-key or ${ArbigentJevHttpClient.ApiKeyEnv}); the AI decides every step")
   } else {
     arbigentInfoLog("Jev: ${settings.description()}, model ${options.jevModel} at ${options.jevBaseUrl}")
   }
+}
+
+/**
+ * clikt does not pass a parent's option to a subcommand, so `run --jev-mode=active task ...` would be
+ * accepted and then ignored. Values from the environment or the settings file need no check: `task`
+ * reads those itself.
+ */
+internal fun CliktCommand.rejectJevOptionsBeforeSubcommand(options: JevOptions) {
+  val subcommand = currentContext.invokedSubcommand?.commandName ?: return
+  val name = options.namesGivenOnCommandLine().firstOrNull() ?: return
+  throw CliktError("$name must be passed after `$subcommand`, as in `run $subcommand $name ... \"<goal>\"`.")
 }

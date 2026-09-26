@@ -1,6 +1,8 @@
 package io.github.takahirom.arbigent
 
 import io.github.takahirom.arbigent.result.ArbigentStepSource
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.JsonObject
@@ -23,8 +25,9 @@ internal class ArbigentJevDecisionInterceptor(
 ) : ArbigentDecisionInterceptor {
   private var previous: Pair<String, List<String>>? = null
 
-  // What each decided step acted on, by step id, so the history can say "Press center (focus was
-  // on X)" instead of an index that meant something only on that step's screen.
+  // Where focus sat for each step this interceptor saw, by step id, so the history can say "Press
+  // center (focus was on X)". Index actions are named from the step's own target instead, which
+  // cache hits and replays record too.
   private val actedOn = mutableMapOf<String, String>()
 
   // Jev steps don't count toward maxStep, so this is what stops jev from looping forever.
@@ -37,33 +40,46 @@ internal class ArbigentJevDecisionInterceptor(
     val tv = decisionInput.formFactor.isTv()
     val screen = decisionInput.elements.elements.map { it.index to if (tv) it.textForAI else stripBounds(it.textForAI) }
     val goal = decisionInput.contextHolder.goal
-    val options = if (tv) tvOptions(decisionInput.elements) else phoneOptions(screen, goal)
+    val options = (if (tv) tvOptions(decisionInput.elements, goal) else phoneOptions(screen, goal))
+      .filterValues { it.type in decisionInput.agentActionTypes }
+      .mapValues { it.value.description } +
+      toolOption(decisionInput.mcpTools.orEmpty())
     val request = request(goal, history(decisionInput.contextHolder), screen, if (tv) decisionInput.focusedTreeString else null, options, tv)
 
     if (settings.mode == ArbigentJevMode.Shadow) {
       return coroutineScope {
-        val jev = async { runCatching { ask(request) } }
+        // Undispatched so the request is on its way before the AI call, which blocks this thread.
+        val jev = async(start = CoroutineStart.UNDISPATCHED) { askCatching(request) }
         val output = chain.proceed(decisionInput)
         val aiAction = output.agentActions.singleOrNull()
-        jev.await()
-          .onSuccess { (choice, confidence) ->
-            val agreement = if (choice == aiAction?.let(::optionKey)) "agrees with" else "differs from"
-            arbigentInfoLog("Jev (shadow): ${describe(choice, confidence, decisionInput)} $agreement the AI's ${aiAction?.stepLogText()}")
-          }
-          .onFailure { arbigentInfoLog("Jev (shadow) failed: ${it.javaClass.simpleName}: ${it.message}") }
+        // Never hold the AI's action for Jev: the screen can move on while waiting.
+        if (jev.isCompleted) {
+          jev.await()
+            .onSuccess { (choice, confidence) ->
+              val agreement = if (choice == aiAction?.let(::optionKey)) "agrees with" else "differs from"
+              arbigentInfoLog("Jev (shadow): ${describe(choice, confidence, decisionInput)} $agreement the AI's ${aiAction?.stepLogText()}")
+            }
+            .onFailure { arbigentInfoLog("Jev (shadow) failed: ${it.javaClass.simpleName}: ${it.message}") }
+        } else {
+          jev.cancel()
+          arbigentInfoLog("Jev (shadow) had not answered when the AI did")
+        }
         aiAction?.let { remember(decisionInput, it) }
         output
       }
     }
 
-    val (choice, confidence) = try {
-      ask(request)
-    } catch (e: Exception) {
+    val (choice, confidence) = askCatching(request).getOrElse { e ->
       arbigentInfoLog("Jev failed, asking the AI: ${e.javaClass.simpleName}: ${e.message}")
       return proceedToAi(decisionInput, chain)
     }
     val screenKey = screen.map { it.second }
     val deferReason = when {
+      // Also rules out an index that isn't on this screen: every index option comes from it.
+      choice !in options -> "not one of the offered options"
+      confidence.isNaN() -> "no usable confidence"
+      // Jev can't fill in a tool's arguments, so it only says a tool is needed and the AI calls it.
+      choice == CallToolOption -> "a tool call is left to the AI"
       choice == "goal_achieved" && confidence < (settings.goalThreshold ?: Double.POSITIVE_INFINITY) -> "goal below the goal threshold"
       confidence < settings.actionThreshold -> "below the action threshold"
       // Jev cannot see whether a scroll changed anything, so it would scroll past the target.
@@ -92,6 +108,7 @@ internal class ArbigentJevDecisionInterceptor(
         screenshotFilePath = decisionInput.screenshotFilePath,
         apiCallJsonLFilePath = null,
         stepSource = ArbigentStepSource.Jev,
+        countsTowardMaxStep = false,
       ),
     )
   }
@@ -113,43 +130,61 @@ internal class ArbigentJevDecisionInterceptor(
   }
 
   private fun remember(decisionInput: ArbigentAi.DecisionInput, action: ArbigentAgentAction) {
-    val elements = decisionInput.elements.elements
-    val description = when (action) {
-      is DpadAutoFocusWithIndexAgentAction -> elements.getOrNull(action.index)?.let(::nameOf)
-        ?.let { "Moved focus to \"$it\" (focus only; this action did not press or select it)" }
-      is ClickWithIndex -> elements.getOrNull(action.index)?.let(::nameOf)?.let { "Clicked \"$it\"" }
-      else -> elements.firstOrNull { it.treeNode.focused == true }?.let(::nameOf)
-        ?.let { "${action.stepLogText().removeSuffix(" 1 times")} (focus was on \"$it\")" }
-    }
-    description?.let { actedOn[decisionInput.stepId] = it }
+    if (action is DpadAutoFocusWithIndexAgentAction || action is ClickWithIndex) return
+    decisionInput.elements.elements.firstOrNull { it.treeNode.focused == true }?.let(::nameOf)
+      ?.let { actedOn[decisionInput.stepId] = "${action.stepLogText().removeSuffix(" 1 times")} (focus was on \"$it\")" }
   }
 
   // Only what was done, never the AI's memo or image description: a jev step has neither.
   private fun history(contextHolder: ArbigentContextHolder): String = contextHolder.steps()
     .mapNotNull { step ->
-      step.feedback ?: actedOn[step.stepId] ?: step.agentAction?.stepLogText()
+      step.feedback ?: actedOn[step.stepId] ?: step.agentAction?.let { describeDone(it, step.targetElement) }
     }
     .mapIndexed { i, line -> "${i + 1}. $line" }
     .joinToString("\n")
     .ifEmpty { "(none)" }
 
-  private fun phoneOptions(screen: List<Pair<Int, String>>, goal: String): Map<String, String> =
+  private fun describeDone(action: ArbigentAgentAction, target: ArbigentElementIdentity?): String {
+    val name = target?.let { it.text ?: it.accessibilityId }?.replace(Regex("\\s+"), " ")?.trim()?.take(80)
+      ?: return action.stepLogText()
+    return when (action) {
+      is DpadAutoFocusWithIndexAgentAction -> "Moved focus to \"$name\" (focus only; this action did not press or select it)"
+      is ClickWithIndex -> "Clicked \"$name\""
+      else -> "${action.stepLogText()} (target: \"$name\")"
+    }
+  }
+
+  // An option is offered only when the step lets the AI take that kind of action.
+  private class Option(val type: AgentActionType, val description: String)
+
+  private fun phoneOptions(screen: List<Pair<Int, String>>, goal: String): Map<String, Option> =
     buildMap {
-      screen.forEach { (index, text) -> put("click $index", "Click element $index: ${text.take(180)}") }
-      inputCandidates(goal).forEach { put("input $it", "Type the text \"$it\" into the focused field") }
-      put("key ENTER", "Press the ENTER key")
-      put("key BACK", "Press the BACK key")
-      put("scroll", "Scroll down to reveal more elements")
-      put("goal_achieved", "The goal is already achieved on the current screen; stop")
+      screen.forEach { (index, text) -> put("click $index", Option(ClickWithIndex, "Click element $index: ${text.take(180)}")) }
+      inputCandidates(goal).forEach { put("input $it", Option(InputTextAgentAction, "Type the text \"$it\" into the focused field")) }
+      put("key ENTER", Option(KeyPressAgentAction, "Press the ENTER key"))
+      put("key BACK", Option(KeyPressAgentAction, "Press the BACK key"))
+      put("scroll", Option(ScrollAgentAction, "Scroll down to reveal more elements"))
+      put("wait", Option(WaitAgentAction, "The screen is still loading or transitioning; wait"))
+      put("goal_achieved", Option(GoalAchievedAgentAction, "The goal is already achieved on the current screen; stop"))
     }
 
-  private fun tvOptions(elements: ArbigentElementList): Map<String, String> = buildMap {
-    elements.elements.forEach { put("focus ${it.index}", "Move the D-pad focus to element ${it.index}: ${stripBounds(it.textForAI).take(160)}") }
-    put("center", "Press the D-pad center key to select the currently focused element")
-    listOf("up", "down", "left", "right").forEach { put(it, "Press the D-pad $it arrow key once") }
-    put("back", "Press the BACK key")
-    put("wait", "The screen is still loading or transitioning; wait")
-    put("goal_achieved", "The expected state is already shown on the current screen; stop")
+  private fun tvOptions(elements: ArbigentElementList, goal: String): Map<String, Option> = buildMap {
+    elements.elements.forEach { put("focus ${it.index}", Option(DpadAutoFocusWithIndexAgentAction, "Move the D-pad focus to element ${it.index}: ${stripBounds(it.textForAI).take(160)}")) }
+    put("center", Option(DpadCenterAgentAction, "Press the D-pad center key to select the currently focused element"))
+    put("up", Option(DpadUpArrowAgentAction, "Press the D-pad up arrow key once"))
+    put("down", Option(DpadDownArrowAgentAction, "Press the D-pad down arrow key once"))
+    put("left", Option(DpadLeftArrowAgentAction, "Press the D-pad left arrow key once"))
+    put("right", Option(DpadRightArrowAgentAction, "Press the D-pad right arrow key once"))
+    inputCandidates(goal).forEach { put("input $it", Option(InputTextAgentAction, "Type the text \"$it\" into the focused field")) }
+    put("back", Option(BackPressAgentAction, "Press the BACK key"))
+    put("wait", Option(WaitAgentAction, "The screen is still loading or transitioning; wait"))
+    put("goal_achieved", Option(GoalAchievedAgentAction, "The expected state is already shown on the current screen; stop"))
+  }
+
+  private fun toolOption(tools: List<MCPTool>): Map<String, String> {
+    if (tools.isEmpty()) return emptyMap()
+    val list = tools.joinToString("; ") { tool -> tool.name + (tool.description?.let { ": ${it.take(120)}" } ?: "") }
+    return mapOf(CallToolOption to "Call one of these tools next (not a screen action): $list")
   }
 
   private fun request(
@@ -176,6 +211,15 @@ internal class ArbigentJevDecisionInterceptor(
     }
   }
 
+  // Cancellation is not a Jev failure: rethrow it, so a cancelled step never goes on to the AI.
+  private suspend fun askCatching(request: JsonObject): Result<Pair<String, Double>> = try {
+    Result.success(ask(request))
+  } catch (e: CancellationException) {
+    throw e
+  } catch (e: Exception) {
+    Result.failure(e)
+  }
+
   private suspend fun ask(request: JsonObject): Pair<String, Double> {
     val next = client.decide(request)["answers"]!!.jsonObject["next"]!!.jsonObject
     return next["choice"]!!.jsonPrimitive.content to next["confidence"]!!.jsonPrimitive.double
@@ -199,6 +243,7 @@ internal class ArbigentJevDecisionInterceptor(
 
   companion object {
     private const val MaxJevStreak = 30
+    private const val CallToolOption = "call_tool"
     private val boundsRegex = Regex("""bounds=\[[^\]]*\]\[[^\]]*\], ?""")
     private val nameRegex = Regex("""(?:text|accessibilityText|content description)=([^,]*)""")
     private fun stripBounds(text: String) = text.replace(boundsRegex, "")

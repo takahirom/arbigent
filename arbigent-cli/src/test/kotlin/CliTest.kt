@@ -292,6 +292,32 @@ scenarios:
   }
 
   @Test
+  fun `jev options before task are rejected rather than ignored`() {
+    val command = ArbigentCli().subcommands(ArbigentRunCommand().subcommands(ArbigentRunTaskCommand()))
+
+    val test = command.test(
+      listOf("run", "--jev-mode=active", "task", "Open settings"),
+      envvars = mapOf("OPENAI_API_KEY" to "key"),
+    )
+
+    assertNotEquals(0, test.statusCode)
+    assertContains(test.output, "--jev-mode must be passed after `task`")
+  }
+
+  @Test
+  fun `a cleartext jev base url is rejected`() {
+    val command = ArbigentCli().subcommands(ArbigentRunCommand().subcommands(ArbigentRunTaskCommand()))
+
+    val test = command.test(
+      "run --dry-run --project-file=${yaml.absolutePath} --jev-base-url=http://jev.example.com",
+      envvars = mapOf("OPENAI_API_KEY" to "key", "TYPESAFE_API_KEY" to "jev-placeholder-key"),
+    )
+
+    assertNotEquals(0, test.statusCode)
+    assertContains(test.output, "must use https")
+  }
+
+  @Test
   fun `run task help shows expected options`() {
     val command = ArbigentCli().subcommands(ArbigentRunCommand().subcommands(ArbigentRunTaskCommand()))
 

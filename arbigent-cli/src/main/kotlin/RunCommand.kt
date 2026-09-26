@@ -147,6 +147,7 @@ class ArbigentRunCommand(
         deviceIdOption = deviceIdOptionRef,
         legacyIosRealDeviceId = legacyIosRealDeviceId,
       )
+      rejectJevOptionsBeforeSubcommand(jevOptions)
       return
     }
 

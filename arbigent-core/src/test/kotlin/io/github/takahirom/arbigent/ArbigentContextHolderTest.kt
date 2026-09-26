@@ -211,17 +211,20 @@ class ArbigentContextHolderTest {
     @Test
     fun jevStepsAreLeftOutOfTheStepShownAgainstTheLimit() {
         val contextHolder = ArbigentContextHolder(goal = "Test Goal", maxStep = 2)
-        listOf(ArbigentStepSource.Jev, ArbigentStepSource.Jev, ArbigentStepSource.Ai).forEachIndexed { i, source ->
-            contextHolder.addStep(
-                ArbigentContextHolder.Step(
-                    stepId = "step$i",
-                    agentAction = ClickWithIndex(i),
-                    cacheKey = "cache$i",
-                    screenshotFilePath = "screenshot$i.png",
-                    stepSource = source,
+        // A Jev decision, the same decision replayed from the cache, then an AI decision.
+        listOf(ArbigentStepSource.Jev to false, ArbigentStepSource.Cache to false, ArbigentStepSource.Ai to true)
+            .forEachIndexed { i, (source, counts) ->
+                contextHolder.addStep(
+                    ArbigentContextHolder.Step(
+                        stepId = "step$i",
+                        agentAction = ClickWithIndex(i),
+                        cacheKey = "cache$i",
+                        screenshotFilePath = "screenshot$i.png",
+                        stepSource = source,
+                        countsTowardMaxStep = counts,
+                    )
                 )
-            )
-        }
+            }
 
         val context = contextHolder.context(ArbigentAiOptions())
 
