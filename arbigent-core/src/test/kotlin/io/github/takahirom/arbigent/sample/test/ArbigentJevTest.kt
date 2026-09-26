@@ -6,7 +6,9 @@ import io.github.takahirom.arbigent.result.ArbigentStepSource
 import io.github.takahirom.arbigent.result.ArbigentUiTreeStrings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -18,7 +20,6 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -286,11 +287,26 @@ class ArbigentJevTest {
   }
 
   @Test
-  fun aCancelledJevRequestDoesNotGoOnToTheAi() = runTest {
-    val interceptor = ArbigentJevDecisionInterceptor(ArbigentJevSettings(), ArbigentJevClient { throw CancellationException("cancelled") })
+  fun aCancelledRunDoesNotGoOnToTheAi() = runTest {
     var aiCalls = 0
-    assertFailsWith<CancellationException> { interceptor.intercept(decisionInput()) { aiCalls++; aiOutput(it) } }
+    lateinit var run: Job
+    val interceptor = ArbigentJevDecisionInterceptor(ArbigentJevSettings(), ArbigentJevClient { run.cancel(); awaitCancellation() })
+    run = launch { interceptor.intercept(decisionInput()) { aiCalls++; aiOutput(it) } }
+    run.join()
+
+    assertTrue(run.isCancelled)
     assertEquals(0, aiCalls)
+  }
+
+  @Test
+  fun aJevRequestCancelledOnItsOwnGoesToTheAi() = runTest {
+    val timesOut = ArbigentJevClient { throw CancellationException("client-side timeout") }
+    for (mode in listOf(ArbigentJevMode.Active, ArbigentJevMode.Shadow)) {
+      var aiCalls = 0
+      ArbigentJevDecisionInterceptor(ArbigentJevSettings(mode = mode), timesOut)
+        .intercept(decisionInput()) { aiCalls++; aiOutput(it) }
+      assertEquals(1, aiCalls, mode.name)
+    }
   }
 
   private fun FakeJevClient.criteria(): Map<String, String> =

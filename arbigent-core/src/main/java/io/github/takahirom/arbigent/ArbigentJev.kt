@@ -1,7 +1,7 @@
 package io.github.takahirom.arbigent
 
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.runInterruptible
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -93,7 +93,8 @@ public class ArbigentJevHttpClient(
       .header("Content-Type", "application/json")
       .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
       .build()
-    val response = withContext(Dispatchers.IO) {
+    // Interruptible so a cancelled request (such as Shadow mode's) doesn't hold the caller until the timeout.
+    val response = runInterruptible(Dispatchers.IO) {
       http.send(httpRequest, HttpResponse.BodyHandlers.ofString())
     }
     check(response.statusCode() == 200) {

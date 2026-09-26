@@ -5,6 +5,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.double
@@ -215,7 +217,10 @@ internal class ArbigentJevDecisionInterceptor(
   private suspend fun askCatching(request: JsonObject): Result<Pair<String, Double>> = try {
     Result.success(ask(request))
   } catch (e: CancellationException) {
-    throw e
+    // Only a cancelled run stops here. A request cancelled on its own, such as a client-side
+    // timeout, is just a failed answer.
+    currentCoroutineContext().ensureActive()
+    Result.failure(e)
   } catch (e: Exception) {
     Result.failure(e)
   }
