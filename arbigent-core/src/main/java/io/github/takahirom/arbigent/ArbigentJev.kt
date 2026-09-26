@@ -135,16 +135,26 @@ public class ArbigentJevConfig(
     }
 
     /**
-     * Null when Jev should not run: it is off, or no [client] is configured. A missing key never
-     * fails the run, so projects that enable Jev still run on machines and CI jobs without one.
+     * Whether Jev runs. Jev turned on without a [client] is [ArbigentJevResolution.MissingKey], not
+     * off, so each front end decides what a missing key means instead of it passing unnoticed.
      */
     public fun resolve(
       projectSettings: ArbigentJevSettings?,
       overrides: ArbigentJevOverrides,
       client: ArbigentJevClient?,
-    ): ArbigentJevConfig? {
-      val settings = effectiveSettings(projectSettings, overrides) ?: return null
-      return ArbigentJevConfig(settings, client ?: return null)
+    ): ArbigentJevResolution {
+      val settings = effectiveSettings(projectSettings, overrides) ?: return ArbigentJevResolution.Off
+      if (client == null) return ArbigentJevResolution.MissingKey(settings)
+      return ArbigentJevResolution.On(ArbigentJevConfig(settings, client))
     }
   }
+}
+
+public sealed interface ArbigentJevResolution {
+  public data object Off : ArbigentJevResolution
+
+  // Jev is turned on, but there is no key to call it with.
+  public data class MissingKey(public val settings: ArbigentJevSettings) : ArbigentJevResolution
+
+  public data class On(public val config: ArbigentJevConfig) : ArbigentJevResolution
 }

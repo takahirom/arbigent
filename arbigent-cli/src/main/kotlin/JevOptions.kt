@@ -13,6 +13,7 @@ import io.github.takahirom.arbigent.ArbigentJevConfig
 import io.github.takahirom.arbigent.ArbigentJevHttpClient
 import io.github.takahirom.arbigent.ArbigentJevMode
 import io.github.takahirom.arbigent.ArbigentJevOverrides
+import io.github.takahirom.arbigent.ArbigentJevResolution
 import io.github.takahirom.arbigent.ArbigentJevSettings
 import io.github.takahirom.arbigent.arbigentInfoLog
 
@@ -29,7 +30,7 @@ class JevOptions : OptionGroup("Options for Jev, which decides the steps it is c
   private fun <AllT, EachT, ValueT> tracked(option: OptionWithValues<AllT, EachT, ValueT>) =
     CommandLineTrackedOption(option).also { trackedOptions += it }
 
-  val jevApiKey by tracked(defaultOption("--jev-api-key", envvar = ArbigentJevHttpClient.ApiKeyEnv, help = "Jev API key. Without one, the AI decides every step"))
+  val jevApiKey by tracked(defaultOption("--jev-api-key", envvar = ArbigentJevHttpClient.ApiKeyEnv, help = "Jev API key, required while Jev is on (turn it off with --jev-mode=disabled)"))
   val jevBaseUrl by tracked(defaultOption("--jev-base-url", envvar = ArbigentJevHttpClient.BaseUrlEnv, help = "Jev API base URL (default: ${ArbigentJevHttpClient.DefaultBaseUrl})")
     .default(ArbigentJevHttpClient.DefaultBaseUrl, defaultForHelp = ArbigentJevHttpClient.DefaultBaseUrl))
   val jevModel by tracked(defaultOption("--jev-model", envvar = ArbigentJevHttpClient.ModelEnv, help = "Jev model (default: ${ArbigentJevHttpClient.DefaultModel})")
@@ -47,7 +48,7 @@ class JevOptions : OptionGroup("Options for Jev, which decides the steps it is c
   val overrides: ArbigentJevOverrides
     get() = ArbigentJevOverrides(mode = jevMode, actionThreshold = jevActionThreshold, goalThreshold = jevGoalThreshold)
 
-  fun createClient(): ArbigentJevClient? {
+  private fun createClient(): ArbigentJevClient? {
     val apiKey = jevApiKey?.takeIf { it.isNotBlank() } ?: return null
     return try {
       ArbigentJevHttpClient(apiKey = apiKey, baseUrl = jevBaseUrl, model = jevModel)
@@ -55,22 +56,28 @@ class JevOptions : OptionGroup("Options for Jev, which decides the steps it is c
       throw CliktError(e.message)
     }
   }
-}
 
-/** Says which settings Jev runs with, or why it doesn't, so a run's log shows what was in effect. */
-internal fun logJevSettings(projectSettings: ArbigentJevSettings?, options: JevOptions, client: ArbigentJevClient?) {
-  val settings = ArbigentJevConfig.effectiveSettings(projectSettings, options.overrides)
-  if (settings == null) {
-    if (projectSettings == null && !options.overrides.isEmpty()) {
-      arbigentInfoLog("Jev thresholds were given, but Jev is off: the project has no settings.jev, so pass --jev-mode to turn it on")
+  /**
+   * The config this run's Jev uses, or null when Jev is off, and says which in the log. Jev turned on
+   * without a key fails the run rather than quietly leaving every step to the AI.
+   */
+  fun resolve(projectSettings: ArbigentJevSettings?): ArbigentJevConfig? =
+    when (val resolution = ArbigentJevConfig.resolve(projectSettings, overrides, createClient())) {
+      ArbigentJevResolution.Off -> {
+        if (projectSettings == null && !overrides.isEmpty()) {
+          arbigentInfoLog("Jev thresholds were given, but Jev is off: the project has no settings.jev, so pass --jev-mode to turn it on")
+        }
+        null
+      }
+      is ArbigentJevResolution.MissingKey -> throw CliktError(
+        "Jev is ${resolution.settings.mode}, but no Jev API key is set (--jev-api-key or ${ArbigentJevHttpClient.ApiKeyEnv}). " +
+          "Set one, or pass --jev-mode=disabled to run without Jev."
+      )
+      is ArbigentJevResolution.On -> {
+        arbigentInfoLog("Jev: ${resolution.config.settings.description()}, model $jevModel at $jevBaseUrl")
+        resolution.config
+      }
     }
-    return
-  }
-  if (client == null) {
-    arbigentInfoLog("Jev is ${settings.mode}, but no Jev API key is set (--jev-api-key or ${ArbigentJevHttpClient.ApiKeyEnv}); the AI decides every step")
-  } else {
-    arbigentInfoLog("Jev: ${settings.description()}, model ${options.jevModel} at ${options.jevBaseUrl}")
-  }
 }
 
 /**

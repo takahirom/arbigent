@@ -84,6 +84,9 @@ class ArbigentRunTaskCommand(
 
     val (resultDir, resultFile) = setupArbigentFiles(workingDirectory, logFile)
     val ai = createAi(aiType, aiApiLoggingEnabled)
+    // No project file, so Jev runs only when --jev-mode turns it on. Resolved before connecting, so
+    // a missing key fails before any device work.
+    val jev = jevOptions.resolve(projectSettings = null)
     val device = deviceConnector.connect(
       os = os,
       requestedDevice = resolveRequestedDevice(
@@ -113,10 +116,7 @@ class ArbigentRunTaskCommand(
       val appSettings = CliAppSettings(workingDirectory = workingDirectory, path = null)
       // Composition root for the `run task` command: the one place the production dispatcher is
       // created and threaded down (no per-signature defaults, no process-wide global).
-      // No project file, so Jev runs only when --jev-mode turns it on.
-      val jevClient = jevOptions.createClient()
-      val arbigentProject = ArbigentProject(projectFileContent, aiFactory = { ai }, deviceFactory = { device }, appSettings = appSettings, dispatcher = Dispatchers.Default, jevClient = jevClient, jevOverrides = jevOptions.overrides)
-      logJevSettings(null, jevOptions, jevClient)
+      val arbigentProject = ArbigentProject(projectFileContent, aiFactory = { ai }, deviceFactory = { device }, appSettings = appSettings, dispatcher = Dispatchers.Default, jev = jev)
       val scenarios = arbigentProject.scenarios
 
       Runtime.getRuntime().addShutdownHook(object : Thread() {

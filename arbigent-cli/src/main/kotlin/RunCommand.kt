@@ -183,7 +183,6 @@ class ArbigentRunCommand(
     
     val (resultDir, resultFile) = setupArbigentFiles(workingDirectory, logFile)
     val ai = createAi(aiType, aiApiLoggingEnabled)
-    val jevClient = jevOptions.createClient()
 
     var device: ArbigentDevice? = null
     val appSettings = CliAppSettings(
@@ -199,10 +198,8 @@ class ArbigentRunCommand(
       deviceFactory = { device ?: throw UnsupportedOperationException("Device not available in dry-run mode") },
       appSettings = appSettings,
       dispatcher = Dispatchers.Default,
-      jevClient = jevClient,
-      jevOverrides = jevOptions.overrides,
+      resolveJev = jevOptions::resolve,
     )
-    logJevSettings(arbigentProject.settings.jev, jevOptions, jevClient)
     if (scenarioIds.isNotEmpty() && tags.isNotEmpty()) {
       throw IllegalArgumentException("Cannot specify both scenario IDs and tags. Please create an issue if you need this feature.")
     }

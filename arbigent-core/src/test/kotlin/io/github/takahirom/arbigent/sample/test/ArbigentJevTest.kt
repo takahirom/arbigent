@@ -18,9 +18,11 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
+import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -226,6 +228,43 @@ class ArbigentJevTest {
   }
 
   @Test
+  fun aRunJevDecidedReplaysWithoutJevOrTheAi() = runTest {
+    val originalTraceDir = ArbigentFiles.traceDir
+    ArbigentFiles.traceDir = Files.createTempDirectory("arbigent-jev-replay").toFile()
+    try {
+      val settings = ArbigentJevSettings(goalThreshold = 0.9)
+      fun scenario(ai: ArbigentAi, client: ArbigentJevClient) = ArbigentScenario(
+        id = "scenario",
+        agentTasks = listOf(ArbigentAgentTask("task", "Open 'Settings'", agentConfig(ai, ArbigentJevConfig(settings, client)))),
+        maxStepCount = 10,
+        tags = setOf(),
+        isLeaf = true,
+        replayWithFallback = true,
+      )
+      val dispatcher = coroutineContext[CoroutineDispatcher]!!
+      val recordingAi = CountingAi()
+      ArbigentScenarioExecutor(dispatcher)
+        .execute(scenario(recordingAi, FakeJevClient(listOf("click 1" to 0.95, "click 2" to 0.95, "goal_achieved" to 0.97))), MCPClient())
+      advanceUntilIdle()
+      assertEquals(0, recordingAi.decisions)
+
+      val ai = CountingAi()
+      val client = FakeJevClient(listOf("click 1" to 0.1))
+      val executor = ArbigentScenarioExecutor(dispatcher)
+      executor.execute(scenario(ai, client), MCPClient())
+      advanceUntilIdle()
+
+      val agent = executor.taskAssignments().single().agent
+      assertTrue(agent.isGoalAchieved())
+      assertEquals(List(3) { ArbigentStepSource.Replay }, agent.stepSources())
+      assertEquals(0, client.requests.size)
+      assertEquals(0, ai.decisions)
+    } finally {
+      ArbigentFiles.traceDir = originalTraceDir
+    }
+  }
+
+  @Test
   fun anAnswerThatIsNotAnOfferedOptionGoesToTheAi() = runTest {
     val ai = CountingAi()
     val client = FakeJevClient(listOf("bogus" to 0.99, "click 999" to 0.99, "focus 1" to 0.99))
@@ -344,10 +383,13 @@ class ArbigentJevTest {
     val client = ArbigentJevClient { error("unused") }
     val project = ArbigentJevSettings(actionThreshold = 0.9, goalThreshold = 0.95)
 
-    assertNull(ArbigentJevConfig.resolve(null, ArbigentJevOverrides(), client))
-    assertNull(ArbigentJevConfig.resolve(project, ArbigentJevOverrides(), client = null))
-    assertNull(ArbigentJevConfig.resolve(project, ArbigentJevOverrides(mode = ArbigentJevMode.Disabled), client))
-    assertEquals(project, ArbigentJevConfig.resolve(project, ArbigentJevOverrides(), client)!!.settings)
+    assertEquals(ArbigentJevResolution.Off, ArbigentJevConfig.resolve(null, ArbigentJevOverrides(), client))
+    assertEquals(ArbigentJevResolution.Off, ArbigentJevConfig.resolve(project, ArbigentJevOverrides(mode = ArbigentJevMode.Disabled), client))
+    // Turned on without a key is its own state, not off, so a missing key can't pass unnoticed.
+    assertEquals(ArbigentJevResolution.MissingKey(project), ArbigentJevConfig.resolve(project, ArbigentJevOverrides(), client = null))
+    assertEquals(ArbigentJevResolution.Off, ArbigentJevConfig.resolve(project, ArbigentJevOverrides(mode = ArbigentJevMode.Disabled), client = null))
+    val on = assertIs<ArbigentJevResolution.On>(ArbigentJevConfig.resolve(project, ArbigentJevOverrides(), client))
+    assertEquals(project, on.config.settings)
     assertEquals(
       ArbigentJevSettings(mode = ArbigentJevMode.Shadow, actionThreshold = 0.7, goalThreshold = 0.95),
       ArbigentJevConfig.effectiveSettings(project, ArbigentJevOverrides(mode = ArbigentJevMode.Shadow, actionThreshold = 0.7)),

@@ -185,29 +185,19 @@ fun loadArbigentProject(
   deviceFactory: () -> ArbigentDevice,
   appSettings: ArbigentAppSettings,
   dispatcher: CoroutineDispatcher,
-  jevClient: ArbigentJevClient? = null,
-  jevOverrides: ArbigentJevOverrides = ArbigentJevOverrides(),
-): ArbigentProject = asCliktError(projectFile) {
-  if (isJourneyProjectSource(projectFile)) {
-    val projectFileContent = ArbigentJourneyXmlImporter.loadProjectContent(File(projectFile))
+  // Given the project's settings.jev; the config Jev runs with, or null to leave it off.
+  resolveJev: (ArbigentJevSettings?) -> ArbigentJevConfig? = { null },
+): ArbigentProject {
+  val projectFileContent = loadArbigentProjectFileContent(projectFile)
+  val jev = resolveJev(projectFileContent.settings.jev)
+  return asCliktError(projectFile) {
     ArbigentProject(
       projectFileContent = projectFileContent,
       aiFactory = aiFactory,
       deviceFactory = deviceFactory,
       appSettings = appSettings,
       dispatcher = dispatcher,
-      jevClient = jevClient,
-      jevOverrides = jevOverrides,
-    )
-  } else {
-    ArbigentProject(
-      file = File(projectFile),
-      aiFactory = aiFactory,
-      deviceFactory = deviceFactory,
-      appSettings = appSettings,
-      dispatcher = dispatcher,
-      jevClient = jevClient,
-      jevOverrides = jevOverrides,
+      jev = jev,
     )
   }
 }
