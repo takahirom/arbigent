@@ -105,6 +105,11 @@ public class ArbigentContextHolder(
     }
   }
 
+  // Jev steps don't use up maxStep, so the step number shown against the limit leaves them out;
+  // otherwise a run with many Jev steps would tell the AI it is past its limit.
+  private fun currentStepAgainstLimit(): Int =
+    steps().count { it.agentAction != null && it.agentAction !is FailedAgentAction && it.stepSource != ArbigentStepSource.Jev } + 1
+
   public fun getStepsText(aiOptions: ArbigentAiOptions?): String {
     val allSteps = steps().withIndex().toList()
     val stepsToInclude = aiOptions?.historicalStepLimit?.let { count ->
@@ -123,7 +128,7 @@ public class ArbigentContextHolder(
   ): String {
     return userPromptTemplate.format(
       goal = goal,
-      currentStep = countMeaningfulActions() + 1,
+      currentStep = currentStepAgainstLimit(),
       maxStep = maxStep,
       steps = getStepsText(aiOptions),
       uiElements = uiElements,
@@ -135,7 +140,7 @@ public class ArbigentContextHolder(
   public fun context(aiOptions: ArbigentAiOptions): String {
     return userPromptTemplate.format(
       goal = goal,
-      currentStep = countMeaningfulActions() + 1,
+      currentStep = currentStepAgainstLimit(),
       maxStep = maxStep,
       steps = getStepsText(aiOptions)
     )

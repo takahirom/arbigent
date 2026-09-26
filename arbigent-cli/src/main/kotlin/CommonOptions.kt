@@ -185,6 +185,8 @@ fun loadArbigentProject(
   deviceFactory: () -> ArbigentDevice,
   appSettings: ArbigentAppSettings,
   dispatcher: CoroutineDispatcher,
+  jevClient: ArbigentJevClient? = null,
+  jevOverrides: ArbigentJevOverrides = ArbigentJevOverrides(),
 ): ArbigentProject = asCliktError(projectFile) {
   if (isJourneyProjectSource(projectFile)) {
     val projectFileContent = ArbigentJourneyXmlImporter.loadProjectContent(File(projectFile))
@@ -194,6 +196,8 @@ fun loadArbigentProject(
       deviceFactory = deviceFactory,
       appSettings = appSettings,
       dispatcher = dispatcher,
+      jevClient = jevClient,
+      jevOverrides = jevOverrides,
     )
   } else {
     ArbigentProject(
@@ -202,6 +206,8 @@ fun loadArbigentProject(
       deviceFactory = deviceFactory,
       appSettings = appSettings,
       dispatcher = dispatcher,
+      jevClient = jevClient,
+      jevOverrides = jevOverrides,
     )
   }
 }

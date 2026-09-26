@@ -277,6 +277,11 @@ public data class ArbigentProjectSettings(
    * `--variables=appId=com.example.app.debug`.
    */
   public val variables: Map<String, String>? = null,
+  /**
+   * Lets Jev decide steps it is confident about, skipping the LLM call. Absent means off. The API
+   * key is per person (`arbigent run --jev-api-key` / `TYPESAFE_API_KEY`), never in the project.
+   */
+  public val jev: ArbigentJevSettings? = null,
 ) {
   public companion object {
     public const val DefaultMcpJson: String = "{}"
@@ -462,7 +467,8 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
   aiDecisionCache: ArbigentAiDecisionCache,
   appSettings: ArbigentAppSettings = DefaultArbigentAppSettings,
   fixedScenarios: List<FixedScenario> = emptyList(),
-  reusableScenarios: List<ArbigentScenarioContent> = emptyList()
+  reusableScenarios: List<ArbigentScenarioContent> = emptyList(),
+  jev: ArbigentJevConfig? = null,
 ): ArbigentScenario {
   val effectiveAppSettings = appSettings.withProjectVariables(projectSettings.variables)
   fun agentTask(
@@ -553,6 +559,7 @@ public fun List<ArbigentScenarioContent>.createArbigentScenario(
         aiOptions(projectSettings.aiOptions?.mergeWith(nodeScenario.aiOptions) ?: nodeScenario.aiOptions)
         aiFactory(aiFactory)
         deviceFactory(deviceFactory)
+        jev(jev)
       }.build(),
     )
   }

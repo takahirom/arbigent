@@ -63,6 +63,7 @@ public class ArbigentAgent internal constructor(
   private val prompt = agentConfig.prompt
   private val aiOptions = agentConfig.aiOptions
   private val appSettings = agentConfig.appSettings
+  private val jev = agentConfig.jev
 
   private val executeInterceptors: List<ArbigentExecutionInterceptor> = interceptors
     .filterIsInstance<ArbigentExecutionInterceptor>()
@@ -126,6 +127,9 @@ public class ArbigentAgent internal constructor(
       add(ArbigentReplayDecisionInterceptor(replayTrace))
     }
     addAll(interceptors.filterIsInstance<ArbigentDecisionInterceptor>())
+    // Innermost, right before the AI: cache hits and replays never reach Jev, and image assertions
+    // still check a goal Jev decides. A fresh instance per agent, since its guards are per task.
+    jev?.let { add(ArbigentJevDecisionInterceptor(it.settings, it.client)) }
   }
   private val decisionChain: suspend (ArbigentAi.DecisionInput) -> ArbigentAi.DecisionOutput = { input ->
     var chain: suspend (ArbigentAi.DecisionInput) -> ArbigentAi.DecisionOutput = { decisionInput ->
@@ -391,6 +395,7 @@ public class AgentConfig(
   internal val prompt: ArbigentPrompt,
   internal val aiOptions: ArbigentAiOptions?,
   internal val appSettings: ArbigentAppSettings?,
+  internal val jev: ArbigentJevConfig? = null,
 ) {
   internal fun resolveGoal(goal: String): String =
     GoalVariableResolver.resolve(goal, appSettings?.variables)
@@ -405,6 +410,7 @@ public class AgentConfig(
     private var aiOptions: ArbigentAiOptions? = null
     private var mcpClient: MCPClient? = null
     private var appSettings: ArbigentAppSettings? = null
+    private var jev: ArbigentJevConfig? = null
 
     public fun addInterceptor(interceptor: ArbigentInterceptor) {
       interceptors.add(0, interceptor)
@@ -438,6 +444,10 @@ public class AgentConfig(
       this.appSettings = appSettings
     }
 
+    public fun jev(jev: ArbigentJevConfig?) {
+      this.jev = jev
+    }
+
     public fun build(): AgentConfig {
       return AgentConfig(
         interceptors = interceptors,
@@ -447,6 +457,7 @@ public class AgentConfig(
         prompt = prompt,
         aiOptions = aiOptions,
         appSettings = appSettings,
+        jev = jev,
       )
     }
   }
@@ -460,6 +471,7 @@ public class AgentConfig(
     builder.aiFactory(aiFactory)
     builder.aiOptions(aiOptions)
     builder.appSettings(appSettings)
+    builder.jev(jev)
     return builder
   }
 }
@@ -1279,6 +1291,7 @@ private suspend fun executeDefault(
 
     var stepRemain = input.maxStep
     while (stepRemain-- > 0 && !contextHolder.isGoalAchieved()) {
+      val stepsBefore = contextHolder.steps().size
       val stepInput = StepInput(
         arbigentContextHolder = contextHolder,
         agentActionTypes = input.agentActionTypes,
@@ -1298,7 +1311,11 @@ private suspend fun executeDefault(
       when (arbigentTimed("agent.step") { input.stepChain(stepInput) }) {
         StepResult.GoalAchieved -> break
         StepResult.Failed -> return ExecutionResult.Failed(contextHolder)
-        StepResult.Continue -> {}
+        StepResult.Continue -> {
+          // A Jev step costs no LLM call, so it doesn't use up maxStep; the interceptor caps how
+          // many Jev steps can run in a row instead.
+          if (contextHolder.steps().drop(stepsBefore).any { it.stepSource == ArbigentStepSource.Jev }) stepRemain++
+        }
       }
       yield()
     }

@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.CliktError
 import com.github.ajalt.clikt.parameters.groups.defaultByName
+import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import com.github.ajalt.clikt.parameters.groups.groupChoice
 import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.choice
@@ -51,6 +52,9 @@ class ArbigentRunCommand(
       "anthropic" to AnthropicAiConfig()
     )
     .defaultByName("openai")
+
+  // internal (not private) so tests can assert these resolve from .arbigent settings yaml.
+  internal val jevOptions by JevOptions()
 
   private val aiApiLoggingEnabled by defaultOption(
     "--ai-api-logging",
@@ -178,6 +182,7 @@ class ArbigentRunCommand(
     
     val (resultDir, resultFile) = setupArbigentFiles(workingDirectory, logFile)
     val ai = createAi(aiType, aiApiLoggingEnabled)
+    val jevClient = jevOptions.createClient()
 
     var device: ArbigentDevice? = null
     val appSettings = CliAppSettings(
@@ -193,7 +198,10 @@ class ArbigentRunCommand(
       deviceFactory = { device ?: throw UnsupportedOperationException("Device not available in dry-run mode") },
       appSettings = appSettings,
       dispatcher = Dispatchers.Default,
+      jevClient = jevClient,
+      jevOverrides = jevOptions.overrides,
     )
+    logJevSettings(arbigentProject.settings.jev, jevOptions, jevClient)
     if (scenarioIds.isNotEmpty() && tags.isNotEmpty()) {
       throw IllegalArgumentException("Cannot specify both scenario IDs and tags. Please create an issue if you need this feature.")
     }

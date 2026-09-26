@@ -8,6 +8,7 @@ import androidx.compose.runtime.getValue
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.groups.defaultByName
+import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import com.github.ajalt.clikt.parameters.groups.groupChoice
 import com.github.ajalt.clikt.parameters.options.*
 import com.github.ajalt.clikt.parameters.types.choice
@@ -71,6 +72,8 @@ class ArbigentRunTaskCommand(
     help = "Host/device port for the XCTest runner on a physical iPhone (default 22087)."
   )
 
+  private val jevOptions by JevOptions()
+
   private val logLevel by logLevelOption()
   private val logFile by logFileOption()
   private val workingDirectory by workingDirectoryOption()
@@ -110,7 +113,10 @@ class ArbigentRunTaskCommand(
       val appSettings = CliAppSettings(workingDirectory = workingDirectory, path = null)
       // Composition root for the `run task` command: the one place the production dispatcher is
       // created and threaded down (no per-signature defaults, no process-wide global).
-      val arbigentProject = ArbigentProject(projectFileContent, aiFactory = { ai }, deviceFactory = { device }, appSettings = appSettings, dispatcher = Dispatchers.Default)
+      // No project file, so Jev runs only when --jev-mode turns it on.
+      val jevClient = jevOptions.createClient()
+      val arbigentProject = ArbigentProject(projectFileContent, aiFactory = { ai }, deviceFactory = { device }, appSettings = appSettings, dispatcher = Dispatchers.Default, jevClient = jevClient, jevOverrides = jevOptions.overrides)
+      logJevSettings(null, jevOptions, jevClient)
       val scenarios = arbigentProject.scenarios
 
       Runtime.getRuntime().addShutdownHook(object : Thread() {

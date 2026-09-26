@@ -2,6 +2,8 @@ package io.github.takahirom.arbigent
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+import io.github.takahirom.arbigent.result.ArbigentStepSource
 
 class ArbigentContextHolderTest {
     private val defaultAiOptions = ArbigentAiOptions(
@@ -204,6 +206,26 @@ class ArbigentContextHolderTest {
         assertEquals(false, context.contains("Test Feedback 1"))
         assertEquals(true, context.contains("Test Feedback 2"))
         assertEquals(true, context.contains("Test Feedback 3"))
+    }
+
+    @Test
+    fun jevStepsAreLeftOutOfTheStepShownAgainstTheLimit() {
+        val contextHolder = ArbigentContextHolder(goal = "Test Goal", maxStep = 2)
+        listOf(ArbigentStepSource.Jev, ArbigentStepSource.Jev, ArbigentStepSource.Ai).forEachIndexed { i, source ->
+            contextHolder.addStep(
+                ArbigentContextHolder.Step(
+                    stepId = "step$i",
+                    agentAction = ClickWithIndex(i),
+                    cacheKey = "cache$i",
+                    screenshotFilePath = "screenshot$i.png",
+                    stepSource = source,
+                )
+            )
+        }
+
+        val context = contextHolder.context(ArbigentAiOptions())
+
+        assertTrue(context.contains("Current step: 2\nStep limit: 2"), context)
     }
 
     @Test

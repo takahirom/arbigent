@@ -320,6 +320,8 @@ class ArbigentAppStateHolder(
   // Project-level defaults for {{name}} variables (settings.variables). The UI has no editor for
   // them yet, so this only carries the loaded value through save/run without dropping it.
   val projectVariablesFlow = MutableStateFlow<Map<String, String>?>(null)
+  // settings.jev, carried through save/run until the UI can edit it and hold a Jev API key.
+  val projectJevFlow = MutableStateFlow<ArbigentJevSettings?>(null)
   val decisionCache = cacheStrategyFlow
     .map {
       val decisionCacheStrategy = it.aiDecisionCacheStrategy
@@ -433,6 +435,7 @@ class ArbigentAppStateHolder(
         additionalActions = additionalActionsFlow.value,
         maxRetry = projectMaxRetryFlow.value,
         variables = projectVariablesFlow.value,
+        jev = projectJevFlow.value,
       ),
       initialScenarios = allScenarioStateHoldersStateFlow.value.map { scenario ->
         scenario.createScenario(allScenarioStateHoldersStateFlow.value)
@@ -465,6 +468,7 @@ class ArbigentAppStateHolder(
           additionalActions = this@ArbigentAppStateHolder.additionalActionsFlow.value,
           maxRetry = this@ArbigentAppStateHolder.projectMaxRetryFlow.value,
           variables = this@ArbigentAppStateHolder.projectVariablesFlow.value,
+          jev = this@ArbigentAppStateHolder.projectJevFlow.value,
         ),
         scenario = createArbigentScenarioContent(),
         aiFactory = aiFactory,
@@ -548,6 +552,7 @@ class ArbigentAppStateHolder(
         maxRetry = projectMaxRetryFlow.value,
         positionComments = positionCommentsFlow.value,
         variables = projectVariablesFlow.value,
+        jev = projectJevFlow.value,
       ),
       scenarioContents = sortedScenarios.map { it.createArbigentScenarioContent() },
       reusableScenarios = _reusableScenariosFlow.value,
@@ -623,6 +628,7 @@ class ArbigentAppStateHolder(
     projectMaxRetryFlow.value = projectFile.settings.maxRetry
     positionCommentsFlow.value = projectFile.settings.positionComments
     projectVariablesFlow.value = projectFile.settings.variables
+    projectJevFlow.value = projectFile.settings.jev
     _fixedScenariosFlow.value = projectFile.fixedScenarios
     _reusableScenariosFlow.value = projectFile.reusableScenarios
     projectStateFlow.value = ArbigentProject(

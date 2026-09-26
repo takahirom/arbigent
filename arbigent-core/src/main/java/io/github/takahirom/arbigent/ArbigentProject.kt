@@ -150,7 +150,10 @@ public fun ArbigentProject(
   deviceFactory: () -> ArbigentDevice,
   appSettings: ArbigentAppSettings,
   dispatcher: CoroutineDispatcher,
+  jevClient: ArbigentJevClient? = null,
+  jevOverrides: ArbigentJevOverrides = ArbigentJevOverrides(),
 ): ArbigentProject {
+  val jev = ArbigentJevConfig.resolve(projectFileContent.settings.jev, jevOverrides, jevClient)
   return ArbigentProject(
     settings = projectFileContent.settings,
     initialScenarios = projectFileContent.scenarioContents.map {
@@ -162,7 +165,8 @@ public fun ArbigentProject(
         aiDecisionCache = projectFileContent.settings.cacheStrategy.aiDecisionCacheStrategy.toCache(),
         appSettings = appSettings,
         fixedScenarios = projectFileContent.fixedScenarios,
-        reusableScenarios = projectFileContent.reusableScenarios
+        reusableScenarios = projectFileContent.reusableScenarios,
+        jev = jev,
       )
     },
     appSettings = appSettings,
@@ -176,9 +180,11 @@ public fun ArbigentProject(
   deviceFactory: () -> ArbigentDevice,
   appSettings: ArbigentAppSettings,
   dispatcher: CoroutineDispatcher,
+  jevClient: ArbigentJevClient? = null,
+  jevOverrides: ArbigentJevOverrides = ArbigentJevOverrides(),
 ): ArbigentProject {
   val projectContentFileContent = ArbigentProjectSerializer().load(file)
-  return ArbigentProject(projectContentFileContent, aiFactory, deviceFactory, appSettings, dispatcher)
+  return ArbigentProject(projectContentFileContent, aiFactory, deviceFactory, appSettings, dispatcher, jevClient, jevOverrides)
 }
 
 public data class ArbigentScenario(
