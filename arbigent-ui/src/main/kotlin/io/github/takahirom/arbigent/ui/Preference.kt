@@ -94,27 +94,36 @@ internal interface KeyStore {
   fun deletePassword(domain: String, account: String)
 }
 
-private class KeychainDelegate(
+// Each keychain read can make the OS ask the user for access, so a value is read at most once per
+// process and kept in step with every write.
+internal class KeychainDelegate(
   private val domain: String = "io.github.takahirom.arbigent",
   private val accountPrefix: String = System.getProperty("user.name"),
   private val keyStoreFactory: () -> KeyStore = globalKeyStoreFactory,
   private val default: () -> String = { "" }
 ) {
-  operator fun getValue(thisRef: Any?, property: KProperty<*>): String {
-    return try {
-      keyStoreFactory().getPassword(domain, getAccount(property)).ifBlank { default() }
-    } catch (ex: PasswordAccessException) {
-      default()
+  operator fun provideDelegate(thisRef: Any?, property: KProperty<*>): Entry =
+    Entry(account = accountPrefix + "-" + property.name)
+
+  inner class Entry(private val account: String) {
+    @Volatile
+    private var value: Lazy<String> = lazy {
+      try {
+        keyStoreFactory().getPassword(domain, account).ifBlank { default() }
+      } catch (ex: PasswordAccessException) {
+        default()
+      }
     }
-  }
 
-  private fun getAccount(property: KProperty<*>) = accountPrefix + "-" + property.name
+    operator fun getValue(thisRef: Any?, property: KProperty<*>): String = value.value
 
-  operator fun setValue(thisRef: Any?, property: KProperty<*>, value: String?) {
-    if (value != null) {
-      keyStoreFactory().setPassword(domain, getAccount(property), value)
-    } else {
-      keyStoreFactory().deletePassword(domain, getAccount(property))
+    operator fun setValue(thisRef: Any?, property: KProperty<*>, value: String?) {
+      if (value != null) {
+        keyStoreFactory().setPassword(domain, account, value)
+      } else {
+        keyStoreFactory().deletePassword(domain, account)
+      }
+      this.value = lazyOf(value?.ifBlank { null } ?: default())
     }
   }
 }
