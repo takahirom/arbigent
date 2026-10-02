@@ -1411,6 +1411,22 @@ class ArbigentReplayTraceTest {
     )
   }
 
+  /** Traces recorded before the screen size was captured diverge once, and are re-recorded with it. */
+  @Test
+  fun `a coordinate tap recorded without a screen size is divergence on a sized screen`() = runTest {
+    val interceptor = ArbigentReplayDecisionInterceptor(coordinateTapTrace(recordedOn = null))
+
+    val exception = assertFailsWith<ReplayDivergenceException> {
+      interceptor.intercept(
+        decisionInput(emptyElements, viewport = ArbigentViewport(width = 1280, height = 720)),
+      ) { error("Should not reach the AI") }
+    }
+    assertTrue(
+      exception.message.contains("recorded on a screen of unknown size but the current screen is 1280x720"),
+      "Expected the reason to name the current size, got: ${exception.message}",
+    )
+  }
+
   @Test
   fun `a coordinate tap replays on a screen of the recorded size`() = runTest {
     val viewport = ArbigentViewport(width = 1080, height = 1920)

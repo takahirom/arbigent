@@ -72,7 +72,8 @@ public interface ArbigentDevice {
 
   /**
    * The size of the screen in the units a coordinate action taps in, or null when the device
-   * cannot say. Replay uses it to refuse a recorded coordinate tap on a differently sized screen.
+   * cannot say. Replay uses it to refuse a recorded coordinate tap on a differently sized screen;
+   * a device that never says leaves both sides null, so its coordinate taps replay unchecked.
    */
   public fun viewport(): ArbigentViewport? = null
 }

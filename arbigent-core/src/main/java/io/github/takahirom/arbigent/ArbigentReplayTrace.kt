@@ -346,10 +346,11 @@ internal class ArbigentReplayDecisionInterceptor(
       val recordedViewport = recorded.decisionOutput.step.viewport
       val currentViewport = decisionInput.viewport
       if (recordedViewport != currentViewport) {
+        val recordedOn = recordedViewport?.let { "a ${it.description()} screen" } ?: "a screen of unknown size"
+        val currentIs = currentViewport?.description() ?: "of unknown size"
         throw ReplayDivergenceException(
-          "step ${replayIndex + 1} taps at (${recordedAction.x}, ${recordedAction.y}) recorded on a " +
-            "${recordedViewport?.description() ?: "screen of unknown size"} screen but the current " +
-            "screen is ${currentViewport?.description() ?: "of unknown size"}",
+          "step ${replayIndex + 1} taps at (${recordedAction.x}, ${recordedAction.y}) recorded on " +
+            "$recordedOn but the current screen is $currentIs",
         )
       }
     }
