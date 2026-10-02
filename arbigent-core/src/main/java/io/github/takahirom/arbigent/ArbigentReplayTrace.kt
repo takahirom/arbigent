@@ -341,10 +341,16 @@ internal class ArbigentReplayDecisionInterceptor(
     }
     val identity = recorded.decisionOutput.step.targetElement
     val reboundAction = if (identity != null) {
-      val currentElement = identity.findMatch(decisionInput.elements)
-        ?: throw ReplayDivergenceException(
+      val currentElement = when (val resolution = identity.resolve(decisionInput.elements)) {
+        is ArbigentElementIdentity.Resolution.Found -> resolution.element
+        ArbigentElementIdentity.Resolution.Absent -> throw ReplayDivergenceException(
           "step ${replayIndex + 1} target ${identity.description()} is absent from the current UI",
         )
+        is ArbigentElementIdentity.Resolution.TwinsChanged -> throw ReplayDivergenceException(
+          "step ${replayIndex + 1} target ${identity.description()} was recorded among " +
+            "${resolution.recorded} identical elements but the current screen has ${resolution.present}",
+        )
+      }
       recordedAction.rebindTo(currentElement, decisionInput.elements)
     } else {
       recordedAction
@@ -369,23 +375,56 @@ internal class ArbigentReplayDecisionInterceptor(
 
 }
 
+/**
+ * What a recorded step acted on, described well enough to find it again on a changed screen.
+ *
+ * [occurrence] alone cannot do that when the screen holds twins — rows that share every
+ * identifying attribute, such as repeated "Delete" buttons. The recording found the same twins and
+ * noted which one it acted on, so the same position is the same row only while the screen holds
+ * the same number of them: [twinCount]. With one more or one fewer, the position names a
+ * different row, and replaying it would act on that row without anything noticing. A trace
+ * recorded before twin counts existed carries none and keeps resolving by position alone.
+ */
 @Serializable
 public data class ArbigentElementIdentity(
   public val text: String? = null,
   public val resourceId: String? = null,
   public val accessibilityId: String? = null,
   public val occurrence: Int = 0,
+  public val twinCount: Int? = null,
 ) {
   init {
     require(text != null || resourceId != null || accessibilityId != null) {
       "An element identity must contain at least one identifying attribute"
     }
+    require(twinCount == null || occurrence < twinCount) {
+      "occurrence $occurrence is not within the $twinCount recorded twins"
+    }
   }
 
-  public fun findMatch(elements: ArbigentElementList): ArbigentElement? {
-    return elements.elements
-      .filter(::matches)
-      .getOrNull(occurrence)
+  /** The element this identity names on the current screen, or null when [resolve] finds none. */
+  public fun findMatch(elements: ArbigentElementList): ArbigentElement? =
+    (resolve(elements) as? Resolution.Found)?.element
+
+  /**
+   * Where this identity lands on the current screen. The two ways of not finding it are kept
+   * apart because they read differently in a divergence report: a target that is gone, and a
+   * target that is still there among a different number of twins, so that the recorded position
+   * can no longer say which one it was.
+   */
+  public fun resolve(elements: ArbigentElementList): Resolution {
+    val twins = elements.elements.filter(::matches)
+    if (twinCount != null && twins.size != twinCount) {
+      return Resolution.TwinsChanged(recorded = twinCount, present = twins.size)
+    }
+    val element = twins.getOrNull(occurrence) ?: return Resolution.Absent
+    return Resolution.Found(element)
+  }
+
+  public sealed interface Resolution {
+    public data class Found(public val element: ArbigentElement) : Resolution
+    public data object Absent : Resolution
+    public data class TwinsChanged(public val recorded: Int, public val present: Int) : Resolution
   }
 
   private fun matches(element: ArbigentElement): Boolean =
@@ -397,7 +436,7 @@ public data class ArbigentElementIdentity(
     text?.let { "text='$it'" },
     resourceId?.let { "resourceId='$it'" },
     accessibilityId?.let { "accessibilityId='$it'" },
-  ).joinToString(", ") + " (occurrence $occurrence)"
+  ).joinToString(", ") + " (occurrence $occurrence" + (twinCount?.let { " of $it" } ?: "") + ")"
 
   private fun String?.matchesAttribute(
     element: ArbigentElement,
@@ -419,9 +458,10 @@ public data class ArbigentElementIdentity(
         resourceId = resourceId,
         accessibilityId = accessibilityId,
       )
-      val occurrence = allElements.filter(identityWithoutOccurrence::matches).indexOf(element)
+      val twins = allElements.filter(identityWithoutOccurrence::matches)
+      val occurrence = twins.indexOf(element)
       if (occurrence < 0) return null
-      return identityWithoutOccurrence.copy(occurrence = occurrence)
+      return identityWithoutOccurrence.copy(occurrence = occurrence, twinCount = twins.size)
     }
 
   }
