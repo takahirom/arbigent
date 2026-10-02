@@ -615,6 +615,12 @@ internal data class ArbigentReplayTrace(
   val taskIdentity: String,
   val goalHash: String,
   val steps: List<ArbigentReplayTraceStep>,
+  /**
+   * Project variables whose values this trace holds as `{{name}}` placeholders, see
+   * [ArbigentReplayTraceVariables]. Empty for a trace recorded with no variables, and for one
+   * recorded before values were kept out of traces.
+   */
+  val variableNames: List<String> = emptyList(),
 ) {
   fun isValidFor(key: ArbigentReplayTraceKey): Boolean = invalidReasonFor(key) == null
 
