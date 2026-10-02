@@ -339,6 +339,21 @@ internal class ArbigentReplayDecisionInterceptor(
         )
       }
     }
+    // A coordinate tap names a pixel, not an element, so the only thing that makes it mean the
+    // same thing again is a screen of the same size. Checked before anything is tapped; a
+    // recorded size the current device cannot confirm is a mismatch too.
+    if (recordedAction is ClickAtCoordinates) {
+      val recordedViewport = recorded.decisionOutput.step.viewport
+      val currentViewport = decisionInput.viewport
+      if (recordedViewport != currentViewport) {
+        val recordedOn = recordedViewport?.let { "a ${it.description()} screen" } ?: "a screen of unknown size"
+        val currentIs = currentViewport?.description() ?: "of unknown size"
+        throw ReplayDivergenceException(
+          "step ${replayIndex + 1} taps at (${recordedAction.x}, ${recordedAction.y}) recorded on " +
+            "$recordedOn but the current screen is $currentIs",
+        )
+      }
+    }
     val identity = recorded.decisionOutput.step.targetElement
     val reboundAction = if (identity != null) {
       val currentElement = when (val resolution = identity.resolve(decisionInput.elements)) {
@@ -644,6 +659,18 @@ private fun selectorAndOccurrence(selector: String): Pair<Regex, Int> {
   return pattern to occurrence
 }
 
+/**
+ * The size of a screen in the units a coordinate tap is expressed in. Two screens with the same
+ * size put the same pixel in the same place, which is all a recorded coordinate relies on.
+ */
+@Serializable
+public data class ArbigentViewport(
+  public val width: Int,
+  public val height: Int,
+) {
+  public fun description(): String = "${width}x$height"
+}
+
 @Serializable
 internal data class ArbigentReplayTraceStep(
   val decisionOutput: ArbigentAi.DecisionOutput,
@@ -657,6 +684,12 @@ internal data class ArbigentReplayTrace(
   val taskIdentity: String,
   val goalHash: String,
   val steps: List<ArbigentReplayTraceStep>,
+  /**
+   * Project variables whose values this trace holds as `{{name}}` placeholders, see
+   * [ArbigentReplayTraceVariables]. Empty for a trace recorded with no variables, and for one
+   * recorded before values were kept out of traces.
+   */
+  val variableNames: List<String> = emptyList(),
 ) {
   fun isValidFor(key: ArbigentReplayTraceKey): Boolean = invalidReasonFor(key) == null
 

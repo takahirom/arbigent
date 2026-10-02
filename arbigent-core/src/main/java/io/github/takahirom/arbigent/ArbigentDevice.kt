@@ -69,6 +69,13 @@ public interface ArbigentDevice {
   public fun elements(): ArbigentElementList
   public fun waitForAppToSettle(appId: String? = null)
   public fun os(): ArbigentDeviceOs
+
+  /**
+   * The size of the screen in the units a coordinate action taps in, or null when the device
+   * cannot say. Replay uses it to refuse a recorded coordinate tap on a differently sized screen;
+   * a device that never says leaves both sides null, so its coordinate taps replay unchecked.
+   */
+  public fun viewport(): ArbigentViewport? = null
 }
 
 /**
@@ -85,6 +92,7 @@ public data class ArbigentScreen(
   val uiTreeStrings: ArbigentUiTreeStrings,
   val focusedTreeString: String?,
   val focusedElement: ArbigentFocusedElement?,
+  val viewport: ArbigentViewport? = null,
 )
 
 public data class ArbigentElement(
@@ -358,6 +366,7 @@ public class MaestroDevice(
         uiTreeStrings = uiTreeStringsFrom(viewHierarchy),
         focusedTreeString = if (includeFocusedTree) focusedNode.focusedTreeString() else null,
         focusedElement = focusedNode?.let(ArbigentFocusedElement::from),
+        viewport = viewport(),
       )
     }
     return deriveWithRetry("device.readScreen.viewHierarchy", derive = ::screenFrom) { lastHierarchy ->
@@ -368,6 +377,7 @@ public class MaestroDevice(
         uiTreeStrings = ArbigentUiTreeStrings(allTreeString = "", optimizedTreeString = ""),
         focusedTreeString = if (includeFocusedTree) focusedNode.focusedTreeString() else null,
         focusedElement = focusedNode?.let(ArbigentFocusedElement::from),
+        viewport = viewport(),
       )
     }
   }
@@ -444,6 +454,14 @@ public class MaestroDevice(
       appendString(")")
     }
   }
+
+  // The pixel size is what a coordinate tap is expressed in: the AI reads the coordinates off a
+  // screenshot taken at native size, and maestro taps a plain "x,y" point in pixels.
+  override fun viewport(): ArbigentViewport =
+    ArbigentViewport(
+      width = maestro.cachedDeviceInfo.widthPixels,
+      height = maestro.cachedDeviceInfo.heightPixels,
+    )
 
   override fun os(): ArbigentDeviceOs {
     return when (maestro.cachedDeviceInfo.platform) {

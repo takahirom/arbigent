@@ -70,6 +70,29 @@ public class ArbigentScenarioExecutor internal constructor(
   private val dispatcher: CoroutineDispatcher,
 ) {
   private val replayTraceStore = ArbigentReplayTraceStore()
+
+  /**
+   * A stored trace holds variable values as placeholders; this fills them in with the variables this
+   * run resolves its goals with. A trace recorded under a variable the run no longer defines cannot
+   * be filled in, so it is not replayed, and the run records a fresh one.
+   */
+  private fun readReplayTrace(
+    key: ArbigentReplayTraceKey,
+    task: ArbigentAgentTask,
+  ): ArbigentReplayTrace? {
+    val stored = replayTraceStore.read(key) ?: return null
+    return when (val resolution = ArbigentReplayTraceVariables.fromPlaceholders(stored, task.replayVariables())) {
+      is ArbigentReplayTraceVariables.Resolution.Resolved -> resolution.trace
+      is ArbigentReplayTraceVariables.Resolution.Unresolved -> {
+        arbigentInfoLog(
+          "Not replaying the stored trace for task ${key.taskIndex + 1}: it was recorded with " +
+            "variables this run does not define: ${resolution.missingNames.joinToString()}",
+        )
+        null
+      }
+    }
+  }
+
   private val _taskAssignmentsStateFlow =
     MutableStateFlow<List<ArbigentTaskAssignment>>(listOf())
   private val _taskAssignmentsHistoryStateFlow =
@@ -238,7 +261,7 @@ public class ArbigentScenarioExecutor internal constructor(
 
     val replayTraceKeys = scenario.replayTraceKeys()
     val replayTraces = if (scenario.replayWithFallback) {
-      replayTraceKeys.map(replayTraceStore::read)
+      replayTraceKeys.mapIndexed { index, key -> readReplayTrace(key, scenario.agentTasks[index]) }
         .takeIf { traces -> traces.isNotEmpty() && traces.all { it != null } }
         ?.map { trace -> requireNotNull(trace) }
     } else {
@@ -426,7 +449,13 @@ public class ArbigentScenarioExecutor internal constructor(
             candidate.invalidReasonFor(key)
           }
           if (reason == null) {
-            replayTraceStore.write(key, requireNotNull(candidate))
+            replayTraceStore.write(
+              key,
+              ArbigentReplayTraceVariables.toPlaceholders(
+                trace = requireNotNull(candidate),
+                variables = assignment.task.replayVariables(),
+              ),
+            )
           } else {
             replayTraceStore.delete(key)
             arbigentInfoLog(
@@ -492,6 +521,10 @@ public class ArbigentScenarioExecutor internal constructor(
     }
   }
 }
+
+/** The variables a task's goal is resolved with, so a trace is protected and filled with the same ones. */
+private fun ArbigentAgentTask.replayVariables(): Map<String, String> =
+  agentConfig.appSettings?.variables.orEmpty()
 
 private fun ArbigentScenario.replayTraceKeys(): List<ArbigentReplayTraceKey> =
   agentTasks.mapIndexed { index, task ->
