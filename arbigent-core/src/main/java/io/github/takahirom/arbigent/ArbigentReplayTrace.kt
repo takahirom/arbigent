@@ -414,6 +414,8 @@ public data class ArbigentElementIdentity(
    */
   public fun resolve(elements: ArbigentElementList): Resolution {
     val twins = elements.elements.filter(::matches)
+    // No match at all is the target being gone, not its twins having changed.
+    if (twins.isEmpty()) return Resolution.Absent
     if (twinCount != null && twins.size != twinCount) {
       return Resolution.TwinsChanged(recorded = twinCount, present = twins.size)
     }

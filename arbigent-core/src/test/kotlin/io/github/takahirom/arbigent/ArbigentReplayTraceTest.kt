@@ -1306,6 +1306,16 @@ class ArbigentReplayTraceTest {
   }
 
   @Test
+  fun `a target whose every twin is gone is absent, not a changed number of twins`() {
+    val rows = listOf(row("Keep", y = 0), row("Delete", y = 10), row("Delete", y = 20))
+    val identity = assertNotNull(ArbigentElementIdentity.from(rows[2], rows))
+
+    val resolution = identity.resolve(ArbigentElementList(listOf(row("Keep", y = 0)), screenWidth = 100))
+
+    assertEquals(ArbigentElementIdentity.Resolution.Absent, resolution)
+  }
+
+  @Test
   fun `a changed number of twins is reported as such, not as an absent target`() = runTest {
     val rows = listOf(row("Keep", y = 0), row("Delete", y = 10), row("Delete", y = 20))
     val identity = assertNotNull(ArbigentElementIdentity.from(rows[2], rows))
