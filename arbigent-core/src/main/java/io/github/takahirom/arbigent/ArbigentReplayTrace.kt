@@ -400,7 +400,17 @@ internal class ArbigentReplayDecisionInterceptor(
             (decided?.stepLogText() ?: "do nothing"),
         )
       }
-      return output.copy(step = output.step.copy(stepSource = ArbigentStepSource.ReplayDelegated))
+      // The AI's fresh step knows nothing of the recording. Without these the agent would write back
+      // what this run observed in place of the recorded anchors, and would decide anew whether the
+      // text was read off the screen; a text its heuristic fails to recognize would then replay
+      // verbatim next time, which is exactly what delegation exists to prevent.
+      return output.copy(
+        step = output.step.copy(
+          stepSource = ArbigentStepSource.ReplayDelegated,
+          anchors = recorded.decisionOutput.step.anchors,
+          derivedInput = true,
+        ),
+      )
     }
     val identity = recorded.decisionOutput.step.targetElement
     val reboundAction = if (identity != null) {
@@ -659,10 +669,12 @@ public object ArbigentReplayAnchors {
   private fun anchorIdentity(element: ArbigentElement, all: List<ArbigentElement>): ArbigentElementIdentity? {
     val identity = ArbigentElementIdentity.from(element, all) ?: return null
     // Presence is all that is asked of an anchor, not which twin it is or how many there are.
-    val presence = identity.copy(occurrence = 0, twinCount = null)
-    if (presence.text == null || isStableText(presence.text)) return presence
-    if (presence.resourceId == null && presence.accessibilityId == null) return null
-    return presence.copy(text = null)
+    // Volatile text, in the text or in a spoken label, would make the anchor miss its own element
+    // the moment the value ticks; a clock labelled with its time is still the same clock.
+    val text = identity.text?.takeIf(::isStableText)
+    val accessibilityId = identity.accessibilityId?.takeIf(::isStableText)
+    if (text == null && identity.resourceId == null && accessibilityId == null) return null
+    return identity.copy(occurrence = 0, twinCount = null, text = text, accessibilityId = accessibilityId)
   }
 
   private fun isStableText(text: String): Boolean {

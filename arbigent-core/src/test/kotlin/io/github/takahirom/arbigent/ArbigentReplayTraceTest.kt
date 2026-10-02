@@ -1715,13 +1715,22 @@ class ArbigentReplayTraceTest {
   @Test
   fun `volatile text is dropped from an anchor's identity or disqualifies the element`() {
     val current = ArbigentElementList(
-      listOf(element("12:34", "clock", ""), element("42", "", ""), element("3", "", "")),
+      listOf(
+        element("12:34", "clock", "12:34"),
+        element("42", "", ""),
+        element("3", "", ""),
+        element("", "", "99%"),
+        element("", "battery", "99%"),
+      ),
       screenWidth = 100,
     )
 
     val anchors = ArbigentReplayAnchors.select(current, previous = null)
 
-    assertEquals(listOf(ArbigentElementIdentity(resourceId = "clock")), anchors)
+    assertEquals(
+      listOf(ArbigentElementIdentity(resourceId = "clock"), ArbigentElementIdentity(resourceId = "battery")),
+      anchors,
+    )
   }
 
   @Test
@@ -1855,6 +1864,31 @@ class ArbigentReplayTraceTest {
 
     assertEquals(decidedAgain, output.agentActions.single())
     assertEquals(ArbigentStepSource.ReplayDelegated, output.step.stepSource)
+  }
+
+  @Test
+  fun `a re-decided step keeps the recorded anchors and stays delegated`() = runTest {
+    val recordedAnchors = listOf(ArbigentElementIdentity(text = "Title", resourceId = "title"))
+    val interceptor = ArbigentReplayDecisionInterceptor(
+      anchoredTrace(InputTextAgentAction("Old title"), anchors = recordedAnchors, derivedInput = true),
+    )
+    val input = decisionInput(elementsOf(element("Title", "title", "")))
+    val decidedAgain = InputTextAgentAction("New title")
+
+    val output = interceptor.intercept(input) {
+      ArbigentAi.DecisionOutput(
+        agentActions = listOf(decidedAgain),
+        step = ArbigentContextHolder.Step(
+          stepId = input.stepId,
+          agentAction = decidedAgain,
+          cacheKey = input.cacheKey,
+          screenshotFilePath = input.screenshotFilePath,
+        ),
+      )
+    }
+
+    assertEquals(recordedAnchors, output.step.anchors)
+    assertTrue(output.step.derivedInput)
   }
 
   @Test
