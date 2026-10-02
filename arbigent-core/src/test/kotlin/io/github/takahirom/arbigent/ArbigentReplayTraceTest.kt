@@ -1286,6 +1286,98 @@ class ArbigentReplayTraceTest {
   }
 
   @Test
+  fun `a recorded twin resolves only among the same number of twins`() {
+    // A list with two identical "Delete" rows, and the recording acted on the second one.
+    val rows = listOf(row("Keep", y = 0), row("Delete", y = 10), row("Delete", y = 20))
+    val identity = assertNotNull(ArbigentElementIdentity.from(rows[2], rows))
+    assertEquals(1, identity.occurrence)
+
+    // Same twins: the same position is the same row.
+    assertEquals(rows[2], identity.findMatch(ArbigentElementList(rows, screenWidth = 100)))
+
+    // A row was added above: position 1 now names a different row, so the step must diverge
+    // instead of deleting whatever sits there.
+    val grown = listOf(row("Delete", y = 0), row("Keep", y = 10), row("Delete", y = 20), row("Delete", y = 30))
+    assertNull(identity.findMatch(ArbigentElementList(grown, screenWidth = 100)))
+
+    // A twin disappeared: the one left may be either of the recorded two.
+    val shrunk = listOf(row("Keep", y = 0), row("Delete", y = 10))
+    assertNull(identity.findMatch(ArbigentElementList(shrunk, screenWidth = 100)))
+  }
+
+  @Test
+  fun `a target whose every twin is gone is absent, not a changed number of twins`() {
+    val rows = listOf(row("Keep", y = 0), row("Delete", y = 10), row("Delete", y = 20))
+    val identity = assertNotNull(ArbigentElementIdentity.from(rows[2], rows))
+
+    val resolution = identity.resolve(ArbigentElementList(listOf(row("Keep", y = 0)), screenWidth = 100))
+
+    assertEquals(ArbigentElementIdentity.Resolution.Absent, resolution)
+  }
+
+  @Test
+  fun `a changed number of twins is reported as such, not as an absent target`() = runTest {
+    val rows = listOf(row("Keep", y = 0), row("Delete", y = 10), row("Delete", y = 20))
+    val identity = assertNotNull(ArbigentElementIdentity.from(rows[2], rows))
+    val action = ClickWithIndex(2)
+    val trace = ArbigentReplayTrace(
+      version = "1.2.3",
+      scenarioId = "scenario",
+      taskIndex = 0,
+      taskIdentity = "scenario",
+      goalHash = "hash",
+      steps = listOf(
+        ArbigentReplayTraceStep(
+          decisionOutput = ArbigentAi.DecisionOutput(
+            agentActions = listOf(action),
+            step = ArbigentContextHolder.Step(
+              stepId = "step-1",
+              agentAction = action,
+              targetElement = identity,
+              cacheKey = "cache-key",
+              screenshotFilePath = "screenshot.png",
+            ),
+          ),
+        ),
+      ),
+    )
+    val interceptor = ArbigentReplayDecisionInterceptor(trace)
+    val grown = listOf(row("Delete", y = 0), row("Keep", y = 10), row("Delete", y = 20), row("Delete", y = 30))
+
+    val exception = assertFailsWith<ReplayDivergenceException> {
+      interceptor.intercept(decisionInput(ArbigentElementList(grown, screenWidth = 100))) {
+        error("Should not reach the AI")
+      }
+    }
+    assertTrue(
+      exception.message.contains("recorded among 2 identical elements but the current screen has 3"),
+      "Expected the reason to name both twin counts, got: ${exception.message}",
+    )
+  }
+
+  @Test
+  fun `an identity recorded without a twin count keeps resolving by position`() {
+    val legacy = ArbigentElementIdentity(text = "Delete", occurrence = 1)
+    val grown = listOf(row("Delete", y = 0), row("Keep", y = 10), row("Delete", y = 20), row("Delete", y = 30))
+
+    assertEquals(grown[2], legacy.findMatch(ArbigentElementList(grown, screenWidth = 100)))
+  }
+
+  @Test
+  fun `a twin count survives the trace JSON round trip`() {
+    val rows = listOf(row("Delete", y = 0), row("Delete", y = 10))
+    val identity = assertNotNull(ArbigentElementIdentity.from(rows[1], rows))
+
+    val decoded = Json.decodeFromString(
+      ArbigentElementIdentity.serializer(),
+      Json.encodeToString(ArbigentElementIdentity.serializer(), identity),
+    )
+
+    assertEquals(identity, decoded)
+    assertEquals(2, decoded.twinCount)
+  }
+
+  @Test
   fun `failed replay attempt keeps decision cache while normal execution purges it`() = runTest {
     val cache = ArbigentAiDecisionCache.Memory.create()
     val cachedAction = GoalAchievedAgentAction()
@@ -1417,6 +1509,22 @@ class ArbigentReplayTraceTest {
       executeActionChain = { ArbigentAgent.ExecuteActionsOutput() },
     )
   }
+
+  private fun row(text: String, y: Int): ArbigentElement = ArbigentElement(
+    index = 0,
+    textForAI = text,
+    rawText = text,
+    identifierData = ArbigentElement.IdentifierData(emptyList(), 0),
+    treeNode = TreeNode(
+      attributes = mutableMapOf("text" to text, "resource-id" to "", "accessibilityText" to ""),
+      children = emptyList(),
+    ),
+    x = 0,
+    y = y,
+    width = 10,
+    height = 10,
+    isVisible = true,
+  )
 
   private fun tvCardElement(text: String): ArbigentElement = ArbigentElement(
     index = 0,
