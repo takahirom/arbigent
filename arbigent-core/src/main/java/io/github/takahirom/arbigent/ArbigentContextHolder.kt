@@ -52,6 +52,20 @@ public class ArbigentContextHolder(
      * not say.
      */
     public val viewport: ArbigentViewport? = null,
+    /**
+     * Elements that appeared on the screen this step was decided against and were not on the
+     * screen of the step before it, at most [ArbigentReplayAnchors.MAX_ANCHORS] of them. Replay
+     * refuses the step when none of them is present, so a recorded action is not carried out on a
+     * screen that merely still holds the action's target. Empty when nothing new appeared, which
+     * is every focus-only D-pad move; null on steps recorded before anchors were captured.
+     */
+    public val anchors: List<ArbigentElementIdentity>? = null,
+    /**
+     * Whether the text this step typed was read off a screen earlier in the task rather than given
+     * by the goal. Replay asks the AI to decide such a step again instead of typing what was
+     * recorded, because the screen it was read from may show different text now.
+     */
+    public val derivedInput: Boolean = false,
   ) {
     public fun isFailed(): Boolean {
       return feedback?.contains("Failed") == true

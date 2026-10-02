@@ -1673,6 +1673,304 @@ class ArbigentReplayTraceTest {
     isVisible = true,
   )
 
+  // ---- anchors (what appeared with a step) and text read off the screen ----
+
+  /**
+   * An anchor is what tells the screen a step belongs on from the screen it came from, so only
+   * what was not there before qualifies. Content titles rotate between runs; elements with an id
+   * come first so the eight kept are the ones most likely to still be there.
+   */
+  @Test
+  fun `anchors are the elements new since the previous screen, ids first, at most eight`() {
+    val carriedOver = listOf(element("Home", "nav_home", ""), element("Shared", "", ""))
+    val titles = (1..10).map { element("Title $it", "", "") }
+    val badges = listOf(element("", "card_badge", ""), element("", "", "card_overlay"))
+    val previous = ArbigentElementList(carriedOver, screenWidth = 100)
+    val current = ArbigentElementList(carriedOver + titles + badges, screenWidth = 100)
+
+    val anchors = ArbigentReplayAnchors.select(current, previous)
+
+    assertEquals(ArbigentReplayAnchors.MAX_ANCHORS, anchors.size)
+    assertEquals(listOf("card_badge", null), anchors.take(2).map { it.resourceId })
+    assertEquals("card_overlay", anchors[1].accessibilityId)
+    assertEquals((1..6).map { "Title $it" }, anchors.drop(2).map { it.text })
+    assertTrue(anchors.none { it.text == "Home" || it.text == "Shared" }, "what was already there is not an anchor")
+  }
+
+  @Test
+  fun `a first screen has nothing before it, so everything on it qualifies as an anchor`() {
+    val current = ArbigentElementList(listOf(element("Home", "nav_home", "")), screenWidth = 100)
+
+    assertEquals(listOf("nav_home"), ArbigentReplayAnchors.select(current, previous = null).map { it.resourceId })
+  }
+
+  @Test
+  fun `a screen that gained nothing has no anchors`() {
+    val screen = ArbigentElementList(listOf(element("Home", "nav_home", "")), screenWidth = 100)
+
+    assertEquals(emptyList(), ArbigentReplayAnchors.select(screen, screen))
+  }
+
+  /** A clock or a counter changes between runs on its own: it cannot anchor anything by its text. */
+  @Test
+  fun `volatile text is dropped from an anchor's identity or disqualifies the element`() {
+    val current = ArbigentElementList(
+      listOf(
+        element("12:34", "clock", "12:34"),
+        element("42", "", ""),
+        element("3", "", ""),
+        element("", "", "99%"),
+        element("", "battery", "99%"),
+      ),
+      screenWidth = 100,
+    )
+
+    val anchors = ArbigentReplayAnchors.select(current, previous = null)
+
+    assertEquals(
+      listOf(ArbigentElementIdentity(resourceId = "clock"), ArbigentElementIdentity(resourceId = "battery")),
+      anchors,
+    )
+  }
+
+  @Test
+  fun `an anchor is matched by presence alone, not by which twin it was`() {
+    val twins = listOf(element("Play", "", ""), element("Play", "", ""))
+    val anchors = ArbigentReplayAnchors.select(ArbigentElementList(twins, screenWidth = 100), previous = null)
+
+    assertEquals(listOf(ArbigentElementIdentity(text = "Play")), anchors)
+    assertTrue(ArbigentReplayAnchors.present(anchors, ArbigentElementList(twins.take(1), screenWidth = 100)))
+  }
+
+  @Test
+  fun `a step with none of its anchors present is divergence`() = runTest {
+    val interceptor = ArbigentReplayDecisionInterceptor(
+      anchoredTrace(GoalAchievedAgentAction(), anchors = listOf(ArbigentElementIdentity(text = "Details"))),
+    )
+
+    val exception = assertFailsWith<ReplayDivergenceException> {
+      interceptor.intercept(decisionInput(elementsOf(element("Other", "", "")))) { error("Should not reach the AI") }
+    }
+    assertTrue(
+      exception.message.contains("showed 1 new element(s), such as text='Details'") &&
+        exception.message.contains("none of them is present"),
+      "Expected the reason to name an anchor, got: ${exception.message}",
+    )
+  }
+
+  @Test
+  fun `one anchor still present is enough to replay the step`() = runTest {
+    val interceptor = ArbigentReplayDecisionInterceptor(
+      anchoredTrace(
+        GoalAchievedAgentAction(),
+        anchors = listOf(ArbigentElementIdentity(text = "Gone"), ArbigentElementIdentity(text = "Details")),
+      ),
+    )
+
+    val output = interceptor.intercept(decisionInput(elementsOf(element("Details", "", "")))) {
+      error("Should not reach the AI")
+    }
+
+    assertEquals(ArbigentStepSource.Replay, output.step.stepSource)
+  }
+
+  @Test
+  fun `a trace recorded before anchors were captured replays without the check`() = runTest {
+    val interceptor = ArbigentReplayDecisionInterceptor(anchoredTrace(GoalAchievedAgentAction(), anchors = null))
+
+    val output = interceptor.intercept(decisionInput(emptyElements)) { error("Should not reach the AI") }
+
+    assertEquals(ArbigentStepSource.Replay, output.step.stepSource)
+  }
+
+  /** The anchors are checked on top of the focus wait, and read only once focus has arrived. */
+  @Test
+  fun `a step waits for an anchor on top of its recorded focus`() = runTest {
+    withVirtualClock {
+      val elsewhere = focusAt(200)
+      val recorded = focusAt(400)
+      val withoutAnchor = elementsOf(element("Loading", "", ""))
+      val withAnchor = elementsOf(element("Details", "", ""))
+      val device = ScriptedDevice(
+        screens = listOf(withoutAnchor, withAnchor),
+        focuses = listOf(elsewhere, recorded, recorded),
+      )
+      var proceeded = false
+
+      ArbigentReplayPacingStepInterceptor(
+        anchoredTrace(GoalAchievedAgentAction(), anchors = listOf(ArbigentElementIdentity(text = "Details")), focus = recorded),
+      ).intercept(stepInput(device)) {
+        proceeded = true
+        ArbigentAgent.StepResult.Continue
+      }
+
+      assertTrue(proceeded)
+      assertEquals(3, device.focusedElementCallCount, "the wait should end on the poll that saw both")
+      assertEquals(2, device.elementsCallCount, "elements are read only on polls whose focus matched")
+    }
+  }
+
+  @Test
+  fun `a step with no target and no focus polls for its anchors instead of sleeping out its budget`() = runTest {
+    withVirtualClock {
+      val device = ScriptedDevice(
+        screens = listOf(elementsOf(element("Loading", "", "")), elementsOf(element("Details", "", ""))),
+      )
+      var proceeded = false
+
+      ArbigentReplayPacingStepInterceptor(
+        anchoredTrace(GoalAchievedAgentAction(), anchors = listOf(ArbigentElementIdentity(text = "Details"))),
+      ).intercept(stepInput(device)) {
+        proceeded = true
+        ArbigentAgent.StepResult.Continue
+      }
+
+      assertTrue(proceeded)
+      assertEquals(2, device.elementsCallCount)
+      assertTrue(currentTime < 10_000, "took $currentTime ms, a whole budget")
+    }
+  }
+
+  @Test
+  fun `typed text is derived when it was on a screen of the task and the goal did not give it`() {
+    val goal = "Search for the first title on the home screen"
+    val seen = setOf("Home", "  Some  Title ")
+
+    assertTrue(ArbigentDerivedInput.isDerived(InputTextAgentAction("some title"), goal, seen))
+    assertTrue(!ArbigentDerivedInput.isDerived(InputTextAgentAction("Some Title"), "Search for Some Title", seen))
+    assertTrue(!ArbigentDerivedInput.isDerived(InputTextAgentAction("made up"), goal, seen), "the AI's own words cannot go stale")
+    assertTrue(!ArbigentDerivedInput.isDerived(ClickWithTextAgentAction("Home"), goal, seen))
+  }
+
+  @Test
+  fun `a step that typed text read off the screen is decided by the AI again on replay`() = runTest {
+    val interceptor = ArbigentReplayDecisionInterceptor(
+      anchoredTrace(InputTextAgentAction("Old title"), anchors = null, derivedInput = true),
+    )
+    val input = decisionInput(emptyElements)
+    val decidedAgain = InputTextAgentAction("New title")
+
+    val output = interceptor.intercept(input) {
+      ArbigentAi.DecisionOutput(
+        agentActions = listOf(decidedAgain),
+        step = ArbigentContextHolder.Step(
+          stepId = input.stepId,
+          agentAction = decidedAgain,
+          cacheKey = input.cacheKey,
+          screenshotFilePath = input.screenshotFilePath,
+        ),
+      )
+    }
+
+    assertEquals(decidedAgain, output.agentActions.single())
+    assertEquals(ArbigentStepSource.ReplayDelegated, output.step.stepSource)
+  }
+
+  @Test
+  fun `a re-decided step keeps the recorded anchors and stays delegated`() = runTest {
+    val recordedAnchors = listOf(ArbigentElementIdentity(text = "Title", resourceId = "title"))
+    val interceptor = ArbigentReplayDecisionInterceptor(
+      anchoredTrace(InputTextAgentAction("Old title"), anchors = recordedAnchors, derivedInput = true),
+    )
+    val input = decisionInput(elementsOf(element("Title", "title", "")))
+    val decidedAgain = InputTextAgentAction("New title")
+
+    val output = interceptor.intercept(input) {
+      ArbigentAi.DecisionOutput(
+        agentActions = listOf(decidedAgain),
+        step = ArbigentContextHolder.Step(
+          stepId = input.stepId,
+          agentAction = decidedAgain,
+          cacheKey = input.cacheKey,
+          screenshotFilePath = input.screenshotFilePath,
+        ),
+      )
+    }
+
+    assertEquals(recordedAnchors, output.step.anchors)
+    assertTrue(output.step.derivedInput)
+  }
+
+  @Test
+  fun `the AI choosing not to type at a step that typed read-off text is divergence`() = runTest {
+    val interceptor = ArbigentReplayDecisionInterceptor(
+      anchoredTrace(InputTextAgentAction("Old title"), anchors = null, derivedInput = true),
+    )
+    val input = decisionInput(emptyElements)
+
+    val exception = assertFailsWith<ReplayDivergenceException> {
+      interceptor.intercept(input) {
+        ArbigentAi.DecisionOutput(
+          agentActions = listOf(GoalAchievedAgentAction()),
+          step = ArbigentContextHolder.Step(
+            stepId = input.stepId,
+            agentAction = GoalAchievedAgentAction(),
+            cacheKey = input.cacheKey,
+            screenshotFilePath = input.screenshotFilePath,
+          ),
+        )
+      }
+    }
+    assertTrue(
+      exception.message.contains("typed text when it was recorded but the AI now decided to"),
+      "got: ${exception.message}",
+    )
+  }
+
+  /** The steps after a re-decided one replayed against the same recording, so it keeps the recorded pace. */
+  @Test
+  fun `a step the AI decided inside a replay counts as replayed when the trace is written`() {
+    val recordedSteps = timestampedSteps(listOf(1_000, 5_000, 12_000))
+    val recordedTrace = trace(recordedSteps.map { it to requireNotNull(it.agentAction) })
+    val sources = listOf(ArbigentStepSource.Replay, ArbigentStepSource.ReplayDelegated, ArbigentStepSource.Replay)
+    val freshSteps = recordedSteps.mapIndexed { index, step ->
+      step.copy(timestamp = 100_000L + index * 100L, stepSource = sources[index])
+    }
+    val context = ArbigentContextHolder("goal", 10).apply { freshSteps.forEach(::addStep) }
+
+    val candidate = ArbigentReplayTrace.candidateFrom(candidateKey(), context, recordedTrace = recordedTrace)
+    val writtenTimestamps = candidate.steps.map { it.decisionOutput.step.timestamp }
+
+    assertEquals(listOf(4_000L, 7_000L), writtenTimestamps.zipWithNext { a, b -> b - a })
+    assertEquals(sources, candidate.steps.map { it.decisionOutput.step.stepSource })
+  }
+
+  @Test
+  fun `anchors and the derived flag survive a trace round trip`() {
+    val anchors = listOf(ArbigentElementIdentity(text = "Details"), ArbigentElementIdentity(resourceId = "clock"))
+    val written = anchoredTrace(InputTextAgentAction("x"), anchors = anchors, derivedInput = true)
+
+    val read = Json { ignoreUnknownKeys = true }.decodeFromString(
+      ArbigentReplayTrace.serializer(),
+      Json.encodeToString(ArbigentReplayTrace.serializer(), written),
+    )
+
+    assertEquals(anchors, read.steps.single().decisionOutput.step.anchors)
+    assertTrue(read.steps.single().decisionOutput.step.derivedInput)
+  }
+
+  private fun elementsOf(vararg elements: ArbigentElement): ArbigentElementList =
+    ArbigentElementList(elements.toList(), screenWidth = 100)
+
+  private fun anchoredTrace(
+    action: ArbigentAgentAction,
+    anchors: List<ArbigentElementIdentity>?,
+    derivedInput: Boolean = false,
+    focus: ArbigentFocusedElement? = null,
+  ): ArbigentReplayTrace = trace(
+    listOf(
+      ArbigentContextHolder.Step(
+        stepId = "step-1",
+        agentAction = action,
+        cacheKey = "cache-key",
+        screenshotFilePath = "screenshot.png",
+        anchors = anchors,
+        derivedInput = derivedInput,
+        focusedElement = focus,
+      ) to action,
+    ),
+  )
+
   private fun element(
     text: String,
     resourceId: String,

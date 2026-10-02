@@ -23,6 +23,10 @@ class ArbigentReplayTraceVariablesTest {
         uiTree = "EditText text=$account id=com.example.app:id/email",
         target = ArbigentElementIdentity(text = account, resourceId = "com.example.app:id/email"),
         focusResourceId = "com.example.app:id/email",
+        anchors = listOf(
+          ArbigentElementIdentity(text = "Signed in as $account", resourceId = "com.example.app:id/greeting"),
+          ArbigentElementIdentity(accessibilityId = "Avatar of $account"),
+        ),
       ),
       step(action = ClickWithTextAgentAction("Continue as $account")),
       step(action = DpadAutoFocusWithIdAgentAction("com.example.app:id/next")),
@@ -115,6 +119,7 @@ class ArbigentReplayTraceVariablesTest {
     uiTree: String? = null,
     target: ArbigentElementIdentity? = null,
     focusResourceId: String? = null,
+    anchors: List<ArbigentElementIdentity>? = null,
   ): ArbigentReplayTraceStep = ArbigentReplayTraceStep(
     decisionOutput = ArbigentAi.DecisionOutput(
       agentActions = listOf(action),
@@ -132,6 +137,7 @@ class ArbigentReplayTraceVariablesTest {
         focusedElement = focusResourceId?.let {
           ArbigentFocusedElement(className = "android.view.View", x = 0, y = 0, width = 10, height = 10, resourceId = it)
         },
+        anchors = anchors,
       ),
     ),
   )

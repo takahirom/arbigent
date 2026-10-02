@@ -76,6 +76,10 @@ internal class ArbigentReplayPacingStepInterceptor(
     val recordedStep = trace.steps.getOrNull(replayIndex)?.decisionOutput?.step
     val identity = recordedStep?.targetElement
     val focusWait = focusWait(replayIndex)
+    // The anchors are checked on top of whichever wait the step already has, and read only once
+    // that wait is satisfied, so a focus poll does not fetch the hierarchy twice. A step with no
+    // other wait polls for them instead of sleeping out its budget.
+    val anchors = recordedStep?.anchors.orEmpty()
     if (identity != null) {
       awaitCondition(
         replayIndex = replayIndex,
@@ -83,7 +87,8 @@ internal class ArbigentReplayPacingStepInterceptor(
         budgetMillis = budgetMillis,
         isSatisfied = {
           val elements = readElements(stepInput.device)
-          elements != null && identity.findMatch(elements) != null
+          elements != null && identity.findMatch(elements) != null &&
+            ArbigentReplayAnchors.present(anchors, elements)
         },
       )
     } else if (focusWait != null) {
@@ -104,8 +109,15 @@ internal class ArbigentReplayPacingStepInterceptor(
           val matches = focusWait.focus.matches(current) &&
             focusWait.previousFocus?.matches(current) != true
           if (!matches) sawOtherScreen = true
-          matches && sawOtherScreen
+          matches && sawOtherScreen && anchorsPresent(stepInput.device, anchors)
         },
+      )
+    } else if (anchors.isNotEmpty()) {
+      awaitCondition(
+        replayIndex = replayIndex,
+        description = "one of the ${anchors.size} elements that appeared with this step",
+        budgetMillis = budgetMillis,
+        isSatisfied = { anchorsPresent(stepInput.device, anchors) },
       )
     } else {
       waitOutBudget(replayIndex, budgetMillis)
@@ -265,6 +277,12 @@ internal class ArbigentReplayPacingStepInterceptor(
     )
   }
 
+  private fun anchorsPresent(device: ArbigentDevice, anchors: List<ArbigentElementIdentity>): Boolean {
+    if (anchors.isEmpty()) return true
+    val elements = readElements(device) ?: return false
+    return ArbigentReplayAnchors.present(anchors, elements)
+  }
+
   private fun readElements(device: ArbigentDevice): ArbigentElementList? {
     return try {
       device.elements()
@@ -353,6 +371,46 @@ internal class ArbigentReplayDecisionInterceptor(
             "$recordedOn but the current screen is $currentIs",
         )
       }
+    }
+    val anchors = recorded.decisionOutput.step.anchors
+    if (anchors == null) {
+      arbigentInfoLog("Replay step ${replayIndex + 1}: no anchors recorded, screen not checked")
+    } else if (anchors.isNotEmpty()) {
+      val present = anchors.count { it.findMatch(decisionInput.elements) != null }
+      if (present == 0) {
+        throw ReplayDivergenceException(
+          "step ${replayIndex + 1} was decided on a screen that showed ${anchors.size} new " +
+            "element(s), such as ${anchors.first().description()}, and none of them is present",
+        )
+      }
+      arbigentInfoLog("Replay step ${replayIndex + 1}: $present of ${anchors.size} anchors present")
+    }
+    if (recorded.decisionOutput.step.derivedInput) {
+      // What was typed came off a screen, so it may read differently now: let the AI decide this
+      // one step. It is wrapped in a replay the way the step is, so a run that falls back to it
+      // every time still skips the AI everywhere else.
+      arbigentInfoLog(
+        "Replay step ${replayIndex + 1}: the recorded text was read off the screen, asking the AI again",
+      )
+      val output = chain.proceed(decisionInput)
+      val decided = output.step.agentAction ?: output.agentActions.singleOrNull()
+      if (decided !is InputTextAgentAction) {
+        throw ReplayDivergenceException(
+          "step ${replayIndex + 1} typed text when it was recorded but the AI now decided to " +
+            (decided?.stepLogText() ?: "do nothing"),
+        )
+      }
+      // The AI's fresh step knows nothing of the recording. Without these the agent would write back
+      // what this run observed in place of the recorded anchors, and would decide anew whether the
+      // text was read off the screen; a text its heuristic fails to recognize would then replay
+      // verbatim next time, which is exactly what delegation exists to prevent.
+      return output.copy(
+        step = output.step.copy(
+          stepSource = ArbigentStepSource.ReplayDelegated,
+          anchors = recorded.decisionOutput.step.anchors,
+          derivedInput = true,
+        ),
+      )
     }
     val identity = recorded.decisionOutput.step.targetElement
     val reboundAction = if (identity != null) {
@@ -576,6 +634,100 @@ private val ACCESSIBILITY_ATTRIBUTE_KEYS = listOf(
  * element's current position nor reported as a divergence — it silently operated on whatever
  * happened to sit at the recorded index.
  */
+/**
+ * Picks the elements replay checks for before it carries out a recorded step, and checks them:
+ * see [ArbigentContextHolder.Step.anchors].
+ *
+ * Anchors are what is new on the screen compared to the step before, because that is what tells
+ * the screen the action belongs on from the one it came from: a target that is on both says
+ * nothing. Elements with an id come first, since content titles rotate between runs; text that
+ * changes on its own, a clock or a counter, is dropped from the identity or skipped. One anchor
+ * still present is enough, so a row of content that rotated does not fail a screen that is
+ * otherwise the recorded one.
+ */
+public object ArbigentReplayAnchors {
+  public const val MAX_ANCHORS: Int = 8
+
+  public fun select(
+    current: ArbigentElementList,
+    previous: ArbigentElementList?,
+  ): List<ArbigentElementIdentity> {
+    val all = current.elements
+    return all.asSequence()
+      .mapNotNull { element -> anchorIdentity(element, all) }
+      .distinct()
+      .filter { identity -> previous == null || identity.findMatch(previous) == null }
+      .sortedBy { identity -> if (identity.resourceId != null || identity.accessibilityId != null) 0 else 1 }
+      .take(MAX_ANCHORS)
+      .toList()
+  }
+
+  /** Whether the screen still shows the recorded step's screen. Nothing recorded means nothing to check. */
+  public fun present(anchors: List<ArbigentElementIdentity>?, elements: ArbigentElementList): Boolean =
+    anchors.isNullOrEmpty() || anchors.any { it.findMatch(elements) != null }
+
+  private fun anchorIdentity(element: ArbigentElement, all: List<ArbigentElement>): ArbigentElementIdentity? {
+    val identity = ArbigentElementIdentity.from(element, all) ?: return null
+    // Presence is all that is asked of an anchor, not which twin it is or how many there are.
+    // Volatile text, in the text or in a spoken label, would make the anchor miss its own element
+    // the moment the value ticks; a clock labelled with its time is still the same clock.
+    val text = identity.text?.takeIf(::isStableText)
+    val accessibilityId = identity.accessibilityId?.takeIf(::isStableText)
+    if (text == null && identity.resourceId == null && accessibilityId == null) return null
+    return identity.copy(occurrence = 0, twinCount = null, text = text, accessibilityId = accessibilityId)
+  }
+
+  private fun isStableText(text: String): Boolean {
+    val trimmed = text.trim()
+    return trimmed.length >= 2 && trimmed.any { it.isLetter() }
+  }
+}
+
+/**
+ * Tells text the AI typed because it read it on some screen of the task from text the goal gave
+ * it: see [ArbigentContextHolder.Step.derivedInput]. Text that is in neither place was the AI's
+ * own choice, and nothing on the screen can make it stale.
+ */
+public object ArbigentDerivedInput {
+  private const val MIN_LENGTH = 2
+
+  public fun isDerived(action: ArbigentAgentAction?, goal: String, seenTexts: Collection<String>): Boolean {
+    if (action !is InputTextAgentAction) return false
+    val typed = normalize(action.text)
+    if (typed.length < MIN_LENGTH) return false
+    if (normalize(goal).contains(typed)) return false
+    return seenTexts.any { normalize(it) == typed }
+  }
+
+  public fun textsOf(elements: ArbigentElementList): List<String> =
+    elements.elements.flatMap { element ->
+      listOfNotNull(
+        element.firstNonBlank(TEXT_ATTRIBUTE_KEYS),
+        element.firstNonBlank(ACCESSIBILITY_ATTRIBUTE_KEYS),
+      )
+    }
+
+  private fun normalize(text: String): String = text.trim().lowercase().replace(Regex("\\s+"), " ")
+}
+
+/**
+ * What one agent run has seen so far: the screen its last decision was made against, which
+ * [ArbigentReplayAnchors.select] diffs the next screen with, and every text that has been on any
+ * of them, which [ArbigentDerivedInput] checks typed text against. Only a decision screen is
+ * recorded here; the replay pacing reads the device too, and a poll must not pass for one.
+ */
+public class ArbigentScreenHistory {
+  public var previousElements: ArbigentElementList? = null
+    private set
+  private val texts = mutableSetOf<String>()
+  public val seenTexts: Set<String> get() = texts
+
+  public fun recordDecisionScreen(elements: ArbigentElementList) {
+    previousElements = elements
+    texts += ArbigentDerivedInput.textsOf(elements)
+  }
+}
+
 private fun ArbigentElement.firstNonBlank(keys: List<String>): String? =
   keys.firstNotNullOfOrNull { key ->
     treeNode.dfs { node -> node.attributes[key].nonBlankOrNull() != null }
@@ -743,9 +895,9 @@ internal data class ArbigentReplayTrace(
       // real one; anchoring on the first could leave that gap non-positive.
       val recordedSteps = recordedTrace?.steps?.map { it.decisionOutput.step }.orEmpty()
       val replayedCount = if (recordedTrace == null) 0 else {
-        prefix.size + steps.drop(prefix.size).takeWhile { it.stepSource == ArbigentStepSource.Replay }.size
+        prefix.size + steps.drop(prefix.size).takeWhile { it.stepSource.isReplayed() }.size
       }
-      require(steps.take(replayedCount).all { it.stepSource == ArbigentStepSource.Replay }) {
+      require(steps.take(replayedCount).all { it.stepSource.isReplayed() }) {
         "Every step in the replayed prefix must come from replay"
       }
       require(replayedCount <= recordedSteps.size) {
@@ -786,6 +938,13 @@ internal data class ArbigentReplayTrace(
      * The actions of these steps, in order. Steps carrying no action are feedback the agent left
      * for itself, and a step id repeats when several were recorded for one decision.
      */
+    /**
+     * A step the AI decided in the middle of a replay sits inside the replayed prefix: the steps
+     * after it replayed against the same recording, so its pace is the recording's too.
+     */
+    private fun ArbigentStepSource.isReplayed(): Boolean =
+      this == ArbigentStepSource.Replay || this == ArbigentStepSource.ReplayDelegated
+
     private fun List<ArbigentContextHolder.Step>.replayable(): List<ArbigentContextHolder.Step> =
       asSequence()
         .filter { step -> step.agentAction != null }
