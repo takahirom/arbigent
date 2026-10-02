@@ -1335,6 +1335,7 @@ private fun readScreen(device: ArbigentDevice, formFactor: ArbigentScenarioDevic
       arbigentDebugLog("Could not read the focused element: $exception")
       null
     },
+    viewport = device.viewport(),
   )
 }
 
@@ -1439,7 +1440,8 @@ private suspend fun step(
     prompt = stepInput.prompt,
     cacheKey = cacheKey,
     aiOptions = stepInput.aiOptions,
-    mcpTools = tools
+    mcpTools = tools,
+    viewport = screen.viewport,
   )
   // Read before the decision, not after it: the AI call takes tens of seconds with reasoning on,
   // and by the time it returns a carousel or an auto-hiding overlay has moved focus off the screen
@@ -1454,6 +1456,7 @@ private suspend fun step(
         // The screen this decision was made against, not the one the action leads to: replay
         // waits for this before it captures the step, the same way it waits for the target.
         focusedElement = focusedElementAtDecision,
+        viewport = screen.viewport,
       ),
     )
   } catch (exception: ReplayDivergenceException) {

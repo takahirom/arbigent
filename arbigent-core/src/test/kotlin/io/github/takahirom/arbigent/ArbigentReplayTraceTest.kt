@@ -1467,7 +1467,120 @@ class ArbigentReplayTraceTest {
     )
   }
 
-  private fun decisionInput(elements: ArbigentElementList): ArbigentAi.DecisionInput =
+  /**
+   * A coordinate tap names a pixel, not an element: only a screen of the same size puts that pixel
+   * in the same place. The check runs before anything is tapped and names both sizes.
+   */
+  @Test
+  fun `a coordinate tap recorded on another screen size is divergence`() = runTest {
+    val interceptor = ArbigentReplayDecisionInterceptor(
+      coordinateTapTrace(recordedOn = ArbigentViewport(width = 1080, height = 1920)),
+    )
+
+    val exception = assertFailsWith<ReplayDivergenceException> {
+      interceptor.intercept(
+        decisionInput(emptyElements, viewport = ArbigentViewport(width = 1440, height = 2560)),
+      ) { error("Should not reach the AI") }
+    }
+    assertTrue(
+      exception.message.contains("recorded on a 1080x1920 screen but the current screen is 1440x2560"),
+      "Expected the reason to name both sizes, got: ${exception.message}",
+    )
+  }
+
+  @Test
+  fun `a coordinate tap recorded on a screen the current device cannot size is divergence`() = runTest {
+    val interceptor = ArbigentReplayDecisionInterceptor(
+      coordinateTapTrace(recordedOn = ArbigentViewport(width = 1080, height = 1920)),
+    )
+
+    val exception = assertFailsWith<ReplayDivergenceException> {
+      interceptor.intercept(decisionInput(emptyElements, viewport = null)) { error("Should not reach the AI") }
+    }
+    assertTrue(
+      exception.message.contains("the current screen is of unknown size"),
+      "Expected the reason to say the current size is unknown, got: ${exception.message}",
+    )
+  }
+
+  /** Traces recorded before the screen size was captured diverge once, and are re-recorded with it. */
+  @Test
+  fun `a coordinate tap recorded without a screen size is divergence on a sized screen`() = runTest {
+    val interceptor = ArbigentReplayDecisionInterceptor(coordinateTapTrace(recordedOn = null))
+
+    val exception = assertFailsWith<ReplayDivergenceException> {
+      interceptor.intercept(
+        decisionInput(emptyElements, viewport = ArbigentViewport(width = 1280, height = 720)),
+      ) { error("Should not reach the AI") }
+    }
+    assertTrue(
+      exception.message.contains("recorded on a screen of unknown size but the current screen is 1280x720"),
+      "Expected the reason to name the current size, got: ${exception.message}",
+    )
+  }
+
+  @Test
+  fun `a coordinate tap replays on a screen of the recorded size`() = runTest {
+    val viewport = ArbigentViewport(width = 1080, height = 1920)
+    val interceptor = ArbigentReplayDecisionInterceptor(coordinateTapTrace(recordedOn = viewport))
+
+    val output = interceptor.intercept(decisionInput(emptyElements, viewport = viewport)) {
+      error("Should not reach the AI")
+    }
+
+    assertEquals(ClickAtCoordinates(x = 195, y = 760), output.agentActions.single())
+    assertEquals(ArbigentStepSource.Replay, output.step.stepSource)
+  }
+
+  @Test
+  fun `an element-targeted step replays on a changed screen size`() = runTest {
+    val action = ClickWithIndex(0)
+    val trace = singleStepTrace(action, viewport = ArbigentViewport(width = 1080, height = 1920))
+    val interceptor = ArbigentReplayDecisionInterceptor(trace)
+    val elements = ArbigentElementList(
+      listOf(element(text = "Only", resourceId = "only", accessibilityId = "Only")),
+      screenWidth = 100,
+    )
+
+    val output = interceptor.intercept(
+      decisionInput(elements, viewport = ArbigentViewport(width = 1440, height = 2560)),
+    ) { error("Should not reach the AI") }
+
+    assertEquals(action, output.agentActions.single())
+  }
+
+  private val emptyElements = ArbigentElementList(emptyList(), screenWidth = 100)
+
+  private fun coordinateTapTrace(recordedOn: ArbigentViewport?): ArbigentReplayTrace =
+    singleStepTrace(ClickAtCoordinates(x = 195, y = 760), viewport = recordedOn)
+
+  private fun singleStepTrace(action: ArbigentAgentAction, viewport: ArbigentViewport?): ArbigentReplayTrace =
+    ArbigentReplayTrace(
+      version = "1.2.3",
+      scenarioId = "scenario",
+      taskIndex = 0,
+      taskIdentity = "scenario",
+      goalHash = "hash",
+      steps = listOf(
+        ArbigentReplayTraceStep(
+          decisionOutput = ArbigentAi.DecisionOutput(
+            agentActions = listOf(action),
+            step = ArbigentContextHolder.Step(
+              stepId = "step-1",
+              agentAction = action,
+              cacheKey = "cache-key",
+              screenshotFilePath = "screenshot.png",
+              viewport = viewport,
+            ),
+          ),
+        ),
+      ),
+    )
+
+  private fun decisionInput(
+    elements: ArbigentElementList,
+    viewport: ArbigentViewport? = null,
+  ): ArbigentAi.DecisionInput =
     ArbigentAi.DecisionInput(
       stepId = "step",
       contextHolder = ArbigentContextHolder("goal", 1),
@@ -1482,6 +1595,7 @@ class ArbigentReplayTraceTest {
       prompt = ArbigentPrompt(),
       cacheKey = "cache-key",
       aiOptions = null,
+      viewport = viewport,
     )
 
   private fun executeInput(attemptMode: ArbigentAttemptMode): ArbigentAgent.ExecuteInput {

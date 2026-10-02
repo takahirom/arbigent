@@ -46,6 +46,12 @@ public class ArbigentContextHolder(
      * recorded before this was captured — replay then paces that step the way it always has.
      */
     public val focusedElement: ArbigentFocusedElement? = null,
+    /**
+     * The size of the screen this step was decided against. A coordinate tap means nothing on a
+     * screen of another size, so replay refuses to repeat one there. Null when the device could
+     * not say.
+     */
+    public val viewport: ArbigentViewport? = null,
   ) {
     public fun isFailed(): Boolean {
       return feedback?.contains("Failed") == true
