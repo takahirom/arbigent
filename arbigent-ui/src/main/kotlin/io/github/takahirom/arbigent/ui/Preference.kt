@@ -106,6 +106,10 @@ internal class KeychainDelegate(
     Entry(account = accountPrefix + "-" + property.name)
 
   inner class Entry(private val account: String) {
+    // One lock per entry keeps the keychain write and the cache update together: without it two
+    // writers could interleave so the keychain ends up holding one value and the cache another.
+    private val lock = Any()
+
     @Volatile
     private var value: Lazy<String> = lazy {
       try {
@@ -118,12 +122,14 @@ internal class KeychainDelegate(
     operator fun getValue(thisRef: Any?, property: KProperty<*>): String = value.value
 
     operator fun setValue(thisRef: Any?, property: KProperty<*>, value: String?) {
-      if (value != null) {
-        keyStoreFactory().setPassword(domain, account, value)
-      } else {
-        keyStoreFactory().deletePassword(domain, account)
+      synchronized(lock) {
+        if (value != null) {
+          keyStoreFactory().setPassword(domain, account, value)
+        } else {
+          keyStoreFactory().deletePassword(domain, account)
+        }
+        this.value = lazyOf(value?.ifBlank { null } ?: default())
       }
-      this.value = lazyOf(value?.ifBlank { null } ?: default())
     }
   }
 }
