@@ -26,6 +26,8 @@ public interface ArbigentAi {
     val cacheKey: String,
     val aiOptions: ArbigentAiOptions?,
     val mcpTools: List<MCPTool>? = null,
+    /** The screen size the decision is made against; null when the device could not say. */
+    val viewport: ArbigentViewport? = null,
   )
 
   public data class ScenarioGenerationInput(

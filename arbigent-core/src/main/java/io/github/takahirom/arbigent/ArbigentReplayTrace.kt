@@ -339,6 +339,20 @@ internal class ArbigentReplayDecisionInterceptor(
         )
       }
     }
+    // A coordinate tap names a pixel, not an element, so the only thing that makes it mean the
+    // same thing again is a screen of the same size. Checked before anything is tapped; a
+    // recorded size the current device cannot confirm is a mismatch too.
+    if (recordedAction is ClickAtCoordinates) {
+      val recordedViewport = recorded.decisionOutput.step.viewport
+      val currentViewport = decisionInput.viewport
+      if (recordedViewport != currentViewport) {
+        throw ReplayDivergenceException(
+          "step ${replayIndex + 1} taps at (${recordedAction.x}, ${recordedAction.y}) recorded on a " +
+            "${recordedViewport?.description() ?: "screen of unknown size"} screen but the current " +
+            "screen is ${currentViewport?.description() ?: "of unknown size"}",
+        )
+      }
+    }
     val identity = recorded.decisionOutput.step.targetElement
     val reboundAction = if (identity != null) {
       val currentElement = identity.findMatch(decisionInput.elements)
@@ -600,6 +614,18 @@ private fun selectorAndOccurrence(selector: String): Pair<Regex, Int> {
     Regex(Regex.escape(patternText))
   }
   return pattern to occurrence
+}
+
+/**
+ * The size of a screen in the units a coordinate tap is expressed in. Two screens with the same
+ * size put the same pixel in the same place, which is all a recorded coordinate relies on.
+ */
+@Serializable
+public data class ArbigentViewport(
+  public val width: Int,
+  public val height: Int,
+) {
+  public fun description(): String = "${width}x$height"
 }
 
 @Serializable
