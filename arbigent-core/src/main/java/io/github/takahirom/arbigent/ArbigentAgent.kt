@@ -338,6 +338,7 @@ public class ArbigentAgent internal constructor(
     val attemptMode: ArbigentAttemptMode,
     val mcpClient: MCPClient? = null,
     val mcpOptions: ArbigentMcpOptions? = null,
+    val screenHistory: ArbigentScreenHistory = ArbigentScreenHistory(),
   )
 
   public sealed interface StepResult {
@@ -1278,6 +1279,7 @@ private suspend fun executeDefault(
     input.updateInitializerCompleted(true)
 
     var stepRemain = input.maxStep
+    val screenHistory = ArbigentScreenHistory()
     while (stepRemain-- > 0 && !contextHolder.isGoalAchieved()) {
       val stepInput = StepInput(
         arbigentContextHolder = contextHolder,
@@ -1293,7 +1295,8 @@ private suspend fun executeDefault(
         cacheOptions = input.cacheOptions,
         attemptMode = input.attemptMode,
         mcpClient = input.mcpClient,
-        mcpOptions = input.mcpOptions
+        mcpOptions = input.mcpOptions,
+        screenHistory = screenHistory,
       )
       when (arbigentTimed("agent.step") { input.stepChain(stepInput) }) {
         StepResult.GoalAchieved -> break
@@ -1447,6 +1450,9 @@ private suspend fun step(
   // and by the time it returns a carousel or an auto-hiding overlay has moved focus off the screen
   // the decision was made against.
   val focusedElementAtDecision = screen.focusedElement
+  val screenHistory = stepInput.screenHistory
+  val anchorsObserved = ArbigentReplayAnchors.select(elements, screenHistory.previousElements)
+  screenHistory.recordDecisionScreen(elements)
   val decisionOutput = try {
     val output = arbigentTimed("step.decision") { decisionChain(decisionInput) }
     val action = output.step.agentAction ?: output.agentActions.singleOrNull()
@@ -1457,6 +1463,13 @@ private suspend fun step(
         // waits for this before it captures the step, the same way it waits for the target.
         focusedElement = focusedElementAtDecision,
         viewport = screen.viewport,
+        // A replayed step keeps the anchors it was recorded with. The screen it read may be a frame
+        // early and show only some of them, and writing those back would leave the next replay
+        // fewer to find before it gives the step up. A step recorded before anchors were captured
+        // takes this run's.
+        anchors = output.step.anchors ?: anchorsObserved,
+        derivedInput = output.step.derivedInput ||
+          ArbigentDerivedInput.isDerived(action, contextHolder.goal, screenHistory.seenTexts),
       ),
     )
   } catch (exception: ReplayDivergenceException) {

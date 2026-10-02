@@ -112,6 +112,12 @@ public enum class ArbigentStepSource {
   Ai,
   Cache,
   Replay,
+
+  /**
+   * Decided by the AI in the middle of a replay, because what was recorded could not be trusted
+   * to still be right: text that was read off a screen at the time. The steps around it replayed.
+   */
+  ReplayDelegated,
 }
 
 @Serializable
