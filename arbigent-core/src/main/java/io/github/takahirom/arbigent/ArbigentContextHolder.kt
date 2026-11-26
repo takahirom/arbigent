@@ -60,12 +60,6 @@ public class ArbigentContextHolder(
      * is every focus-only D-pad move; null on steps recorded before anchors were captured.
      */
     public val anchors: List<ArbigentElementIdentity>? = null,
-    /**
-     * Whether the text this step typed was read off a screen earlier in the task rather than given
-     * by the goal. Replay asks the AI to decide such a step again instead of typing what was
-     * recorded, because the screen it was read from may show different text now.
-     */
-    public val derivedInput: Boolean = false,
   ) {
     public fun isFailed(): Boolean {
       return feedback?.contains("Failed") == true

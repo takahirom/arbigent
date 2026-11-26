@@ -385,33 +385,6 @@ internal class ArbigentReplayDecisionInterceptor(
       }
       arbigentInfoLog("Replay step ${replayIndex + 1}: $present of ${anchors.size} anchors present")
     }
-    if (recorded.decisionOutput.step.derivedInput) {
-      // What was typed came off a screen, so it may read differently now: let the AI decide this
-      // one step. It is wrapped in a replay the way the step is, so a run that falls back to it
-      // every time still skips the AI everywhere else.
-      arbigentInfoLog(
-        "Replay step ${replayIndex + 1}: the recorded text was read off the screen, asking the AI again",
-      )
-      val output = chain.proceed(decisionInput)
-      val decided = output.step.agentAction ?: output.agentActions.singleOrNull()
-      if (decided !is InputTextAgentAction) {
-        throw ReplayDivergenceException(
-          "step ${replayIndex + 1} typed text when it was recorded but the AI now decided to " +
-            (decided?.stepLogText() ?: "do nothing"),
-        )
-      }
-      // The AI's fresh step knows nothing of the recording. Without these the agent would write back
-      // what this run observed in place of the recorded anchors, and would decide anew whether the
-      // text was read off the screen; a text its heuristic fails to recognize would then replay
-      // verbatim next time, which is exactly what delegation exists to prevent.
-      return output.copy(
-        step = output.step.copy(
-          stepSource = ArbigentStepSource.ReplayDelegated,
-          anchors = recorded.decisionOutput.step.anchors,
-          derivedInput = true,
-        ),
-      )
-    }
     val identity = recorded.decisionOutput.step.targetElement
     val reboundAction = if (identity != null) {
       val currentElement = when (val resolution = identity.resolve(decisionInput.elements)) {
@@ -684,47 +657,16 @@ public object ArbigentReplayAnchors {
 }
 
 /**
- * Tells text the AI typed because it read it on some screen of the task from text the goal gave
- * it: see [ArbigentContextHolder.Step.derivedInput]. Text that is in neither place was the AI's
- * own choice, and nothing on the screen can make it stale.
- */
-public object ArbigentDerivedInput {
-  private const val MIN_LENGTH = 2
-
-  public fun isDerived(action: ArbigentAgentAction?, goal: String, seenTexts: Collection<String>): Boolean {
-    if (action !is InputTextAgentAction) return false
-    val typed = normalize(action.text)
-    if (typed.length < MIN_LENGTH) return false
-    if (normalize(goal).contains(typed)) return false
-    return seenTexts.any { normalize(it) == typed }
-  }
-
-  public fun textsOf(elements: ArbigentElementList): List<String> =
-    elements.elements.flatMap { element ->
-      listOfNotNull(
-        element.firstNonBlank(TEXT_ATTRIBUTE_KEYS),
-        element.firstNonBlank(ACCESSIBILITY_ATTRIBUTE_KEYS),
-      )
-    }
-
-  private fun normalize(text: String): String = text.trim().lowercase().replace(Regex("\\s+"), " ")
-}
-
-/**
  * What one agent run has seen so far: the screen its last decision was made against, which
- * [ArbigentReplayAnchors.select] diffs the next screen with, and every text that has been on any
- * of them, which [ArbigentDerivedInput] checks typed text against. Only a decision screen is
- * recorded here; the replay pacing reads the device too, and a poll must not pass for one.
+ * [ArbigentReplayAnchors.select] diffs the next screen with. Only a decision screen is recorded
+ * here; the replay pacing reads the device too, and a poll must not pass for one.
  */
 public class ArbigentScreenHistory {
   public var previousElements: ArbigentElementList? = null
     private set
-  private val texts = mutableSetOf<String>()
-  public val seenTexts: Set<String> get() = texts
 
   public fun recordDecisionScreen(elements: ArbigentElementList) {
     previousElements = elements
-    texts += ArbigentDerivedInput.textsOf(elements)
   }
 }
 
@@ -895,9 +837,9 @@ internal data class ArbigentReplayTrace(
       // real one; anchoring on the first could leave that gap non-positive.
       val recordedSteps = recordedTrace?.steps?.map { it.decisionOutput.step }.orEmpty()
       val replayedCount = if (recordedTrace == null) 0 else {
-        prefix.size + steps.drop(prefix.size).takeWhile { it.stepSource.isReplayed() }.size
+        prefix.size + steps.drop(prefix.size).takeWhile { it.stepSource == ArbigentStepSource.Replay }.size
       }
-      require(steps.take(replayedCount).all { it.stepSource.isReplayed() }) {
+      require(steps.take(replayedCount).all { it.stepSource == ArbigentStepSource.Replay }) {
         "Every step in the replayed prefix must come from replay"
       }
       require(replayedCount <= recordedSteps.size) {
@@ -938,13 +880,6 @@ internal data class ArbigentReplayTrace(
      * The actions of these steps, in order. Steps carrying no action are feedback the agent left
      * for itself, and a step id repeats when several were recorded for one decision.
      */
-    /**
-     * A step the AI decided in the middle of a replay sits inside the replayed prefix: the steps
-     * after it replayed against the same recording, so its pace is the recording's too.
-     */
-    private fun ArbigentStepSource.isReplayed(): Boolean =
-      this == ArbigentStepSource.Replay || this == ArbigentStepSource.ReplayDelegated
-
     private fun List<ArbigentContextHolder.Step>.replayable(): List<ArbigentContextHolder.Step> =
       asSequence()
         .filter { step -> step.agentAction != null }

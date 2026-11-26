@@ -1468,8 +1468,6 @@ private suspend fun step(
         // fewer to find before it gives the step up. A step recorded before anchors were captured
         // takes this run's.
         anchors = output.step.anchors ?: anchorsObserved,
-        derivedInput = output.step.derivedInput ||
-          ArbigentDerivedInput.isDerived(action, contextHolder.goal, screenHistory.seenTexts),
       ),
     )
   } catch (exception: ReplayDivergenceException) {

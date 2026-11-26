@@ -1832,113 +1832,9 @@ class ArbigentReplayTraceTest {
   }
 
   @Test
-  fun `typed text is derived when it was on a screen of the task and the goal did not give it`() {
-    val goal = "Search for the first title on the home screen"
-    val seen = setOf("Home", "  Some  Title ")
-
-    assertTrue(ArbigentDerivedInput.isDerived(InputTextAgentAction("some title"), goal, seen))
-    assertTrue(!ArbigentDerivedInput.isDerived(InputTextAgentAction("Some Title"), "Search for Some Title", seen))
-    assertTrue(!ArbigentDerivedInput.isDerived(InputTextAgentAction("made up"), goal, seen), "the AI's own words cannot go stale")
-    assertTrue(!ArbigentDerivedInput.isDerived(ClickWithTextAgentAction("Home"), goal, seen))
-  }
-
-  @Test
-  fun `a step that typed text read off the screen is decided by the AI again on replay`() = runTest {
-    val interceptor = ArbigentReplayDecisionInterceptor(
-      anchoredTrace(InputTextAgentAction("Old title"), anchors = null, derivedInput = true),
-    )
-    val input = decisionInput(emptyElements)
-    val decidedAgain = InputTextAgentAction("New title")
-
-    val output = interceptor.intercept(input) {
-      ArbigentAi.DecisionOutput(
-        agentActions = listOf(decidedAgain),
-        step = ArbigentContextHolder.Step(
-          stepId = input.stepId,
-          agentAction = decidedAgain,
-          cacheKey = input.cacheKey,
-          screenshotFilePath = input.screenshotFilePath,
-        ),
-      )
-    }
-
-    assertEquals(decidedAgain, output.agentActions.single())
-    assertEquals(ArbigentStepSource.ReplayDelegated, output.step.stepSource)
-  }
-
-  @Test
-  fun `a re-decided step keeps the recorded anchors and stays delegated`() = runTest {
-    val recordedAnchors = listOf(ArbigentElementIdentity(text = "Title", resourceId = "title"))
-    val interceptor = ArbigentReplayDecisionInterceptor(
-      anchoredTrace(InputTextAgentAction("Old title"), anchors = recordedAnchors, derivedInput = true),
-    )
-    val input = decisionInput(elementsOf(element("Title", "title", "")))
-    val decidedAgain = InputTextAgentAction("New title")
-
-    val output = interceptor.intercept(input) {
-      ArbigentAi.DecisionOutput(
-        agentActions = listOf(decidedAgain),
-        step = ArbigentContextHolder.Step(
-          stepId = input.stepId,
-          agentAction = decidedAgain,
-          cacheKey = input.cacheKey,
-          screenshotFilePath = input.screenshotFilePath,
-        ),
-      )
-    }
-
-    assertEquals(recordedAnchors, output.step.anchors)
-    assertTrue(output.step.derivedInput)
-  }
-
-  @Test
-  fun `the AI choosing not to type at a step that typed read-off text is divergence`() = runTest {
-    val interceptor = ArbigentReplayDecisionInterceptor(
-      anchoredTrace(InputTextAgentAction("Old title"), anchors = null, derivedInput = true),
-    )
-    val input = decisionInput(emptyElements)
-
-    val exception = assertFailsWith<ReplayDivergenceException> {
-      interceptor.intercept(input) {
-        ArbigentAi.DecisionOutput(
-          agentActions = listOf(GoalAchievedAgentAction()),
-          step = ArbigentContextHolder.Step(
-            stepId = input.stepId,
-            agentAction = GoalAchievedAgentAction(),
-            cacheKey = input.cacheKey,
-            screenshotFilePath = input.screenshotFilePath,
-          ),
-        )
-      }
-    }
-    assertTrue(
-      exception.message.contains("typed text when it was recorded but the AI now decided to"),
-      "got: ${exception.message}",
-    )
-  }
-
-  /** The steps after a re-decided one replayed against the same recording, so it keeps the recorded pace. */
-  @Test
-  fun `a step the AI decided inside a replay counts as replayed when the trace is written`() {
-    val recordedSteps = timestampedSteps(listOf(1_000, 5_000, 12_000))
-    val recordedTrace = trace(recordedSteps.map { it to requireNotNull(it.agentAction) })
-    val sources = listOf(ArbigentStepSource.Replay, ArbigentStepSource.ReplayDelegated, ArbigentStepSource.Replay)
-    val freshSteps = recordedSteps.mapIndexed { index, step ->
-      step.copy(timestamp = 100_000L + index * 100L, stepSource = sources[index])
-    }
-    val context = ArbigentContextHolder("goal", 10).apply { freshSteps.forEach(::addStep) }
-
-    val candidate = ArbigentReplayTrace.candidateFrom(candidateKey(), context, recordedTrace = recordedTrace)
-    val writtenTimestamps = candidate.steps.map { it.decisionOutput.step.timestamp }
-
-    assertEquals(listOf(4_000L, 7_000L), writtenTimestamps.zipWithNext { a, b -> b - a })
-    assertEquals(sources, candidate.steps.map { it.decisionOutput.step.stepSource })
-  }
-
-  @Test
-  fun `anchors and the derived flag survive a trace round trip`() {
+  fun `anchors survive a trace round trip`() {
     val anchors = listOf(ArbigentElementIdentity(text = "Details"), ArbigentElementIdentity(resourceId = "clock"))
-    val written = anchoredTrace(InputTextAgentAction("x"), anchors = anchors, derivedInput = true)
+    val written = anchoredTrace(InputTextAgentAction("x"), anchors = anchors)
 
     val read = Json { ignoreUnknownKeys = true }.decodeFromString(
       ArbigentReplayTrace.serializer(),
@@ -1946,7 +1842,6 @@ class ArbigentReplayTraceTest {
     )
 
     assertEquals(anchors, read.steps.single().decisionOutput.step.anchors)
-    assertTrue(read.steps.single().decisionOutput.step.derivedInput)
   }
 
   private fun elementsOf(vararg elements: ArbigentElement): ArbigentElementList =
@@ -1955,7 +1850,6 @@ class ArbigentReplayTraceTest {
   private fun anchoredTrace(
     action: ArbigentAgentAction,
     anchors: List<ArbigentElementIdentity>?,
-    derivedInput: Boolean = false,
     focus: ArbigentFocusedElement? = null,
   ): ArbigentReplayTrace = trace(
     listOf(
@@ -1965,7 +1859,6 @@ class ArbigentReplayTraceTest {
         cacheKey = "cache-key",
         screenshotFilePath = "screenshot.png",
         anchors = anchors,
-        derivedInput = derivedInput,
         focusedElement = focus,
       ) to action,
     ),

@@ -344,7 +344,6 @@ private fun StepView(step: ArbigentAgentTaskStepResult) {
             when (step.stepSource) {
               ArbigentStepSource.Cache -> "Cache Hit"
               ArbigentStepSource.Replay -> "Replayed"
-              ArbigentStepSource.ReplayDelegated -> "Re-decided on replay"
               ArbigentStepSource.Ai -> ""
             }
           )
@@ -388,7 +387,7 @@ private fun StepView(step: ArbigentAgentTaskStepResult) {
             marginBottom(10.px)
           }
         }) {
-          if (step.stepSource == ArbigentStepSource.Ai || step.stepSource == ArbigentStepSource.ReplayDelegated) {
+          if (step.stepSource == ArbigentStepSource.Ai) {
             A(
               href = step.apiCallJsonPath,
               attrs = {

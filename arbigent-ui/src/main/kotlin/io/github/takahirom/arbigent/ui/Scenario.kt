@@ -1214,11 +1214,7 @@ private fun ContentPanel(
                 )
                 if (step.stepSource != ArbigentStepSource.Ai) {
                   Text(
-                    when (step.stepSource) {
-                      ArbigentStepSource.Replay -> "Replayed"
-                      ArbigentStepSource.ReplayDelegated -> "Re-decided on replay"
-                      else -> "Cache hit"
-                    },
+                    if (step.stepSource == ArbigentStepSource.Replay) "Replayed" else "Cache hit",
                     modifier = Modifier.padding(4.dp)
                       .background(JewelTheme.colorPalette.purple(8))
                   )
