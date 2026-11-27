@@ -45,8 +45,13 @@ internal class ReplayDivergenceException(
  * press, which is most of an Android TV run — falls back to its recorded focus: it polls until
  * focus sits where the recording had it, which is what a D-pad press moves and therefore the one
  * signal those steps leave behind. Only a focus the recording moved is waited for; see
- * [ArbigentReplayPacingStepInterceptor.focusWait]. A step with neither waits its budget
- * out, as does a step recorded before focus was captured, so no trace paces worse than it used to.
+ * [ArbigentReplayPacingStepInterceptor.focusWait].
+ *
+ * A step with recorded anchors also waits until one of them is present, on top of its target or
+ * focus wait; a step with neither a target nor a focus wait polls for an anchor alone. See
+ * [ArbigentContextHolder.Step.anchors].
+ * A step with no target, no focus wait and no anchors waits its budget out, as does a step
+ * recorded before focus was captured, so no trace paces worse than it used to.
  */
 internal class ArbigentReplayPacingStepInterceptor(
   private val trace: ArbigentReplayTrace,
@@ -597,17 +602,6 @@ private val ACCESSIBILITY_ATTRIBUTE_KEYS = listOf(
 )
 
 /**
- * First non-blank value for [keys], searched over the element's own node and then its
- * descendants, the same way the element text shown to the AI is built.
- *
- * Reading only the node's own attributes made this return null for the shape an Android TV
- * card or tab actually has: the focusable container carries no text, resource-id or
- * accessibility text at all, and the text lives in a non-clickable child TextView. No identity
- * meant no identity was recorded, so a replayed index action was neither rebound to the
- * element's current position nor reported as a divergence — it silently operated on whatever
- * happened to sit at the recorded index.
- */
-/**
  * Picks the elements replay checks for before it carries out a recorded step, and checks them:
  * see [ArbigentContextHolder.Step.anchors].
  *
@@ -670,6 +664,17 @@ public class ArbigentScreenHistory {
   }
 }
 
+/**
+ * First non-blank value for [keys], searched over the element's own node and then its
+ * descendants, the same way the element text shown to the AI is built.
+ *
+ * Reading only the node's own attributes made this return null for the shape an Android TV
+ * card or tab actually has: the focusable container carries no text, resource-id or
+ * accessibility text at all, and the text lives in a non-clickable child TextView. No identity
+ * meant no identity was recorded, so a replayed index action was neither rebound to the
+ * element's current position nor reported as a divergence — it silently operated on whatever
+ * happened to sit at the recorded index.
+ */
 private fun ArbigentElement.firstNonBlank(keys: List<String>): String? =
   keys.firstNotNullOfOrNull { key ->
     treeNode.dfs { node -> node.attributes[key].nonBlankOrNull() != null }
