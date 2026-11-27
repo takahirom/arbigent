@@ -162,9 +162,7 @@ jobs:
           retention-days: 120
 
   cli-e2e-ios:
-    # Use macOS 14 as it has Xcode 15.4 pre-installed at /Applications/Xcode_15.4.app
-    # macOS 15 (macos-latest) does not include Xcode 15.4 by default
-    runs-on: macos-14
+    runs-on: macos-latest
     concurrency:
       group: ${{ github.workflow }}-cli-e2e-ios-${{ github.ref }}
       cancel-in-progress: true
@@ -180,24 +178,15 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
-      - name: build
-        id: build
-        run: |
-          ./gradlew arbigent-cli:installDist --stacktrace
-      - name: Install Xcode
-        run: |
-          # Select Xcode 15.4
-          sudo xcode-select -s /Applications/Xcode_15.4.app
-          # Check Xcode version
-          xcodebuild -version
+      - name: Show Xcode version
+        run: xcodebuild -version
       - name: Install applesimutils
         # `brew trust` is required since Homebrew started refusing untrusted third-party taps;
         # `|| true` keeps this working on older Homebrew versions without the trust command.
         run: brew tap wix/brew && (brew trust wix/brew || true) && brew install applesimutils
+      # Boot the simulator before the Gradle build so it has the build's time to settle.
+      # Driving it right after boot on a hosted runner made the XCTest runner fail with
+      # "Timed out waiting for AX loaded notification".
       - name: Start iOS Simulator with Custom Timeout
         run: |
           # List available devices
@@ -207,13 +196,23 @@ jobs:
           echo "Shutting down all simulators..."
           xcrun simctl shutdown all
           
-          # Boot the iPhone 15 Pro simulator
-          echo "Booting iPhone 15 Pro simulator..."
-          xcrun simctl boot "iPhone 15 Pro"
+          # Boot an available iPhone on the newest iOS runtime of the runner's Xcode,
+          # so the job does not depend on a device name that a runner image may drop
+          UDID=$(xcrun simctl list devices available -j | jq -r '
+            [.devices | to_entries[] | select(.key | test("iOS"))
+              | .key as $runtime | .value[] | select(.name | startswith("iPhone"))
+              | {runtime: ($runtime | split("iOS-")[1] | split("-") | map(tonumber)), udid}]
+            | sort_by(.runtime) | last | .udid')
+          if [ -z "$UDID" ] || [ "$UDID" = "null" ]; then
+            echo "Error: no available iPhone simulator."
+            exit 1
+          fi
+          echo "Booting iPhone simulator $UDID..."
+          xcrun simctl boot "$UDID"
           
           # Start bootstatus in background (-b blocks until boot complete)
           echo "Waiting for simulator to finish booting..."
-          xcrun simctl bootstatus "iPhone 15 Pro" -b &
+          xcrun simctl bootstatus "$UDID" -b &
           BOOT_PID=$!
           
           # Set maximum timeout in seconds
@@ -233,6 +232,14 @@ jobs:
           done
           echo "Simulator booted successfully."
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+      - name: build
+        id: build
+        run: |
+          ./gradlew arbigent-cli:installDist --stacktrace
       - name: CLI E2E test for iOS
         env:
           OPENAI_API_KEY: ${{ secrets.OPEN_ROUTER_API_KEY }}
@@ -250,4 +257,6 @@ jobs:
           name: cli-ios-report
           path: |
             arbigent-result/*
+            ~/Library/Logs/maestro/
+            ~/.maestro/tests/
           retention-days: 120
