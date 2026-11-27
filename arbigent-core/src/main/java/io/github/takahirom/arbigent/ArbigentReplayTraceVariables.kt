@@ -97,6 +97,13 @@ internal object ArbigentReplayTraceVariables {
       focusedElement = focusedElement?.let { focus ->
         focus.copy(resourceId = focus.resourceId?.let(transform))
       },
+      anchors = anchors?.map { identity ->
+        identity.copy(
+          text = identity.text?.let(transform),
+          resourceId = identity.resourceId?.let(transform),
+          accessibilityId = identity.accessibilityId?.let(transform),
+        )
+      },
     )
 
   /**

@@ -45,8 +45,13 @@ internal class ReplayDivergenceException(
  * press, which is most of an Android TV run — falls back to its recorded focus: it polls until
  * focus sits where the recording had it, which is what a D-pad press moves and therefore the one
  * signal those steps leave behind. Only a focus the recording moved is waited for; see
- * [ArbigentReplayPacingStepInterceptor.focusWait]. A step with neither waits its budget
- * out, as does a step recorded before focus was captured, so no trace paces worse than it used to.
+ * [ArbigentReplayPacingStepInterceptor.focusWait].
+ *
+ * A step with recorded anchors also waits until one of them is present, on top of its target or
+ * focus wait; a step with neither a target nor a focus wait polls for an anchor alone. See
+ * [ArbigentContextHolder.Step.anchors].
+ * A step with no target, no focus wait and no anchors waits its budget out, as does a step
+ * recorded before focus was captured, so no trace paces worse than it used to.
  */
 internal class ArbigentReplayPacingStepInterceptor(
   private val trace: ArbigentReplayTrace,
@@ -76,6 +81,10 @@ internal class ArbigentReplayPacingStepInterceptor(
     val recordedStep = trace.steps.getOrNull(replayIndex)?.decisionOutput?.step
     val identity = recordedStep?.targetElement
     val focusWait = focusWait(replayIndex)
+    // The anchors are checked on top of whichever wait the step already has, and read only once
+    // that wait is satisfied, so a focus poll does not fetch the hierarchy twice. A step with no
+    // other wait polls for them instead of sleeping out its budget.
+    val anchors = recordedStep?.anchors.orEmpty()
     if (identity != null) {
       awaitCondition(
         replayIndex = replayIndex,
@@ -83,7 +92,8 @@ internal class ArbigentReplayPacingStepInterceptor(
         budgetMillis = budgetMillis,
         isSatisfied = {
           val elements = readElements(stepInput.device)
-          elements != null && identity.findMatch(elements) != null
+          elements != null && identity.findMatch(elements) != null &&
+            ArbigentReplayAnchors.present(anchors, elements)
         },
       )
     } else if (focusWait != null) {
@@ -104,8 +114,15 @@ internal class ArbigentReplayPacingStepInterceptor(
           val matches = focusWait.focus.matches(current) &&
             focusWait.previousFocus?.matches(current) != true
           if (!matches) sawOtherScreen = true
-          matches && sawOtherScreen
+          matches && sawOtherScreen && anchorsPresent(stepInput.device, anchors)
         },
+      )
+    } else if (anchors.isNotEmpty()) {
+      awaitCondition(
+        replayIndex = replayIndex,
+        description = "one of the ${anchors.size} elements that appeared with this step",
+        budgetMillis = budgetMillis,
+        isSatisfied = { anchorsPresent(stepInput.device, anchors) },
       )
     } else {
       waitOutBudget(replayIndex, budgetMillis)
@@ -265,6 +282,12 @@ internal class ArbigentReplayPacingStepInterceptor(
     )
   }
 
+  private fun anchorsPresent(device: ArbigentDevice, anchors: List<ArbigentElementIdentity>): Boolean {
+    if (anchors.isEmpty()) return true
+    val elements = readElements(device) ?: return false
+    return ArbigentReplayAnchors.present(anchors, elements)
+  }
+
   private fun readElements(device: ArbigentDevice): ArbigentElementList? {
     return try {
       device.elements()
@@ -353,6 +376,19 @@ internal class ArbigentReplayDecisionInterceptor(
             "$recordedOn but the current screen is $currentIs",
         )
       }
+    }
+    val anchors = recorded.decisionOutput.step.anchors
+    if (anchors == null) {
+      arbigentInfoLog("Replay step ${replayIndex + 1}: no anchors recorded, screen not checked")
+    } else if (anchors.isNotEmpty()) {
+      val present = anchors.count { it.findMatch(decisionInput.elements) != null }
+      if (present == 0) {
+        throw ReplayDivergenceException(
+          "step ${replayIndex + 1} was decided on a screen that showed ${anchors.size} new " +
+            "element(s), such as ${anchors.first().description()}, and none of them is present",
+        )
+      }
+      arbigentInfoLog("Replay step ${replayIndex + 1}: $present of ${anchors.size} anchors present")
     }
     val identity = recorded.decisionOutput.step.targetElement
     val reboundAction = if (identity != null) {
@@ -564,6 +600,69 @@ private val ACCESSIBILITY_ATTRIBUTE_KEYS = listOf(
   "label",
   "name",
 )
+
+/**
+ * Picks the elements replay checks for before it carries out a recorded step, and checks them:
+ * see [ArbigentContextHolder.Step.anchors].
+ *
+ * Anchors are what is new on the screen compared to the step before, because that is what tells
+ * the screen the action belongs on from the one it came from: a target that is on both says
+ * nothing. Elements with an id come first, since content titles rotate between runs; text that
+ * changes on its own, a clock or a counter, is dropped from the identity or skipped. One anchor
+ * still present is enough, so a row of content that rotated does not fail a screen that is
+ * otherwise the recorded one.
+ */
+public object ArbigentReplayAnchors {
+  public const val MAX_ANCHORS: Int = 8
+
+  public fun select(
+    current: ArbigentElementList,
+    previous: ArbigentElementList?,
+  ): List<ArbigentElementIdentity> {
+    val all = current.elements
+    return all.asSequence()
+      .mapNotNull { element -> anchorIdentity(element, all) }
+      .distinct()
+      .filter { identity -> previous == null || identity.findMatch(previous) == null }
+      .sortedBy { identity -> if (identity.resourceId != null || identity.accessibilityId != null) 0 else 1 }
+      .take(MAX_ANCHORS)
+      .toList()
+  }
+
+  /** Whether the screen still shows the recorded step's screen. Nothing recorded means nothing to check. */
+  public fun present(anchors: List<ArbigentElementIdentity>?, elements: ArbigentElementList): Boolean =
+    anchors.isNullOrEmpty() || anchors.any { it.findMatch(elements) != null }
+
+  private fun anchorIdentity(element: ArbigentElement, all: List<ArbigentElement>): ArbigentElementIdentity? {
+    val identity = ArbigentElementIdentity.from(element, all) ?: return null
+    // Presence is all that is asked of an anchor, not which twin it is or how many there are.
+    // Volatile text, in the text or in a spoken label, would make the anchor miss its own element
+    // the moment the value ticks; a clock labelled with its time is still the same clock.
+    val text = identity.text?.takeIf(::isStableText)
+    val accessibilityId = identity.accessibilityId?.takeIf(::isStableText)
+    if (text == null && identity.resourceId == null && accessibilityId == null) return null
+    return identity.copy(occurrence = 0, twinCount = null, text = text, accessibilityId = accessibilityId)
+  }
+
+  private fun isStableText(text: String): Boolean {
+    val trimmed = text.trim()
+    return trimmed.length >= 2 && trimmed.any { it.isLetter() }
+  }
+}
+
+/**
+ * What one agent run has seen so far: the screen its last decision was made against, which
+ * [ArbigentReplayAnchors.select] diffs the next screen with. Only a decision screen is recorded
+ * here; the replay pacing reads the device too, and a poll must not pass for one.
+ */
+public class ArbigentScreenHistory {
+  public var previousElements: ArbigentElementList? = null
+    private set
+
+  public fun recordDecisionScreen(elements: ArbigentElementList) {
+    previousElements = elements
+  }
+}
 
 /**
  * First non-blank value for [keys], searched over the element's own node and then its
