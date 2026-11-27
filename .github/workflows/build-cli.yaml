@@ -178,20 +178,15 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
-      - name: build
-        id: build
-        run: |
-          ./gradlew arbigent-cli:installDist --stacktrace
       - name: Show Xcode version
         run: xcodebuild -version
       - name: Install applesimutils
         # `brew trust` is required since Homebrew started refusing untrusted third-party taps;
         # `|| true` keeps this working on older Homebrew versions without the trust command.
         run: brew tap wix/brew && (brew trust wix/brew || true) && brew install applesimutils
+      # Boot the simulator before the Gradle build so it has the build's time to settle.
+      # Driving it right after boot on a hosted runner made the XCTest runner fail with
+      # "Timed out waiting for AX loaded notification".
       - name: Start iOS Simulator with Custom Timeout
         run: |
           # List available devices
@@ -237,6 +232,14 @@ jobs:
           done
           echo "Simulator booted successfully."
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+      - name: build
+        id: build
+        run: |
+          ./gradlew arbigent-cli:installDist --stacktrace
       - name: CLI E2E test for iOS
         env:
           OPENAI_API_KEY: ${{ secrets.OPEN_ROUTER_API_KEY }}
@@ -254,4 +257,6 @@ jobs:
           name: cli-ios-report
           path: |
             arbigent-result/*
+            ~/Library/Logs/maestro/
+            ~/.maestro/tests/
           retention-days: 120
